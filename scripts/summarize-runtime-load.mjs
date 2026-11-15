@@ -80,7 +80,7 @@ for (const path of inputs) {
         const value = p.last.values.get(name) - p.first.values.get(name);
         return Number.isFinite(value) && value >= 0 ? value : null;
       };
-      const dt = (p.last.at - p.first.at) / 1000;
+      const dt = samples.length > 1 ? (samples.at(-1).at - samples[0].at) / 1000 : 0;
       const c = (components[p.role] ??= {
         averageCpuCores: 0,
         peakInstanceRssMiB: 0,
