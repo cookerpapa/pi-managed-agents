@@ -153,8 +153,8 @@ export async function createRuntimeLoadFixture(directory) {
     }
     const main = `const {FakeResponsesServer}=require('./provider.cjs');const {httpMcpFixture}=require('./mcp.cjs');
 const server=new FakeResponsesServer({host:'0.0.0.0',port:8089,allowNetwork:true,model:process.env.BENCH_MODEL,apiKey:process.env.BENCH_KEY});
-(async()=>{const sharp=require('/app/node_modules/sharp');const pixels=Buffer.alloc(512*512*3);let seed=42;for(let i=0;i<pixels.length;i++){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;pixels[i]=seed&255;}const image=await sharp(pixels,{raw:{width:512,height:512,channels:3}}).png().toBuffer();
-await server.start();await httpMcpFixture({host:'0.0.0.0',port:8090,control:true,token:process.env.BENCH_KEY,imageData:image.toString('base64')});})().catch(()=>process.exit(1));`;
+(async()=>{const {deflateSync,crc32}=require('node:zlib');const pixels=Buffer.alloc(512*(1+512*3));let seed=42;for(let y=0;y<512;y++)for(let x=1;x<=512*3;x++){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;pixels[y*(1+512*3)+x]=seed&255;}const chunk=(type,data)=>{const body=Buffer.concat([Buffer.from(type),data]);const size=Buffer.alloc(4);size.writeUInt32BE(data.length);const crc=Buffer.alloc(4);crc.writeUInt32BE(crc32(body));return Buffer.concat([size,body,crc]);};const header=Buffer.alloc(13);header.writeUInt32BE(512,0);header.writeUInt32BE(512,4);header[8]=8;header[9]=2;const image=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(pixels)),chunk('IEND',Buffer.alloc(0))]);
+await server.start();await httpMcpFixture({host:'0.0.0.0',port:8090,control:true,token:process.env.BENCH_KEY,imageData:image.toString('base64')});})().catch(e=>{console.error(e.message);process.exit(1);});`;
     const image = JSON.parse(
       kubectl(["get", "deployment/pi-cloud-tool-host", "-o", "json"]),
     ).spec.template.spec.containers.find((c) => c.name === "tool-host").image;
