@@ -75,7 +75,7 @@ for (let i = 0; i < args.length; i++) {
 const directory = resolve(argument("--output", ".cache/runtime-load-" + Date.now()));
 const mode = argument("--mode", "smoke");
 assert(
-  ["smoke", "matrix", "soak", "faults", "custom", "cleanup"].includes(mode),
+  ["smoke", "matrix", "capacity", "soak", "faults", "custom", "cleanup"].includes(mode),
   "Invalid load mode",
 );
 serializeRelease(runtimeDirectory);
@@ -225,6 +225,13 @@ async function cleanup() {
       database,
     );
   report.metering = billing[0];
+  const { rows: delivery } = await sql`select count(*)::int as events,
+    percentile_cont(0.50) within group(order by extract(epoch from(e.received_at-e.occurred_at))*1000) as p50_ms,
+    percentile_cont(0.95) within group(order by extract(epoch from(e.received_at-e.occurred_at))*1000) as p95_ms,
+    percentile_cont(0.99) within group(order by extract(epoch from(e.received_at-e.occurred_at))*1000) as p99_ms
+    from model_metering_events e join model_invocations i on i.id=e.invocation_id
+    where i.tenant_id=${tenant.tenantId}::uuid and e.kind='usage'`.execute(database);
+  report.metering.deliveryLatency = delivery[0];
   assert.equal(billing[0].foreign_models, 0);
   assert.equal(billing[0].charged, 0);
   const blobs = new S3AttachmentBlobStore({
@@ -456,8 +463,8 @@ async function stage(profile) {
     "Invalid arrival rate",
   );
   assert(
-    (profile.paddingBytes ?? 0) >= 0 && (profile.paddingBytes ?? 0) <= 2 * 1024 ** 2,
-    "Invalid input padding",
+    (profile.paddingBytes ?? 0) >= 0 && (profile.paddingBytes ?? 0) <= 96 * 1024,
+    "Input padding must leave room for the plan within the public 100,000-character limit",
   );
   assert((profile.views ?? 1) >= 0 && (profile.views ?? 1) <= 8, "Invalid viewer count");
   phase(profile.name);
@@ -881,6 +888,11 @@ try {
     project = await api.createProject("Owned runtime capacity");
     await savePrivate();
     const tools = await configureMcp();
+    const idle = new RuntimeLoadMetrics({ database, tenantId: tenant.tenantId, fixture });
+    await idle.start();
+    await delay(6000);
+    await idle.stop();
+    report.idleBaseline = { resources: idle.summary(), samples: idle.samples };
     const profiles =
       mode === "smoke"
         ? [
@@ -902,152 +914,180 @@ try {
               rounds: 2,
             },
           ]
-        : mode === "custom"
+        : mode === "capacity"
           ? [
               {
-                name: argument("--name", "custom"),
-                kind: argument("--kind", "text"),
-                concurrency: Number(argument("--concurrency", "4")),
-                count: Number(argument("--count", "16")),
-                firstByteMs: Number(argument("--first-byte-ms", "100")),
-                chunkMs: Number(argument("--chunk-ms", "0")),
-                outputBytes: Number(argument("--output-bytes", "2048")),
-                paddingBytes: Number(argument("--input-bytes", "0")),
-                rounds: Number(argument("--rounds", "3")),
-                toolName: argument("--tool", "echo") === "image" ? tools.image : tools.echo,
-                views: Number(argument("--views", "1")),
-                slowReaderMs: Number(argument("--slow-reader-ms", "0")),
-                readHistory: args.includes("--history"),
-                ...(argument("--rate") ? { arrivalRate: Number(argument("--rate")) } : {}),
+                name: "context-64k",
+                kind: "text",
+                concurrency: 4,
+                count: 12,
+                paddingBytes: 64 * 1024,
+                firstByteMs: 100,
               },
+              {
+                name: "fast-text-64",
+                kind: "text",
+                concurrency: 64,
+                count: 192,
+                firstByteMs: 0,
+                outputBytes: 4096,
+              },
+              ...[16, 32].map((rate) => ({
+                name: "arrival-" + rate,
+                kind: "text",
+                concurrency: 64,
+                arrivalRate: rate,
+                count: rate * 30,
+                firstByteMs: 300,
+                outputBytes: 2048,
+              })),
             ]
-          : mode === "matrix"
+          : mode === "custom"
             ? [
-                ...[1, 4, 8, 16, 32].map((concurrency) => ({
-                  name: "fast-text-" + concurrency,
-                  kind: "text",
-                  concurrency,
-                  count: Math.max(8, concurrency * 3),
-                  firstByteMs: 0,
-                  outputBytes: 4096,
-                })),
                 {
-                  name: "paced-text",
-                  kind: "text",
-                  concurrency: 8,
-                  count: 24,
-                  firstByteMs: 1000,
-                  chunkMs: 100,
-                  chunkBytes: 64,
-                  outputBytes: 1024,
+                  name: argument("--name", "custom"),
+                  kind: argument("--kind", "text"),
+                  concurrency: Number(argument("--concurrency", "4")),
+                  count: Number(argument("--count", "16")),
+                  firstByteMs: Number(argument("--first-byte-ms", "100")),
+                  chunkMs: Number(argument("--chunk-ms", "0")),
+                  outputBytes: Number(argument("--output-bytes", "2048")),
+                  paddingBytes: Number(argument("--input-bytes", "0")),
+                  rounds: Number(argument("--rounds", "3")),
+                  toolName: argument("--tool", "echo") === "image" ? tools.image : tools.echo,
+                  views: Number(argument("--views", "1")),
+                  slowReaderMs: Number(argument("--slow-reader-ms", "0")),
+                  readHistory: args.includes("--history"),
+                  ...(argument("--rate") ? { arrivalRate: Number(argument("--rate")) } : {}),
                 },
-                {
-                  name: "mcp-tools",
-                  kind: "mcp",
-                  toolName: tools.echo,
-                  concurrency: 8,
-                  count: 24,
-                  firstByteMs: 100,
-                  rounds: 3,
-                },
-                {
-                  name: "continuous-tool-loops",
-                  kind: "mcp",
-                  toolName: tools.echo,
-                  concurrency: 8,
-                  count: 8,
-                  firstByteMs: 100,
-                  rounds: 32,
-                  outputBytes: 1024,
-                },
-                {
-                  name: "guest-tools",
-                  kind: "guest",
-                  concurrency: 4,
-                  count: 8,
-                  firstByteMs: 100,
-                  rounds: 3,
-                  toolDelayMs: 100,
-                },
-                {
-                  name: "context-256k",
-                  kind: "text",
-                  concurrency: 4,
-                  count: 12,
-                  paddingBytes: 256 * 1024,
-                  firstByteMs: 100,
-                },
-                {
-                  name: "child-conversations",
-                  kind: "children",
-                  concurrency: 2,
-                  count: 6,
-                  children: 4,
-                  firstByteMs: 300,
-                  outputBytes: 512,
-                },
-                {
-                  name: "sse-fanout-history",
-                  kind: "text",
-                  concurrency: 8,
-                  count: 16,
-                  views: 3,
-                  slowReaderMs: 80,
-                  readHistory: true,
-                  firstByteMs: 100,
-                  chunkMs: 30,
-                },
-                {
-                  name: "mcp-images",
-                  kind: "mcp",
-                  toolName: tools.image,
-                  concurrency: 4,
-                  count: 8,
-                  rounds: 1,
-                  firstByteMs: 100,
-                },
-                ...[1, 2, 4, 8].map((rate) => ({
-                  name: "arrival-" + rate,
-                  kind: "text",
-                  arrivalRate: rate,
-                  concurrency: 32,
-                  count: Math.max(16, rate * 45),
-                  firstByteMs: 300,
-                  outputBytes: 2048,
-                })),
               ]
-            : mode === "soak"
+            : mode === "matrix"
               ? [
+                  ...[1, 4, 8, 16, 32].map((concurrency) => ({
+                    name: "fast-text-" + concurrency,
+                    kind: "text",
+                    concurrency,
+                    count: Math.max(8, concurrency * 3),
+                    firstByteMs: 0,
+                    outputBytes: 4096,
+                  })),
                   {
-                    name: "bounded-soak",
+                    name: "paced-text",
+                    kind: "text",
+                    concurrency: 8,
+                    count: 24,
+                    firstByteMs: 1000,
+                    chunkMs: 100,
+                    chunkBytes: 64,
+                    outputBytes: 1024,
+                  },
+                  {
+                    name: "mcp-tools",
                     kind: "mcp",
                     toolName: tools.echo,
                     concurrency: 8,
-                    count: Number(argument("--count", "240")),
-                    arrivalRate: Number(argument("--rate", "1")),
-                    firstByteMs: 200,
-                    chunkMs: 20,
+                    count: 24,
+                    firstByteMs: 100,
                     rounds: 3,
                   },
+                  {
+                    name: "continuous-tool-loops",
+                    kind: "mcp",
+                    toolName: tools.echo,
+                    concurrency: 8,
+                    count: 8,
+                    firstByteMs: 100,
+                    rounds: 32,
+                    outputBytes: 1024,
+                  },
+                  {
+                    name: "guest-tools",
+                    kind: "guest",
+                    concurrency: 4,
+                    count: 8,
+                    firstByteMs: 100,
+                    rounds: 3,
+                    toolDelayMs: 100,
+                  },
+                  {
+                    name: "context-64k",
+                    kind: "text",
+                    concurrency: 4,
+                    count: 12,
+                    paddingBytes: 64 * 1024,
+                    firstByteMs: 100,
+                  },
+                  {
+                    name: "child-conversations",
+                    kind: "children",
+                    concurrency: 2,
+                    count: 6,
+                    children: 4,
+                    firstByteMs: 300,
+                    outputBytes: 512,
+                  },
+                  {
+                    name: "sse-fanout-history",
+                    kind: "text",
+                    concurrency: 8,
+                    count: 16,
+                    views: 3,
+                    slowReaderMs: 80,
+                    readHistory: true,
+                    firstByteMs: 100,
+                    chunkMs: 30,
+                  },
+                  {
+                    name: "mcp-images",
+                    kind: "mcp",
+                    toolName: tools.image,
+                    concurrency: 4,
+                    count: 8,
+                    rounds: 1,
+                    firstByteMs: 100,
+                  },
+                  ...[1, 2, 4, 8].map((rate) => ({
+                    name: "arrival-" + rate,
+                    kind: "text",
+                    arrivalRate: rate,
+                    concurrency: 32,
+                    count: Math.max(16, rate * 45),
+                    firstByteMs: 300,
+                    outputBytes: 2048,
+                  })),
                 ]
-              : [
-                  {
-                    name: "once-rate-limit",
-                    kind: "text",
-                    concurrency: 4,
-                    count: 8,
-                    firstByteMs: 100,
-                    fault: "rate_limit_once",
-                  },
-                  {
-                    name: "once-disconnect",
-                    kind: "text",
-                    concurrency: 4,
-                    count: 8,
-                    firstByteMs: 100,
-                    fault: "disconnect_once",
-                  },
-                ];
+              : mode === "soak"
+                ? [
+                    {
+                      name: "bounded-soak",
+                      kind: "mcp",
+                      toolName: tools.echo,
+                      concurrency: 8,
+                      count: Number(argument("--count", "240")),
+                      arrivalRate: Number(argument("--rate", "1")),
+                      firstByteMs: 200,
+                      chunkMs: 20,
+                      rounds: 3,
+                    },
+                  ]
+                : [
+                    {
+                      name: "once-rate-limit",
+                      kind: "text",
+                      concurrency: 4,
+                      count: 8,
+                      firstByteMs: 100,
+                      fault: "rate_limit_once",
+                    },
+                    {
+                      name: "once-disconnect",
+                      kind: "text",
+                      concurrency: 4,
+                      count: 8,
+                      firstByteMs: 100,
+                      fault: "disconnect_once",
+                    },
+                  ];
     for (const profile of profiles) {
       if (stop.signal.aborted) break;
       await stage(profile);

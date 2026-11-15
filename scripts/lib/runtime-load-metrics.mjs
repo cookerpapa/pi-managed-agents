@@ -225,7 +225,9 @@ export class RuntimeLoadMetrics {
       transactions: Number(BigInt(s.at(-1).pg.transactions) - BigInt(s[0].pg.transactions)),
       maximumLockWaiters: Math.max(...s.map((s) => s.pg.lock_waiters)),
       maximumObservedKafkaLag: Math.max(0, ...s.map((s) => s.kafka?.lag ?? 0)),
-      kafkaSamples: s.filter((s) => s.kafka && !s.kafka.unavailable).length,
+      kafkaSamples: new Set(
+        s.filter((s) => s.kafka && !s.kafka.unavailable).map((s) => s.kafka.observedAt),
+      ).size,
       scrapeMs: s.map((s) => s.finishedAt - s.at),
       headroomStopped: this.abort.signal.aborted,
       collectionErrors: this.errors,

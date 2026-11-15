@@ -18,6 +18,8 @@ PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode matrix --output /private/capacity-matrix
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
+  --mode capacity --output /private/capacity-upper-points
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode soak --count 240 --rate 1 --output /private/capacity-soak
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode faults --output /private/capacity-faults
@@ -29,6 +31,10 @@ small real Guest workload, larger input, native children, SSE viewers/history,
 retained image results, arrival-rate bursts, provider-context expiry and native
 compaction. Fault mode includes synthetic provider failures, Worker handoff,
 Projector interruption, Stop and uncertain external results.
+The optional `capacity` extension raises concurrency to 64 and offered arrivals
+to 16/32 per second. Run it only after checking the lower matrix's headroom.
+Input padding stays below the public 100,000-character message limit; long
+contexts are built through retained multi-turn history.
 
 Custom stages accept `--concurrency`, `--count`, `--rate`, `--kind text|mcp|guest|children`,
 `--first-byte-ms`, `--chunk-ms`, `--output-bytes`, `--input-bytes`, `--rounds`,
@@ -70,6 +76,11 @@ it does not authorize overwriting the edit or discarding ownership records.
 raw timing samples and reduced component/database measurements. Treat it as private:
 it contains test resource IDs. Publish a content-free summary with the exact
 revision/configuration and the scope of every result.
+
+```sh
+node scripts/summarize-runtime-load.mjs summary.json \
+  /private/capacity-matrix/report.json /private/capacity-upper-points/report.json
+```
 
 - Offered, accepted and successfully completed work are separate. HTTP admission
   success does not mean an Agent finished. Cancelled fault cases are expected
