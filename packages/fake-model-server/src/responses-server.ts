@@ -92,6 +92,8 @@ export const benchmarkPrompt = (plan: BenchmarkPlan, paddingBytes = 0) =>
 const errorFrame = (code: string, message: string, status = 400) => ({
   type: "error",
   status,
+  code,
+  message,
   error: { type: "invalid_request_error", code, message },
 });
 function imagesIn(value: unknown): { count: number; characters: number } {

@@ -150,6 +150,7 @@ for (const path of inputs) {
         ]),
       ),
       historyReadsMs: m.historyReadsMs,
+      historyPages: m.historyPages,
       // IDs, transcripts, configuration receipts and request bodies remain private.
       evidence: m.expectedOutcomesPassed ? m.evidence : undefined,
     });

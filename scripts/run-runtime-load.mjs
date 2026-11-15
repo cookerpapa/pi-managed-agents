@@ -403,10 +403,23 @@ async function executeWork(
     if (!result || !terminal(result.state))
       throw new Error("Accepted Run exceeded observation budget");
     const end = Date.now();
-    let historyMs;
+    let historyMs, historyPages;
+    const historyPageMs = [];
     if (readHistory) {
       const at = performance.now();
-      await api.getConversation(session.sessionId);
+      let before;
+      for (historyPages = 0; historyPages < 4;) {
+        const pageAt = performance.now();
+        const page = await api.getConversation(session.sessionId, before ? { before } : {});
+        historyPageMs.push(performance.now() - pageAt);
+        historyPages++;
+        if (!page.history.hasBefore) break;
+        assert(
+          page.history.before && page.history.before !== before,
+          "History cursor did not advance",
+        );
+        before = page.history.before;
+      }
       historyMs = performance.now() - at;
     }
     return {
@@ -430,6 +443,8 @@ async function executeWork(
       toolResults,
       sseReconnects,
       historyMs,
+      historyPages,
+      historyPageMs,
       ...(result.failure ? { error: result.failure.code } : {}),
       errors: events,
     };
@@ -538,6 +553,10 @@ async function stage(profile) {
     metrics: metrics.samples,
   };
   value.historyReadsMs = distribution(load.results.map((r) => r.historyMs));
+  value.historyPages = {
+    count: load.results.reduce((n, r) => n + (r.historyPages ?? 0), 0),
+    latencyMs: distribution(load.results.flatMap((r) => r.historyPageMs ?? [])),
+  };
   report.measurements.push(value);
   await save();
   console.log(
@@ -712,6 +731,7 @@ async function faultStage(kind, tools) {
       await metrics.refreshTargets();
       evidence.owners = owners;
     } else if (kind === "stop-under-load") {
+      const cancelledRuns = [];
       for (const session of owned.slice(0, 2)) {
         const r = await database
           .selectFrom("runs")
@@ -719,11 +739,24 @@ async function faultStage(kind, tools) {
           .where("session_id", "=", session.sessionId)
           .executeTakeFirstOrThrow();
         await api.cancelTurn(session.sessionId, r.turn_id, newIdempotencyKey("capacity-stop"));
+        cancelledRuns.push(r.id);
       }
+      // Admission of Stop is not native abort settlement. Inject a genuinely
+      // late reply only after the Worker has committed its cancellation outcome.
+      await Promise.all(cancelledRuns.map(settled));
       await fixture.releaseTools("PMA_LATE_REPLY");
     }
     const results = await Promise.all(operations);
     const after = await fixture.mcpState();
+    report.faultAttempts ??= [];
+    report.faultAttempts.push({
+      kind,
+      results,
+      evidence,
+      physicalCalls: after.calls.length - before.calls.length,
+      physicalWrites: after.writes - before.writes,
+    });
+    await save();
     if (kind === "stop-under-load") {
       assert(results.slice(0, 2).every((r) => r.state === "cancelled"));
       assert(results.slice(2).every((r) => r.state === "completed"));

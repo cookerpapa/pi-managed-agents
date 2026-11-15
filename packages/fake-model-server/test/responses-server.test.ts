@@ -4,6 +4,7 @@ import { Type, type Message } from "@earendil-works/pi-ai";
 import { WebSocket } from "ws";
 import { FakeResponsesServer, benchmarkPrompt } from "../src/responses-server.ts";
 import { CloudModelRegistry } from "../../sandbox-supervisor/src/durable/model-registry.ts";
+import { isRetryableAssistantError } from "@earendil-works/pi-ai/utils/retry";
 
 const closers: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
@@ -103,6 +104,44 @@ it("runs native Pi Responses text and fragmented tool round trips without a real
   );
   expect(f.server.metrics().completed).toBe(2);
   expect(f.server.metrics().samples.every((s) => s.planId === "native")).toBe(true);
+});
+
+it("exposes a transient WebSocket error that the pinned native retry policy recognizes", async () => {
+  const f = await fixture(),
+    registry = new CloudModelRegistry();
+  const model = registry.configure({
+    provider: "openai-codex",
+    modelId: f.server.options.model,
+    api: "openai-codex-responses",
+    baseUrl: f.server.origin,
+    apiKey: f.key,
+    inputModalities: ["text"],
+    contextWindow: 1000000,
+    maxTokens: 4096,
+  });
+  const result = await registry.models
+    .streamSimple(
+      model,
+      {
+        messages: [
+          {
+            role: "user",
+            content: benchmarkPrompt({ id: "native-429", kind: "text", fault: "rate_limit_once" }),
+            timestamp: 1,
+          },
+        ],
+      },
+      {
+        apiKey: f.key,
+        transport: "websocket",
+        sessionId: randomUUID(),
+        maxRetries: 0,
+        timeoutMs: 5000,
+      },
+    )
+    .result();
+  expect(result.stopReason).toBe("error");
+  expect(isRetryableAssistantError(result), result.errorMessage).toBe(true);
 });
 
 it("resumes a synthetic response on a new WebSocket using only its Tool result suffix", async () => {
