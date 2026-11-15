@@ -75,7 +75,17 @@ for (let i = 0; i < args.length; i++) {
 const directory = resolve(argument("--output", ".cache/runtime-load-" + Date.now()));
 const mode = argument("--mode", "smoke");
 assert(
-  ["smoke", "http", "matrix", "capacity", "soak", "faults", "custom", "cleanup"].includes(mode),
+  [
+    "smoke",
+    "http",
+    "matrix",
+    "capacity",
+    "soak",
+    "faults",
+    "provider-faults",
+    "custom",
+    "cleanup",
+  ].includes(mode),
   "Invalid load mode",
 );
 serializeRelease(runtimeDirectory);
@@ -524,6 +534,12 @@ async function stage(profile) {
       ),
   });
   await metrics.stop();
+  for (const result of load.results.filter((r) => !r.success && r.runId)) {
+    result.nativeErrors = nativeMessages(await nativeHistory(database, { runId: result.runId }))
+      .filter((m) => m.role === "assistant" && m.errorMessage)
+      .map((m) => String(m.errorMessage).slice(0, 300))
+      .slice(-4);
+  }
   const endProvider = await fixture.metrics();
   const samples = endProvider.samples.filter((s) => s.startedAt >= began);
   const value = {
@@ -557,6 +573,40 @@ async function stage(profile) {
     count: load.results.reduce((n, r) => n + (r.historyPages ?? 0), 0),
     latencyMs: distribution(load.results.flatMap((r) => r.historyPageMs ?? [])),
   };
+  if (profile.fault) {
+    const expected =
+      profile.fault === "rate_limit_once" ? /usage limit/i : /upstream_websocket_lost/i;
+    assert(
+      load.results.every(
+        (r) => r.state === "failed" && r.nativeErrors?.some((message) => expected.test(message)),
+      ),
+      "Injected provider error did not settle with the pinned adapter's expected classification",
+    );
+    phase(profile.name + "-new-request-recovery");
+    const recovery = await runLoad({
+      concurrency: profile.concurrency,
+      count: profile.count,
+      signal: stop.signal,
+      work: (index) =>
+        executeWork(queue[index], {
+          id: load.results[index].planId,
+          kind: "text",
+          fault: profile.fault,
+          outputBytes: profile.outputBytes ?? 2048,
+        }),
+    });
+    assert(
+      recovery.results.length === profile.count && recovery.results.every((r) => r.success),
+      "A new user request did not recover after the injected provider failure",
+    );
+    value.expectedOutcomesPassed = true;
+    value.evidence = {
+      terminalFailure: profile.count,
+      subsequentUserRequestsCompleted: profile.count,
+      automaticReplayClaimed: false,
+    };
+    value.recovery = { summary: summarizeLoad(recovery), load: recovery };
+  }
   report.measurements.push(value);
   await save();
   console.log(

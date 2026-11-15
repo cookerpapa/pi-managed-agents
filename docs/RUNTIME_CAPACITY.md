@@ -33,6 +33,12 @@ small real Guest workload, larger input, native children, SSE viewers/history,
 retained image results, arrival-rate bursts, provider-context expiry and native
 compaction. Fault mode includes synthetic provider failures, Worker handoff,
 Projector interruption, Stop and uncertain external results.
+`provider-faults` reruns only the two provider failure cases. With the pinned
+Codex adapter/proxy, the synthetic 429 becomes a terminal usage-limit message,
+and a lost upstream WebSocket is not automatically replayed. These checks require
+terminal settlement followed by a successful new user request; they do not claim
+automatic retry. Stop tests wait for native abort settlement before injecting a
+late completion, since Stop admission alone does not order the final result.
 The optional `capacity` extension raises concurrency to 64 and offered arrivals
 to 16/32 per second. Run it only after checking the lower matrix's headroom.
 Input padding stays below the public 100,000-character message limit; long

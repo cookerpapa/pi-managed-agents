@@ -128,6 +128,7 @@ for (const path of inputs) {
       profile,
       summary: m.summary,
       expectedOutcomesPassed: m.expectedOutcomesPassed,
+      recovery: m.recovery?.summary,
       resources: {
         ...m.resources,
         kafkaSamples: kafka.length,
