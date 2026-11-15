@@ -17,6 +17,7 @@ for (const path of inputs) {
     mode: r.mode,
     at: r.at,
     driverRevision: r.driverRevision,
+    sourceSha256: r.sourceSha256,
     dirty: r.dirty,
     serving: r.serving,
     hardware: r.hardware,

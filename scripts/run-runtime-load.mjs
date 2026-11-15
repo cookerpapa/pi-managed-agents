@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { cpus, totalmem } from "node:os";
@@ -127,6 +127,23 @@ const report = {
   cleanupConfirmed: false,
   realProviderRequests: false,
 };
+report.sourceSha256 = Object.fromEntries(
+  await Promise.all(
+    [
+      "scripts/run-runtime-load.mjs",
+      "scripts/lib/runtime-load-fixture.mjs",
+      "scripts/lib/runtime-load-metrics.mjs",
+      "scripts/lib/runtime-load-scheduler.mjs",
+      "packages/fake-model-server/src/responses-server.ts",
+      "packages/control-plane/test/mcp/http-fixture.ts",
+    ].map(async (path) => [
+      path,
+      createHash("sha256")
+        .update(await readFile(path))
+        .digest("hex"),
+    ]),
+  ),
+);
 const save = () => writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { mode: 0o600 });
 const phase = (name) => console.log(JSON.stringify({ phase: name, at: new Date().toISOString() }));
 const stop = new AbortController();
