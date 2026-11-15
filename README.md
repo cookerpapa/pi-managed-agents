@@ -101,6 +101,10 @@ targets does not synchronize their files. See the [client](docs/SESSION_CLIENT.m
 - **Delegation and automation:** native child Conversations within one Session
   family, compact child progress, and scheduled inputs that start a new Run when
   the conversation is idle. Ultra enables proactive delegation.
+- **HTTP MCP tools:** owner-managed personal or organization connections, Bearer
+  credentials, live tool discovery and native Pi proxies. Connection changes do
+  not restart Workers; accepted calls retain original-result recovery.
+  [Supported surface and limits](docs/MCP.md).
 - **Independent clients and local execution:** a reusable Session client for web
   and other interfaces, plus an explicit outbound Linux executor. Agent loops
   remain in cloud Workers. [Local setup and limits](docs/LOCAL_EXECUTION.md).

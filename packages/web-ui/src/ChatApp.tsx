@@ -1,3 +1,4 @@
+import { McpConnections } from "./McpConnections.tsx";
 import { UsageBilling } from "./UsageBilling.tsx";
 import { SkillMarket } from "./SkillMarket.tsx";
 import { SessionSchedules } from "./SessionSchedules.tsx";
@@ -362,6 +363,7 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const [schedulesOpen, setSchedulesOpen] = useState(false);
   const [billingOpen, setBillingOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const [toolGroupDisplay, setToolGroupDisplay] = useState<{
     sessionId: string;
     expanded: boolean;
@@ -1878,6 +1880,14 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
         onClose={() => setBillingOpen(false)}
       />
     );
+  if (mcpOpen)
+    return (
+      <McpConnections
+        api={api}
+        owner={identity.role === "owner"}
+        onClose={() => setMcpOpen(false)}
+      />
+    );
   if (skillsOpen)
     return (
       <SkillMarket
@@ -1979,6 +1989,9 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
               onClick={() => setSkillsOpen(true)}
             >
               <span>◇</span> Skills
+            </button>
+            <button className="product-resource-nav" type="button" onClick={() => setMcpOpen(true)}>
+              <span>⌘</span> MCP
             </button>
           </div>
           <nav className="product-conversation-list" aria-label={t("chat.sidebar.label")}>

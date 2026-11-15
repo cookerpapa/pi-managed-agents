@@ -30,7 +30,6 @@ import {
 } from "@pi-cloud/sandbox-supervisor";
 import { WorkerToolRuntime } from "./tools/worker-tool-runtime.ts";
 import { ExecutionTargetClient } from "./tools/execution-target-client.ts";
-import { WorkerToolCatalog } from "./tools/worker-tool-catalog.ts";
 import { FamilyModelPermits } from "./family-model-permits.ts";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
@@ -176,7 +175,6 @@ export class PiWorkerRuntime {
   #modelGateway: TenantModelGateway | undefined;
   #modelPermits: FamilyModelPermits | undefined;
   #activity: RunActivityPublisher | undefined;
-  readonly #toolCatalog = new WorkerToolCatalog();
   #catalogConsumer: KafkaToolCatalogConsumer | undefined;
   #publicEgress: import("@pi-cloud/protocol").GuestPublicEgress = {
     revision: 0,
@@ -340,7 +338,7 @@ export class PiWorkerRuntime {
       identity,
       bootLedger: ledger,
       readiness: () =>
-        this.#toolCatalog.ready &&
+        this.#catalogConsumer?.ready === true &&
         this.#state === "ready" &&
         client?.state === "connected" &&
         this.#runWorker?.state === "running" &&
@@ -460,13 +458,15 @@ export class PiWorkerRuntime {
       brokers: this.#config.kafka.brokers,
       replicas: this.#config.kafka.replicas,
       instanceId: identity.bootId,
-      minimumGeneration: async () => {
-        const { rows } = await sql<{ generation: string }>`select generation::text
-          from tool_catalog_publication where scope='platform'`.execute(this.#readDatabase);
-        return Number(rows[0]?.generation ?? 1);
+      minimumGenerations: async () => {
+        const { rows } = await sql<{
+          scope: string;
+          generation: string;
+        }>`select scope,generation::text
+          from tool_catalog_publication`.execute(this.#readDatabase);
+        return rows.map((row) => ({ scope: row.scope, generation: Number(row.generation) }));
       },
       onSnapshot: ({ catalog }) => {
-        this.#toolCatalog.update(catalog);
         operationalLog({
           service: "pi-cloud-pi-worker",
           level: "info",
@@ -523,17 +523,14 @@ export class PiWorkerRuntime {
     );
     this.#executionTargets = executionTargets;
     const trustedTools = new WorkerToolRuntime({
-      implementation: (name) => {
-        const snapshot = this.#catalogConsumer?.view.snapshot;
-        return snapshot
-          ? {
-              releaseId: snapshot.releaseId,
-              generation: snapshot.generation,
-              replay: snapshot.replayable.includes(name) ? "safe" : "never",
-            }
-          : undefined;
-      },
-      catalog: this.#toolCatalog,
+      implementation: (name) => this.#catalogConsumer?.view.implementation(name),
+      catalog: this.#catalogConsumer.view,
+      scopedCatalog: (scope) =>
+        this.#catalogConsumer!.view.forActor({
+          tenantId: scope.tenantId,
+          userId: scope.actorUserId ?? null,
+          root: scope.sessionKind === "conversation",
+        }),
       nativeConversations: nativeSessions,
       control: this.#subagentControl,
       maximumDepth: this.#config.subagentMaximumDepth,
@@ -755,7 +752,7 @@ export class PiWorkerRuntime {
       maximumActiveFamilies: this.#config.maxConcurrentSessions,
       onCapacity: (sample) => this.#metrics?.activeSessionFamilies.set(sample.families),
       canClaimRuns: () =>
-        this.#toolCatalog.ready &&
+        this.#catalogConsumer?.ready === true &&
         runBackend.healthy &&
         (this.#state === "ready" || this.#state === "draining") &&
         client?.state === "connected",

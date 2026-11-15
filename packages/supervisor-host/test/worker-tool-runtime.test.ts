@@ -102,6 +102,94 @@ it("prepares a control invocation and returns its reply without executing its bu
   f.mailbox.close();
 });
 
+it("keeps a withdrawn MCP registration reply-only and reuses the original operation and deadline", async () => {
+  const f = fixture(),
+    name = "mcp_echo_fixture";
+  f.runtime.options.nativeConversations.recoveredControlToolNames = () => [name];
+  const wait = vi.spyOn(f.runtime.options, "wait");
+  const bindings = await f.runtime.create({
+    command,
+    prepareWorkflow: async () => {
+      throw new Error("No workflow");
+    },
+    environment: () => {
+      throw new Error("No VM");
+    },
+  });
+  const binding = bindings.current().find((b) => b.tool.name === name)!;
+  expect(binding.offered).toBe(false);
+  const tool = binding.tool as PreparedAgentTool;
+  const reply = {
+    topic: "pi-cloud.tool-replies.v4.20000000-0000-4000-8000-000000000001",
+    partition: 0 as const,
+    offset: "12",
+    deadlineAt: Date.now() + 12345,
+    toolCallId: "old-call",
+    toolName: name,
+  };
+  const original = {
+    sequence: 8,
+    taskId: 7,
+    conversationId: 1,
+    reply,
+    command: {
+      kind: "control_tool" as const,
+      target: "control" as const,
+      operationId: "original-operation",
+      taskId: 7,
+      conversationId: 1,
+      toolName: name,
+      nativeCallId: "old-call",
+      arguments: { text: "one effect" },
+      contextAnchor: null,
+      replyTopic: reply.topic,
+      replyRecovery: reply,
+      implementation: {
+        releaseId: "old",
+        generation: 1,
+        replay: "never" as const,
+        catalogScope: "mcp:20000000-0000-4000-8000-000000000002",
+      },
+      scope: {
+        tenantId: "tenant",
+        sessionId: "session",
+        runId: "run",
+        turnId: "turn",
+        piSessionId: "physical",
+        writerId: "old",
+        fencingToken: 1,
+      },
+    },
+  };
+  await expect(tool.prepareExecution!("new-call", {})).rejects.toThrow("only restores");
+  const recover = (args: unknown) =>
+    withToolInvocation({ id: "task:7", nativeToolCallId: "old-call" }, () =>
+      tool.prepareRecovery!("old-call", args, undefined, original),
+    );
+  await expect(recover({ text: "changed" })).rejects.toThrow("matching original");
+  const prepared = await recover(original.command.arguments);
+  expect(wait.mock.calls[0]?.[5]).toEqual(reply);
+  expect(prepared.command).toMatchObject({
+    operationId: original.command.operationId,
+    replyRecovery: reply,
+  });
+  expect(prepared.command).not.toHaveProperty("recovery");
+  f.mailbox.accept({
+    kind: "tool_result",
+    operationId: original.command.operationId,
+    sequence: 1,
+    result: {
+      toolName: name,
+      toolCallId: "old-call",
+      isError: false,
+      result: { content: [{ type: "text", text: "ORIGINAL" }] },
+    },
+  });
+  await expect(prepared.result()).resolves.toHaveProperty("content.0.text", "ORIGINAL");
+  prepared.dispose();
+  f.mailbox.close();
+});
+
 it("recovers a delegation with its original effect and a fresh callback identity", async () => {
   const f = fixture();
   const source = {
@@ -338,10 +426,17 @@ it("cancels outstanding workflow host calls and rejects late callbacks after dis
 
 it("offers phone capabilities only to the granted root and lazily prepares its own destination", async () => {
   const { androidToolDefinitions, ANDROID_CAPABILITIES } = await import("@pi-cloud/protocol");
-  const { WorkerToolCatalog } = await import("../src/tools/worker-tool-catalog.ts");
+  const { ToolCatalogView } = await import("@pi-cloud/event-log");
   const { controlToolCatalog } = await import("@pi-cloud/control-plane");
-  const catalog = new WorkerToolCatalog();
-  catalog.update(controlToolCatalog(androidToolDefinitions()));
+  const catalog = new ToolCatalogView();
+  catalog.accept({
+    version: 2,
+    scope: "platform",
+    generation: 1,
+    releaseId: "fixture",
+    replayable: [],
+    catalog: controlToolCatalog(androidToolDefinitions()),
+  });
   const mailbox = new ToolReplyMailbox();
   const prepareTarget = vi.fn(async () => crypto.randomUUID());
   const runtime = new WorkerToolRuntime({
@@ -498,7 +593,14 @@ it("offers phone capabilities only to the granted root and lazily prepares its o
   });
   expect(await recovered.result()).toMatchObject({ content: [{ text: "original" }] });
   recovered.dispose();
-  catalog.update(controlToolCatalog([]));
+  catalog.accept({
+    version: 2,
+    scope: "platform",
+    generation: 2,
+    releaseId: "fixture-2",
+    replayable: [],
+    catalog: controlToolCatalog([]),
+  });
   expect(root.current().some((t) => t.tool.name === "android_observe")).toBe(false);
   await expect(
     withToolInvocation({ id: "task:9", nativeToolCallId: "old-call" }, () =>

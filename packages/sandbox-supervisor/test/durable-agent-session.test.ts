@@ -4,6 +4,7 @@ import { MemoryStorage, type StorageWrite, type Seq } from "@earendil-works/pi-d
 import type { Context } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT, awaitWithContext } from "@earendil-works/chord/context";
 import { createModels } from "@earendil-works/pi-ai/models";
+import { getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import {
   fauxProvider,
   fauxAssistantMessage,
@@ -410,6 +411,152 @@ it("rejects duplicate provider call IDs within one response before executing eit
     expect(f.commands).toHaveLength(0);
   } finally {
     await f.runtime.close();
+  }
+});
+
+it("resumes a native MCP task with its original reply even when withdrawn, without publishing another intent", async () => {
+  const name = "mcp_fixture",
+    runId = randomUUID(),
+    models = createModels(),
+    faux = fauxProvider({ tokensPerSecond: 1_000_000 });
+  models.setProvider(faux.provider);
+  faux.setResponses([
+    fauxAssistantMessage(fauxToolCall(name, { text: "one effect" }), { stopReason: "toolUse" }),
+  ]);
+  const definition = {
+    name,
+    description: "MCP reply proxy",
+    parameters: Type.Object({ text: Type.String() }),
+    replay: "safe" as const,
+  };
+  const committed = Promise.withResolvers<void>(),
+    ready = Promise.withResolvers<void>(),
+    reply = Promise.withResolvers<void>();
+  const saved: StorageWrite[][] = [];
+  let runtime: DurableAgentSession | undefined,
+    original: import("@pi-cloud/protocol").CandidateControlToolCommand | undefined;
+  let effects = 0,
+    recovered = 0;
+  class Store extends MemoryStorage {
+    override async commit(writes: readonly StorageWrite[], _context: Context): Promise<Seq> {
+      const next = this.prepareCommit(writes),
+        prepared = runtime?.preparePublication({
+          seq: next.seq,
+          nextId: 100,
+          writes: next.writes,
+        } as unknown as DurableSessionCommit);
+      saved.push(structuredClone([...writes]));
+      effects += prepared?.tools.length ?? 0;
+      const seq = next.apply();
+      prepared?.confirmed();
+      if (prepared?.tools.length) committed.resolve();
+      return seq;
+    }
+  }
+  const bind = async (active: DurableAgentSession, restore: boolean) =>
+    active.bind({
+      runId,
+      conversationId: 1,
+      model: faux.getModel(),
+      agent: {},
+      context: {},
+      remoteTools: () => (restore ? [] : [name]),
+      recoveryTools: () => (restore ? [name] : []),
+      tools: [],
+      assertCurrent: async () => {},
+      openModel: async (request) => ({
+        model: faux.getModel(),
+        options: request.options,
+        release: () => {},
+      }),
+      prepareRemote: async (invocation) => {
+        if (restore) {
+          expect(invocation.recovery).toBe(true);
+          recovered++;
+          ready.resolve();
+        } else
+          original = {
+            target: "control",
+            executionReference: createExecutionReference(randomUUID(), runId, 1),
+            operationId: randomUUID(),
+            toolCallId: `task:${invocation.taskId}`,
+            nativeCallId: invocation.callId,
+            conversationId: 1,
+            toolName: name,
+            arguments: invocation.args,
+            contextAnchor: null,
+            occurredAt: new Date().toISOString(),
+          };
+        return {
+          command: {
+            ...original!,
+            ...(restore
+              ? {
+                  replyRecovery: {
+                    topic: `pi-cloud.tool-replies.v4.20000000-0000-4000-8000-000000000009`,
+                    partition: 0 as const,
+                    offset: "1",
+                    deadlineAt: Date.now() + 10000,
+                    toolCallId: invocation.callId,
+                    toolName: name,
+                  },
+                }
+              : {}),
+          },
+          completed: () => false,
+          dispose: () => {},
+          result: async () => {
+            await awaitWithContext(reply.promise, invocation.context);
+            return { content: [{ type: "text" as const, text: "ORIGINAL_REPLY" }] };
+          },
+        };
+      },
+    });
+  runtime = await DurableAgentSession.open(new Store(), {
+    models,
+    remoteTools: [definition],
+    settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
+  });
+  let next: DurableAgentSession | undefined;
+  try {
+    const first = await bind(runtime, false);
+    await first.submit(
+      { type: "input", content: "call once", requestId: "original" },
+      BACKGROUND_CONTEXT,
+    );
+    await committed.promise;
+    await runtime.close();
+    runtime = undefined;
+    const restored = new MemoryStorage();
+    for (const writes of saved) await restored.commit(writes, BACKGROUND_CONTEXT);
+    faux.setResponses([
+      (request) => {
+        expect(getCurrentTools(request.messages).some((t) => t.name === name)).toBe(false);
+        return fauxAssistantMessage("RECOVERED");
+      },
+    ]);
+    next = await DurableAgentSession.open(restored, {
+      models,
+      remoteTools: [definition],
+      settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
+    });
+    const second = await bind(next, true);
+    next.harness.resume();
+    await ready.promise;
+    expect(effects).toBe(1);
+    expect(recovered).toBe(1);
+    reply.resolve();
+    await second.waitForIdle(BACKGROUND_CONTEXT);
+    const history = JSON.stringify((await second.context(BACKGROUND_CONTEXT)).messages);
+    expect(history).toContain("ORIGINAL_REPLY");
+    expect(history).toContain("RECOVERED");
+    expect(
+      (await restored.submissionByRequest(second.id, "original", BACKGROUND_CONTEXT))?.status,
+    ).toBe("done");
+  } finally {
+    reply.resolve();
+    await runtime?.close();
+    await next?.close();
   }
 });
 

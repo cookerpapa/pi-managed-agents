@@ -306,6 +306,19 @@ async function privatePem(path: string): Promise<string> {
   }
 }
 
+async function loadMcpCredentialConfig(environment: ProductionControlPlaneEnvironment) {
+  return environment.PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY_FILE ||
+    environment.PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY
+    ? {
+        mcpCredentialKey: await secret(
+          environment,
+          "PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY",
+          booleanValue(environment, "PI_CLOUD_ALLOW_INLINE_SECRETS"),
+        ),
+      }
+    : {};
+}
+
 /** The tool host needs neither user-login configuration nor VM management credentials. */
 export async function loadToolHostConfig(
   environment: ProductionControlPlaneEnvironment = process.env,
@@ -324,6 +337,7 @@ export async function loadToolHostConfig(
     throw new Error("Invalid enabled Tool names");
   return {
     databaseUrl: await loadProductionDatabaseUrl(environment),
+    ...(await loadMcpCredentialConfig(environment)),
     kafkaBrokers: boundedList(
       required(environment, "PI_CLOUD_KAFKA_BROKERS"),
       "PI_CLOUD_KAFKA_BROKERS",
@@ -525,6 +539,7 @@ export async function loadSessionApiConfig(
   const shared = await loadSharedRoleConfig(environment);
   return {
     ...shared,
+    ...(await loadMcpCredentialConfig(environment)),
     ...loadKafkaCatalogConfig(environment),
     ...(await workspaceAccess(environment)),
     ...(await loadSourceControlConfig(environment)),

@@ -532,8 +532,8 @@ from context-token compaction and physical memory capacity.
 
 Ordinary Control Tool definitions and handlers have one execution-side registry.
 The independent `tool-host` process publishes complete credential-free snapshots
-to `pi-cloud.tool-catalog.v1` (compacted, one partition, RF=3). Each Worker has its
-own boot consumer group and restores the PG-selected generation before claiming
+to `pi-cloud.tool-catalog.v2` (compacted, one partition, RF=3). Each Worker has its
+own boot consumer group and restores all PG-selected scope generations before claiming
 work. Generation and digest checks reject stale/conflicting updates; Kafka fences
 old catalog publishers. Deployment activation, not process startup, selects a new
 release. Pi applies changed definitions to later model requests in the same loop.
@@ -542,10 +542,24 @@ fix the selected implementation release and do not retry uncertain effects.
 Fixed guest Tools retain the matched protocol. See
 [ADR-0305](adr/0305-execution-owned-tools-and-bindings.md).
 
+[ADR-0325](adr/0325-http-mcp-tools.md) adds personal/organization HTTP MCP
+connections. PG owns settings and encrypted credentials; only API and Tool host
+receive the credential key. Tool host uses the pinned Pi MCP client and publishes
+one scoped catalog per connection. Workers filter root tool definitions by the
+accepted Session tenant/actor. They register native proxies without MCP clients
+or credentials. The same Session intent, dispatch and reply path applies. The
+original reply offset/deadline is indexed on the native task; a replacement can
+wait for it, including after withdrawal, without another HTTP invocation. An
+admitted MCP call survives recoverable Worker closure but native task cancellation
+still closes it. Projector/Tool-host loss can settle UNKNOWN; no external-effect
+ledger or automatic operation replay is added. See [MCP](MCP.md).
+
 Under [ADR-0315](adr/0315-control-tool-dispatch-authority.md), ordinary control
 Tool dispatch does not read Worker lease expiry. The ordered consumer supplies
 admission and cancellation/closure; the exact native intent/task remains readable
-from PG. Cold restoration excludes closed or superseded Run/writer identities.
+from PG. Cold restoration excludes closed or superseded Run/writer identities
+for re-executable control work; MCP recovery only returns an uncertain outcome to
+the still-pending task's original reply destination.
 Concrete handlers retain their own tenant, resource and business transaction
 checks. A confirmed effect can retry its original reply without repeating it.
 

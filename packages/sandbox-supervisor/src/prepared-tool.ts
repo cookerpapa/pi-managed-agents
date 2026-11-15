@@ -10,6 +10,8 @@ export type PreparedToolExecution = Readonly<{
 }>;
 
 export type PreparedAgentTool = ToolRegistration & {
+  /** Native recovery can resolve this proxy; it is never offered for a fresh model call. */
+  recoveryOnly?: true;
   /** Recovery consumes the persisted original reply, never invokes a Tool again. */
   recoverySource?: "reply";
   prepareExecution?: (

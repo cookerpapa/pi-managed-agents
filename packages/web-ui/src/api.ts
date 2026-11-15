@@ -96,6 +96,74 @@ export class PiCloudApi extends SessionApi {
     this.#authorizationToken = authorizationToken;
   }
 
+  async listMcpConnections(
+    cursor?: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    connections: import("@pi-cloud/protocol").McpConnectionResource[];
+    next: string | null;
+  }> {
+    return (await request(
+      this.#fetch,
+      `/v1/mcp/connections${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      { method: "GET", ...(signal ? { signal } : {}) },
+      this.#authorizationToken,
+    )) as {
+      connections: import("@pi-cloud/protocol").McpConnectionResource[];
+      next: string | null;
+    };
+  }
+  async getMcpConnection(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    connection: import("@pi-cloud/protocol").McpConnectionResource;
+    tools: import("@pi-cloud/protocol").McpConnectionTool[];
+  }> {
+    return (await request(
+      this.#fetch,
+      `/v1/mcp/connections/${encodeURIComponent(id)}`,
+      { method: "GET", ...(signal ? { signal } : {}) },
+      this.#authorizationToken,
+    )) as {
+      connection: import("@pi-cloud/protocol").McpConnectionResource;
+      tools: import("@pi-cloud/protocol").McpConnectionTool[];
+    };
+  }
+  async saveMcpConnection(
+    id: string,
+    input: import("@pi-cloud/protocol").McpConnectionChange,
+  ): Promise<{
+    connection: import("@pi-cloud/protocol").McpConnectionResource;
+    tools: import("@pi-cloud/protocol").McpConnectionTool[];
+  }> {
+    return (await request(
+      this.#fetch,
+      `/v1/mcp/connections/${encodeURIComponent(id)}`,
+      jsonRequest(input, undefined, "PUT"),
+      this.#authorizationToken,
+    )) as {
+      connection: import("@pi-cloud/protocol").McpConnectionResource;
+      tools: import("@pi-cloud/protocol").McpConnectionTool[];
+    };
+  }
+  async refreshMcpConnection(id: string, expectedRevision: string): Promise<unknown> {
+    return request(
+      this.#fetch,
+      `/v1/mcp/connections/${encodeURIComponent(id)}/refresh`,
+      jsonRequest({ expectedRevision }),
+      this.#authorizationToken,
+    );
+  }
+  async removeMcpConnection(id: string, expectedRevision: string): Promise<unknown> {
+    return request(
+      this.#fetch,
+      `/v1/mcp/connections/${encodeURIComponent(id)}`,
+      jsonRequest({ expectedRevision }, undefined, "DELETE"),
+      this.#authorizationToken,
+    );
+  }
+
   async getAuthenticationConfiguration(): Promise<AuthenticationConfigurationResource> {
     return parseAuthenticationConfigurationResource(
       await request(this.#fetch, "/v1/auth/providers", { method: "GET" }),

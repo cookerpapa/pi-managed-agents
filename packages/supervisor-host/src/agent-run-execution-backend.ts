@@ -415,6 +415,7 @@ export class AgentRunExecutionBackend implements TurnExecutionBackend, TurnCance
           workingDirectory: request.workingDirectory,
           ...(request.skillCatalog ? { skillCatalog: request.skillCatalog } : {}),
           toolCapabilities: request.toolCapabilities,
+          ...(request.actorUserId ? { actorUserId: request.actorUserId } : {}),
           ...(request.executionTargets?.length
             ? { executionTargets: request.executionTargets }
             : {}),

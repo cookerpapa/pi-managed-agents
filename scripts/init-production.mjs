@@ -1,3 +1,4 @@
+import { ensureMcpCredentialMasterKey } from "./lib/mcp-secret.mjs";
 import { ensureMeteringSecret } from "./lib/metering-secret.mjs";
 import { execFile } from "node:child_process";
 import { createHash, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
@@ -511,6 +512,7 @@ await assertPrivateDirectory(runtimeDirectory);
 if (await validateExisting(runtimeDirectory)) {
   const sourceControlCredentialMasterKeyCreated =
     await ensureSourceControlCredentialMasterKey(runtimeDirectory);
+  await ensureMcpCredentialMasterKey(runtimeDirectory);
   const cubePersistentStateKeyCreated = await ensureCubePersistentStateKey(runtimeDirectory);
   const sandboxControlTokenCreated = await ensureSandboxControlToken(runtimeDirectory);
   const workspaceServiceTokenCreated = await ensureWorkspaceServiceToken(runtimeDirectory);
@@ -618,6 +620,10 @@ await writePrivateFile(
 await writePrivateFile(resolve(secretsDirectory, "api-token"), `${apiToken}\n`);
 await writePrivateFile(
   resolve(secretsDirectory, "source-control-credential-master-key"),
+  `${randomBytes(32).toString("base64url")}\n`,
+);
+await writePrivateFile(
+  resolve(secretsDirectory, "mcp-credential-master-key"),
   `${randomBytes(32).toString("base64url")}\n`,
 );
 await writePrivateFile(

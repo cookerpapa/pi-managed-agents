@@ -41,6 +41,7 @@ import { SessionLeaseCoordinatorError } from "./session-lease-coordinator.ts";
 
 export type TurnExecutionRequest = {
   stopOnResume?: true;
+  actorUserId?: string;
   tenantId: string;
   projectId: string;
   workspaceId: string;
@@ -734,6 +735,7 @@ export class RunExecutor {
           "workspace_row.seed_kind as workspaceSeedKind",
           "session_row.execution_mode as executionMode",
           "session_row.project_id as projectId",
+          "session_row.created_by_user_id as actorUserId",
           "session_row.workspace_id as workspaceId",
           "session_row.next_event_seq as nextEventSeq",
           "run.id as runId",
@@ -855,6 +857,7 @@ export class RunExecutor {
       mark("ownership");
       const request: TurnExecutionRequest = {
         ...(row.stopOnResume ? { stopOnResume: true as const } : {}),
+        ...(row.actorUserId ? { actorUserId: row.actorUserId } : {}),
         tenantId: row.tenantId,
         projectId: row.projectId,
         workspaceId: row.workspaceId,

@@ -6,50 +6,130 @@ import {
   TOOL_CATALOG_KEY,
   TOOL_CATALOG_TOPIC,
   parseToolCatalogPublication,
+  parseControlToolCatalog,
   type ControlToolCatalog,
   type ControlToolCatalogSource,
   type ToolCatalogPublication,
+  type ToolCatalogWatermark,
+  type ToolImplementation,
 } from "@pi-cloud/protocol";
 import { KafkaLogConsumer } from "./kafka-log-consumer.ts";
 
-/** One current, code-owned directory; no runnable source or execution authority. */
+/** Disposable scoped views of one PG-selected directory publication authority. */
 export class ToolCatalogView implements ControlToolCatalogSource {
-  #value: ToolCatalogPublication | undefined;
+  readonly #values = new Map<string, ToolCatalogPublication>();
   readonly #listeners = new Set<() => void>();
+  #revision = 0;
 
   get ready(): boolean {
-    return this.#value !== undefined;
+    return this.#values.has(TOOL_CATALOG_KEY);
   }
   get snapshot(): ToolCatalogPublication | undefined {
-    return this.#value;
+    return this.#values.get(TOOL_CATALOG_KEY);
+  }
+  snapshotFor(scope: string): ToolCatalogPublication | undefined {
+    return this.#values.get(scope);
   }
   read(): ControlToolCatalog {
-    if (!this.#value) throw new Error("Tool catalog has not been restored");
-    return this.#value.catalog;
+    if (!this.snapshot) throw new Error("Tool catalog has not been restored");
+    return this.snapshot.catalog;
   }
   subscribe(listener: () => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
-  accept(input: unknown): void {
+  accept(input: unknown): boolean {
     const next = parseToolCatalogPublication(input);
     if (
       createHash("sha256").update(JSON.stringify(next.catalog.tools)).digest("hex") !==
       next.catalog.revision
     )
       throw new Error("Tool catalog digest does not match its definitions");
-    const old = this.#value;
-    if (old && next.generation < old.generation) return;
+    const old = this.#values.get(next.scope);
+    if (old && next.generation < old.generation) return false;
     if (old?.generation === next.generation) {
       if (!isDeepStrictEqual(old, next))
         throw new Error("Tool catalog generation changed its contents");
-      return;
+      return false;
     }
-    this.#value = structuredClone(next);
+    for (const [scope, value] of this.#values) {
+      if (scope === next.scope) continue;
+      const names = new Set(value.catalog.tools.map((tool) => tool.name));
+      if (next.catalog.tools.some((tool) => names.has(tool.name)))
+        throw new Error("Tool identity collides across catalog scopes");
+    }
+    const captured = structuredClone(next);
+    const freeze = (value: unknown): void => {
+      if (!value || typeof value !== "object" || Object.isFrozen(value)) return;
+      for (const child of Object.values(value)) freeze(child);
+      Object.freeze(value);
+    };
+    freeze(captured);
+    this.#values.set(next.scope, captured);
+    this.#revision++;
     for (const listener of this.#listeners) listener();
+    return true;
+  }
+  forActor(actor: {
+    tenantId: string;
+    userId?: string | null;
+    root: boolean;
+  }): ControlToolCatalogSource {
+    let revision = -1;
+    let value: ControlToolCatalog;
+    return {
+      read: () => {
+        const platform = this.snapshot;
+        if (!platform) throw new Error("Tool catalog has not been restored");
+        if (revision === this.#revision) return value;
+        const tools = [...platform.catalog.tools];
+        if (actor.root && actor.userId) {
+          for (const entry of this.#values.values()) {
+            const access = entry.mcp;
+            if (
+              entry.releaseId === platform.releaseId &&
+              access?.enabled &&
+              access.tenantId === actor.tenantId &&
+              (access.visibility === "organization" || access.ownerUserId === actor.userId)
+            )
+              tools.push(...entry.catalog.tools);
+          }
+        }
+        tools.sort((a, b) => a.name.localeCompare(b.name));
+        value = parseControlToolCatalog({
+          version: 4,
+          tools,
+          revision: createHash("sha256").update(JSON.stringify(tools)).digest("hex"),
+        });
+        revision = this.#revision;
+        return value;
+      },
+      subscribe: (listener) => this.subscribe(listener),
+    };
+  }
+  publicationFor(name: string): ToolCatalogPublication | undefined {
+    const platform = this.snapshot;
+    if (!platform) return;
+    for (const entry of this.#values.values())
+      if (
+        entry.releaseId === platform.releaseId &&
+        (!entry.mcp || entry.mcp.enabled) &&
+        entry.catalog.tools.some((tool) => tool.name === name)
+      )
+        return entry;
+  }
+  implementation(name: string): ToolImplementation | undefined {
+    const entry = this.publicationFor(name);
+    if (!entry) return;
+    return {
+      releaseId: entry.releaseId,
+      generation: entry.generation,
+      replay: entry.replayable.includes(name) ? "safe" : "never",
+      ...(entry.scope !== TOOL_CATALOG_KEY ? { catalogScope: entry.scope } : {}),
+    };
   }
   replayable(name: string): boolean {
-    return this.#value?.replayable.includes(name) === true;
+    return this.implementation(name)?.replay === "safe";
   }
 }
 
@@ -99,7 +179,7 @@ export class KafkaToolCatalogConsumer {
       brokers: readonly string[];
       replicas: number;
       instanceId: string;
-      minimumGeneration(): Promise<number>;
+      minimumGenerations(): Promise<readonly ToolCatalogWatermark[]>;
       onSnapshot?(snapshot: ToolCatalogPublication): void;
     },
   ) {
@@ -117,9 +197,7 @@ export class KafkaToolCatalogConsumer {
       },
       handler: async ({ fact }, current) => {
         if (current?.() === false) return;
-        const prior = this.view.snapshot?.generation;
-        this.view.accept(fact);
-        if (prior !== this.view.snapshot?.generation) options.onSnapshot?.(this.view.snapshot!);
+        if (this.view.accept(fact)) options.onSnapshot?.(fact);
       },
     });
   }
@@ -134,12 +212,18 @@ export class KafkaToolCatalogConsumer {
   }
   async start(timeoutMs = 120_000): Promise<void> {
     await ensureTopic(this.options.brokers, this.options.replicas);
-    const minimum = Math.max(1, await this.options.minimumGeneration());
+    const minimum = [...(await this.options.minimumGenerations())];
+    if (!minimum.some((item) => item.scope === TOOL_CATALOG_KEY))
+      minimum.push({ scope: TOOL_CATALOG_KEY, generation: 1 });
     await this.#consumer.start();
     await this.#consumer.waitUntilAssigned(timeoutMs);
     const until = Date.now() + timeoutMs;
     while (!this.#closed && Date.now() < until) {
-      if ((this.view.snapshot?.generation ?? 0) >= minimum) {
+      if (
+        minimum.every(
+          (item) => (this.view.snapshotFor(item.scope)?.generation ?? 0) >= item.generation,
+        )
+      ) {
         this.#bootstrapped = true;
         return;
       }
@@ -225,7 +309,7 @@ export class KafkaToolCatalogPublisher {
           await new Promise<void>((resolve, reject) =>
             producer.beginTransaction((error) => (error ? reject(error) : resolve())),
           );
-          producer.produce(TOOL_CATALOG_TOPIC, 0, body, TOOL_CATALOG_KEY);
+          producer.produce(TOOL_CATALOG_TOPIC, 0, body, snapshot.scope);
           await new Promise<void>((resolve, reject) =>
             producer.commitTransaction(10000, (error) => (error ? reject(error) : resolve())),
           );

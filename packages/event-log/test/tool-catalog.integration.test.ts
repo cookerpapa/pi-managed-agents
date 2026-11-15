@@ -11,8 +11,12 @@ it.skipIf(process.env.PI_CLOUD_ISOLATED_TOOL_CATALOG_CHECK !== "1")(
     const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS!.split(",");
     const options = { brokers, replicas: 3 };
     let selected = 1;
+    const selectedScopes = new Map<string, number>();
+    const authorize = (value: ToolCatalogPublication) =>
+      value.generation ===
+      (value.scope === "platform" ? selected : selectedScopes.get(value.scope));
     const snapshot = (generation: number): ToolCatalogPublication => ({
-      version: 1,
+      version: 2,
       scope: "platform",
       generation,
       releaseId: `release-${generation}`,
@@ -22,7 +26,7 @@ it.skipIf(process.env.PI_CLOUD_ISOLATED_TOOL_CATALOG_CHECK !== "1")(
     const publisher = new KafkaToolCatalogPublisher({
       ...options,
       instanceId: randomUUID(),
-      authorize: async (value) => value.generation === selected,
+      authorize: async (value) => authorize(value),
     });
     const consumers: KafkaToolCatalogConsumer[] = [];
     const gates = Promise.withResolvers<void>();
@@ -32,14 +36,17 @@ it.skipIf(process.env.PI_CLOUD_ISOLATED_TOOL_CATALOG_CHECK !== "1")(
       instanceId: randomUUID(),
       authorize: async (value) => {
         if (++checks === 2) await gates.promise;
-        return value.generation === selected;
+        return authorize(value);
       },
     });
     const open = async () => {
       const consumer = new KafkaToolCatalogConsumer({
         ...options,
         instanceId: randomUUID(),
-        minimumGeneration: async () => selected,
+        minimumGenerations: async () => [
+          { scope: "platform", generation: selected },
+          ...[...selectedScopes].map(([scope, generation]) => ({ scope, generation })),
+        ],
       });
       consumers.push(consumer);
       await consumer.start();
@@ -69,6 +76,59 @@ it.skipIf(process.env.PI_CLOUD_ISOLATED_TOOL_CATALOG_CHECK !== "1")(
       );
       const cold = await open();
       expect(cold.view.snapshot?.generation).toBe(2);
+      const tenantId = randomUUID(),
+        ownerUserId = randomUUID();
+      const scopes = [`mcp:${randomUUID()}`, `mcp:${randomUUID()}`];
+      for (const [i, scope] of scopes.entries()) {
+        selectedScopes.set(scope, 1);
+        const tools = [
+          {
+            name: `mcp_fixture_${i}`,
+            description: "HTTP tool",
+            parameters: { type: "object", properties: {} },
+            environment: { kind: "none" as const },
+            availability: "root" as const,
+          },
+        ];
+        await publisher.publish({
+          ...snapshot(1),
+          scope,
+          releaseId: "release-2",
+          mcp: {
+            tenantId,
+            ownerUserId,
+            visibility: i === 0 ? "personal" : "organization",
+            revision: 1,
+            enabled: true,
+          },
+          catalog: {
+            version: 4,
+            tools,
+            revision: createHash("sha256").update(JSON.stringify(tools)).digest("hex"),
+          },
+        });
+      }
+      const scopedCold = await open();
+      expect(
+        scopedCold.view.forActor({ tenantId, userId: ownerUserId, root: true }).read().tools,
+      ).toHaveLength(2);
+      expect(
+        scopedCold.view.forActor({ tenantId, userId: randomUUID(), root: true }).read().tools,
+      ).toHaveLength(1);
+      selectedScopes.set(scopes[0]!, 2);
+      await publisher.publish({
+        ...snapshot(2),
+        scope: scopes[0]!,
+        mcp: { tenantId, ownerUserId, visibility: "personal", revision: 2, enabled: false },
+      });
+      const withdrawn = await open();
+      expect(
+        withdrawn.view
+          .forActor({ tenantId, userId: ownerUserId, root: true })
+          .read()
+          .tools.map((t) => t.name),
+      ).toEqual(["mcp_fixture_1"]);
+      expect(withdrawn.view.snapshot?.generation).toBe(2);
     } finally {
       gates.resolve();
       for (const consumer of consumers) await consumer.close();

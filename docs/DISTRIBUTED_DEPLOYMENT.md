@@ -84,6 +84,9 @@ labels and installs/upgrades the release.
 Secret keys follow the rendered mounts: database URLs, API/bootstrap credentials,
 Cube/Tool credentials, metrics tokens, SSH host key when enabled, and optional
 source-control credentials. Worker credentials may use a separate named Secret.
+HTTP MCP requires `mcp-credential-master-key` (32 random bytes, base64url encoded)
+in the platform Secret; only Session API and Tool host mount it. Preserve it with
+connection settings. See [MCP operations](MCP.md).
 Image attachments require a private S3 credential in the trusted Worker and
 platform Secrets, as described below; Workspace files still use Cube Volumes.
 External egress CIDRs and TCP ports

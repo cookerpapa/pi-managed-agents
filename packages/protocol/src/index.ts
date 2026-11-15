@@ -628,6 +628,7 @@ export * from "./tool-preview.ts";
 export * from "./run-observation.ts";
 export * from "./control-tool-catalog.ts";
 export * from "./tool-catalog-publication.ts";
+export * from "./mcp-connections.ts";
 export * from "./tool-environment.ts";
 export * from "./completion-transport.ts";
 export type {

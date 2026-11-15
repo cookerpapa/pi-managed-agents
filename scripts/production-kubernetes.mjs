@@ -313,6 +313,7 @@ function installSecrets() {
     "session-image-s3-credentials.json",
     "session-image-s3-server.json",
     "source-control-credential-master-key",
+    "mcp-credential-master-key",
   ];
   if (environment.PI_CLOUD_GITHUB_APP_ID)
     names.push("github-app-private-key.pem", "github-webhook-secret");

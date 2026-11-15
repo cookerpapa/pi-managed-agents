@@ -181,6 +181,7 @@ export function expandSessionLogEnvelope(input: unknown): SessionLogFact {
             "implementation",
             "sourceDocumentId",
             "recovery",
+            "replyRecovery",
             "replyMode",
             "workflowKey",
             "view",

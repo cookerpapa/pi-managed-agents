@@ -18,6 +18,7 @@ Release names and historical measurements belong to reports, not the component m
 | [Attachments](CHAT_ATTACHMENTS.md) | Long paste, uploads, visual input and retained originals |
 | [Workspace uploads](WORKSPACE_UPLOADS.md) | Working files, tus continuation, browser drafts and explicit retention |
 | [Skills](SKILLS.md) | Cloud discovery, Agent publication, version selection and Sandbox resources |
+| [HTTP MCP](MCP.md) | Scoped connections, hot tool discovery, credential ownership and original-result recovery |
 | [Model billing](MODEL_BILLING.md) | Model receipts, price versions, statements and limits |
 | [Resource billing](RESOURCE_BILLING.md) | Service minutes, BYO exemption, capacity receipts and statements |
 | [Schedules](SCHEDULES.md) | Scheduled input and ordinary Run admission |

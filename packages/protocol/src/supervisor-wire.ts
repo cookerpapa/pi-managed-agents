@@ -200,6 +200,7 @@ export const ExecuteTurnCommandMessageSchema = Type.Object(
         executionTargets: Type.Optional(ExecutionTargetGrantsSchema),
         scheduledOrigin: Type.Optional(ScheduledOriginSchema),
         skillCatalog: Type.Optional(RunSkillCatalogSchema),
+        actorUserId: Type.Optional(UuidSchema),
         agentSystemPrompt: Type.Optional(
           Type.String({ minLength: 1, maxLength: MAX_AGENT_INPUT_CHARACTERS }),
         ),

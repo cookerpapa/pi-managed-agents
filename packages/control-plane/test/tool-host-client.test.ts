@@ -38,7 +38,8 @@ it.each(["success", "refused", "lost_reply"] as const)(
     const client = new ToolHostClient({
       baseUrl,
       token: "test-only-token",
-      catalog: () => ({ releaseId: "release-2", generation: 2 }) as ToolCatalogPublication,
+      catalog: () =>
+        ({ scope: "platform", releaseId: "release-2", generation: 2 }) as ToolCatalogPublication,
     });
     try {
       const result = await client.execute(command, () => true);

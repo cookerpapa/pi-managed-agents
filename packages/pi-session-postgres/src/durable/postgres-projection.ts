@@ -100,9 +100,17 @@ function toolRecoveryFields(
   seq: number,
 ): Map<number, Record<string, string>> {
   const result = new Map<number, Record<string, string>>();
-  if (!metadata?.remoteTools) return result;
-  if (!Array.isArray(metadata.remoteTools)) throw new Error("Invalid Tool recovery metadata");
-  for (const value of metadata.remoteTools) {
+  if (!metadata) return result;
+  for (const field of ["remoteTools", "controlTools"])
+    if (metadata[field] !== undefined && !Array.isArray(metadata[field]))
+      throw new Error("Invalid Tool recovery metadata");
+  const tools = [
+    ...((metadata.remoteTools as unknown[]) ?? []),
+    ...((metadata.controlTools as { replyRecovery?: unknown }[]) ?? []).filter(
+      (t) => t.replyRecovery,
+    ),
+  ];
+  for (const value of tools) {
     const tool = value as {
       taskId: number;
       target: string;
@@ -113,16 +121,17 @@ function toolRecoveryFields(
       bindingId?: string;
     };
     const reply = parseToolReplyRecovery(tool.replyRecovery);
-    const operationId = tool.target === "executor" ? tool.operationId : tool.request?.operationId;
-    const bindingId = tool.target === "executor" ? tool.bindingId : tool.request?.activationId;
+    const operationId = tool.target === "cube" ? tool.request?.operationId : tool.operationId;
+    const bindingId = tool.target === "cube" ? tool.request?.activationId : tool.bindingId;
     if (
       (tool.target !== "executor" &&
+        tool.target !== "control" &&
         (tool.target !== "cube" || tool.request?.operation !== "tool.execute")) ||
       !Number.isSafeInteger(tool.taskId) ||
       tool.taskId < 1 ||
       tool.replyTopic !== reply.topic ||
       !/^[0-9a-f-]{36}$/.test(operationId ?? "") ||
-      !/^[0-9a-f-]{36}$/.test(bindingId ?? "") ||
+      (tool.target !== "control" && !/^[0-9a-f-]{36}$/.test(bindingId ?? "")) ||
       result.has(tool.taskId)
     )
       throw new Error("Invalid Tool recovery identity");
@@ -131,7 +140,7 @@ function toolRecoveryFields(
       replyOffset: reply.offset,
       replyOperation: operationId!,
       replyIntentSeq: String(seq),
-      replyBinding: bindingId!,
+      ...(bindingId ? { replyBinding: bindingId } : {}),
     });
   }
   return result;
@@ -996,7 +1005,7 @@ export class DurablePostgresProjection {
           or (existing.fields->'replyOperation'=excluded.fields->'replyOperation'
             and existing.fields->'replyTopic'=excluded.fields->'replyTopic'
             and existing.fields->'replyOffset'=excluded.fields->'replyOffset'
-            and existing.fields->'replyBinding'=excluded.fields->'replyBinding'
+            and existing.fields->'replyBinding' is not distinct from excluded.fields->'replyBinding'
             and existing.fields->'replyIntentSeq'=excluded.fields->'replyIntentSeq'))
         and (existing.kind in ('task','submission') or
         (${current} and existing.kind='document' and existing.created_seq=excluded.created_seq)) returning id`.execute(

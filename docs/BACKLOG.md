@@ -10,8 +10,9 @@
   2026-11-14; ADR-0325 records the boundary and initial authenticated HTTP scope.
   Multiple Harnesses and a platform STDIO path are outside this slice.
 - [x] Initial Pi MCP 1.0 HTTP discovery/call/Bearer/cancellation/lost-reply probe.
-- [ ] Scoped connection management, catalog delivery, execution, original-result
-  recovery and required serial publication/live acceptance.
+- [x] Scoped connection management, catalog delivery, execution and original-result
+  recovery implemented. Native/PG/browser and RF=3 checks passed.
+- [ ] Planned publication and owned Luna/Worker replacement acceptance.
 
 ## External client SDK — low priority / deferred
 

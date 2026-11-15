@@ -10,7 +10,7 @@ function snapshot(generation: number, names: string[] = []) {
     environment: { kind: "none" as const },
   }));
   return {
-    version: 1 as const,
+    version: 2 as const,
     scope: "platform" as const,
     generation,
     releaseId: `code-${generation}`,
@@ -67,4 +67,89 @@ it("does not mistake visibility for a replay grant", () => {
   expect(view.read().tools).toHaveLength(1);
   expect(view.replayable("write_external")).toBe(false);
   expect(() => view.accept({ ...snapshot(2), replayable: ["missing"] })).toThrow("absent");
+});
+
+const tenant = "10000000-0000-4000-8000-000000000001";
+const alice = "20000000-0000-4000-8000-000000000001";
+const bob = "20000000-0000-4000-8000-000000000002";
+const connection = "30000000-0000-4000-8000-000000000001";
+function mcp(
+  generation: number,
+  options: { enabled?: boolean; visibility?: "personal" | "organization"; releaseId?: string } = {},
+) {
+  const base = snapshot(generation, ["mcp_lookup_fixture"]);
+  const tools = base.catalog.tools.map((tool) => ({ ...tool, availability: "root" as const }));
+  return {
+    ...base,
+    scope: `mcp:${connection}`,
+    releaseId: options.releaseId ?? "code-3",
+    replayable: [],
+    mcp: {
+      tenantId: tenant,
+      ownerUserId: alice,
+      visibility: options.visibility ?? "personal",
+      revision: generation,
+      enabled: options.enabled ?? true,
+    },
+    catalog: {
+      ...base.catalog,
+      tools,
+      revision: createHash("sha256").update(JSON.stringify(tools)).digest("hex"),
+    },
+  };
+}
+
+it("exposes connection tools only to their admitted tenant/actor roots", () => {
+  const view = new ToolCatalogView();
+  view.accept(snapshot(3, ["platform_tool"]));
+  const owner = view.forActor({ tenantId: tenant, userId: alice, root: true });
+  const colleague = view.forActor({ tenantId: tenant, userId: bob, root: true });
+  view.accept(mcp(1));
+  expect(owner.read().tools.map((tool) => tool.name)).toContain("mcp_lookup_fixture");
+  expect(colleague.read().tools.map((tool) => tool.name)).not.toContain("mcp_lookup_fixture");
+  expect(
+    view
+      .forActor({ tenantId: "40000000-0000-4000-8000-000000000001", userId: alice, root: true })
+      .read().tools,
+  ).toHaveLength(1);
+  expect(view.forActor({ tenantId: tenant, userId: alice, root: false }).read().tools).toHaveLength(
+    1,
+  );
+  expect(view.forActor({ tenantId: tenant, root: true }).read().tools).toHaveLength(1);
+  expect(view.read().tools).toHaveLength(1);
+  view.accept(mcp(2, { visibility: "organization" }));
+  expect(colleague.read().tools).toHaveLength(2);
+  expect(view.snapshot?.generation).toBe(3);
+  expect(view.implementation("mcp_lookup_fixture")).toEqual({
+    releaseId: "code-3",
+    generation: 2,
+    replay: "never",
+    catalogScope: `mcp:${connection}`,
+  });
+});
+
+it("withdraws a connection without changing platform tools or resurrecting stale generations", () => {
+  const view = new ToolCatalogView();
+  view.accept(snapshot(3, ["platform_tool"]));
+  const actor = view.forActor({ tenantId: tenant, userId: alice, root: true });
+  view.accept(mcp(1));
+  view.accept(mcp(2, { enabled: false }));
+  view.accept(mcp(1));
+  expect(actor.read().tools).toHaveLength(1);
+  expect(view.implementation("mcp_lookup_fixture")).toBeUndefined();
+  expect(view.implementation("platform_tool")?.generation).toBe(3);
+  expect(() => view.accept(mcp(2))).toThrow("generation");
+});
+
+it("waits for a new code release's scoped selection instead of routing through an old host", () => {
+  const view = new ToolCatalogView();
+  view.accept(snapshot(3));
+  view.accept(mcp(1));
+  const actor = view.forActor({ tenantId: tenant, userId: alice, root: true });
+  expect(actor.read().tools).toHaveLength(1);
+  view.accept(snapshot(4));
+  expect(actor.read().tools).toHaveLength(0);
+  expect(view.implementation("mcp_lookup_fixture")).toBeUndefined();
+  view.accept(mcp(2, { releaseId: "code-4" }));
+  expect(actor.read().tools).toHaveLength(1);
 });

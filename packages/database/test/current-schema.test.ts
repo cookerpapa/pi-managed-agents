@@ -23,9 +23,9 @@ describe("current PiCloud schema", () => {
       const firstMigrationPass = await sql<{ name: string }>`
         select name from kysely_migration order by name
       `.execute(database);
-      expect(firstMigrationPass.rows).toHaveLength(224);
+      expect(firstMigrationPass.rows).toHaveLength(225);
       expect(firstMigrationPass.rows[0]?.name).toBe("001_initial_control_plane");
-      expect(firstMigrationPass.rows.at(-1)?.name).toBe("224_compute_service_periods");
+      expect(firstMigrationPass.rows.at(-1)?.name).toBe("225_http_mcp_connections");
       const storageColumns = await sql<{
         column_name: string;
       }>`select column_name from information_schema.columns where table_name='workspaces'`.execute(
@@ -144,6 +144,7 @@ describe("current PiCloud schema", () => {
         "workspace_runtimes",
         "sandbox_tool_bindings",
         "tool_catalog_publication",
+        "mcp_connections",
         "sandbox_control_instances",
         "workspaces",
         "development_environments",

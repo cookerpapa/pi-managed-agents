@@ -5,6 +5,71 @@ import { ImageAttachmentCodec } from "@pi-cloud/session-attachments";
 import { DurableSessionPublisher } from "../src/durable-session-publisher.ts";
 import type { AcceptedDurableCommitFact, AcceptedFactWriter } from "../src/accepted-fact.ts";
 import { toolInvocationFixture } from "./tool-invocation-fixture.ts";
+import {
+  MCP_TOOL_TIMEOUT_MS,
+  TOOL_REPLY_DELIVERY_MARGIN_MS,
+  type DurableCommitPublication,
+} from "@pi-cloud/protocol";
+import { validateControlToolReferences } from "../src/tool-invocation-fact.ts";
+
+it("pins MCP original reply references in the same native intent without a second command body", async () => {
+  const f = toolInvocationFixture(),
+    facts: AcceptedDurableCommitFact[] = [];
+  const topic = "pi-cloud.tool-replies.v4.10000000-0000-4000-8000-000000000009";
+  const publisher = new DurableSessionPublisher({
+    replyTopic: topic,
+    replyPosition: async () => ({ topic, partition: 0, offset: "42" }),
+    channels: {
+      resolve: () => ({
+        publication: { scope: f.scope },
+        commitNative: async (fact) => {
+          facts.push(fact);
+        },
+      }),
+      checkHealth: async () => {},
+    },
+  });
+  const publication: DurableCommitPublication = {
+    ...f.publication,
+    tools: [
+      {
+        taskId: 4,
+        command: {
+          target: "control",
+          operationId: "20000000-0000-4000-8000-000000000008",
+          executionReference: f.executionReference,
+          toolCallId: "task:4",
+          nativeCallId: "provider-1",
+          conversationId: 1,
+          toolName: "mcp_write_fixture",
+          contextAnchor: null,
+          arguments: { path: "large.txt", content: "hello" },
+          occurredAt: f.command.occurredAt,
+          implementation: {
+            releaseId: "mcp",
+            generation: 1,
+            replay: "never",
+            catalogScope: "mcp:10000000-0000-4000-8000-000000000001",
+          },
+        },
+      },
+    ],
+  };
+  await publisher.scoped(f.executionReference).publish(publication);
+  const fact = facts[0]!;
+  validateControlToolReferences(fact);
+  expect(fact.tools[0]).toHaveProperty("replyRecovery", {
+    topic,
+    partition: 0,
+    offset: "42",
+    deadlineAt:
+      Date.parse(f.command.occurredAt) + MCP_TOOL_TIMEOUT_MS + TOOL_REPLY_DELIVERY_MARGIN_MS,
+    toolCallId: "provider-1",
+    toolName: "mcp_write_fixture",
+  });
+  expect(fact.tools[0]).not.toHaveProperty("arguments");
+  await publisher.close();
+});
 
 it("uploads images before Kafka timing, packs their references, and rejects publication after close", async () => {
   const { scope, executionReference } = toolInvocationFixture();

@@ -95,9 +95,17 @@ export class ControlToolDispatcher {
         if (
           pending.dispatch.scope.tenantId === fact.scope.tenantId &&
           pending.dispatch.scope.piSessionId === fact.scope.piSessionId &&
-          pending.dispatch.scope.writerId === fact.scope.writerId
-        )
-          this.#remove(key);
+          (pending.dispatch.scope.writerId === fact.scope.writerId ||
+            (fact.kind === "work_finished" &&
+              pending.dispatch.replyRecovery &&
+              pending.dispatch.scope.runId === fact.scope.runId))
+        ) {
+          if (fact.kind === "execution_seal" && fact.recover && pending.dispatch.replyRecovery) {
+            // An accepted HTTP request belongs to its native task, not the old
+            // Worker. Keep its original delivery; never launch a queued old effect.
+            if (pending.execution === "once") pending.execution = "unknown";
+          } else this.#remove(key);
+        }
       this.wake(fact.scope.tenantId, fact.scope.piSessionId);
       return;
     }
@@ -224,13 +232,16 @@ export class ControlToolDispatcher {
         cross join lateral jsonb_array_elements(c.cloud_metadata::jsonb->'controlTools') effect
         join runs owner on owner.tenant_id=c.tenant_id
           and owner.id=(effect->'scope'->>'runId')::uuid
-          and owner.lease_id=(effect->'scope'->>'writerId')::uuid
-          and owner.fencing_token=(effect->'scope'->>'fencingToken')::bigint
         join pi_durable_records r on r.tenant_id=c.tenant_id and r.session_id=c.session_id
           and r.id=(effect->>'taskId')::bigint and r.kind='task'
         where c.cloud_metadata is not null
-          and owner.state='running' and owner.output_seal_id is null
-          and owner.output_sealed_at is null
+          and ((effect ? 'replyRecovery' and owner.state in ('running','queued')
+            and r.fields->>'replyOperation'=effect->>'operationId'
+            and r.fields->>'replyIntentSeq'=c.seq::text)
+            or (not(effect ? 'replyRecovery') and owner.state='running'
+              and owner.lease_id=(effect->'scope'->>'writerId')::uuid
+              and owner.fencing_token=(effect->'scope'->>'fencingToken')::bigint
+              and owner.output_seal_id is null and owner.output_sealed_at is null))
           and r.fields->>'nativeKind'='"pi.tool"'
           and r.fields->>'status' in ('pending','running')
           and coalesce(r.fields->>'abortRequested','false')='false'
@@ -429,7 +440,29 @@ export class ControlToolDispatcher {
         // Mark before awaiting: any uncertain handler/encoding failure must not
         // submit this external effect for a second time.
         if (pending.execution === "once") pending.execution = "unknown";
-        outcome = await this.options.execute(command, current, pending.controller.signal);
+        const remaining = command.replyRecovery
+          ? command.replyRecovery.deadlineAt - Date.now()
+          : undefined;
+        outcome =
+          remaining !== undefined && remaining <= 0
+            ? {
+                isError: true,
+                result: {
+                  content: [
+                    {
+                      type: "text",
+                      text: "tool_unavailable: The original dispatch deadline elapsed before this invocation could be submitted.",
+                    },
+                  ],
+                },
+              }
+            : await this.options.execute(
+                command,
+                current,
+                remaining === undefined
+                  ? pending.controller.signal
+                  : AbortSignal.any([pending.controller.signal, AbortSignal.timeout(remaining)]),
+              );
       }
       if (!current()) return;
       if ("waiting" in outcome) {

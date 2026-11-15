@@ -1,3 +1,4 @@
+import { ensureMcpCredentialMasterKey } from "./lib/mcp-secret.mjs";
 import { writeRuntimeFileAtomically } from "./lib/runtime-file-policy.mjs";
 import { metadataRelease } from "./lib/metadata-release.mjs";
 import { reconcileDeploymentBackendTemplates } from "./lib/deployment-backend-templates.mjs";
@@ -247,6 +248,7 @@ if (action === "prepare") {
     flag: "wx",
   });
   await ensureMeteringSecret(runtimeDirectory);
+  await ensureMcpCredentialMasterKey(runtimeDirectory);
   phase("render complete pinned Cube chart against preserved installed overrides");
   await prepareCubeUpgradePlan(cubeOptions(plan.nativeVersion));
   phase("capture immutable upstream Cube dependency images");
@@ -597,6 +599,7 @@ try {
   // identities stay in PG; no normal VM shutdown is mistaken for user Release.
   await assertDrained(true, false);
   await ensureMeteringSecret(runtimeDirectory);
+  await ensureMcpCredentialMasterKey(runtimeDirectory);
   if (physicalMaintenance) {
     const repository = createComputeRetirementRepository(database);
     const assertProcessesStopped = async () =>
@@ -678,6 +681,7 @@ try {
   // Existing installations do not rerun init-production. Reconcile the same
   // deployment-owned provider policy before the matched provider Pod starts.
   await ensureMeteringSecret(runtimeDirectory);
+  await ensureMcpCredentialMasterKey(runtimeDirectory);
   await updateProviderRuntimePolicyFile(resolve(runtimeDirectory, "secrets/cli-proxy-config.yaml"));
   cutover = true;
   {
@@ -823,7 +827,7 @@ try {
       guestExecution: 1,
       sessionActivity: 1,
       toolHostReplacement: 1,
-      toolCatalogPublication: 1,
+      toolCatalogPublication: 2,
     },
   });
   deployment.nativeDependencies = JSON.parse(

@@ -18,6 +18,7 @@ import {
   type OriginalRemoteToolIntent,
   type AcceptedToolCommand,
   type AcceptedExecutorToolCommand,
+  type ControlToolDispatch,
   type PendingToolReplyRecovery,
   parseToolReplyRecovery,
   durableToolIntent,
@@ -94,7 +95,18 @@ type RemoteToolMetadata =
     })
   | (Omit<AcceptedExecutorToolCommand, "kind" | "arguments" | "nativeCallId" | "operationIndex"> & {
       target: "executor";
-    });
+    })
+  | (ControlToolDispatch & { scope: AcceptedToolCommand["scope"] });
+
+function remoteReplySources(metadata: {
+  remoteTools?: RemoteToolMetadata[];
+  controlTools?: RemoteToolMetadata[];
+}): RemoteToolMetadata[] {
+  return [
+    ...(metadata.remoteTools ?? []),
+    ...(metadata.controlTools ?? []).filter((t) => t.replyRecovery),
+  ];
+}
 type Owner = {
   authority: ActiveExecutionAuthority & { start(): void; assertActive(): void };
   storage: Promise<PublishedDurableStorage>;
@@ -112,6 +124,7 @@ type Owner = {
     number,
     { operationId: string; activationId: string; writerId: string; target: "cube" | "executor" }
   >;
+  recoveredControlTools: Map<number, { toolName: string; conversationId: number }>;
 };
 export type DurableSessionHandle = {
   binding: DurableRunBinding;
@@ -153,6 +166,16 @@ export class PostgresDurableSessionHost {
   }
   hasExecution(reference: string): boolean {
     return this.#executions.has(reference);
+  }
+  /** Internal native registrations only; these do not expand the model's tool list. */
+  recoveredControlToolNames(reference: string, conversationId: number): readonly string[] {
+    return [
+      ...new Set(
+        [...(this.#executions.get(reference)?.recoveredControlTools.values() ?? [])]
+          .filter((t) => t.conversationId === conversationId)
+          .map((t) => t.toolName),
+      ),
+    ];
   }
   /** Synchronous provider admission check: event-loop delay cannot extend a
    * confirmed deadline while its timer is still queued. This never queries PG. */
@@ -306,8 +329,9 @@ export class PostgresDurableSessionHost {
           and r.id=${taskId} and r.kind='task' and r.fields->>'status'<>'terminal'
         order by l.ordinal limit 1`.execute(this.options.database);
         if (!row) throw new Error("Original remote Tool intent is unavailable");
-        const metadata = JSON.parse(row.cloud_metadata) as { remoteTools?: RemoteToolMetadata[] };
-        const source = metadata.remoteTools?.find((t) => t.taskId === taskId);
+        const source = remoteReplySources(JSON.parse(row.cloud_metadata)).find(
+          (t) => t.taskId === taskId,
+        );
         const write = JSON.parse(row.body);
         if (
           !source ||
@@ -319,7 +343,8 @@ export class PostgresDurableSessionHost {
           write.value?.conversationId !== conversationId ||
           (source.target === "cube"
             ? source.request?.operation !== "tool.execute"
-            : source.target !== "executor" || source.conversationId !== conversationId)
+            : !["executor", "control"].includes(source.target) ||
+              source.conversationId !== conversationId)
         )
           throw new Error("Remote Tool recovery changed native work identity");
         const sequence = Number(row.seq);
@@ -340,36 +365,44 @@ export class PostgresDurableSessionHost {
           conversationId,
           reply,
           command:
-            source.target === "executor"
+            source.target === "control"
               ? {
-                  kind: "executor_tool",
-                  target: "executor",
+                  ...parseControlToolDispatch(source),
+                  kind: "control_tool",
                   scope: source.scope,
-                  operationId: source.operationId,
-                  bindingId: source.bindingId,
-                  taskId,
-                  conversationId,
-                  toolName: source.toolName,
                   nativeCallId: intent.callId,
                   arguments: intent.arguments,
-                  replyTopic: source.replyTopic,
-                  replyRecovery: reply,
-                  occurredAt: source.occurredAt,
                 }
-              : {
-                  kind: "tool_command",
-                  scope: source.scope,
-                  toolCallId: `task:${taskId}`,
-                  replyTopic: source.replyTopic,
-                  replyRecovery: reply,
-                  occurredAt: source.occurredAt,
-                  ...(source.environment ? { environment: source.environment } : {}),
-                  request: parseToolSandboxOperationRequest({
-                    ...source.request,
-                    args: intent.arguments,
-                    toolCallId: intent.callId,
-                  }),
-                },
+              : source.target === "executor"
+                ? {
+                    kind: "executor_tool",
+                    target: "executor",
+                    scope: source.scope,
+                    operationId: source.operationId,
+                    bindingId: source.bindingId,
+                    taskId,
+                    conversationId,
+                    toolName: source.toolName,
+                    nativeCallId: intent.callId,
+                    arguments: intent.arguments,
+                    replyTopic: source.replyTopic,
+                    replyRecovery: reply,
+                    occurredAt: source.occurredAt,
+                  }
+                : {
+                    kind: "tool_command",
+                    scope: source.scope,
+                    toolCallId: `task:${taskId}`,
+                    replyTopic: source.replyTopic,
+                    replyRecovery: reply,
+                    occurredAt: source.occurredAt,
+                    ...(source.environment ? { environment: source.environment } : {}),
+                    request: parseToolSandboxOperationRequest({
+                      ...source.request,
+                      args: intent.arguments,
+                      toolCallId: intent.callId,
+                    }),
+                  },
         };
       },
       owner.readSignal,
@@ -381,6 +414,7 @@ export class PostgresDurableSessionHost {
     binding: DurableRunBinding,
     signal: AbortSignal,
     operations: Owner["recoveredOperations"],
+    controls: Owner["recoveredControlTools"],
     stopOnResume = false,
   ): Promise<void> {
     const { rows } = await sql<{ id: string; cloud_metadata: string }>`
@@ -392,8 +426,9 @@ export class PostgresDurableSessionHost {
         and r.fields->>'run'=${binding.runId}
       order by r.id`.execute(this.options.database);
     const references = rows.map((row) => {
-      const metadata = JSON.parse(row.cloud_metadata) as { remoteTools?: RemoteToolMetadata[] };
-      const source = metadata.remoteTools?.find((t) => t.taskId === Number(row.id));
+      const source = remoteReplySources(JSON.parse(row.cloud_metadata)).find(
+        (t) => t.taskId === Number(row.id),
+      );
       if (
         !source ||
         source.scope?.tenantId !== binding.tenantId ||
@@ -401,6 +436,17 @@ export class PostgresDurableSessionHost {
         source.scope.runId !== binding.runId
       )
         throw new Error("Pending Tool replay scope changed");
+      if (source.target === "control") {
+        parseControlToolDispatch(source);
+        controls.set(Number(row.id), {
+          toolName: source.toolName,
+          conversationId: source.conversationId,
+        });
+        return {
+          operationId: source.operationId,
+          reply: parseToolReplyRecovery(source.replyRecovery),
+        };
+      }
       if (source.target !== "cube" && source.target !== "executor")
         throw new Error("Pending Tool recovery target changed");
       const operationId =
@@ -615,6 +661,7 @@ export class PostgresDurableSessionHost {
       const runs = new Map<number, DurableSessionOpen>(),
         bindings = new Map<number, DurableRunBinding>();
       const recoveredOperations: Owner["recoveredOperations"] = new Map();
+      const recoveredControlTools: Owner["recoveredControlTools"] = new Map();
       const progress = new NativeProjectionProgress({
         initialThrough: 0,
         assertCurrent: () => authority.assertCurrent(),
@@ -647,6 +694,8 @@ export class PostgresDurableSessionHost {
               for (const write of commit.writes) {
                 if (write.type !== "task") continue;
                 const task = durableToolState(write.value);
+                if (task?.terminal && recoveredControlTools.has(task.id))
+                  completedRecoveries.push(task.id);
                 const original = task && recoveredOperations.get(task.id);
                 if (!task || !original) continue;
                 if (task.aborted)
@@ -723,7 +772,10 @@ export class PostgresDurableSessionHost {
                 });
                 acknowledged = true;
                 preparation?.confirmed();
-                for (const id of completedRecoveries) recoveredOperations.delete(id);
+                for (const id of completedRecoveries) {
+                  recoveredOperations.delete(id);
+                  recoveredControlTools.delete(id);
+                }
                 for (const { prepared } of display) prepared.confirmed();
               } catch (cause) {
                 if (!acknowledged && cause instanceof PublicationNotSentError) {
@@ -750,7 +802,13 @@ export class PostgresDurableSessionHost {
             }),
           waitProjected: (through) => progress.wait(through, authority.signal),
         });
-        await this.#restoreReplies(binding, readSignal, recoveredOperations, input.stopOnResume);
+        await this.#restoreReplies(
+          binding,
+          readSignal,
+          recoveredOperations,
+          recoveredControlTools,
+          input.stopOnResume,
+        );
         return store;
       })();
       owner = {
@@ -761,6 +819,7 @@ export class PostgresDurableSessionHost {
         interruption,
         readSignal,
         recoveredOperations,
+        recoveredControlTools,
         display: new Map(),
         publicationTail: Promise.resolve(),
         releaseTail: Promise.resolve(),

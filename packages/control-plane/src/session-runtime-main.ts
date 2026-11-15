@@ -221,14 +221,14 @@ export async function startSessionRuntime(): Promise<void> {
       brokers: config.kafkaBrokers,
       replicas: config.kafkaReplicas,
       instanceId: controlPlaneInstanceId,
-      minimumGeneration: async () => (await catalogAuthority.read())?.generation ?? 1,
+      minimumGenerations: () => catalogAuthority.minimumGenerations(),
     });
     await catalogConsumer.start();
     const toolCatalog = catalogConsumer.view;
     toolHost = new ToolHostClient({
       baseUrl: process.env.PI_CLOUD_TOOL_HOST_URL ?? "http://tool-host:4310",
       token: config.supervisorManagementToken,
-      catalog: () => toolCatalog.snapshot,
+      catalog: (name) => toolCatalog.publicationFor(name),
     });
     const controlTools = new ControlToolDispatcher({
       database,

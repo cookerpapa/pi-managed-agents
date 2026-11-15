@@ -131,6 +131,7 @@ export type DurableRunConfiguration = {
   skillCatalog?: readonly import("@pi-cloud/protocol").SkillCatalogEntry[];
   workspaceAvailable?: boolean;
   remoteTools: () => readonly string[];
+  recoveryTools?: () => readonly string[];
   tools: readonly ToolRegistration[];
   assertCurrent(): Promise<void>;
   beforeEffect?(signal?: AbortSignal): Promise<void>;
@@ -205,7 +206,7 @@ export class DurableAgentSession {
       recover: async (invocation) => {
         const prepared = await this.#prepareRemote(invocation);
         try {
-          if (isControlToolCommand(prepared.command)) {
+          if (isControlToolCommand(prepared.command) && !prepared.command.replyRecovery) {
             if (!prepared.command.recovery)
               throw new Error("Control recovery requires its original reference");
             await this.publishControl(invocation.taskId, prepared.command);
@@ -248,6 +249,37 @@ export class DurableAgentSession {
         ],
         hooks: [
           hook(GenerationTask, {
+            beforeRequest: (request, api) => {
+              const run = this.#bindings.get(api.conversationId);
+              if (!run) return;
+              const offered = new Set(run.remoteTools());
+              // Pi 1.0 resolves recovered ToolTask executions against agent.tools.
+              // The public request hook hides reply-only MCP registrations without
+              // changing native tasks, result history or committed storage batches.
+              return {
+                messages: request.messages.map((message) =>
+                  message.role !== "system"
+                    ? message
+                    : {
+                        ...message,
+                        ...(message.toolsAdded
+                          ? {
+                              toolsAdded: message.toolsAdded.filter(
+                                (tool) => !tool.name.startsWith("mcp_") || offered.has(tool.name),
+                              ),
+                            }
+                          : {}),
+                        ...(message.toolsRemoved
+                          ? {
+                              toolsRemoved: message.toolsRemoved.filter(
+                                (tool) => !tool.name.startsWith("mcp_") || offered.has(tool.name),
+                              ),
+                            }
+                          : {}),
+                      },
+                ),
+              };
+            },
             onYield: async (answer, api) => {
               const run = this.#bindings.get(api.conversationId);
               const next = await run?.beforeYield?.(answer);
@@ -286,7 +318,11 @@ export class DurableAgentSession {
           await conversation.commit(async (tx) => {
             if (this.#bindings.get(run.conversationId) !== run) return;
             const wanted = [
-              ...this.remote.definitions.filter((tool) => run.remoteTools().includes(tool.name)),
+              ...this.remote.definitions.filter(
+                (tool) =>
+                  run.remoteTools().includes(tool.name) ||
+                  run.recoveryTools?.().includes(tool.name),
+              ),
               ...run.tools,
             ];
             const state = await tx.doc(AgentDoc, conversation.id);
@@ -513,7 +549,10 @@ export class DurableAgentSession {
               run.tools.some((tool) => extension.name === `pi-cloud-tool:${tool.name}`),
           ),
         tools: [
-          ...this.remote.definitions.filter((tool) => run.remoteTools().includes(tool.name)),
+          ...this.remote.definitions.filter(
+            (tool) =>
+              run.remoteTools().includes(tool.name) || run.recoveryTools?.().includes(tool.name),
+          ),
           ...run.tools,
         ],
       });

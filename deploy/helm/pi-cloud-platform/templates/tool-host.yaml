@@ -47,6 +47,7 @@ spec:
             - { name: NODE_ENV, value: production }
             - { name: HOST, value: 0.0.0.0 }
             - { name: DATABASE_URL_FILE, value: /run/pi-cloud-secrets/database-url }
+            - { name: PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY_FILE, value: /run/pi-cloud-secrets/mcp-credential-master-key }
             - { name: PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN_FILE, value: /run/pi-cloud-secrets/supervisor-management-token }
             - { name: PI_CLOUD_SANDBOX_CONTROL_TOKEN_FILE, value: /run/pi-cloud-secrets/sandbox-control-token }
             - { name: PI_CLOUD_SESSION_EXECUTION_BASE_URL, value: {{ .Values.sessionRuntime.executionBaseUrl | quote }} }
@@ -82,6 +83,7 @@ spec:
             capabilities: { drop: [ALL] }
           resources: {{- toYaml .Values.toolHost.resources | nindent 12 }}
           volumeMounts:
+            - { name: platform-secrets, mountPath: /run/pi-cloud-secrets/mcp-credential-master-key, subPath: mcp-credential-master-key, readOnly: true }
             - { name: platform-secrets, mountPath: /run/pi-cloud-secrets/database-url, subPath: {{ .Values.external.database.secretKey }}, readOnly: true }
             - { name: platform-secrets, mountPath: /run/pi-cloud-secrets/supervisor-management-token, subPath: supervisor-management-token, readOnly: true }
             - { name: platform-secrets, mountPath: /run/pi-cloud-secrets/sandbox-control-token, subPath: sandbox-control-token, readOnly: true }

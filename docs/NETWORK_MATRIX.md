@@ -19,6 +19,8 @@ firewall denial. Enforce deployment isolation with the configured networks/CNI.
 | Pi Worker | Kafka | yes | direct transactional Session publication and consumption of owned pending replies, including original destinations after handoff |
 | Pi Worker | provider proxy/model provider | yes | model requests |
 | Session runtime / Projector | Kafka | yes | ordered seal/control publication and one group for native history, live views and Tool routing |
+| Tool host | Registered HTTP MCP endpoints | HTTP/S, configured proxy/NO_PROXY | Pi MCP discovery and once-admitted calls; credentials stay in this role |
+| Tool host / Worker / Session API | Kafka catalog topic | scoped metadata, no credentials | tool directory publication and per-boot views |
 | Control Plane | Session runtime | yes | PG-authorized control publication; never native appends |
 | Session runtime | Cube resource / ordinary envd data endpoints | yes | fixed Guest control, cold connection receipt, workflow/image/Skill/preview data and retention |
 | Control Plane | Cube API | yes | VM lifecycle and resource recovery |

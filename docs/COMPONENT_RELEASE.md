@@ -14,7 +14,9 @@ catalog and presentation-only Web operations. Install its initial schema 196 / W
 
 [ADR-0305](adr/0305-execution-owned-tools-and-bindings.md) moves ordinary handlers
 into `tool-host`. Install its matched schema 214 / `toolHostReplacement: 1` and
-`toolCatalogPublication: 1` contracts first. The
+`toolCatalogPublication: 1` contracts first. HTTP MCP subsequently requires the
+matched schema 225 / `toolCatalogPublication: 2` transition in [ADR-0325](adr/0325-http-mcp-tools.md).
+Connection settings and discovery are live data updates after that cutover. The
 [current live acceptance](reports/decoupling-delivery-20261113.md) keeps an original
 Run/Worker/VM running through a Tool-host-only replacement and verifies the next
 request's updated directory, preview and generated image. The old `session-runtime` tool

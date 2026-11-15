@@ -639,6 +639,10 @@ export class PiCloudTurnRunner {
               },
         remoteTools: () =>
           tools.tools.filter((tool) => tool.prepareExecution).map((tool) => tool.name),
+        recoveryTools: () =>
+          (options.trustedToolDefinitions?.current() ?? [])
+            .filter((tool) => (tool as import("./prepared-tool.ts").PreparedAgentTool).recoveryOnly)
+            .map((tool) => tool.name),
         tools: tools.tools.filter((tool) => !tool.prepareExecution),
         assertCurrent: () => owner.authority.assertCurrent(),
         ...(p.stopOnResume || options.beforeEffect
@@ -668,7 +672,14 @@ export class PiCloudTurnRunner {
               throw new Error("Tool has no committed native request boundary");
             sampling.select({ sequence, attempt: 1, publish: false });
           }
-          const tool = tools.tools.find((tool) => tool.name === invocation.toolName);
+          const tool =
+            tools.tools.find((tool) => tool.name === invocation.toolName) ??
+            (invocation.recovery
+              ? (options.trustedToolDefinitions
+                  ?.current()
+                  .find((tool) => tool.name === invocation.toolName) as
+                  import("./prepared-tool.ts").PreparedAgentTool | undefined)
+              : undefined);
           const prepare = invocation.recovery ? tool?.prepareRecovery : tool?.prepareExecution;
           if (!tool || !prepare) throw new Error("Remote Tool has no matching preparation port");
           const original =

@@ -104,6 +104,7 @@ spec:
             - { name: PI_CLOUD_GITLAB_ISSUE_LABEL, value: {{ .Values.controlPlane.sourceControl.gitlab.issueLabel | quote }} }
             - { name: PI_CLOUD_SOURCE_CONTROL_CREDENTIAL_MASTER_KEY_FILE, value: /run/pi-cloud-secrets/source-control-credential-master-key }
             {{- end }}
+            - { name: PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY_FILE, value: /run/pi-cloud-secrets/mcp-credential-master-key }
             - { name: PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN_FILE, value: /run/pi-cloud-secrets/supervisor-management-token }
             - { name: PI_CLOUD_CUBE_EGRESS_CONFIG_TOKEN_FILE, value: /run/pi-cloud-secrets/cube-egress-config-token }
             - { name: PI_CLOUD_WORKSPACE_SERVICE_TOKEN_FILE, value: /run/pi-cloud-secrets/workspace-service-token }
@@ -139,6 +140,7 @@ spec:
             capabilities: { drop: [ALL] }
           resources: {{- toYaml .Values.sessionApi.resources | nindent 12 }}
           volumeMounts:
+            - { name: platform-secrets, mountPath: /run/pi-cloud-secrets/mcp-credential-master-key, subPath: mcp-credential-master-key, readOnly: true }
             - { name: model-catalog, mountPath: /run/pi-cloud-models, readOnly: true }
             {{- if .Values.imageAttachments.endpoint }}
             - { name: platform-secrets, mountPath: /run/pi-cloud-secrets/session-image-s3-credentials.json, subPath: {{ .Values.imageAttachments.credentialsSecretKey }}, readOnly: true }

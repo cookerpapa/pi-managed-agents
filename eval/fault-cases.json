@@ -3,6 +3,27 @@
   "description": "Deterministic infrastructure fault contracts for the maintained PostgreSQL, Kafka, Pi Worker and Cube Tool path.",
   "cases": [
     {
+      "id": "mcp-original-reply-handoff",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/control-tool-dispatcher.test.ts",
+      "test": "keeps an admitted MCP HTTP call through Worker closure, then cancels by native task across writers",
+      "invariant": "Recoverable writer closure preserves an admitted MCP effect and its original reply destination; native cancellation still closes the call."
+    },
+    {
+      "id": "mcp-cold-no-effect-replay",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/control-tool-dispatcher.test.ts",
+      "test": "cold MCP recovery returns UNKNOWN on the original topic after a Worker replacement, without executing",
+      "invariant": "A lost caller does not authorize replay of an external MCP effect; UNKNOWN is delivered to the pending original task."
+    },
+    {
+      "id": "mcp-withdrawn-native-recovery",
+      "workspace": "@pi-cloud/sandbox-supervisor",
+      "file": "test/durable-agent-session.test.ts",
+      "test": "resumes a native MCP task with its original reply even when withdrawn, without publishing another intent",
+      "invariant": "Pi resumes the original accepted input through a reply-only Tool proxy; withdrawn MCP definitions stay absent from model requests."
+    },
+    {
       "id": "control-dispatch-lease-independent",
       "workspace": "@pi-cloud/control-plane",
       "file": "test/control-tool-dispatcher.test.ts",

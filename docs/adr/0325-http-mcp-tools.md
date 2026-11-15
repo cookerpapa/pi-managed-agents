@@ -29,6 +29,10 @@ The package's declared protocol baseline is 2025-11-25, with its documented olde
 negotiated versions. This is not a claim of every future MCP feature. Keep one
 pinned client behind a platform-owned adapter; record a concrete unmet requirement
 before replacing it with the official SDK. Do not implement another MCP stack.
+The Pi client reads JSON/error bodies before applying its own message limit.
+Its injectable fetch port therefore uses a bounded response stream with the
+existing platform transport budget; Pi's SSE parser bounds individual events.
+This is an application adapter, not a vendor source patch.
 
 ## Connection and catalog authority
 
@@ -52,6 +56,12 @@ Conversations, keeping child delegation from silently widening external account
 access. The selected release plus connection scope/generation identify an admitted
 implementation. Name mapping cannot collide with built-in Tools or other connections.
 
+The accepted actor is the Session's existing recorded owner, matching personal
+Skill selection; this does not introduce private Sessions or change current
+tenant collaboration permissions. A collaborator who can steer an owner's
+Session acts through that Session's Agent. The first slice does not switch
+credentials per queued message or claim such isolation.
+
 Tool-host discovery/reconciliation publishes metadata after validating the current
 connection revision. Discovery failure is visible and does not silently select
 another endpoint. Tool changes apply at the next model request, not in the middle
@@ -73,6 +83,13 @@ and protection where ordinary control Tools need it, rather than adding another
 operation ledger. Pending recovery needs an internal reply-only proxy even if
 the tool is no longer offered to new model requests. A missing reply or lost
 Projector/Tool-host caller can still settle as UNKNOWN.
+
+Pi 1.0 resolves a recovering ToolTask against the current native Agent tool
+selection. Keep the pending reply-only registration in that native selection
+and use the public Generation `beforeRequest` hook to remove unoffered MCP tool
+definitions from model-bound messages. Fresh preparation through a reply-only
+proxy is rejected. Native task definitions, phase functions and storage batches
+remain unchanged; the upstream contract is covered by a real Harness recovery test.
 
 Revocation rejects new admission without retargeting accepted calls. Native Stop
 and ordered cancellation retain their current settlement semantics; cancellation

@@ -36,6 +36,7 @@ export type ControlPlaneApplicationOptions = Omit<
   ControlPlaneStoreOptions,
   "tenantId" | "defaultModelProfileId"
 > & {
+  mcp?: import("./mcp/connection-service.ts").McpConnectionService;
   executionTargets?: import("./execution-target-service.ts").ExecutionTargetService;
   skills?: import("./skill-market-service.ts").SkillMarketService;
   schedules?: import("./session-schedule-service.ts").SessionScheduleService;

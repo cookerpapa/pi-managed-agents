@@ -106,35 +106,42 @@ export class ControlToolRegistry implements ControlToolCatalogSource {
         },
       };
     const outcome = await tool.execute(command, current, signal);
-    try {
-      const { result } = parseToolResultPayload({
-        toolName: command.toolName,
-        toolCallId: command.nativeCallId,
-        isError: outcome.isError ?? false,
-        result: outcome.result,
-      });
-      assertSubagentResultBudget(
-        result.content
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n"),
-      );
-      if (result.details !== undefined) assertSubagentResultBudget(result.details);
-      if (result.diagnostics !== undefined) assertSubagentResultBudget(result.diagnostics);
-      return outcome;
-    } catch {
-      // A completed handler must not run again merely because its reply cannot be delivered.
-      return {
-        isError: true,
-        result: {
-          content: [
-            {
-              type: "text",
-              text: "tool_result_unavailable: The Tool returned an invalid or oversized result. Its effects may already have occurred; inspect them before repeating it.",
-            },
-          ],
-        },
-      };
-    }
+    return normalizeCompletedControlResult(command, outcome);
+  }
+}
+
+export function normalizeCompletedControlResult(
+  command: Pick<AcceptedControlToolCommand, "toolName" | "nativeCallId">,
+  outcome: { isError?: boolean; result: unknown; execution?: NonNullable<Result["execution"]> },
+): Result {
+  try {
+    const { result } = parseToolResultPayload({
+      toolName: command.toolName,
+      toolCallId: command.nativeCallId,
+      isError: outcome.isError ?? false,
+      result: outcome.result,
+    });
+    assertSubagentResultBudget(
+      result.content
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n"),
+    );
+    if (result.details !== undefined) assertSubagentResultBudget(result.details);
+    if (result.diagnostics !== undefined) assertSubagentResultBudget(result.diagnostics);
+    return { ...outcome, result };
+  } catch {
+    // A completed handler must not run again merely because its reply cannot be delivered.
+    return {
+      isError: true,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: "tool_result_unavailable: The Tool returned an invalid or oversized result. Its effects may already have occurred; inspect them before repeating it.",
+          },
+        ],
+      },
+    };
   }
 }

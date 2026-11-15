@@ -344,6 +344,7 @@ export class RunCancellationExecutor {
         )
         .select([
           "cancellation.tenant_id as tenantId",
+          "session_row.created_by_user_id as actorUserId",
           "cancellation.id as controlRequestId",
           "cancellation.idempotency_key as cancellationIdempotencyKey",
           "cancellation.payload as cancellationPayload",
@@ -452,6 +453,7 @@ export class RunCancellationExecutor {
           reason: commandPayload.reason,
           gracePeriodMs: commandPayload.gracePeriodMs,
           target: {
+            ...(row.actorUserId ? { actorUserId: row.actorUserId } : {}),
             tenantId: row.tenantId,
             projectId: row.projectId,
             workspaceId: row.workspaceId,

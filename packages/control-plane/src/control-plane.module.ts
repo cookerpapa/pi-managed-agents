@@ -1,3 +1,5 @@
+import { McpConnectionController } from "./mcp/connection-controller.ts";
+import { McpConnectionService } from "./mcp/connection-service.ts";
 import { ResourceBackendController } from "./resource-backend-controller.ts";
 import { ResourceBackendService } from "./resource-backend-service.ts";
 import { WorkspaceCapacityController } from "./workspace-capacity-controller.ts";
@@ -57,6 +59,7 @@ export type ControlPlaneModuleOptions = Omit<
   ControlPlaneStoreOptions,
   "tenantId" | "defaultModelProfileId"
 > & {
+  mcp?: McpConnectionService;
   executionTargets?: ExecutionTargetService;
   schedules?: SessionScheduleService;
   skills?: SkillMarketService;
@@ -127,6 +130,7 @@ export class ControlPlaneModule {
     return {
       module: ControlPlaneModule,
       controllers: [
+        McpConnectionController,
         ResourceBackendController,
         WorkspaceCapacityController,
         ResourceBillingController,
@@ -136,6 +140,10 @@ export class ControlPlaneModule {
         WorkspaceFileTransferController,
       ],
       providers: [
+        {
+          provide: McpConnectionService,
+          useValue: options.mcp ?? new McpConnectionService(options.database),
+        },
         {
           provide: ResourceBackendService,
           useValue: options.resourceBackends ?? new ResourceBackendService(options.database),

@@ -1,5 +1,6 @@
 import type { AcceptedToolCommand } from "./tool-command.ts";
 import type { AcceptedExecutorToolCommand } from "./execution-target.ts";
+import type { ControlToolDispatch } from "./control-tool-command.ts";
 
 export const TOOL_REPLY_DELIVERY_MARGIN_MS = 120_000;
 
@@ -48,6 +49,14 @@ export type OriginalRemoteToolIntent = Readonly<{
   sequence: number;
   taskId: number;
   conversationId: number;
-  command: AcceptedToolCommand | Omit<AcceptedExecutorToolCommand, "operationIndex">;
+  command:
+    | AcceptedToolCommand
+    | Omit<AcceptedExecutorToolCommand, "operationIndex">
+    | (ControlToolDispatch & {
+        kind: "control_tool";
+        scope: AcceptedToolCommand["scope"];
+        nativeCallId: string;
+        arguments: Record<string, unknown>;
+      });
   reply: ToolReplyRecovery;
 }>;

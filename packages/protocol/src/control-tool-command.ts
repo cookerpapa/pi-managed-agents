@@ -1,9 +1,15 @@
 import { isControlDispatchToolName } from "./control-tool-catalog.ts";
 import { parseToolEnvironmentRequest, type ToolEnvironmentRequest } from "./tool-environment.ts";
+import { MCP_CATALOG_SCOPE_PATTERN } from "./tool-catalog-publication.ts";
+import { parseToolReplyRecovery, type ToolReplyRecovery } from "./tool-recovery.ts";
+
+export const MCP_TOOL_TIMEOUT_MS = 300_000;
 export type ToolImplementation = Readonly<{
   releaseId: string;
   generation: number;
   replay: "safe" | "never";
+  /** Absent for code-owned platform tools; MCP identifies its connection catalog. */
+  catalogScope?: string;
 }>;
 
 export type ControlToolRecoverySource = Readonly<{
@@ -38,6 +44,8 @@ export type CandidateControlToolCommand = Readonly<{
   implementation?: ToolImplementation;
   sourceDocumentId?: number;
   recovery?: ControlToolRecoverySource & { documentId?: number };
+  /** Reply-only reattachment; never a request to invoke the external tool again. */
+  replyRecovery?: ToolReplyRecovery;
   replyMode?: "hostcall";
   workflowKey?: string;
   occurredAt: string;
@@ -55,6 +63,7 @@ export type ControlToolDispatch = Readonly<{
   implementation?: ToolImplementation;
   sourceDocumentId?: number;
   recovery?: ControlToolRecovery;
+  replyRecovery?: ToolReplyRecovery;
   replyMode?: "hostcall";
   workflowKey?: string;
   replyTopic: string;
@@ -68,7 +77,11 @@ export function parseControlToolDispatch(value: unknown): ControlToolDispatch {
       v.implementation.releaseId.length > 256 ||
       !Number.isSafeInteger(v.implementation.generation) ||
       v.implementation.generation < 1 ||
-      !["safe", "never"].includes(v.implementation.replay))
+      !["safe", "never"].includes(v.implementation.replay) ||
+      (v.implementation.catalogScope !== undefined &&
+        (!MCP_CATALOG_SCOPE_PATTERN.test(v.implementation.catalogScope) ||
+          v.implementation.replay !== "never" ||
+          !v.toolName.startsWith("mcp_"))))
   )
     throw new Error("Invalid Tool implementation identity");
   if (
@@ -95,6 +108,21 @@ export function parseControlToolDispatch(value: unknown): ControlToolDispatch {
   )
     throw new Error("Invalid control Tool dispatch reference");
   const recovery = v.recovery;
+  if (v.replyRecovery !== undefined) {
+    const reply = parseToolReplyRecovery(v.replyRecovery);
+    if (
+      !v.implementation?.catalogScope ||
+      v.recovery ||
+      v.sourceDocumentId !== undefined ||
+      v.replyMode !== undefined ||
+      v.workflowKey !== undefined ||
+      reply.topic !== v.replyTopic ||
+      reply.toolName !== v.toolName
+    )
+      throw new Error("Invalid control Tool reply recovery");
+  }
+  if (v.implementation?.catalogScope && !v.replyRecovery)
+    throw new Error("MCP Tool requires an original reply reference");
   if (v.environment !== undefined) {
     parseToolEnvironmentRequest(v.environment);
     if (v.bindingId !== v.environment.requestId)

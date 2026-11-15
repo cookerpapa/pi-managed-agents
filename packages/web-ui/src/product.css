@@ -5239,3 +5239,117 @@ body.product-panel-resizing {
   padding: 10px 0;
   border-bottom: 1px solid #383838;
 }
+
+/* Connection administration uses the existing page rhythm and theme. */
+.mcp-connections {
+  --mcp-border: #3e3e3e;
+  --mcp-bg: #252525;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.mcp-connections button,
+.mcp-connections input,
+.mcp-connections select {
+  font: inherit;
+}
+.mcp-editor {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--mcp-border);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.mcp-editor h2,
+.mcp-row h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.mcp-editor > label,
+.mcp-field-pair > label {
+  display: grid;
+  gap: 6px;
+}
+.mcp-editor input:not([type="checkbox"]),
+.mcp-editor select {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--mcp-border);
+  border-radius: 6px;
+  background: var(--mcp-bg);
+  color: inherit;
+}
+.mcp-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.mcp-editor .mcp-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mcp-editor fieldset {
+  min-width: 0;
+  border: 1px solid var(--mcp-border);
+  border-radius: 6px;
+  padding: 12px;
+}
+.mcp-editor fieldset .mcp-checkbox {
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
+.mcp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.mcp-actions button,
+.mcp-connections .skill-market-header > button {
+  padding: 7px 12px;
+  border: 1px solid var(--mcp-border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.mcp-connections button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mcp-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.mcp-row {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--mcp-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.mcp-row p {
+  margin: 6px 0 0;
+}
+.mcp-endpoint {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.mcp-hint {
+  font-size: 13px;
+  opacity: 0.75;
+  margin: 0;
+}
+.mcp-error {
+  color: #f08b8b;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .mcp-field-pair {
+    grid-template-columns: 1fr;
+  }
+}

@@ -13,6 +13,7 @@ import {
   parseDurableDisplayDescription,
   parseToolEnvironmentRequest,
   TOOL_REPLY_DELIVERY_MARGIN_MS,
+  MCP_TOOL_TIMEOUT_MS,
   executorToolBudget,
   type DurableCommitPublication,
   type DurableCommitPublisher,
@@ -89,6 +90,7 @@ export class DurableSessionPublisher {
           const hasRemote = publication.tools.some(
             ({ command }) =>
               isExecutorToolCommand(command) ||
+              (isControlToolCommand(command) && !!command.implementation?.catalogScope) ||
               (!isNamedToolCommand(command) && command.request.operation === "tool.execute"),
           );
           const replyPosition = hasRemote ? await this.options.replyPosition?.() : undefined;
@@ -181,6 +183,19 @@ export class DurableSessionPublisher {
                 ...(command.workflowKey ? { workflowKey: command.workflowKey } : {}),
                 scope: identity,
                 replyTopic: this.options.replyTopic,
+                ...(command.implementation?.catalogScope
+                  ? {
+                      replyRecovery: {
+                        ...replyPosition!,
+                        deadlineAt:
+                          Date.parse(command.occurredAt) +
+                          MCP_TOOL_TIMEOUT_MS +
+                          TOOL_REPLY_DELIVERY_MARGIN_MS,
+                        toolCallId: command.nativeCallId,
+                        toolName: command.toolName,
+                      },
+                    }
+                  : {}),
               };
             }
             const intent = durableToolIntent(publication.commit, taskId, index);

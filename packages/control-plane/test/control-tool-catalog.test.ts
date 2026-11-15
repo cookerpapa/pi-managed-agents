@@ -10,7 +10,7 @@ import {
   fauxAssistantMessage,
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
-import { ToolReplyMailbox } from "@pi-cloud/event-log";
+import { ToolReplyMailbox, ToolCatalogView } from "@pi-cloud/event-log";
 import {
   createExecutionReference,
   type ControlToolCatalogDefinition,
@@ -19,7 +19,6 @@ import {
 import { DurableAgentSession } from "../../sandbox-supervisor/src/durable/agent-session.ts";
 import { withToolInvocation, type PreparedAgentTool } from "@pi-cloud/sandbox-supervisor";
 import { WorkerToolRuntime } from "../../supervisor-host/src/tools/worker-tool-runtime.ts";
-import { WorkerToolCatalog } from "../../supervisor-host/src/tools/worker-tool-catalog.ts";
 import { restoreToolReply } from "../../supervisor-host/src/tool-reply-result.ts";
 import { ControlToolRegistry, controlToolCatalog } from "../src/control-tool-registry.ts";
 import type { AcceptedControlToolCommand } from "@pi-cloud/runtime-core/accepted-fact";
@@ -31,16 +30,31 @@ const definition = (name: string): ControlToolCatalogDefinition => ({
   parameters: { type: "object", properties: {}, additionalProperties: false },
 });
 
+function update(view: ToolCatalogView, catalog: import("@pi-cloud/protocol").ControlToolCatalog) {
+  const prior = view.snapshot;
+  view.accept({
+    version: 2,
+    scope: "platform",
+    releaseId: "fixture",
+    replayable: [],
+    catalog,
+    generation:
+      prior?.catalog.revision === catalog.revision
+        ? prior.generation
+        : (prior?.generation ?? 0) + 1,
+  });
+}
+
 it("retains the last valid Worker catalog and rejects collisions without installing executable code", () => {
-  const worker = new WorkerToolCatalog();
+  const worker = new ToolCatalogView();
   expect(worker.ready).toBe(false);
   const snapshot = controlToolCatalog([definition("new_tool")]);
-  worker.update(snapshot);
+  update(worker, snapshot);
   const changed = vi.fn();
   const stop = worker.subscribe(changed);
-  worker.update(snapshot);
+  update(worker, snapshot);
   expect(changed).not.toHaveBeenCalled();
-  expect(() => worker.update({ ...snapshot, revision: "0".repeat(64) })).toThrow("revision");
+  expect(() => update(worker, { ...snapshot, revision: "0".repeat(64) })).toThrow("digest");
   expect(() => controlToolCatalog([definition("bash")])).toThrow("fixed native");
   expect(worker.read()).toEqual(snapshot);
   stop();
@@ -64,7 +78,7 @@ it("turns oversized completed ordinary results into a bounded error instead of r
 
 it("adds and withdraws an unknown Tool within one native submission while retaining an accepted result", async () => {
   const server = new ControlToolRegistry(),
-    worker = new WorkerToolCatalog();
+    worker = new ToolCatalogView();
   const started = Promise.withResolvers<void>(),
     release = Promise.withResolvers<void>();
   server.register({
@@ -75,8 +89,8 @@ it("adds and withdraws an unknown Tool within one native submission while retain
       return { result: { content: [{ type: "text", text: "gate complete" }] } };
     },
   });
-  worker.update(server.read());
-  const disconnect = server.subscribe(() => worker.update(server.read()));
+  update(worker, server.read());
+  const disconnect = server.subscribe(() => update(worker, server.read()));
   const mailbox = new ToolReplyMailbox();
   const runId = randomUUID(),
     writerId = randomUUID();

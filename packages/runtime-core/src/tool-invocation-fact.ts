@@ -78,7 +78,9 @@ export function validateControlToolReferences(
     if (reference.recovery) {
       durableControlRecovery(fact.commit, reference, index);
     } else {
-      durableControlIntent(fact.commit, reference, index);
+      const intent = durableControlIntent(fact.commit, reference, index);
+      if (reference.replyRecovery && reference.replyRecovery.toolCallId !== intent.callId)
+        throw new Error("Control Tool original reply identity changed");
       if (
         reference.sourceDocumentId === undefined &&
         index.task(reference.taskId)?.conversationId !== reference.conversationId

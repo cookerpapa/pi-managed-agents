@@ -1,3 +1,5 @@
+import { McpConnectionService } from "./mcp/connection-service.ts";
+import { McpCredentialVault } from "./mcp/credential-vault.ts";
 import { ResourceBackendService } from "./resource-backend-service.ts";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -101,7 +103,7 @@ export async function startSessionApi(): Promise<void> {
       brokers: config.kafkaBrokers,
       replicas: config.kafkaReplicas,
       instanceId: randomUUID(),
-      minimumGeneration: async () => (await catalogAuthority.read())?.generation ?? 1,
+      minimumGenerations: () => catalogAuthority.minimumGenerations(),
     });
     cleanup.push(() => catalog.close());
     await catalog.start();
@@ -146,6 +148,10 @@ export async function startSessionApi(): Promise<void> {
     cleanup.push(() => source.close());
     const application = await createControlPlaneApplication({
       database,
+      mcp: new McpConnectionService(
+        database,
+        config.mcpCredentialKey ? new McpCredentialVault(config.mcpCredentialKey) : undefined,
+      ),
       conversationReadDatabase: readDatabase,
       skills,
       executionTargets,

@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
+import { Type } from "typebox";
 import {
   infrastructureToolDefinitions,
   skillActivationNeedsWorkspace,
@@ -28,6 +29,8 @@ import {
   ToolExecutionFailure,
   ToolResultAttachmentError,
   executorToolBudget,
+  MCP_TOOL_TIMEOUT_MS,
+  TOOL_REPLY_DELIVERY_MARGIN_MS,
 } from "@pi-cloud/protocol";
 import {
   toolInvocationId,
@@ -45,7 +48,9 @@ export class WorkerToolRuntime {
     readonly options: {
       implementation(name: string): import("@pi-cloud/protocol").ToolImplementation | undefined;
       catalog: ControlToolCatalogSource;
+      scopedCatalog?(scope: ExecuteTurnCommandMessage["payload"]): ControlToolCatalogSource;
       nativeConversations: {
+        recoveredControlToolNames?(reference: string, conversationId: number): readonly string[];
         childAnchor(
           reference: string,
           inherit: boolean,
@@ -84,6 +89,7 @@ export class WorkerToolRuntime {
     onExecutionUnavailable?(failure: { code: string; message: string }): void;
   }): Promise<TrustedAgentToolSet> {
     const scope = context.command.payload;
+    const catalog = this.options.scopedCatalog?.(scope) ?? this.options.catalog;
     const workspaceAvailable = hasConversationWorkspace(scope);
     const targetBindings = new Map<string, Promise<string>>();
     const prepareTarget = (target: ExecutionTargetGrant, signal?: AbortSignal) => {
@@ -216,10 +222,15 @@ export class WorkerToolRuntime {
       name: string;
       environment?: ToolEnvironmentRequirement;
     };
-    const createBinding = (definition: Definition, ordinary: boolean): TrustedAgentTool => {
+    const createBinding = (
+      definition: Definition,
+      ordinary: boolean,
+      recoveryOnly = false,
+    ): TrustedAgentTool => {
       const environment = definition.environment ?? { kind: "none" as const };
+      const mcp = ordinary && definition.name.startsWith("mcp_");
       const target = toolExecutionTarget(definition, capabilities);
-      const recoverDeviceReply = async (
+      const recoverOriginalReply = async (
         nativeCallId: string,
         args: unknown,
         signal?: AbortSignal,
@@ -229,7 +240,10 @@ export class WorkerToolRuntime {
         const call = original?.command;
         if (
           !original ||
-          call?.kind !== "executor_tool" ||
+          (call?.kind !== "executor_tool" && call?.kind !== "control_tool") ||
+          (mcp
+            ? call.kind !== "control_tool" || !call.implementation?.catalogScope
+            : call.kind !== "executor_tool") ||
           original.taskId !== parseSubagentTaskId(toolInvocationId(nativeCallId)) ||
           original.conversationId !== scope.piSession.conversationId ||
           call.scope.tenantId !== scope.tenantId ||
@@ -241,7 +255,7 @@ export class WorkerToolRuntime {
           original.reply.toolName !== definition.name ||
           !isDeepStrictEqual(call.arguments, args)
         )
-          throw new Error("Device recovery has no matching original operation");
+          throw new Error("Tool recovery has no matching original operation");
         const lifetime = new AbortController();
         const activeSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
         const pending = this.options.wait(
@@ -254,22 +268,40 @@ export class WorkerToolRuntime {
         );
         void pending.result.catch(() => {});
         return {
-          command: {
-            target: "executor" as const,
-            executionReference: scope.executionReference,
-            operationId: call.operationId,
-            bindingId: call.bindingId,
-            toolCallId: toolInvocationId(nativeCallId),
-            nativeCallId,
-            conversationId: scope.piSession.conversationId,
-            toolName: definition.name,
-            arguments: call.arguments,
-            occurredAt: call.occurredAt,
-            originalWriterId: call.scope.writerId,
-            replyRecovery: original.reply,
-          },
+          command:
+            call.kind === "control_tool"
+              ? {
+                  target: "control" as const,
+                  executionReference: scope.executionReference,
+                  operationId: call.operationId,
+                  toolCallId: toolInvocationId(nativeCallId),
+                  nativeCallId,
+                  conversationId: scope.piSession.conversationId,
+                  toolName: definition.name,
+                  arguments: call.arguments,
+                  contextAnchor: call.contextAnchor,
+                  implementation: call.implementation,
+                  replyRecovery: original.reply,
+                  occurredAt: new Date(
+                    original.reply.deadlineAt - MCP_TOOL_TIMEOUT_MS - TOOL_REPLY_DELIVERY_MARGIN_MS,
+                  ).toISOString(),
+                }
+              : {
+                  target: "executor" as const,
+                  executionReference: scope.executionReference,
+                  operationId: call.operationId,
+                  bindingId: call.bindingId,
+                  toolCallId: toolInvocationId(nativeCallId),
+                  nativeCallId,
+                  conversationId: scope.piSession.conversationId,
+                  toolName: definition.name,
+                  arguments: call.arguments,
+                  occurredAt: call.occurredAt,
+                  originalWriterId: call.scope.writerId,
+                  replyRecovery: original.reply,
+                },
           completed: pending.executionSettled,
-          dispose: () => lifetime.abort(new Error("Recovered device wait closed")),
+          dispose: () => lifetime.abort(new Error("Recovered Tool wait closed")),
           result: async () => {
             try {
               const reply = await pending.result;
@@ -281,11 +313,18 @@ export class WorkerToolRuntime {
                 error instanceof ToolExecutionFailure
                   ? error
                   : new ToolExecutionFailure({
-                      code: "executor_result_unknown",
+                      code: "tool_result_unknown",
                       effect: "unknown",
                       message:
-                        "The original device result is unavailable. Inspect its state before repeating the action.",
+                        "The original Tool result is unavailable. Inspect its state before repeating the action.",
                     });
+              if (mcp)
+                return {
+                  isError: true,
+                  content: [
+                    { type: "text" as const, text: `tool_result_unknown: ${failure.message}` },
+                  ],
+                };
               if (failure.effect === "unknown") context.onExecutionUnavailable?.(failure);
               throw failure;
             }
@@ -298,6 +337,8 @@ export class WorkerToolRuntime {
         signal?: AbortSignal,
         recovery = false,
       ) => {
+        if (recoveryOnly)
+          throw new Error("tool_unavailable: this registration only restores an original reply");
         if (definition.availability === "root" && scope.sessionKind === "subagent")
           throw new Error("tool_unavailable: This Tool belongs to the root conversation");
         if (!workspaceAvailable && (environment.kind === "workspace" || definition.workflowScript))
@@ -310,9 +351,7 @@ export class WorkerToolRuntime {
           return prepareWorkflow(nativeCallId, invocationId, script, signal, definition.name);
         }
         if (ordinary) {
-          const current = this.options.catalog
-            .read()
-            .tools.find((tool) => tool.name === definition.name);
+          const current = catalog.read().tools.find((tool) => tool.name === definition.name);
           if (
             !current ||
             !isDeepStrictEqual(current.parameters, definition.parameters) ||
@@ -348,7 +387,7 @@ export class WorkerToolRuntime {
           if (
             skillAvailability(
               skill.requirements,
-              effectiveToolCapabilities(capabilities, this.options.catalog.read().tools),
+              effectiveToolCapabilities(capabilities, catalog.read().tools),
             ).state === "unsupported"
           )
             throw new Error(
@@ -385,7 +424,9 @@ export class WorkerToolRuntime {
         const deadline =
           environment.kind === "target"
             ? AbortSignal.timeout(executorToolBudget(definition.name, args).replyMs)
-            : undefined;
+            : mcp
+              ? AbortSignal.timeout(MCP_TOOL_TIMEOUT_MS + TOOL_REPLY_DELIVERY_MARGIN_MS)
+              : undefined;
         const activeSignal = AbortSignal.any([
           waiting.signal,
           ...(signal ? [signal] : []),
@@ -446,8 +487,15 @@ export class WorkerToolRuntime {
                   code: "tool_reply_timeout",
                   effect: "unknown",
                   message:
-                    "No final device reply arrived. The action may have happened; inspect the device before repeating it.",
+                    "No final Tool reply arrived. The action may have happened; inspect its state before repeating it.",
                 });
+                if (mcp)
+                  return {
+                    isError: true,
+                    content: [
+                      { type: "text" as const, text: `tool_result_unknown: ${failure.message}` },
+                    ],
+                  };
                 context.onExecutionUnavailable?.(failure);
                 throw failure;
               }
@@ -464,10 +512,11 @@ export class WorkerToolRuntime {
       };
       return {
         executionPlane: ordinary ? ("platform" as const) : ("orchestration" as const),
-        offered: isConversationToolOffered(definition, capabilities),
+        offered: !recoveryOnly && isConversationToolOffered(definition, capabilities),
         tool: {
           ...definition,
-          ...(environment.kind === "target"
+          ...(recoveryOnly ? { recoveryOnly: true as const } : {}),
+          ...(environment.kind === "target" || mcp
             ? { replay: "safe" as const, recoverySource: "reply" as const }
             : {}),
           async execute() {
@@ -475,8 +524,8 @@ export class WorkerToolRuntime {
           },
           prepareExecution: (callId: string, args: unknown, signal?: AbortSignal) =>
             prepare(callId, args, signal),
-          ...(environment.kind === "target"
-            ? { prepareRecovery: recoverDeviceReply }
+          ...(environment.kind === "target" || mcp
+            ? { prepareRecovery: recoverOriginalReply }
             : definition.replay === "safe"
               ? {
                   prepareRecovery: (callId: string, args: unknown, signal?: AbortSignal) =>
@@ -493,11 +542,17 @@ export class WorkerToolRuntime {
     let current: readonly TrustedAgentTool[] = native;
     return {
       current: () => {
-        const catalog = this.options.catalog.read();
-        if (catalog.revision !== revision) {
+        const snapshot = catalog.read();
+        const restored =
+          this.options.nativeConversations.recoveredControlToolNames?.(
+            scope.executionReference,
+            scope.piSession.conversationId,
+          ) ?? [];
+        const nextRevision = snapshot.revision + ":" + restored.join(",");
+        if (nextRevision !== revision) {
           current = [
             ...native,
-            ...catalog.tools.map((definition) =>
+            ...snapshot.tools.map((definition) =>
               createBinding(
                 {
                   name: definition.name,
@@ -510,12 +565,28 @@ export class WorkerToolRuntime {
                 true,
               ),
             ),
+            ...restored
+              .filter((name) => !snapshot.tools.some((t) => t.name === name))
+              .map((name) =>
+                createBinding(
+                  {
+                    name,
+                    description: "Restore the original in-flight reply only.",
+                    parameters: Type.Object({}, { additionalProperties: true }),
+                    replay: "safe",
+                    environment: { kind: "none" },
+                    availability: "root",
+                  },
+                  true,
+                  true,
+                ),
+              ),
           ];
-          revision = catalog.revision;
+          revision = nextRevision;
         }
         return current;
       },
-      subscribe: (listener) => this.options.catalog.subscribe(listener),
+      subscribe: (listener) => catalog.subscribe(listener),
     };
   }
 }

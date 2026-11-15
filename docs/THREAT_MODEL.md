@@ -20,6 +20,14 @@ platform credential. Upstream OAuth/API credentials remain in CLIProxyAPI's
 private deployment Volume. The Worker has no Cube API credential; sandbox
 management and the independent completion receiver have no model credential.
 
+HTTP MCP connections add an explicit external-service boundary: owners select
+endpoints and personal-Session or organization scope. The Tool host alone runs
+the pinned MCP protocol client; the API stores encrypted credentials and Workers
+only see tool definitions. MCP output remains Tool data. No remote extension code
+is installed in the Harness and no Workspace access is implied by registration.
+Personal scope follows the existing Session owner and collaboration rules; it
+does not create a private Session ACL. See [MCP](MCP.md).
+
 The explicit local Linux integration uses a different boundary: Bubblewrap mounts
 only the selected project, fixed runtime files and temporary storage. The host
 home/root, Docker socket and platform credentials are not exposed to its tools.

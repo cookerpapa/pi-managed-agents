@@ -73,6 +73,9 @@ export async function purgeOwnedAcceptanceTenant(
       (select count(*) from session_attachment_references where tenant_id=${tenant.tenantId}::uuid)::int as images,
       (select count(*) from session_attachment_objects where tenant_id=${tenant.tenantId}::uuid and write_completed_at is null)::int as unfinished_image_writers,
       (select count(*) from skill_versions where tenant_id=${tenant.tenantId}::uuid and not published)::int as unfinished_skill_writers,
+      (select count(*) from mcp_connections c left join tool_catalog_publication p on p.scope='mcp:'||c.id::text
+        where c.tenant_id=${tenant.tenantId}::uuid and (c.deleted_at is null or p.published_generation is distinct from p.generation
+          or coalesce((p.mcp->>'enabled')::boolean,true)))::int as mcp_connections,
       (select count(*) from session_uploads where tenant_id=${tenant.tenantId}::uuid)::int as uploads`.execute(
       db,
     );
@@ -108,6 +111,10 @@ export async function purgeOwnedAcceptanceTenant(
     // belong exclusively to the verified disposable acceptance account.
     await sql`delete from model_metering_events where invocation_id in
       (select id from model_invocations where tenant_id=${tenant.tenantId}::uuid)`.execute(tx);
+    await sql`delete from tool_catalog_publication where scope in
+      (select 'mcp:'||id::text from mcp_connections where tenant_id=${tenant.tenantId}::uuid)`.execute(
+      tx,
+    );
     for (const table of [
       // All owned Sessions are gone. Remove the remaining graph in dependency
       // order instead of relying on the tenant's cascades or waiting for GC.
@@ -117,6 +124,7 @@ export async function purgeOwnedAcceptanceTenant(
       "resource_rate_versions",
       "model_invocations",
       "model_rate_versions",
+      "mcp_connections",
       "run_skill_catalogs",
       "skill_installations",
       "skill_versions",

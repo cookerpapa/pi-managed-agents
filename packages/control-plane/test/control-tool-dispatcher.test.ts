@@ -78,7 +78,7 @@ async function fixture(replayable = true) {
   await sql`insert into pi_durable_log values(${tenant}::uuid,'physical',8,4,'task',${JSON.stringify({ type: "task", value: task })})`.execute(
     database,
   );
-  const publish = vi.fn(async () => {});
+  const publish = vi.fn(async (_topic: string, _reply: unknown) => {});
   const execute = vi.fn(async (): Promise<ControlToolOutcome> => ({
     result: { content: [{ type: "text", text: "ready" }] },
   }));
@@ -261,6 +261,85 @@ function intent(f: Awaited<ReturnType<typeof fixture>>) {
     },
   };
 }
+
+async function mcpFixture() {
+  const base = await fixture(false);
+  const f = { ...base, dispatch: { ...base.dispatch } };
+  f.dispatch.toolName = "mcp_echo_fixture";
+  f.dispatch.implementation = {
+    releaseId: "mcp-test",
+    generation: 1,
+    replay: "never",
+    catalogScope: "mcp:20000000-0000-4000-8000-000000000011",
+  };
+  f.dispatch.replyTopic = "pi-cloud.tool-replies.v4.20000000-0000-4000-8000-000000000012";
+  f.dispatch.replyRecovery = {
+    topic: f.dispatch.replyTopic,
+    partition: 0,
+    offset: "0",
+    deadlineAt: Date.now() + 420000,
+    toolCallId: "provider-call",
+    toolName: f.dispatch.toolName,
+  };
+  await sql`update pi_durable_commits set cloud_metadata=${JSON.stringify({ controlTools: [f.dispatch] })}`.execute(
+    f.database,
+  );
+  await sql`update pi_durable_records set fields=fields||${JSON.stringify({ replyIntentSeq: "8", replyOperation: f.dispatch.operationId })}::jsonb`.execute(
+    f.database,
+  );
+  return f;
+}
+
+it("keeps an admitted MCP HTTP call through Worker closure, then cancels by native task across writers", async () => {
+  const f = await mcpFixture(),
+    finish = Promise.withResolvers<ControlToolOutcome>();
+  f.execute.mockImplementation(() => finish.promise);
+  await f.dispatcher.consume(
+    intent(f),
+    () => true,
+    async () => true,
+  );
+  await vi.waitFor(() => expect(f.execute).toHaveBeenCalledTimes(1));
+  const signal = (f.execute.mock.calls[0] as unknown as [unknown, unknown, AbortSignal])[2];
+  await f.dispatcher.consume({
+    topic: "native-controls",
+    partition: 1,
+    offset: 10n,
+    fact: {
+      kind: "execution_seal",
+      factId: "seal",
+      scope: f.dispatch.scope,
+      agentId: "agent",
+      baseSequence: 8,
+      occurredAt: new Date().toISOString(),
+      recover: true,
+    },
+  });
+  expect(signal.aborted).toBe(false);
+  finish.resolve({ result: { content: [{ type: "text", text: "ORIGINAL_MCP_RESULT" }] } });
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledTimes(1));
+  expect(f.publish.mock.calls[0]?.[0]).toBe(f.dispatch.replyTopic);
+  expect(JSON.stringify(f.publish.mock.calls)).toContain("ORIGINAL_MCP_RESULT");
+  const ended = intent(f);
+  ended.fact.tools = [];
+  ended.fact.scope = { ...f.dispatch.scope, writerId: "replacement", fencingToken: 3 };
+  ended.fact.commit.writes = [{ type: "task", value: { ...f.task, abortRequested: true } }];
+  await f.dispatcher.consume(ended);
+  expect(signal.aborted).toBe(true);
+  expect(f.execute).toHaveBeenCalledTimes(1);
+}, 20000);
+
+it("cold MCP recovery returns UNKNOWN on the original topic after a Worker replacement, without executing", async () => {
+  const f = await mcpFixture();
+  await sql`update runs set lease_id='20000000-0000-4000-8000-000000000009'::uuid,fencing_token=3`.execute(
+    f.database,
+  );
+  await f.dispatcher.recover([1], () => true);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledTimes(1));
+  expect(f.execute).not.toHaveBeenCalled();
+  expect(f.publish.mock.calls[0]?.[0]).toBe(f.dispatch.replyTopic);
+  expect(JSON.stringify(f.publish.mock.calls)).toContain("tool_result_unknown");
+}, 20000);
 
 it("commits dispatch before a non-replayable effect and never repeats it after reply loss", async () => {
   const f = await fixture(false);

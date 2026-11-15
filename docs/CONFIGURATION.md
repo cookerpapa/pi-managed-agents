@@ -785,5 +785,5 @@ Workers use `PI_CLOUD_SESSION_EXECUTION_URL` (Helm
 `pi-workers.services.sessionExecutionUrl`) for logical input-image preparation and
 workflow attachments. Existing `PI_CLOUD_SANDBOX_CONTROL_URLS` remain for Worker
 boot inventory/retirement. Model calls and canonical Session commits are unchanged.
-The complete Tool catalog uses `pi-cloud.tool-catalog.v1`; it is configuration,
+The scoped Tool catalog uses `pi-cloud.tool-catalog.v2`; it is configuration,
 not conversation history or a second dispatch consumer.

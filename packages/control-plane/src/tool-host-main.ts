@@ -1,3 +1,5 @@
+import { McpToolHostRuntime, McpInvocationRefused } from "./mcp/tool-host-runtime.ts";
+import { McpCredentialVault } from "./mcp/credential-vault.ts";
 import Fastify from "fastify";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -47,6 +49,7 @@ export async function startToolHost() {
   let selected: ToolCatalogPublication | undefined;
   let closing: Promise<void> | undefined;
   let retryTimer: NodeJS.Timeout | undefined;
+  let mcp: McpToolHostRuntime | undefined;
   const app = Fastify({ logger: false, bodyLimit: MAX_TOOL_RESPONSE_BYTES });
   const close = () =>
     (closing ??= (async () => {
@@ -126,9 +129,29 @@ export async function startToolHost() {
         .tools.filter((tool) => tools.replayable(tool.name))
         .map((tool) => tool.name)
         .sort();
-    const publish = async (snapshot: ToolCatalogPublication) => {
+    const publishScoped = async (snapshot: ToolCatalogPublication) => {
       await publisher.publish(snapshot);
       await authority.confirmPublished(snapshot);
+    };
+    mcp = new McpToolHostRuntime({
+      database,
+      databaseUrl: config.databaseUrl,
+      releaseId,
+      ...(config.mcpCredentialKey
+        ? { vault: new McpCredentialVault(config.mcpCredentialKey) }
+        : {}),
+      fetch: ((url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+        proxyFetch(url as Parameters<typeof proxyFetch>[0], {
+          ...(init as Parameters<typeof proxyFetch>[1]),
+          dispatcher: egress,
+        })) as unknown as typeof fetch,
+      publish: publishScoped,
+      report: (event) => operationalLog({ service: "pi-cloud-tool-host", level: "warn", event }),
+    });
+    cleanup.push(() => mcp!.close());
+    const publish = async (snapshot: ToolCatalogPublication) => {
+      await mcp!.adoptRelease();
+      await publishScoped(snapshot);
       selected = snapshot;
     };
     const credentials = Buffer.from(`Bearer ${config.supervisorManagementToken}`);
@@ -208,8 +231,9 @@ export async function startToolHost() {
           parseControlToolDispatch(dispatch);
           if (
             call.implementation?.releaseId !== releaseId ||
-            call.implementation.generation !== selected.generation ||
-            (call.implementation.replay === "safe") !== replayable().includes(call.toolName)
+            (!call.implementation.catalogScope &&
+              (call.implementation.generation !== selected.generation ||
+                (call.implementation.replay === "safe") !== replayable().includes(call.toolName)))
           )
             return reply.code(412).send({ error: "tool_implementation_changed" });
           if (
@@ -231,6 +255,8 @@ export async function startToolHost() {
         // and increment are synchronous with respect to the drain endpoint.
         if (!accepting || quiescence.status().phase !== "open")
           return reply.code(503).send({ error: "tool_host_draining" });
+        if (request.raw.aborted || reply.raw.destroyed)
+          return reply.code(409).send({ error: "tool_caller_disconnected" });
         const controller = new AbortController();
         active.add(controller);
         const abort = () => {
@@ -239,11 +265,9 @@ export async function startToolHost() {
         request.raw.once("aborted", abort);
         reply.raw.once("close", abort);
         try {
-          const outcome = await tools.execute(
-            call,
-            () => !controller.signal.aborted,
-            controller.signal,
-          );
+          const outcome = call.implementation?.catalogScope
+            ? await mcp!.execute(call, () => !controller.signal.aborted, controller.signal)
+            : await tools.execute(call, () => !controller.signal.aborted, controller.signal);
           const result = parseToolResultPayload({
             toolName: call.replyMode === "hostcall" ? "subagent-control" : call.toolName,
             toolCallId: call.nativeCallId,
@@ -256,7 +280,9 @@ export async function startToolHost() {
             result,
           );
           return { operationId: call.operationId, releaseId, result: packed };
-        } catch {
+        } catch (error) {
+          if (error instanceof McpInvocationRefused)
+            return reply.code(409).send({ error: "mcp_invocation_not_admitted" });
           return reply.code(502).send({ error: "tool_execution_unconfirmed" });
         } finally {
           active.delete(controller);
@@ -286,6 +312,7 @@ export async function startToolHost() {
         await publish(snapshot);
     };
     await restore();
+    mcp.start();
     let retrying = false;
     retryTimer = setInterval(() => {
       if (retrying || closing || selected) return;

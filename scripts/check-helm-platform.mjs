@@ -40,6 +40,18 @@ const resources = parseAllDocuments(rendered)
     return document.toJSON();
   })
   .filter(Boolean);
+for (const resource of resources.filter((r) => r.spec?.template)) {
+  const containers = resource.spec.template.spec.containers;
+  const mcpMounts = containers.flatMap((c) =>
+    (c.volumeMounts ?? []).filter((m) => m.subPath === "mcp-credential-master-key"),
+  );
+  const expected = ["pi-cloud-session-api", "pi-cloud-tool-host"].includes(resource.metadata.name);
+  assert.equal(
+    mcpMounts.length,
+    expected ? 1 : 0,
+    `${resource.metadata.name}: MCP key belongs only to API/Tool host`,
+  );
+}
 const metadataFixture = mkdtempSync(resolve(tmpdir(), "pma-chart-metadata-"));
 try {
   const copiedChart = resolve(metadataFixture, "chart");

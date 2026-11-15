@@ -26,7 +26,7 @@ export class ToolHostClient {
     readonly options: {
       baseUrl: string;
       token: string;
-      catalog(): ToolCatalogPublication | undefined;
+      catalog(toolName: string): ToolCatalogPublication | undefined;
     },
   ) {}
 
@@ -35,7 +35,7 @@ export class ToolHostClient {
     current: () => boolean,
     signal?: AbortSignal,
   ): Promise<ControlToolOutcome> {
-    const catalog = this.options.catalog();
+    const catalog = this.options.catalog(command.toolName);
     const selected = command.implementation;
     const failure = (message: string): ControlToolOutcome => ({
       isError: true,
@@ -43,7 +43,11 @@ export class ToolHostClient {
     });
     if (!current() || signal?.aborted || !selected)
       return failure("tool_unavailable: The tool catalog or execution owner is unavailable.");
-    if (catalog?.generation !== selected.generation || catalog?.releaseId !== selected.releaseId)
+    if (
+      catalog?.generation !== selected.generation ||
+      catalog?.releaseId !== selected.releaseId ||
+      catalog?.scope !== (selected.catalogScope ?? "platform")
+    )
       return failure(
         "tool_unavailable: The accepted tool implementation has been replaced. This invocation was not submitted.",
       );
