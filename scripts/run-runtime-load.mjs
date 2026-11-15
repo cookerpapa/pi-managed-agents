@@ -1032,6 +1032,14 @@ try {
                 firstByteMs: 0,
                 outputBytes: 4096,
               },
+              {
+                name: "waiting-model-64",
+                kind: "text",
+                concurrency: 64,
+                count: 64,
+                firstByteMs: 10000,
+                outputBytes: 2048,
+              },
               ...[16, 32].map((rate) => ({
                 name: "arrival-" + rate,
                 kind: "text",
