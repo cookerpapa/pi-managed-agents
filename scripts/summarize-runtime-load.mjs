@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
 const [output, ...inputs] = process.argv.slice(2);
 assert(output && inputs.length, "Usage: summarize-runtime-load.mjs output.json report.json ...");
-const result = { format: "pma.runtime-capacity-summary.v1", evaluations: [] };
+const result = { format: "pma.runtime-capacity-summary.v1", environments: {}, evaluations: [] };
 for (const path of inputs) {
   const r = JSON.parse(await readFile(path, "utf8"));
   assert.equal(r.format, "pma.runtime-capacity.v1");
+  const environment = createHash("sha256")
+    .update(JSON.stringify(r.inventory))
+    .digest("hex")
+    .slice(0, 16);
+  result.environments[environment] = r.inventory;
   const role = (name) =>
     r.inventory
       .map((i) => i.name)
@@ -21,7 +27,7 @@ for (const path of inputs) {
     dirty: r.dirty,
     serving: r.serving,
     hardware: r.hardware,
-    inventory: r.inventory,
+    environment,
     accepted: r.accepted,
     cleanupConfirmed: r.cleanupConfirmed,
     realProviderRequests: r.realProviderRequests,
@@ -143,13 +149,19 @@ for (const path of inputs) {
       components,
       containers: Object.fromEntries(containers),
       stageTimings: Object.fromEntries(
-        Object.entries(durations).map(([key, v]) => [
-          key,
-          {
-            count: v.count,
-            meanMs: (v.sumSeconds / v.count) * 1000,
-          },
-        ]),
+        Object.entries(durations)
+          .filter(([key]) =>
+            /run_claim|stage="(writer_prepare|world_state_prepare|pi_session_open|kafka_publish|projection|producer_ack|producer_queue)"/.test(
+              key,
+            ),
+          )
+          .map(([key, v]) => [
+            key,
+            {
+              count: v.count,
+              meanMs: (v.sumSeconds / v.count) * 1000,
+            },
+          ]),
       ),
       historyReadsMs: m.historyReadsMs,
       historyPages: m.historyPages,
