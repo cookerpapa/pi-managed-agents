@@ -210,6 +210,7 @@ export class RuntimeLoadMetrics {
   async stop() {
     clearInterval(this.timer);
     await this.pending;
+    this.lastExtendedAt = 0;
     await this.sample().catch((e) => this.errors.push(String(e.message)));
   }
   summary() {

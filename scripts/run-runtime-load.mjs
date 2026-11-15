@@ -1113,6 +1113,21 @@ try {
       report.measurements.every(
         (m) => (m.expectedOutcomesPassed || m.summary.failed === 0) && !m.resources.headroomStopped,
       );
+    const drainage = new RuntimeLoadMetrics({ database, tenantId: tenant.tenantId, fixture });
+    await drainage.start();
+    await delay(6000);
+    await drainage.stop();
+    const last = drainage.samples.at(-1);
+    report.postLoad = {
+      resources: drainage.summary(),
+      lastQueue: last.pg,
+      lastKafkaLag: last.kafka?.unavailable ? null : last.kafka?.lag,
+    };
+    assert.equal(
+      last.pg.running + last.pg.queued + last.pg.settling,
+      0,
+      "Owned Runs remained active after load drainage",
+    );
   }
 } catch (error) {
   failure = error;

@@ -25,6 +25,8 @@ for (const path of inputs) {
     cleanupConfirmed: r.cleanupConfirmed,
     realProviderRequests: r.realProviderRequests,
     metering: r.metering,
+    idleBaseline: r.idleBaseline?.resources,
+    postLoad: r.postLoad,
     history: r.history && {
       seedRuns: r.history.seedRuns,
       seedOutputBytes: r.history.seedOutputBytes,
@@ -130,7 +132,10 @@ for (const path of inputs) {
         ...m.resources,
         kafkaSamples: kafka.length,
         firstKafkaLag: kafka[0]?.lag,
-        finalKafkaLag: kafka.at(-1)?.lag,
+        lastObservedKafkaLag: kafka.at(-1)?.lag,
+        lastKafkaObservationAgeMs: kafka.length
+          ? samples.at(-1).finishedAt - kafka.at(-1).observedAt
+          : null,
       },
       provider,
       components,
