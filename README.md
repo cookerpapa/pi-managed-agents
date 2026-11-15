@@ -26,7 +26,7 @@ restarting platform services; users select them on the resource page. Existing
 Android devices can be registered for an organization and bound to idle Sessions.
 There is no automatic provider fallback or emulator-provisioning UI. See the
 [backend contract](docs/RESOURCE_BACKENDS.md) and
-[current delivery evidence](docs/reports/client-service-delivery-20261114.md).
+[current delivery evidence](docs/reports/http-mcp-delivery-20261115.md).
 
 > **Open to opportunities:** The maintainer is looking for engineering roles in
 > Agent Runtime, Harness or Managed Agents infrastructure, based in **Guangzhou,

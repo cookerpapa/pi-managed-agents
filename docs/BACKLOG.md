@@ -1,8 +1,8 @@
 # Maintained backlog
 
-## HTTP MCP tool integration — in progress
+## HTTP MCP tool integration — delivered
 
-- [ ] [#40](https://github.com/cookerpapa/pi-managed-agents/issues/40): evaluate
+- [x] [#40](https://github.com/cookerpapa/pi-managed-agents/issues/40): evaluate
   Pi's standalone MCP client and integrate HTTP tools through native Pi proxies,
   the existing Session dispatch path and the execution-side Tool host. Extend
   scoped catalog publication and retain authorization, original reply/deadline
@@ -12,13 +12,20 @@
 - [x] Initial Pi MCP 1.0 HTTP discovery/call/Bearer/cancellation/lost-reply probe.
 - [x] Scoped connection management, catalog delivery, execution and original-result
   recovery implemented. Native/PG/browser and RF=3 checks passed.
-- [ ] Planned publication and owned Luna/Worker replacement acceptance.
+- [x] Planned publication and owned Luna/Worker replacement acceptance, including
+  same-Run hot tools, images, cancellation, withdrawal and no duplicate effects.
+
+[Delivery evidence and limits](reports/http-mcp-delivery-20261115.md). Current
+release: `http-mcp-20261115-r1`, schema 225, catalog v2. Original assets were
+preserved; the obsolete v1 catalog was deleted after consumer verification.
+- [ ] Existing native Cube template cleanup still has eight unconfirmed old
+  candidates. Retain their ownership metadata until native deletion is confirmed.
 
 ## External client SDK — low priority / deferred
 
 - [ ] [#41](https://github.com/cookerpapa/pi-managed-agents/issues/41): package the
   shared Session client for standalone JavaScript/TypeScript applications, with
-  public contracts and runnable examples. MCP #40 takes priority. This does not
+  public contracts and runnable examples. HTTP MCP #40 is delivered; SDK packaging remains deferred. This does not
   introduce Agent configuration publishing or require Workspace-free Sessions.
 
 ## Managed Agents project positioning — documented
@@ -48,7 +55,7 @@
   Android Worker/receiver/VM recovery and original-asset preservation.
 
 [Delivery evidence and limits](reports/client-service-delivery-20261114.md).
-Core publication is `local-image-reply-20261113`, schema 224, with independently
+That delivery used `local-image-reply-20261113`, schema 224, with independently
 recorded role artifacts. Device link, BoxLite and Android keep separate releases.
 WSL memory and BoxLite's host-isolation profile were not changed. Optional test
 nodes are stopped and temporary Worker memory settings are restored.

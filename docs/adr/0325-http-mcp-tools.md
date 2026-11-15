@@ -1,6 +1,6 @@
 # ADR-0325: HTTP MCP tools behind execution-owned catalogs
 
-Date: 2026-11-14. Status: accepted; implementation in progress. Issue: #40.
+Date: 2026-11-14. Status: implemented, published and [live-verified](../reports/http-mcp-delivery-20261115.md) on 2026-11-15. Issue: #40.
 
 ## Decision and scope
 

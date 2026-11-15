@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { sql } from "kysely";
 import { createDatabase } from "../packages/database/src/index.ts";
 import { createPrivateTenant } from "../packages/control-plane/src/tenant-administration.ts";
-import { httpMcpFixture } from "../packages/control-plane/test/mcp/http-fixture.ts";
+import { createMcpLiveFixture } from "./lib/mcp-live-fixture.mjs";
 import { mcpToolName } from "../packages/control-plane/src/mcp/http-client.ts";
 import { PiCloudApi } from "../packages/web-ui/src/api.ts";
 import { newIdempotencyKey } from "@pi-cloud/session-client";
@@ -49,10 +49,12 @@ url.hostname = serviceAddress("postgres");
 const database = createDatabase({ connectionString: url.toString(), maxConnections: 3 });
 const base = `http://127.0.0.1:${runtimeEnvironment().PI_CLOUD_HTTP_PORT}`;
 const token = randomUUID(),
-  server = await httpMcpFixture({ host: "0.0.0.0", token });
-const node = JSON.parse(kubectl(["get", "nodes", "-o", "json"])).items[0];
-const host = node.status.addresses.find((a) => a.type === "InternalIP").address;
-const endpoint = `http://${host}:${server.port}/mcp`;
+  server = await createMcpLiveFixture(token).catch(async (error) => {
+    await database.destroy();
+    throw error;
+  });
+const endpoint = server.url;
+report.fixture = server.name;
 const definition = (name) => ({
   name,
   description:
@@ -61,7 +63,8 @@ const definition = (name) => ({
       : `Owned acceptance tool ${name}.`,
   inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
 });
-server.state.tools = ["echo", "hold", "image", "lost_write"].map(definition);
+const remoteTools = ["echo", "hold", "image", "lost_write"].map(definition);
+await server.change(remoteTools);
 const terminal = (state) => ["completed", "failed", "cancelled", "timed_out"].includes(state);
 async function until(read, label, budget = 300000) {
   const end = Date.now() + budget;
@@ -189,21 +192,24 @@ try {
 
   phase("catalog hot update within the same native submission");
   const hot = await newSession("MCP live catalog");
-  let held = server.state.calls.filter((n) => n === "hold").length;
+  let held = (await server.state()).calls.filter((n) => n === "hold").length;
   const hotRun = await submit(
     hot,
     `First call ${name("hold")} with text HOT_GATE. After it finishes, a new tool ${name("fresh_echo")} will be available; call that tool with text MCP_HOT_OK. Do not substitute another tool. Then reply MCP_HOT_DONE. Do not use bash, files, search or delegation.`,
   );
-  await until(() => server.state.calls.filter((n) => n === "hold").length > held, "Hot gate");
-  server.state.tools.push(definition("fresh_echo"));
-  server.change();
+  await until(
+    async () => (await server.state()).calls.filter((n) => n === "hold").length > held,
+    "Hot gate",
+  );
+  remoteTools.push(definition("fresh_echo"));
+  await server.change(remoteTools);
   await until(
     async () =>
       (await api.getMcpConnection(connectionId)).tools.some((t) => t.name === "fresh_echo"),
     "Hot discovery",
     90000,
   );
-  server.release();
+  await server.release();
   assert(
     (await checked(hotRun)).some(
       (m) => m.role === "toolResult" && m.toolName === name("fresh_echo") && !m.isError,
@@ -214,12 +220,15 @@ try {
 
   phase("Worker crash restores original reply after tool withdrawal");
   const handoff = await newSession("MCP original result recovery");
-  held = server.state.calls.filter((n) => n === "hold").length;
+  held = (await server.state()).calls.filter((n) => n === "hold").length;
   const recovery = await submit(
     handoff,
     `Call ${name("hold")} exactly once with text RECOVERY_GATE. Wait for its original result. After that, reply MCP_RECOVERED. Do not call other tools or repeat the operation.`,
   );
-  await until(() => server.state.calls.filter((n) => n === "hold").length > held, "Recovery gate");
+  await until(
+    async () => (await server.state()).calls.filter((n) => n === "hold").length > held,
+    "Recovery gate",
+  );
   const before = await database
     .selectFrom("runs as r")
     .innerJoin("workers as w", "w.id", "r.worker_id")
@@ -254,9 +263,9 @@ try {
     "Worker ownership recovery",
     180000,
   );
-  server.release("ORIGINAL_MCP_AFTER_HANDOFF");
+  await server.release("ORIGINAL_MCP_AFTER_HANDOFF");
   const restored = await checked(recovery);
-  assert.equal(server.state.calls.filter((n) => n === "hold").length, held + 1);
+  assert.equal((await server.state()).calls.filter((n) => n === "hold").length, held + 1);
   assert.equal(
     restored.filter(
       (m) =>
@@ -283,24 +292,24 @@ try {
   await ready();
   phase("native Stop and late response");
   const stopped = await newSession("MCP cancellation");
-  held = server.state.calls.filter((n) => n === "hold").length;
+  held = (await server.state()).calls.filter((n) => n === "hold").length;
   const cancelRun = await submit(
     stopped,
     `Call ${name("hold")} exactly once with text CANCEL_GATE, wait for the result, and do not call any other tool.`,
   );
   await until(
-    () => server.state.calls.filter((n) => n === "hold").length > held,
+    async () => (await server.state()).calls.filter((n) => n === "hold").length > held,
     "Cancellation gate",
   );
-  const cancellations = server.state.cancellations;
+  const cancellations = (await server.state()).cancellations;
   await api.cancelTurn(stopped.sessionId, cancelRun.turnId, newIdempotencyKey("mcp-stop"));
   assert.equal((await settled(cancelRun.runId)).state, "cancelled");
   await until(
-    () => server.state.cancellations > cancellations,
+    async () => (await server.state()).cancellations > cancellations,
     "MCP cancellation notification",
     10000,
   );
-  server.release("LATE_MCP_MUST_NOT_REPLACE_ABORT");
+  await server.release("LATE_MCP_MUST_NOT_REPLACE_ABORT");
   await delay(500);
   assert(
     !JSON.stringify(await messages(cancelRun.runId)).includes("LATE_MCP_MUST_NOT_REPLACE_ABORT"),
@@ -310,13 +319,13 @@ try {
 
   phase("lost external write response is not replayed");
   const lost = await newSession("MCP uncertain result");
-  const writes = server.state.writes;
+  const writes = (await server.state()).writes;
   const unknown = await submit(
     lost,
     `Call ${name("lost_write")} exactly once with text WRITE_ONCE. If its result is uncertain or an error, do not retry or call another tool; report the uncertainty briefly.`,
   );
   const unknownHistory = await checked(unknown);
-  assert.equal(server.state.writes, writes + 1);
+  assert.equal((await server.state()).writes, writes + 1);
   assert(
     unknownHistory.some(
       (m) =>
@@ -332,7 +341,7 @@ try {
   await save();
 } finally {
   try {
-    server.release();
+    await server.release();
     for (const session of sessions) {
       const runs = await database
         .selectFrom("runs")

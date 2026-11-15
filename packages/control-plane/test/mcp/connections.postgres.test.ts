@@ -186,6 +186,30 @@ it("publishes discovered tools and checks live connection authority without read
     ).rejects.toBeInstanceOf(McpInvocationRefused);
     expect(view.snapshot?.generation).toBe(platform.generation);
     expect(await authority.minimumGenerations()).toHaveLength(2);
+    const beforeRotation = await service.read(actor, id);
+    const invalid = await service.save(actor, id, {
+      ...input,
+      expectedRevision: beforeRotation.connection.revision,
+      credential: { kind: "bearer", token: "rotated-invalid-token" },
+    });
+    await runtime.reconcile();
+    expect((await service.read(actor, id)).connection).toMatchObject({
+      status: "error",
+      error: "mcp_authentication_failed",
+    });
+    expect(view.publicationFor(command.toolName)).toBeUndefined();
+    expect(server.state.calls).toEqual(["echo"]);
+    await service.save(actor, id, { ...input, expectedRevision: invalid.connection.revision });
+    await runtime.reconcile();
+    const restored = {
+      ...command,
+      operationId: randomUUID(),
+      implementation: view.implementation(command.toolName)!,
+    };
+    expect(
+      await runtime.execute(restored, () => true, new AbortController().signal),
+    ).toHaveProperty("result.content.0.text", "MCP_OK");
+    expect(server.state.calls).toEqual(["echo", "echo"]);
   } finally {
     await runtime?.close();
     await server.close();

@@ -82,9 +82,18 @@ activation publishes stored connection snapshots before the new platform record
 so consumers do not temporarily lose every connection during an upgrade.
 Discovery uses notifications and a periodic refresh; errors remain visible in
 the connection page. No endpoint body, credential or Tool argument is logged.
+The endpoint must be reachable under the deployment's existing egress CIDR/port
+configuration and proxy/`NO_PROXY` rules. Registration does not override cluster
+network configuration; see [distributed deployment](DISTRIBUTED_DEPLOYMENT.md).
 
 API routes are `GET /v1/mcp/connections`, `GET|PUT|DELETE /v1/mcp/connections/:id`
 and `POST /v1/mcp/connections/:id/refresh`. PUT creates with a client UUID and
 `expectedRevision: null`; updates/deletes/refreshes require the current revision.
 Reusing the same acknowledged change is idempotent. See the owned schemas in
 `packages/protocol/src/mcp-connections.ts` and [ADR-0325](adr/0325-http-mcp-tools.md).
+
+Verification commands: `npm run browser:mcp:check` and, against an explicitly
+owned live fixture, `PI_CLOUD_LIVE_MCP_CHECK=1 npm run production:mcp-check -- /private/mcp-report`.
+The live check creates a temporary cluster service and tenant, uses Luna, replaces
+only the fixture's Worker when no unrelated Runs are active, and cleans its
+connections, conversations, attachments, Workspace and Kubernetes resources.

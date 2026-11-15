@@ -1,10 +1,22 @@
 import { createServer, type ServerResponse } from "node:http";
 
 /** Owned protocol fixture; never connects to an external account or filesystem. */
-export async function httpMcpFixture(options: { host?: string; token?: string } = {}) {
+export async function httpMcpFixture(
+  options: { host?: string; token?: string; port?: number; control?: boolean } = {},
+) {
   const streams = new Set<ServerResponse>();
   const resumptions = new Map<string, unknown>();
   const held = new Set<(text: string) => void>();
+  const release = (text = "ORIGINAL_MCP_REPLY") => {
+    for (const send of held) send(text);
+    held.clear();
+  };
+  const change = () => {
+    for (const stream of streams)
+      stream.write(
+        `data: ${JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" })}\n\n`,
+      );
+  };
   const state = {
     writes: 0,
     cancellations: 0,
@@ -25,6 +37,19 @@ export async function httpMcpFixture(options: { host?: string; token?: string } 
     if (req.headers.authorization !== `Bearer ${options.token ?? "fixture-token"}`) {
       res.writeHead(401);
       res.end();
+      return;
+    }
+    if (options.control && req.url?.startsWith("/fixture/")) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
+      if (req.url === "/fixture/tools") {
+        state.tools = body.tools;
+        change();
+      }
+      if (req.url === "/fixture/release") release(body.text);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(state));
       return;
     }
     if (req.method === "DELETE") {
@@ -87,7 +112,7 @@ export async function httpMcpFixture(options: { host?: string; token?: string } 
             {
               type: "image",
               mimeType: "image/png",
-              data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aA3UAAAAASUVORK5CYII=",
+              data: "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAn0lEQVRoge2SQQkAQRDDKqcST2zErIh7hIFCBKSh6cdpoht0A9ArdhfiLtENugHoFbsLcZfoBt0A9IrdhbhLdINuAHrF7kLcJbpBNwC9Ynch7hLdoBuAXrG7EHeJbtANQK/YXYi7RDfoBqBX7C7EXaIbdAPQK3YX4i7RDboB6BW7C3GX6AbdAPSK3YW4S3SDbgB6xe5C3CW6QTcAveIfHoQSwVoC6bimAAAAAElFTkSuQmCC",
             },
           ],
         });
@@ -127,21 +152,15 @@ export async function httpMcpFixture(options: { host?: string; token?: string } 
     }
     send({});
   });
-  await new Promise<void>((resolve) => server.listen(0, options.host ?? "127.0.0.1", resolve));
+  await new Promise<void>((resolve) =>
+    server.listen(options.port ?? 0, options.host ?? "127.0.0.1", resolve),
+  );
   return {
     state,
     port: (server.address() as { port: number }).port,
-    release(text = "ORIGINAL_MCP_REPLY") {
-      for (const send of held) send(text);
-      held.clear();
-    },
+    release,
     url: `http://127.0.0.1:${(server.address() as { port: number }).port}/mcp`,
-    change() {
-      for (const stream of streams)
-        stream.write(
-          `data: ${JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" })}\n\n`,
-        );
-    },
+    change,
     async close() {
       for (const stream of streams) stream.end();
       server.closeAllConnections();
