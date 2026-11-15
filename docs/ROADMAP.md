@@ -1,11 +1,14 @@
 # Implementation roadmap
 
-## Runtime throughput baseline — in progress
+## Runtime throughput baseline — delivered
 
-Implement #42 under ADR-0326: deterministic Responses with real Pi, CLIProxyAPI,
-Kafka, Projector, PG and SSE; phased active-Session, Tool, history/image and recovery
-measurements. The owner authorized implementation and serial testing with a
-24 GiB WSL memory budget. Default runs make no paid-provider requests.
+Issue #42 is [implemented and measured](reports/runtime-capacity-20261115.md)
+under ADR-0326: deterministic Responses through real Pi, CLIProxyAPI, Kafka,
+Projector, PG and SSE, with serial Tool/history/image/concurrency, soak and recovery
+checks on the 24 GiB WSL host. No paid-provider requests were made. An HTTP SSE
+framing defect was repaired through a provider-only publication; other production
+artifacts and original user assets were preserved. The report separates measured
+operating points from unproven fleet scale and records latency/memory follow-ups.
 
 ## HTTP MCP tool integration — delivered
 

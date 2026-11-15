@@ -114,3 +114,20 @@ node scripts/summarize-runtime-load.mjs summary.json \
 Original infrastructure, idle machines and maintenance loops share this single
 host. PG/WAL and container observations include that background activity. Record
 an idle baseline, and do not infer multi-node resilience or linear scaling.
+
+## Component comparisons
+
+After the live driver has cleaned up, run maintained component benchmarks one at
+a time. They use isolated databases/brokers and measure different boundaries:
+
+```sh
+npm run eval:postgres-session-projection
+PI_CLOUD_KAFKA_LOAD_CASES=concurrency-1,concurrency-16,concurrency-64 \
+  PI_CLOUD_EVAL_OUTPUT=.cache/capacity-kafka.json npm run eval:kafka-accepted-facts
+npm run eval:schedules -- .cache/capacity-schedules.json
+```
+
+The PG benchmark writes complete 1 KiB native entries. The Kafka benchmark uses
+synthetic accepted facts rather than an Agent. The 10,000-plan scheduler check
+measures admission and API responsiveness, not 10,000 active Agents. Do not merge
+their throughput numbers with completed-Run throughput.

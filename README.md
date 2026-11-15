@@ -292,6 +292,9 @@ native crash recovery and image preservation on the maintained single-host setup
 - Self-hosted defaults have no product quotas on conversations or concurrency.
   Workspace storage has an explicit, growable capacity enforced by the filesystem;
   physical pool capacity and transport/provider bounds still apply.
+  The [runtime capacity baseline](docs/reports/runtime-capacity-20261115.md) measures
+  real Pi/Kafka/PG/Tool/SSE paths with simulated models and reports the tested
+  hardware, workload, latency and recovery boundaries instead of a universal QPS claim.
 - Shared native/presentation roots and safe reclamation are implemented under
   [ADR-0287](docs/adr/0287-single-path-shared-forks.md). A measured 1 GiB Fork takes
   about 0.8 seconds; ordinary complete-message writes cost about 8 ms more in the

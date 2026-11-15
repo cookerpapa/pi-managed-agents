@@ -1,14 +1,32 @@
 # Maintained backlog
 
-## Runtime throughput baseline — in progress
+## Runtime throughput baseline — delivered
 
-- [ ] [#42](https://github.com/cookerpapa/pi-managed-agents/issues/42): update the
+- [x] [#42](https://github.com/cookerpapa/pi-managed-agents/issues/42): update the
   fake provider and current-loop drivers; record sustainable throughput, latency,
   backlog and resource usage under named workloads on the 24 GiB WSL host.
-- [ ] Exercise text, controlled/real Tools, histories, images, child Conversations,
+- [x] Exercise text, controlled/real Tools, histories, images, child Conversations,
   SSE readers, bounded soak/bursts and selected fault-under-load cases serially.
-- [ ] Verify original configuration/assets and complete owned-resource cleanup.
+- [x] Verify original configuration/assets and complete owned-resource cleanup.
   Defaults do not contact a paid provider. ADR-0326 records the measurement boundary.
+- [x] Repair HTTP Responses framing discovered by the benchmark; provider-only
+  release `provider-sse-20261115-r1` passed native regression, image and live checks.
+
+[Report and measured limits](reports/runtime-capacity-20261115.md): 31 selected
+scenarios, a four-minute Tool soak, 64 simultaneous simulated model requests,
+native recovery and separate PG/Kafka/10,000-plan admission measurements.
+
+- [ ] Profile the cold writer/environment and projection waits around the observed
+  short-Run throughput plateau; retain durability, ordering and current authority.
+- [ ] Investigate the 6.87 s cold history-page outlier with more samples and query
+  timings before changing the history layout.
+- [ ] Extend memory observation beyond four minutes. Worker/Session-runtime RSS
+  increased during the cold-Session soak; this alone proves neither a leak nor a plateau.
+- [ ] Review the pinned Codex adapter's synthetic 429 usage-limit classification
+  separately from genuine subscription/quota exhaustion; do not retry all limits.
+
+Large child families, 2,000/10,000 SSE viewers and multi-node fleet claims remain
+under the existing capacity backlog. The bounded single-host results do not close them.
 
 ## HTTP MCP tool integration — delivered
 

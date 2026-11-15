@@ -1,6 +1,7 @@
 # Evaluation
 
-Current capacity work uses the [runtime load driver](RUNTIME_CAPACITY.md) under
+The [measured capacity baseline](reports/runtime-capacity-20261115.md) uses the
+[runtime load driver](RUNTIME_CAPACITY.md) under
 ADR-0326. Its synthetic provider preserves the real execution path; it is distinct
 from the older cold-admission and isolated Kafka/PG microbenchmarks below.
 
