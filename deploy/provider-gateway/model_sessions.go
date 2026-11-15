@@ -606,6 +606,15 @@ func (h *OpenAIResponsesAPIHandler) piCloudAttempt(c *gin.Context, p *piCloudMod
 	if result == nil || result.Chunks == nil {
 		return nil, &piCloudAttemptError{status: 502, code: "provider_response_incomplete"}
 	}
+	// Native HTTP executors retain the upstream media type. SSE may begin with
+	// an event name or a comment before its first data field; those bytes are not
+	// a raw WebSocket JSON frame. Select the framer before consuming any chunks.
+	if strings.EqualFold(strings.TrimSpace(strings.Split(result.Headers.Get("Content-Type"), ";")[0]), "text/event-stream") {
+		httpMode = true
+		s.httpUntil = time.Now().Add(5 * time.Minute)
+		c.Header("X-PiCloud-Model-Transport", "http")
+		c.Header("X-PiCloud-Model-Incremental", "false")
+	}
 	framer := &responsesSSEFramer{}
 	total := 0
 	for {

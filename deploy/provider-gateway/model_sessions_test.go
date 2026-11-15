@@ -64,6 +64,7 @@ type piCloudModelFixture struct {
 	httpBlock       atomic.Bool
 	terminalDone    atomic.Bool
 	httpCalls       atomic.Int64
+	httpPreamble    atomic.Bool
 	peersMu         sync.Mutex
 	peers           []*websocket.Conn
 }
@@ -85,6 +86,9 @@ func piCloudFixture(t *testing.T) *piCloudModelFixture {
 				return
 			}
 			w.Header().Set("Content-Type", "text/event-stream")
+			if f.httpPreamble.Load() {
+				fmt.Fprint(w, ": keepalive\n\nevent: response.created\n")
+			}
 			fmt.Fprint(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_http\",\"status\":\"in_progress\"}}\n\n")
 			terminal := "response.completed"
 			if f.terminalDone.Load() {
@@ -435,6 +439,24 @@ func TestPiCloudModelPreOutputHTTPFallback(t *testing.T) {
 	}
 	if failed != 1 {
 		t.Fatalf("failed execution records=%d, want one", failed)
+	}
+}
+
+func TestPiCloudModelHTTPRouteAcceptsEventAndCommentPreamble(t *testing.T) {
+	f := piCloudFixture(t)
+	f.httpPreamble.Store(true)
+	auth, ok := f.handler.AuthManager.GetByID(f.authID)
+	if !ok {
+		t.Fatal("fixture auth is missing")
+	}
+	auth.Attributes["websockets"] = "false"
+	if _, err := f.handler.AuthManager.Update(context.Background(), auth); err != nil {
+		t.Fatal(err)
+	}
+	f.send(t, piCloudBody("["+piCloudUser+"]"), strings.Repeat("e", 64))
+	request := <-f.received
+	if request.connection != 0 || f.httpCalls.Load() != 1 || f.connections.Load() != 0 {
+		t.Fatal("explicit HTTP route did not complete its SSE response")
 	}
 }
 
