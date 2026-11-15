@@ -1,5 +1,15 @@
 # Maintained backlog
 
+## Runtime throughput baseline — in progress
+
+- [ ] [#42](https://github.com/cookerpapa/pi-managed-agents/issues/42): update the
+  fake provider and current-loop drivers; record sustainable throughput, latency,
+  backlog and resource usage under named workloads on the 24 GiB WSL host.
+- [ ] Exercise text, controlled/real Tools, histories, images, child Conversations,
+  SSE readers, bounded soak/bursts and selected fault-under-load cases serially.
+- [ ] Verify original configuration/assets and complete owned-resource cleanup.
+  Defaults do not contact a paid provider. ADR-0326 records the measurement boundary.
+
 ## HTTP MCP tool integration — delivered
 
 - [x] [#40](https://github.com/cookerpapa/pi-managed-agents/issues/40): evaluate

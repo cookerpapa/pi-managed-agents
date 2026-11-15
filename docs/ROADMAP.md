@@ -1,5 +1,12 @@
 # Implementation roadmap
 
+## Runtime throughput baseline — in progress
+
+Implement #42 under ADR-0326: deterministic Responses with real Pi, CLIProxyAPI,
+Kafka, Projector, PG and SSE; phased active-Session, Tool, history/image and recovery
+measurements. The owner authorized implementation and serial testing with a
+24 GiB WSL memory budget. Default runs make no paid-provider requests.
+
 ## HTTP MCP tool integration — delivered
 
 Issue #40 is [implemented, published and live-verified](reports/http-mcp-delivery-20261115.md)

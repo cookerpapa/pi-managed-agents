@@ -1,4 +1,18 @@
-# PiCloud deterministic fake model server
+# PiCloud deterministic model fixtures
+
+`FakeResponsesServer` implements the current Responses HTTP/SSE and WebSocket
+contract, including bounded continuation state, paced text, fragmented Tools,
+native Pi round trips, cancellation and controlled failures. It accepts only an
+owned `pma-benchmark-*` model and a validated synthetic workload marker. Metadata
+and aggregate counters contain no request bodies or credentials.
+
+The complete runtime driver deploys this fixture explicitly, registers a temporary
+CLIProxyAPI route/model and restores configuration after owned-resource cleanup.
+See [runtime capacity evaluation](../../docs/RUNTIME_CAPACITY.md). The default test
+matrix sends no requests to a paid provider. Non-loopback listening requires an
+explicit owned-fixture opt-in; ordinary local tests retain loopback binding.
+
+## Chat Completions protocol fixture
 
 This package is a loopback-only, OpenAI Chat Completions compatible test server.
 It makes model streams and provider failures reproducible without spending
@@ -41,7 +55,8 @@ for a real provider.
 npm test --workspace @pi-cloud/fake-model-server
 ```
 
-The contract suite sends real HTTP/SSE requests through the pinned Pi `0.84.1`
-OpenAI adapter. It checks text deltas, fragmented tool arguments, the follow-up
+The Chat Completions contract suite uses the pinned Pi `1.0.0` compatibility
+adapter. It checks text deltas, fragmented tool arguments, the follow-up
 after a tool result, the complete Java repair loop, provider error mapping,
-request timeout, explicit abort, malformed SSE, and mid-stream disconnect.
+request timeout, explicit abort, malformed SSE, and mid-stream disconnect. These
+small fixtures are protocol checks, not an active-Session capacity measurement.

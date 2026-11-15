@@ -1,5 +1,8 @@
 # Current architecture decisions
 
+[ADR-0326](0326-runtime-capacity-benchmarks.md) defines deterministic-provider
+capacity measurements through the real runtime with owned fixtures and restored configuration (#42).
+
 [ADR-0325](0325-http-mcp-tools.md) adds scoped HTTP MCP tools through Pi-native
 proxies and the execution-owned Tool host, retaining original-reply recovery (#40).
 

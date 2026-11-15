@@ -13,6 +13,7 @@
     "start": "node src/run-server.ts"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.0.0"
+    "@earendil-works/pi-ai": "1.0.0",
+    "ws": "8.21.1"
   }
 }

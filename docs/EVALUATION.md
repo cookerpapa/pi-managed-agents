@@ -1,5 +1,9 @@
 # Evaluation
 
+Current capacity work uses the [runtime load driver](RUNTIME_CAPACITY.md) under
+ADR-0326. Its synthetic provider preserves the real execution path; it is distinct
+from the older cold-admission and isolated Kafka/PG microbenchmarks below.
+
 Current runtime acceptance follows [ADR-0229](adr/0229-native-durable-runtime.md)
 and the [Durable migration record](reports/pi-durable-migration-20261006.md).
 Older measured results below describe their recorded revisions. The former

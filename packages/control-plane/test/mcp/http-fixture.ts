@@ -2,7 +2,13 @@ import { createServer, type ServerResponse } from "node:http";
 
 /** Owned protocol fixture; never connects to an external account or filesystem. */
 export async function httpMcpFixture(
-  options: { host?: string; token?: string; port?: number; control?: boolean } = {},
+  options: {
+    host?: string;
+    token?: string;
+    port?: number;
+    control?: boolean;
+    imageData?: string;
+  } = {},
 ) {
   const streams = new Set<ServerResponse>();
   const resumptions = new Map<string, unknown>();
@@ -112,7 +118,9 @@ export async function httpMcpFixture(
             {
               type: "image",
               mimeType: "image/png",
-              data: "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAn0lEQVRoge2SQQkAQRDDKqcST2zErIh7hIFCBKSh6cdpoht0A9ArdhfiLtENugHoFbsLcZfoBt0A9IrdhbhLdINuAHrF7kLcJbpBNwC9Ynch7hLdoBuAXrG7EHeJbtANQK/YXYi7RDfoBqBX7C7EXaIbdAPQK3YX4i7RDboB6BW7C3GX6AbdAPSK3YW4S3SDbgB6xe5C3CW6QTcAveIfHoQSwVoC6bimAAAAAElFTkSuQmCC",
+              data:
+                options.imageData ??
+                "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAn0lEQVRoge2SQQkAQRDDKqcST2zErIh7hIFCBKSh6cdpoht0A9ArdhfiLtENugHoFbsLcZfoBt0A9IrdhbhLdINuAHrF7kLcJbpBNwC9Ynch7hLdoBuAXrG7EHeJbtANQK/YXYi7RDfoBqBX7C7EXaIbdAPQK3YX4i7RDboB6BW7C3GX6AbdAPSK3YW4S3SDbgB6xe5C3CW6QTcAveIfHoQSwVoC6bimAAAAAElFTkSuQmCC",
             },
           ],
         });

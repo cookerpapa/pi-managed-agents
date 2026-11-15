@@ -8,3 +8,10 @@ export {
   type FakeModelScenario,
   type FakeModelServerOptions,
 } from "./server.ts";
+export {
+  FakeResponsesServer,
+  BENCHMARK_MARKER,
+  benchmarkPrompt,
+  parseBenchmarkPlan,
+  type BenchmarkPlan,
+} from "./responses-server.ts";

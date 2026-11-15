@@ -40,6 +40,7 @@ work from remaining proposals and unverified limits.
 | [Matched release](MATCHED_RELEASE.md) | Coordinated changes, draining and artifact checks |
 | [Component release](COMPONENT_RELEASE.md) | Supported independent publication scopes |
 | [Evaluation](EVALUATION.md) | Deterministic, infrastructure and live-model verification |
+| [Runtime capacity](RUNTIME_CAPACITY.md) | Simulated-provider load through the real runtime, measurements and cleanup |
 | [Observability](OBSERVABILITY.md) | Metrics, traces, logs and diagnostic limits |
 | [Asset recovery](ASSET_RECOVERY.md) | Conversation/attachment recovery and exclusions |
 | [Distributed deployment](DISTRIBUTED_DEPLOYMENT.md) | Multi-machine deployment requirements |
