@@ -171,7 +171,7 @@ export class FakeResponsesServer {
       }
       if (this.#rejectWebsockets) {
         socket.end(
-          "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+          "HTTP/1.1 426 Upgrade Required\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
         return;
       }

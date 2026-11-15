@@ -16,6 +16,8 @@ has no external model client. No paid provider is used by these modes.
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode smoke --output /private/capacity-smoke
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
+  --mode http --output /private/capacity-http
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode matrix --output /private/capacity-matrix
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode capacity --output /private/capacity-upper-points
@@ -48,7 +50,8 @@ production image or sandbox provider. CLIProxyAPI temporarily gains one uniquely
 named API-key route; the projected model catalog gains its explicit synthetic
 model. Original accounts, routes, defaults and credentials are retained. Calls
 exercise CLIProxyAPI's real HTTP/full-context ingress and upstream WebSocket
-continuation, and a controlled HTTP fallback case.
+continuation. The separate `http` mode selects a native HTTP-only provider route;
+it does not assume arbitrary WebSocket failures authorize replay or fallback.
 
 Tests create their own tenant, model profile, conversations, MCP connection and
 Workspace. Guest commands are bounded and operate in that Workspace. Image

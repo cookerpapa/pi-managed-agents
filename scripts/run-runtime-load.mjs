@@ -75,7 +75,7 @@ for (let i = 0; i < args.length; i++) {
 const directory = resolve(argument("--output", ".cache/runtime-load-" + Date.now()));
 const mode = argument("--mode", "smoke");
 assert(
-  ["smoke", "matrix", "capacity", "soak", "faults", "custom", "cleanup"].includes(mode),
+  ["smoke", "http", "matrix", "capacity", "soak", "faults", "custom", "cleanup"].includes(mode),
   "Invalid load mode",
 );
 serializeRelease(runtimeDirectory);
@@ -868,7 +868,7 @@ try {
       report.initialHost.memoryAvailableBytes > 5 * 1024 ** 3,
       "Insufficient host headroom for the first stage",
     );
-    fixture = await createRuntimeLoadFixture(directory);
+    fixture = await createRuntimeLoadFixture(directory, { websockets: mode !== "http" });
     const { createPrivateTenant } =
       await import("../packages/control-plane/src/tenant-administration.ts");
     tenant = await createPrivateTenant(database, {
@@ -894,7 +894,7 @@ try {
     await idle.stop();
     report.idleBaseline = { resources: idle.summary(), samples: idle.samples };
     const profiles =
-      mode === "smoke"
+      mode === "smoke" || mode === "http"
         ? [
             {
               name: "text-smoke",
@@ -1092,22 +1092,14 @@ try {
       if (stop.signal.aborted) break;
       await stage(profile);
     }
-    if (mode === "matrix" && !stop.signal.aborted) {
-      await historyStage();
-      await fixture.transport({ rejectWebsockets: true });
-      try {
-        const http = await stage({
-          name: "http-fallback",
-          kind: "text",
-          concurrency: 4,
-          count: 8,
-          firstByteMs: 100,
-        });
-        assert(http.provider.httpRequests > 0, "HTTP path was not exercised");
-      } finally {
-        await fixture.transport({ rejectWebsockets: false });
-      }
-    }
+    if (mode === "matrix" && !stop.signal.aborted) await historyStage();
+    if (mode === "http")
+      assert(
+        report.measurements.every(
+          (m) => m.provider.httpRequests > 0 && m.provider.websocketRequests === 0,
+        ),
+        "Explicit HTTP route was not exercised",
+      );
     if (mode === "faults" && !stop.signal.aborted)
       for (const kind of [
         "worker-handoff",
@@ -1117,8 +1109,7 @@ try {
       ])
         await faultStage(kind, tools);
     report.accepted =
-      report.measurements.length ===
-        profiles.length + (mode === "faults" ? 4 : mode === "matrix" ? 1 : 0) &&
+      report.measurements.length === profiles.length + (mode === "faults" ? 4 : 0) &&
       report.measurements.every(
         (m) => (m.expectedOutcomesPassed || m.summary.failed === 0) && !m.resources.headroomStopped,
       );

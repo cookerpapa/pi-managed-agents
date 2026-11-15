@@ -43,7 +43,7 @@ export function benchmarkCatalog(original, model) {
     ],
   });
 }
-export function addBenchmarkProvider(source, { name, url, key, model }) {
+export function addBenchmarkProvider(source, { name, url, key, model, websockets = true }) {
   const document = parseDocument(source);
   assert.equal(document.errors.length, 0, "Provider config is invalid");
   assert.equal(document.get("config-version"), 8, "Use the current provider layout");
@@ -64,7 +64,7 @@ export function addBenchmarkProvider(source, { name, url, key, model }) {
         "disable-cooling": true,
         "request-retry": 0,
         models: [{ name: model, alias: model }],
-        keys: [{ "api-key": key, websockets: true }],
+        keys: [{ "api-key": key, websockets }],
       },
     ],
   );
@@ -87,7 +87,7 @@ async function wait(read, label, ms = 90000) {
 
 /** A private receipt exists before configuration changes. Resume cleanup with
  * restoreRuntimeLoadFixture after interruption; never overwrite a foreign edit. */
-export async function createRuntimeLoadFixture(directory) {
+export async function createRuntimeLoadFixture(directory, { websockets = true } = {}) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const receiptPath = resolve(directory, "fixture-private.json");
   const id = randomUUID(),
@@ -240,6 +240,7 @@ await server.start();await httpMcpFixture({host:'0.0.0.0',port:8090,control:true
       url: fixture.modelUrl,
       key,
       model,
+      websockets,
     });
     let desiredProvider;
     try {
