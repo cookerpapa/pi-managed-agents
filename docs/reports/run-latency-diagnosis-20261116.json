@@ -1,0 +1,402 @@
+{
+  "format": "pma-cold-run-latency-diagnosis-20261116",
+  "runtimeRevision": "68dd3e55617708566974dd3d49cd4bc202c81646",
+  "release": "claim-keyed-20261116-r1",
+  "businessCodeChanged": false,
+  "globalPlannerSettingsChanged": false,
+  "normalMeasurements": {
+    "previous1": {
+      "completed": 192,
+      "runsPerSecond": 9.485454885601879,
+      "intervalsMs": {
+        "submission_to_provider": {
+          "count": 192,
+          "mean": 4618.286,
+          "p50": 4656,
+          "p95": 6490,
+          "max": 6673
+        },
+        "provider": {
+          "count": 192,
+          "mean": 3.115,
+          "p50": 3,
+          "p95": 5,
+          "max": 8
+        },
+        "provider_to_settlement": {
+          "count": 192,
+          "mean": 1320.25,
+          "p50": 879,
+          "p95": 5450,
+          "max": 7796
+        },
+        "total": {
+          "count": 192,
+          "mean": 5941.651,
+          "p50": 6063,
+          "p95": 9261,
+          "max": 11522
+        },
+        "provider_to_harness_response": {
+          "count": 192,
+          "mean": 545.317,
+          "p50": 268.133,
+          "p95": 755.643,
+          "max": 6171.791
+        },
+        "harness_response_to_settlement": {
+          "count": 192,
+          "mean": 774.933,
+          "p50": 579.082,
+          "p95": 1856.57,
+          "max": 5024.216
+        }
+      },
+      "selectedStagesMs": {
+        "run.claim.timing": {
+          "count": 192,
+          "mean": 30.456,
+          "p50": 22.366,
+          "p95": 81.389,
+          "max": 126.673
+        },
+        "writer_prepare": {
+          "count": 192,
+          "mean": 2007.628,
+          "p50": 2033.452,
+          "p95": 3662.93,
+          "max": 3879.503
+        },
+        "pi_session_open": {
+          "count": 192,
+          "mean": 149.475,
+          "p50": 11.347,
+          "p95": 944.863,
+          "max": 2657.908
+        },
+        "pi_harness_open": {
+          "count": 192,
+          "mean": 0.674,
+          "p50": 0.527,
+          "p95": 1.468,
+          "max": 7.923
+        },
+        "world_state_prepare": {
+          "count": 192,
+          "mean": 727.876,
+          "p50": 282.407,
+          "p95": 2783.993,
+          "max": 4806.451
+        },
+        "model_permit_wait": {
+          "count": 192,
+          "mean": 0.074,
+          "p50": 0.06,
+          "p95": 0.153,
+          "max": 0.366
+        }
+      }
+    },
+    "previous2": {
+      "completed": 192,
+      "runsPerSecond": 6.44058121472187,
+      "intervalsMs": {
+        "submission_to_provider": {
+          "count": 192,
+          "mean": 2821.651,
+          "p50": 1518,
+          "p95": 7084,
+          "max": 9218
+        },
+        "provider": {
+          "count": 192,
+          "mean": 6.104,
+          "p50": 3,
+          "p95": 16,
+          "max": 46
+        },
+        "provider_to_settlement": {
+          "count": 192,
+          "mean": 5209.01,
+          "p50": 2256,
+          "p95": 15021,
+          "max": 20251
+        },
+        "total": {
+          "count": 192,
+          "mean": 8036.766,
+          "p50": 6439,
+          "p95": 20403,
+          "max": 27001
+        },
+        "provider_to_harness_response": {
+          "count": 192,
+          "mean": 497.295,
+          "p50": 194.958,
+          "p95": 1588.971,
+          "max": 1914.259
+        },
+        "harness_response_to_settlement": {
+          "count": 192,
+          "mean": 4711.716,
+          "p50": 1508.147,
+          "p95": 14903.274,
+          "max": 18809.544
+        }
+      },
+      "selectedStagesMs": {
+        "run.claim.timing": {
+          "count": 192,
+          "mean": 35.769,
+          "p50": 20.763,
+          "p95": 85.668,
+          "max": 926.088
+        },
+        "writer_prepare": {
+          "count": 192,
+          "mean": 1028.757,
+          "p50": 658.349,
+          "p95": 2627.405,
+          "max": 2742.993
+        },
+        "pi_session_open": {
+          "count": 192,
+          "mean": 222.263,
+          "p50": 6.789,
+          "p95": 1471.461,
+          "max": 2226.312
+        },
+        "pi_harness_open": {
+          "count": 192,
+          "mean": 1.115,
+          "p50": 0.644,
+          "p95": 3.045,
+          "max": 3.982
+        },
+        "world_state_prepare": {
+          "count": 192,
+          "mean": 351.375,
+          "p50": 147.231,
+          "p95": 1290.5,
+          "max": 3135.706
+        },
+        "model_permit_wait": {
+          "count": 192,
+          "mean": 0.111,
+          "p50": 0.074,
+          "p95": 0.248,
+          "max": 0.401
+        }
+      }
+    },
+    "clean": {
+      "completed": 192,
+      "runsPerSecond": 4.405825177932051,
+      "intervalsMs": {
+        "submission_to_provider": {
+          "count": 192,
+          "mean": 2924.562,
+          "p50": 1295,
+          "p95": 7370,
+          "max": 8682
+        },
+        "provider": {
+          "count": 192,
+          "mean": 11.542,
+          "p50": 9,
+          "p95": 28,
+          "max": 55
+        },
+        "provider_to_settlement": {
+          "count": 192,
+          "mean": 9086.01,
+          "p50": 7972,
+          "p95": 21022,
+          "max": 26084
+        },
+        "total": {
+          "count": 192,
+          "mean": 12022.115,
+          "p50": 10640,
+          "p95": 26473,
+          "max": 32996
+        },
+        "provider_to_harness_response": {
+          "count": 192,
+          "mean": 564.702,
+          "p50": 186.359,
+          "p95": 1764.012,
+          "max": 1898.658
+        },
+        "harness_response_to_settlement": {
+          "count": 192,
+          "mean": 8521.309,
+          "p50": 7089.5,
+          "p95": 19882.484,
+          "max": 24982.372
+        }
+      },
+      "selectedStagesMs": {
+        "run.claim.timing": {
+          "count": 192,
+          "mean": 107.132,
+          "p50": 53.721,
+          "p95": 549.883,
+          "max": 1551.77
+        },
+        "writer_prepare": {
+          "count": 192,
+          "mean": 860.737,
+          "p50": 565.251,
+          "p95": 2612.491,
+          "max": 2959.686
+        },
+        "pi_session_open": {
+          "count": 192,
+          "mean": 315.851,
+          "p50": 19.914,
+          "p95": 2012.916,
+          "max": 3786.371
+        },
+        "pi_harness_open": {
+          "count": 192,
+          "mean": 2.884,
+          "p50": 2.362,
+          "p95": 6.015,
+          "max": 32.385
+        },
+        "world_state_prepare": {
+          "count": 192,
+          "mean": 234.396,
+          "p50": 105.95,
+          "p95": 625.26,
+          "max": 2249.818
+        },
+        "model_permit_wait": {
+          "count": 192,
+          "mean": 0.267,
+          "p50": 0.204,
+          "p95": 0.557,
+          "max": 2.376
+        }
+      }
+    }
+  },
+  "readOnlySettlementPlans": [
+    {
+      "name": "full",
+      "planningMs": 56.474,
+      "executionMs": 4.34,
+      "rows": 0,
+      "bufferHits": 35,
+      "bufferReads": 0
+    },
+    {
+      "name": "full-repeat",
+      "planningMs": 40.448,
+      "executionMs": 3.699,
+      "rows": 0,
+      "bufferHits": 32,
+      "bufferReads": 0
+    },
+    {
+      "name": "identity-only-control",
+      "planningMs": 5.645,
+      "executionMs": 0.343,
+      "rows": 1,
+      "bufferHits": 5,
+      "bufferReads": 0
+    }
+  ],
+  "cleanSlowProjection": {
+    "records": 28,
+    "kinds": {
+      "work_finished": 28
+    },
+    "slowestMs": 1536.224390999996,
+    "slowestStagesMs": {
+      "projection": 1480.065803000005,
+      "view_notify": 0.2979330000234768
+    },
+    "projectionPoolConnections": 12,
+    "partitions": 32
+  },
+  "diagnosticLimit": {
+    "allocatorAbort": true,
+    "message": "corrupted double-linked list",
+    "signal": "SIGABRT",
+    "reclaimedRuns": 9,
+    "completedRuns": 192,
+    "causeUnresolved": true,
+    "postAbortTailsExcludedFromNormalClaims": true,
+    "terminalAckToConsumeBeforeAbort": {
+      "samples": 118,
+      "meanMs": 1069.983,
+      "p95Ms": 3248,
+      "maxMs": 3650
+    },
+    "slowLocalStatBeforeAbort": [
+      {
+        "worker": "A",
+        "samplesAbove100Ms": 10,
+        "meanMs": 834.497,
+        "meanEventLoopIdleMs": 700.496
+      },
+      {
+        "worker": "B",
+        "samplesAbove100Ms": 10,
+        "meanMs": 440.944,
+        "meanEventLoopIdleMs": 395.711
+      }
+    ]
+  },
+  "acceptance": {
+    "load": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 194,
+        "foreign_models": 0,
+        "charged": 0
+      }
+    },
+    "clean": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0
+      }
+    }
+  },
+  "restoration": {
+    "phase": "restored",
+    "templatesRestored": true,
+    "preservation": {
+      "preserved": true,
+      "originalFiles": 393,
+      "originalMachines": 2,
+      "failures": []
+    }
+  },
+  "limits": [
+    "No stable throughput or fleet-capacity claim.",
+    "Callback time includes both queueing and native/network work.",
+    "The identity-only SQL control omits eligibility and is not a replacement.",
+    "Read-only idle EXPLAIN does not establish the loaded query planning/execution split.",
+    "Settlement uses the recorded runs.settled_at timestamp, not the later client observation."
+  ]
+}

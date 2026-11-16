@@ -1,5 +1,8 @@
 # Delivery and research evidence
 
+- [Cold Run latency diagnosis](run-latency-diagnosis-20261116.md): paired startup,
+  provider and terminal timings, native-client contention, history-query planning
+  cost, clean reproduction and the separate diagnostic allocator-abort limitation.
 - [Run-claim query repair](run-claim-query-repair-20261116.md): bounded keyed
   eligibility, deployed plan measurements, normal throughput repetitions and
   recovery/preservation acceptance. Downstream throughput variability remains open.

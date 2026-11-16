@@ -55,9 +55,20 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   across 1,310 captured statement durations and ordinary candidate-query p95 near
   9 ms. Two 64-concurrency bursts completed all 192 Runs at 9.49/6.44 per second;
   overall throughput and downstream settlement tails remain variable.
-- [ ] Investigate post-provider publication/projection/settlement queueing under
-  cold-Run bursts. Final r3 also exposed settlement p95 up to 58 s. Do not
-  treat the 32-concurrency 11.18/s burst as a sustained capacity guarantee.
+- [x] Locate cold startup and post-provider waits through paired Worker/provider
+  logs, bounded native-client diagnostics and a clean repetition. The
+  [latency diagnosis](reports/run-latency-diagnosis-20261116.md) identifies producer
+  initialization/shared background contention and expensive terminal-history
+  selection on the ordered projection path. It does not attribute all delay to
+  one statement or establish a stable capacity guarantee.
+- [ ] Narrow terminal/family history selection to known identities while retaining
+  child/Fork/prune eligibility; verify planning cost, atomicity and backlog relief.
+- [ ] Evaluate Kafka client initialization/background scheduling without weakening
+  Session producer fencing. Investigate the allocator abort seen in the injected
+  diagnostic repetition; its recovery tails are not ordinary latency evidence.
+- [ ] Remeasure publication/projection/settlement saturation after the bounded
+  repairs. The clean 64-concurrency repetition completed 192 Runs at 4.41/s with
+  settlement p95 26.47 s. No sustainable or fleet-scale rate is established.
 - [ ] Repeat sustained-rate admission controls: the 8/s, 45-second case completed
   315 requests and dropped 45 at the generator's in-flight bound; 4/s completed
   all 180. Record offered/submitted/completed work separately.

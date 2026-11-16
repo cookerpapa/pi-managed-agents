@@ -30,6 +30,12 @@ below 16 ms, and normal candidate-query p95 was approximately 9 ms. Repeated
 64-concurrency bursts completed all 192 Runs at 9.49/6.44 per second; variable
 publication/projection/settlement latency remains separate work.
 
+The subsequent [latency decomposition](reports/run-latency-diagnosis-20261116.md)
+locates cold producer initialization, shared native-client background work and
+expensive family-history selection during terminal projection. A clean repeat
+still completed all 192 Runs but reached only 4.41/s. The proposed bounded query
+and client investigations remain pending; no ownership or protocol was changed.
+
 ## HTTP MCP tool integration — delivered
 
 Issue #40 is [implemented, published and live-verified](reports/http-mcp-delivery-20261115.md)
