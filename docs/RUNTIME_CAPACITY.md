@@ -94,6 +94,13 @@ node scripts/summarize-runtime-load.mjs summary.json \
 - Offered, accepted and successfully completed work are separate. HTTP admission
   success does not mean an Agent finished. Cancelled fault cases are expected
   outcomes but are excluded from successful completion throughput.
+- A history failure after native settlement is reported as `historyFailures`,
+  preserving the completed Run's timing and state. It still fails workload
+  acceptance. Successful page latencies exclude failed pages; the history error
+  and total history duration remain explicit.
+- Summary exports pair one-request Runs with provider timestamps to report
+  `singleRequestPhases`. Multi-request, incomplete and inconsistent clock samples
+  are excluded, rather than subtracting separately computed percentiles.
 - The cold-task matrix includes public SSE setup/teardown and fresh Run ownership.
   Successful Runs/second includes batch drainage. Continuous tool loops separately
   measure active native work without repeated cold-start setup.

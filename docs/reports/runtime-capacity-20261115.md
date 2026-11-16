@@ -3,6 +3,9 @@
 Issue [#42](https://github.com/cookerpapa/pi-managed-agents/issues/42),
 [ADR-0326](../adr/0326-runtime-capacity-benchmarks.md).
 Reproduction: [runtime capacity guide](../RUNTIME_CAPACITY.md).
+[Follow-up diagnosis](runtime-capacity-diagnosis-20261116.md) reproduces an expensive
+frozen-history plan and records bounded implementation directions without changing
+the original measurements below.
 [Content-free machine-readable evidence](runtime-capacity-20261115.json) contains
 the measured profiles, quantiles, resource samples reduced by component, source
 identities and explicit selection of the 31 accepted scenarios. It retains

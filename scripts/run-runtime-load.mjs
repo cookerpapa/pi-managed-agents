@@ -430,22 +430,27 @@ async function executeWork(
     if (!result || !terminal(result.state))
       throw new Error("Accepted Run exceeded observation budget");
     const end = Date.now();
-    let historyMs, historyPages;
+    let historyMs, historyPages, historyError;
     const historyPageMs = [];
     if (readHistory) {
       const at = performance.now();
       let before;
-      for (historyPages = 0; historyPages < 4;) {
-        const pageAt = performance.now();
-        const page = await api.getConversation(session.sessionId, before ? { before } : {});
-        historyPageMs.push(performance.now() - pageAt);
-        historyPages++;
-        if (!page.history.hasBefore) break;
-        assert(
-          page.history.before && page.history.before !== before,
-          "History cursor did not advance",
-        );
-        before = page.history.before;
+      try {
+        for (historyPages = 0; historyPages < 4;) {
+          const pageAt = performance.now();
+          const page = await api.getConversation(session.sessionId, before ? { before } : {});
+          historyPageMs.push(performance.now() - pageAt);
+          historyPages++;
+          if (!page.history.hasBefore) break;
+          assert(
+            page.history.before && page.history.before !== before,
+            "History cursor did not advance",
+          );
+          before = page.history.before;
+        }
+      } catch (error) {
+        // A failed history read must not erase a Run's already observed outcome.
+        historyError = String(error.code ?? error.message).slice(0, 300);
       }
       historyMs = performance.now() - at;
     }
@@ -472,6 +477,7 @@ async function executeWork(
       historyMs,
       historyPages,
       historyPageMs,
+      ...(historyError ? { historyError } : {}),
       ...(result.failure ? { error: result.failure.code } : {}),
       errors: events,
     };
@@ -654,14 +660,14 @@ async function historyStage() {
       { id: randomUUID(), kind: "text", outputBytes: 1024 },
       { readHistory: true },
     );
-  assert(warm.success, "Warm continuation failed");
+  assert(warm.success && !warm.historyError, "Warm continuation or history read failed");
   await fixture.transport({ forgetResponses: true });
   const cold = await executeWork(
     session,
     { id: randomUUID(), kind: "text", outputBytes: 1024 },
     { readHistory: true },
   );
-  assert(cold.success, "Expired provider context did not recover");
+  assert(cold.success && !cold.historyError, "Expired provider context or history read failed");
   const compact = await api.compactConversation(
     session.sessionId,
     "Summarize this synthetic capacity fixture briefly.",
@@ -674,7 +680,10 @@ async function historyStage() {
     { id: randomUUID(), kind: "text", outputBytes: 1024 },
     { readHistory: true },
   );
-  assert(after.success, "Post-compaction continuation failed");
+  assert(
+    after.success && !after.historyError,
+    "Post-compaction continuation or history read failed",
+  );
   const final = await fixture.metrics();
   report.history = {
     seedRuns: seed.length,
@@ -1219,7 +1228,10 @@ try {
     report.accepted =
       report.measurements.length === profiles.length + (mode === "faults" ? 4 : 0) &&
       report.measurements.every(
-        (m) => (m.expectedOutcomesPassed || m.summary.failed === 0) && !m.resources.headroomStopped,
+        (m) =>
+          (m.expectedOutcomesPassed || m.summary.failed === 0) &&
+          m.summary.historyFailures === 0 &&
+          !m.resources.headroomStopped,
       );
     const drainage = new RuntimeLoadMetrics({ database, tenantId: tenant.tenantId, fixture });
     await drainage.start();

@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { runLoad, summarizeLoad, distribution } from "./runtime-load-scheduler.mjs";
+import {
+  runLoad,
+  summarizeLoad,
+  distribution,
+  summarizeSingleRequestPhases,
+} from "./runtime-load-scheduler.mjs";
 
 it("keeps arrival accounting independent of slow work and distinguishes dropped inputs", async () => {
   let now = 0;
@@ -44,4 +49,46 @@ it("does not count an accepted failed Run as successful throughput", async () =>
 });
 it("reports absent latency as absent rather than zero", () => {
   expect(distribution([])).toEqual({ count: 0, p50: null, p95: null, p99: null, max: null });
+});
+
+it("keeps a history failure separate from an already completed Run", async () => {
+  const load = await runLoad({
+    concurrency: 1,
+    count: 1,
+    work: async () => ({ runId: "one", state: "completed", success: true, historyError: "57014" }),
+  });
+  expect(summarizeLoad(load)).toMatchObject({
+    accepted: 1,
+    completed: 1,
+    failed: 0,
+    historyFailures: 1,
+    historyErrors: [{ index: 0, code: "57014" }],
+  });
+});
+
+it("pairs one-request timings and excludes retries, missing clocks and clock inversions", () => {
+  const results = ["a", "retry", "missing", "clock"].map((planId) => ({
+    success: true,
+    planId,
+    submittedAt: 100,
+    settledAt: 200,
+  }));
+  const request = (planId, startedAt = 120) => ({
+    planId,
+    startedAt,
+    finishedAt: 150,
+    outcome: "completed",
+  });
+  const summary = summarizeSingleRequestPhases(results, [
+    request("a"),
+    request("retry"),
+    request("retry"),
+    request("clock", 50),
+  ]);
+  expect(summary).toMatchObject({
+    samples: 1,
+    beforeProviderMs: { p50: 20 },
+    providerMs: { p50: 30 },
+    afterProviderMs: { p50: 50 },
+  });
 });

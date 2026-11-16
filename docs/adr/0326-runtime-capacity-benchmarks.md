@@ -1,6 +1,6 @@
 # ADR-0326: Capacity benchmarks through existing runtime ports
 
-Date: 2026-11-15. Status: accepted; implementation in progress. Issue: #42.
+Date: 2026-11-15. Status: accepted; initial baseline implemented. Issue: #42.
 
 ## Decision
 

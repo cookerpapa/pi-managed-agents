@@ -1,0 +1,2070 @@
+{
+  "format": "pma.capacity-diagnosis.v1",
+  "date": "2026-11-16",
+  "businessImplementationChanged": false,
+  "paidProviderRequests": 0,
+  "pairedPhases": [
+    {
+      "name": "fast-text-1",
+      "phases": {
+        "samples": 8,
+        "beforeProviderMs": {
+          "count": 8,
+          "p50": 822,
+          "p95": 864,
+          "p99": 864,
+          "max": 864
+        },
+        "providerMs": {
+          "count": 8,
+          "p50": 3,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "afterProviderMs": {
+          "count": 8,
+          "p50": 89,
+          "p95": 123,
+          "p99": 123,
+          "max": 123
+        }
+      }
+    },
+    {
+      "name": "fast-text-16",
+      "phases": {
+        "samples": 48,
+        "beforeProviderMs": {
+          "count": 48,
+          "p50": 851,
+          "p95": 1378,
+          "p99": 1426,
+          "max": 1426
+        },
+        "providerMs": {
+          "count": 48,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4,
+          "max": 4
+        },
+        "afterProviderMs": {
+          "count": 48,
+          "p50": 243,
+          "p95": 688,
+          "p99": 882,
+          "max": 882
+        }
+      }
+    },
+    {
+      "name": "fast-text-32",
+      "phases": {
+        "samples": 96,
+        "beforeProviderMs": {
+          "count": 96,
+          "p50": 1818,
+          "p95": 2451,
+          "p99": 2559,
+          "max": 2559
+        },
+        "providerMs": {
+          "count": 96,
+          "p50": 3,
+          "p95": 4,
+          "p99": 5,
+          "max": 5
+        },
+        "afterProviderMs": {
+          "count": 96,
+          "p50": 603,
+          "p95": 1964,
+          "p99": 2848,
+          "max": 2848
+        }
+      }
+    },
+    {
+      "name": "fast-text-64",
+      "phases": {
+        "samples": 192,
+        "beforeProviderMs": {
+          "count": 192,
+          "p50": 3150,
+          "p95": 5283,
+          "p99": 5650,
+          "max": 5867
+        },
+        "providerMs": {
+          "count": 192,
+          "p50": 3,
+          "p95": 4,
+          "p99": 5,
+          "max": 5
+        },
+        "afterProviderMs": {
+          "count": 192,
+          "p50": 1316,
+          "p95": 7276,
+          "p99": 7847,
+          "max": 8085
+        }
+      }
+    }
+  ],
+  "queryAmplification": [
+    {
+      "query": "frozen positions",
+      "executionMs": 2306.862,
+      "jitPresent": false,
+      "plan": {
+        "Node Type": "Limit",
+        "Plan Rows": 2,
+        "Actual Rows": 65,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 14685172,
+        "Plans": [
+          {
+            "Node Type": "Result",
+            "Plan Rows": 2,
+            "Actual Rows": 65,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 14685172,
+            "Plans": [
+              {
+                "Node Type": "Incremental Sort",
+                "Plan Rows": 2,
+                "Actual Rows": 65,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 14685172,
+                "Plans": [
+                  {
+                    "Node Type": "Nested Loop",
+                    "Join Filter": "(ag.id = \"*SELECT* 1\".assistant_record_id)",
+                    "Plan Rows": 1,
+                    "Actual Rows": 68,
+                    "Actual Loops": 1,
+                    "Rows Removed by Join Filter": 58448,
+                    "Shared Hit Blocks": 14685169,
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Join Filter": "(t.turn_id = \"*SELECT* 1\".turn_id)",
+                        "Plan Rows": 1,
+                        "Actual Rows": 68,
+                        "Actual Loops": 1,
+                        "Rows Removed by Join Filter": 0,
+                        "Shared Hit Blocks": 5737,
+                        "Plans": [
+                          {
+                            "Node Type": "Function Scan",
+                            "Alias": "t",
+                            "Plan Rows": 1,
+                            "Actual Rows": 1,
+                            "Actual Loops": 1,
+                            "Shared Hit Blocks": 0
+                          },
+                          {
+                            "Node Type": "Append",
+                            "Plan Rows": 2,
+                            "Actual Rows": 68,
+                            "Actual Loops": 1,
+                            "Shared Hit Blocks": 5737,
+                            "Plans": [
+                              {
+                                "Node Type": "Subquery Scan",
+                                "Alias": "*SELECT* 1",
+                                "Plan Rows": 1,
+                                "Actual Rows": 1,
+                                "Actual Loops": 1,
+                                "Shared Hit Blocks": 5674,
+                                "Plans": [
+                                  {
+                                    "Node Type": "Result",
+                                    "Plan Rows": 1,
+                                    "Actual Rows": 1,
+                                    "Actual Loops": 1,
+                                    "Shared Hit Blocks": 5674,
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Nested Loop",
+                                        "Plan Rows": 1,
+                                        "Actual Rows": 1,
+                                        "Actual Loops": 1,
+                                        "Shared Hit Blocks": 5674,
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Nested Loop",
+                                            "Join Filter": "(h_1.id = walk.header_body_id)",
+                                            "Plan Rows": 1,
+                                            "Actual Rows": 1,
+                                            "Actual Loops": 1,
+                                            "Rows Removed by Join Filter": 269,
+                                            "Shared Hit Blocks": 5670,
+                                            "Plans": [
+                                              {
+                                                "Node Type": "Nested Loop",
+                                                "Plan Rows": 1,
+                                                "Actual Rows": 270,
+                                                "Actual Loops": 1,
+                                                "Shared Hit Blocks": 540,
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Index Scan",
+                                                    "Relation Name": "pi_history_bodies",
+                                                    "Alias": "h_1",
+                                                    "Index Name": "pi_history_bodies_pkey",
+                                                    "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                                                    "Plan Rows": 1,
+                                                    "Actual Rows": 270,
+                                                    "Actual Loops": 1,
+                                                    "Shared Hit Blocks": 270
+                                                  },
+                                                  {
+                                                    "Node Type": "Seq Scan",
+                                                    "Relation Name": "pi_history_views",
+                                                    "Alias": "v",
+                                                    "Plan Rows": 1,
+                                                    "Actual Rows": 1,
+                                                    "Actual Loops": 270,
+                                                    "Shared Hit Blocks": 270
+                                                  }
+                                                ]
+                                              },
+                                              {
+                                                "Node Type": "CTE Scan",
+                                                "Alias": "walk",
+                                                "Plan Rows": 200,
+                                                "Actual Rows": 1,
+                                                "Actual Loops": 270,
+                                                "Shared Hit Blocks": 5130,
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Recursive Union",
+                                                    "Plan Rows": 201,
+                                                    "Actual Rows": 1,
+                                                    "Actual Loops": 270,
+                                                    "Shared Hit Blocks": 5130,
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "Index Scan",
+                                                        "Relation Name": "pi_history_view_nodes",
+                                                        "Alias": "n",
+                                                        "Index Name": "pi_history_view_nodes_pkey",
+                                                        "Index Cond": "((tenant_id = v.tenant_id) AND (id = v.root_id))",
+                                                        "Plan Rows": 1,
+                                                        "Actual Rows": 1,
+                                                        "Actual Loops": 270,
+                                                        "Shared Hit Blocks": 810
+                                                      },
+                                                      {
+                                                        "Node Type": "Hash Join",
+                                                        "Plan Rows": 20,
+                                                        "Actual Rows": 0,
+                                                        "Actual Loops": 270,
+                                                        "Shared Hit Blocks": 4320,
+                                                        "Plans": [
+                                                          {
+                                                            "Node Type": "Nested Loop",
+                                                            "Plan Rows": 20,
+                                                            "Actual Rows": 2,
+                                                            "Actual Loops": 270,
+                                                            "Shared Hit Blocks": 0,
+                                                            "Plans": [
+                                                              {
+                                                                "Node Type": "WorkTable Scan",
+                                                                "Alias": "p",
+                                                                "Plan Rows": 10,
+                                                                "Actual Rows": 1,
+                                                                "Actual Loops": 270,
+                                                                "Shared Hit Blocks": 0
+                                                              },
+                                                              {
+                                                                "Node Type": "Values Scan",
+                                                                "Alias": "*VALUES*",
+                                                                "Plan Rows": 2,
+                                                                "Actual Rows": 2,
+                                                                "Actual Loops": 270,
+                                                                "Shared Hit Blocks": 0
+                                                              }
+                                                            ]
+                                                          },
+                                                          {
+                                                            "Node Type": "Hash",
+                                                            "Plan Rows": 98,
+                                                            "Actual Rows": 2,
+                                                            "Actual Loops": 270,
+                                                            "Shared Hit Blocks": 4320,
+                                                            "Plans": [
+                                                              {
+                                                                "Node Type": "Seq Scan",
+                                                                "Relation Name": "pi_history_view_nodes",
+                                                                "Alias": "c",
+                                                                "Plan Rows": 98,
+                                                                "Actual Rows": 2,
+                                                                "Actual Loops": 270,
+                                                                "Shared Hit Blocks": 4320
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "Node Type": "Index Scan",
+                                            "Relation Name": "pi_history_blocks",
+                                            "Alias": "b",
+                                            "Index Name": "pi_history_blocks_pkey",
+                                            "Index Cond": "((tenant_id = '<scope-id>'::uuid) AND (id = walk.block_id))",
+                                            "Plan Rows": 1,
+                                            "Actual Rows": 1,
+                                            "Actual Loops": 1,
+                                            "Shared Hit Blocks": 4
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Subquery Scan",
+                                "Alias": "*SELECT* 2",
+                                "Plan Rows": 1,
+                                "Actual Rows": 67,
+                                "Actual Loops": 1,
+                                "Shared Hit Blocks": 63,
+                                "Plans": [
+                                  {
+                                    "Node Type": "Nested Loop",
+                                    "Plan Rows": 1,
+                                    "Actual Rows": 67,
+                                    "Actual Loops": 1,
+                                    "Shared Hit Blocks": 63,
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "pi_history_views",
+                                        "Alias": "v_1",
+                                        "Plan Rows": 1,
+                                        "Actual Rows": 1,
+                                        "Actual Loops": 1,
+                                        "Shared Hit Blocks": 1
+                                      },
+                                      {
+                                        "Node Type": "Nested Loop",
+                                        "Join Filter": "(b_1.id = f.block_id)",
+                                        "Plan Rows": 1,
+                                        "Actual Rows": 67,
+                                        "Actual Loops": 1,
+                                        "Rows Removed by Join Filter": 0,
+                                        "Shared Hit Blocks": 62,
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Nested Loop",
+                                            "Join Filter": "(walk_1.block_id = b_1.id)",
+                                            "Plan Rows": 1,
+                                            "Actual Rows": 1,
+                                            "Actual Loops": 1,
+                                            "Rows Removed by Join Filter": 1,
+                                            "Shared Hit Blocks": 23,
+                                            "Plans": [
+                                              {
+                                                "Node Type": "Seq Scan",
+                                                "Relation Name": "pi_history_blocks",
+                                                "Alias": "b_1",
+                                                "Plan Rows": 1,
+                                                "Actual Rows": 2,
+                                                "Actual Loops": 1,
+                                                "Shared Hit Blocks": 4
+                                              },
+                                              {
+                                                "Node Type": "CTE Scan",
+                                                "Alias": "walk_1",
+                                                "Plan Rows": 200,
+                                                "Actual Rows": 1,
+                                                "Actual Loops": 2,
+                                                "Shared Hit Blocks": 19,
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Recursive Union",
+                                                    "Plan Rows": 201,
+                                                    "Actual Rows": 1,
+                                                    "Actual Loops": 1,
+                                                    "Shared Hit Blocks": 19,
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "Index Scan",
+                                                        "Relation Name": "pi_history_view_nodes",
+                                                        "Alias": "n_1",
+                                                        "Index Name": "pi_history_view_nodes_pkey",
+                                                        "Index Cond": "((tenant_id = v_1.tenant_id) AND (id = v_1.root_id))",
+                                                        "Plan Rows": 1,
+                                                        "Actual Rows": 1,
+                                                        "Actual Loops": 1,
+                                                        "Shared Hit Blocks": 3
+                                                      },
+                                                      {
+                                                        "Node Type": "Hash Join",
+                                                        "Plan Rows": 20,
+                                                        "Actual Rows": 0,
+                                                        "Actual Loops": 1,
+                                                        "Shared Hit Blocks": 16,
+                                                        "Plans": [
+                                                          {
+                                                            "Node Type": "Nested Loop",
+                                                            "Plan Rows": 20,
+                                                            "Actual Rows": 2,
+                                                            "Actual Loops": 1,
+                                                            "Shared Hit Blocks": 0,
+                                                            "Plans": [
+                                                              {
+                                                                "Node Type": "WorkTable Scan",
+                                                                "Alias": "p_1",
+                                                                "Plan Rows": 10,
+                                                                "Actual Rows": 1,
+                                                                "Actual Loops": 1,
+                                                                "Shared Hit Blocks": 0
+                                                              },
+                                                              {
+                                                                "Node Type": "Values Scan",
+                                                                "Alias": "*VALUES*_1",
+                                                                "Plan Rows": 2,
+                                                                "Actual Rows": 2,
+                                                                "Actual Loops": 1,
+                                                                "Shared Hit Blocks": 0
+                                                              }
+                                                            ]
+                                                          },
+                                                          {
+                                                            "Node Type": "Hash",
+                                                            "Plan Rows": 98,
+                                                            "Actual Rows": 2,
+                                                            "Actual Loops": 1,
+                                                            "Shared Hit Blocks": 16,
+                                                            "Plans": [
+                                                              {
+                                                                "Node Type": "Seq Scan",
+                                                                "Relation Name": "pi_history_view_nodes",
+                                                                "Alias": "c_1",
+                                                                "Plan Rows": 98,
+                                                                "Actual Rows": 2,
+                                                                "Actual Loops": 1,
+                                                                "Shared Hit Blocks": 16
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "Node Type": "Index Scan",
+                                            "Relation Name": "pi_history_frames",
+                                            "Alias": "f",
+                                            "Index Name": "pi_history_frames_pkey",
+                                            "Index Cond": "((tenant_id = '<scope-id>'::uuid) AND (block_id = walk_1.block_id) AND (ROW(seq, ordinal) <= ROW(walk_1.through_seq, walk_1.through_ordinal)) AND (ROW(seq, ordinal) < ROW('9007199254740991'::bigint, 2147483647)))",
+                                            "Plan Rows": 1,
+                                            "Actual Rows": 67,
+                                            "Actual Loops": 1,
+                                            "Shared Hit Blocks": 39
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Nested Loop",
+                        "Join Filter": "(ab.id = ag.entry_body_id)",
+                        "Plan Rows": 1,
+                        "Actual Rows": 860,
+                        "Actual Loops": 68,
+                        "Rows Removed by Join Filter": 214737,
+                        "Shared Hit Blocks": 14679432,
+                        "Plans": [
+                          {
+                            "Node Type": "Index Scan",
+                            "Relation Name": "pi_history_records",
+                            "Alias": "ag",
+                            "Index Name": "pi_history_record_identity",
+                            "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                            "Plan Rows": 1,
+                            "Actual Rows": 860,
+                            "Actual Loops": 68,
+                            "Shared Hit Blocks": 58344
+                          },
+                          {
+                            "Node Type": "Index Scan",
+                            "Relation Name": "pi_history_bodies",
+                            "Alias": "ab",
+                            "Index Name": "pi_history_bodies_pkey",
+                            "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                            "Plan Rows": 1,
+                            "Actual Rows": 250,
+                            "Actual Loops": 58480,
+                            "Shared Hit Blocks": 14621088
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "query": "frozen bodies",
+      "executionMs": 4812.512,
+      "jitPresent": false,
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Join Filter": "(b.id = \"*SELECT* 2\".body_id)",
+        "Plan Rows": 1,
+        "Actual Rows": 3,
+        "Actual Loops": 1,
+        "Rows Removed by Join Filter": 255,
+        "Shared Hit Blocks": 28927465,
+        "Plans": [
+          {
+            "Node Type": "Nested Loop",
+            "Join Filter": "((k.turn_id = \"*SELECT* 2\".turn_id) AND (k.record_id = \"*SELECT* 2\".record_id) AND (k.seq = \"*SELECT* 2\".seq) AND (k.ordinal = \"*SELECT* 2\".ordinal))",
+            "Plan Rows": 1,
+            "Actual Rows": 3,
+            "Actual Loops": 1,
+            "Rows Removed by Join Filter": 198,
+            "Shared Hit Blocks": 28927172,
+            "Plans": [
+              {
+                "Node Type": "Nested Loop",
+                "Join Filter": "(eg.id = \"*SELECT* 2\".entry_record_id)",
+                "Plan Rows": 1,
+                "Actual Rows": 67,
+                "Actual Loops": 1,
+                "Rows Removed by Join Filter": 57553,
+                "Shared Hit Blocks": 28927172,
+                "Plans": [
+                  {
+                    "Node Type": "Nested Loop",
+                    "Join Filter": "(ag.id = \"*SELECT* 2\".assistant_record_id)",
+                    "Plan Rows": 1,
+                    "Actual Rows": 67,
+                    "Actual Loops": 1,
+                    "Rows Removed by Join Filter": 57588,
+                    "Shared Hit Blocks": 14463614,
+                    "Plans": [
+                      {
+                        "Node Type": "Subquery Scan",
+                        "Alias": "*SELECT* 2",
+                        "Plan Rows": 1,
+                        "Actual Rows": 67,
+                        "Actual Loops": 1,
+                        "Shared Hit Blocks": 56,
+                        "Plans": [
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plan Rows": 1,
+                            "Actual Rows": 67,
+                            "Actual Loops": 1,
+                            "Shared Hit Blocks": 56,
+                            "Plans": [
+                              {
+                                "Node Type": "Seq Scan",
+                                "Relation Name": "pi_history_views",
+                                "Alias": "v",
+                                "Plan Rows": 1,
+                                "Actual Rows": 1,
+                                "Actual Loops": 1,
+                                "Shared Hit Blocks": 1
+                              },
+                              {
+                                "Node Type": "Nested Loop",
+                                "Join Filter": "(b_1.id = f.block_id)",
+                                "Plan Rows": 1,
+                                "Actual Rows": 67,
+                                "Actual Loops": 1,
+                                "Rows Removed by Join Filter": 0,
+                                "Shared Hit Blocks": 55,
+                                "Plans": [
+                                  {
+                                    "Node Type": "Nested Loop",
+                                    "Join Filter": "(walk.block_id = b_1.id)",
+                                    "Plan Rows": 1,
+                                    "Actual Rows": 1,
+                                    "Actual Loops": 1,
+                                    "Rows Removed by Join Filter": 1,
+                                    "Shared Hit Blocks": 23,
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "pi_history_blocks",
+                                        "Alias": "b_1",
+                                        "Plan Rows": 1,
+                                        "Actual Rows": 2,
+                                        "Actual Loops": 1,
+                                        "Shared Hit Blocks": 4
+                                      },
+                                      {
+                                        "Node Type": "CTE Scan",
+                                        "Alias": "walk",
+                                        "Plan Rows": 200,
+                                        "Actual Rows": 1,
+                                        "Actual Loops": 2,
+                                        "Shared Hit Blocks": 19,
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Recursive Union",
+                                            "Plan Rows": 201,
+                                            "Actual Rows": 1,
+                                            "Actual Loops": 1,
+                                            "Shared Hit Blocks": 19,
+                                            "Plans": [
+                                              {
+                                                "Node Type": "Index Scan",
+                                                "Relation Name": "pi_history_view_nodes",
+                                                "Alias": "n",
+                                                "Index Name": "pi_history_view_nodes_pkey",
+                                                "Index Cond": "((tenant_id = v.tenant_id) AND (id = v.root_id))",
+                                                "Plan Rows": 1,
+                                                "Actual Rows": 1,
+                                                "Actual Loops": 1,
+                                                "Shared Hit Blocks": 3
+                                              },
+                                              {
+                                                "Node Type": "Hash Join",
+                                                "Plan Rows": 20,
+                                                "Actual Rows": 0,
+                                                "Actual Loops": 1,
+                                                "Shared Hit Blocks": 16,
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Nested Loop",
+                                                    "Plan Rows": 20,
+                                                    "Actual Rows": 2,
+                                                    "Actual Loops": 1,
+                                                    "Shared Hit Blocks": 0,
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "WorkTable Scan",
+                                                        "Alias": "p",
+                                                        "Plan Rows": 10,
+                                                        "Actual Rows": 1,
+                                                        "Actual Loops": 1,
+                                                        "Shared Hit Blocks": 0
+                                                      },
+                                                      {
+                                                        "Node Type": "Values Scan",
+                                                        "Alias": "*VALUES*",
+                                                        "Plan Rows": 2,
+                                                        "Actual Rows": 2,
+                                                        "Actual Loops": 1,
+                                                        "Shared Hit Blocks": 0
+                                                      }
+                                                    ]
+                                                  },
+                                                  {
+                                                    "Node Type": "Hash",
+                                                    "Plan Rows": 98,
+                                                    "Actual Rows": 2,
+                                                    "Actual Loops": 1,
+                                                    "Shared Hit Blocks": 16,
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "Seq Scan",
+                                                        "Relation Name": "pi_history_view_nodes",
+                                                        "Alias": "c",
+                                                        "Plan Rows": 98,
+                                                        "Actual Rows": 2,
+                                                        "Actual Loops": 1,
+                                                        "Shared Hit Blocks": 16
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Node Type": "Index Scan",
+                                    "Relation Name": "pi_history_frames",
+                                    "Alias": "f",
+                                    "Index Name": "pi_history_frames_pkey",
+                                    "Index Cond": "((tenant_id = '<scope-id>'::uuid) AND (block_id = walk.block_id) AND (ROW(seq, ordinal) <= ROW(walk.through_seq, walk.through_ordinal)))",
+                                    "Plan Rows": 1,
+                                    "Actual Rows": 67,
+                                    "Actual Loops": 1,
+                                    "Shared Hit Blocks": 32
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Nested Loop",
+                        "Join Filter": "(ab.id = ag.entry_body_id)",
+                        "Plan Rows": 1,
+                        "Actual Rows": 860,
+                        "Actual Loops": 67,
+                        "Rows Removed by Join Filter": 214737,
+                        "Shared Hit Blocks": 14463558,
+                        "Plans": [
+                          {
+                            "Node Type": "Index Scan",
+                            "Relation Name": "pi_history_records",
+                            "Alias": "ag",
+                            "Index Name": "pi_history_record_identity",
+                            "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                            "Plan Rows": 1,
+                            "Actual Rows": 860,
+                            "Actual Loops": 67,
+                            "Shared Hit Blocks": 57486
+                          },
+                          {
+                            "Node Type": "Index Scan",
+                            "Relation Name": "pi_history_bodies",
+                            "Alias": "ab",
+                            "Index Name": "pi_history_bodies_pkey",
+                            "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                            "Plan Rows": 1,
+                            "Actual Rows": 250,
+                            "Actual Loops": 57620,
+                            "Shared Hit Blocks": 14406072
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "Node Type": "Nested Loop",
+                    "Join Filter": "(eb.id = eg.entry_body_id)",
+                    "Plan Rows": 1,
+                    "Actual Rows": 860,
+                    "Actual Loops": 67,
+                    "Rows Removed by Join Filter": 214737,
+                    "Shared Hit Blocks": 14463558,
+                    "Plans": [
+                      {
+                        "Node Type": "Index Scan",
+                        "Relation Name": "pi_history_records",
+                        "Alias": "eg",
+                        "Index Name": "pi_history_record_identity",
+                        "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                        "Plan Rows": 1,
+                        "Actual Rows": 860,
+                        "Actual Loops": 67,
+                        "Shared Hit Blocks": 57486
+                      },
+                      {
+                        "Node Type": "Index Scan",
+                        "Relation Name": "pi_history_bodies",
+                        "Alias": "eb",
+                        "Index Name": "pi_history_bodies_pkey",
+                        "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+                        "Plan Rows": 1,
+                        "Actual Rows": 250,
+                        "Actual Loops": 57620,
+                        "Shared Hit Blocks": 14406072
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Function Scan",
+                "Alias": "k",
+                "Plan Rows": 3,
+                "Actual Rows": 3,
+                "Actual Loops": 67,
+                "Shared Hit Blocks": 0
+              }
+            ]
+          },
+          {
+            "Node Type": "Index Scan",
+            "Relation Name": "pi_history_bodies",
+            "Alias": "b",
+            "Index Name": "pi_history_bodies_pkey",
+            "Index Cond": "(tenant_id = '<scope-id>'::uuid)",
+            "Plan Rows": 1,
+            "Actual Rows": 86,
+            "Actual Loops": 3,
+            "Shared Hit Blocks": 264
+          }
+        ]
+      }
+    }
+  ],
+  "controls": [
+    {
+      "name": "jit-comparison",
+      "cleanupConfirmed": true,
+      "jitRestored": true,
+      "measurements": [
+        {
+          "profile": {
+            "name": "jit-on-0",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "jit": "on"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "dropped": 0,
+            "elapsedMs": 42528.025413,
+            "successfulRunsPerSecond": 4.514669988447413,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 64,
+              "p95": 128,
+              "p99": 296,
+              "max": 330
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 365,
+              "p95": 3358,
+              "p99": 3556,
+              "max": 3637
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 8116,
+              "p95": 18862,
+              "p99": 27881,
+              "max": 30471
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 9546,
+              "p95": 19610,
+              "p99": 30355,
+              "max": 31217
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0015629999979864806,
+              "p95": 0.003267000000050757,
+              "p99": 0.09230400000524241,
+              "max": 0.3633719999997993
+            },
+            "sseReconnects": 10,
+            "errors": []
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "jit-off-1",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "jit": "off"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 174,
+            "completed": 174,
+            "failed": 18,
+            "dropped": 0,
+            "elapsedMs": 28554.189522,
+            "successfulRunsPerSecond": 6.093676721797308,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 174,
+              "p50": 44,
+              "p95": 106,
+              "p99": 328,
+              "max": 372
+            },
+            "queueMs": {
+              "count": 174,
+              "p50": 231,
+              "p95": 813,
+              "p99": 1019,
+              "max": 1048
+            },
+            "firstDurableTextMs": {
+              "count": 174,
+              "p50": 2731,
+              "p95": 5293,
+              "p99": 6389,
+              "max": 8932
+            },
+            "settlementMs": {
+              "count": 174,
+              "p50": 3116,
+              "p95": 5903,
+              "p99": 7083,
+              "max": 9399
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.000901999999769032,
+              "p95": 0.001963999995496124,
+              "p99": 0.05749900000228081,
+              "max": 0.06384100001014303
+            },
+            "sseReconnects": 68,
+            "errors": [
+              {
+                "index": 41,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 42,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 43,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 47,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 48,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 49,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 50,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 52,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 54,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 55,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 56,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 57,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 58,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 59,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 60,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 61,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 62,
+                "code": "SSE setup timed out"
+              },
+              {
+                "index": 63,
+                "code": "SSE setup timed out"
+              }
+            ]
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "jit-on-2",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "jit": "on"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 191,
+            "completed": 191,
+            "failed": 1,
+            "dropped": 0,
+            "elapsedMs": 23613.96949399999,
+            "successfulRunsPerSecond": 8.088432571598378,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 191,
+              "p50": 17,
+              "p95": 30,
+              "p99": 70,
+              "max": 78
+            },
+            "queueMs": {
+              "count": 191,
+              "p50": 151,
+              "p95": 385,
+              "p99": 471,
+              "max": 487
+            },
+            "firstDurableTextMs": {
+              "count": 191,
+              "p50": 1136,
+              "p95": 2104,
+              "p99": 2588,
+              "max": 2778
+            },
+            "settlementMs": {
+              "count": 191,
+              "p50": 1205,
+              "p95": 2563,
+              "p99": 2860,
+              "max": 3368
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0003299999953014776,
+              "p95": 0.000662000005831942,
+              "p99": 0.0011820000072475523,
+              "max": 0.017984000005526468
+            },
+            "sseReconnects": 68,
+            "errors": [
+              {
+                "index": 6,
+                "code": "SSE setup timed out"
+              }
+            ]
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "views-comparison",
+      "cleanupConfirmed": true,
+      "measurements": [
+        {
+          "profile": {
+            "name": "views-1-0",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "views": 1
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "dropped": 0,
+            "elapsedMs": 26017.213791999995,
+            "successfulRunsPerSecond": 7.379729495055995,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 23,
+              "p95": 101,
+              "p99": 200,
+              "max": 348
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 125,
+              "p95": 941,
+              "p99": 1653,
+              "max": 1732
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 5450,
+              "p95": 12778,
+              "p99": 16664,
+              "max": 17284
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 6398,
+              "p95": 13652,
+              "p99": 17470,
+              "max": 17508
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0007009999972069636,
+              "p95": 0.002926000001025386,
+              "p99": 0.011782000001403503,
+              "max": 0.020489000002271496
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "views-0-1",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "views": 0
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "dropped": 0,
+            "elapsedMs": 27948.61293999999,
+            "successfulRunsPerSecond": 6.869750581618669,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 46,
+              "p95": 700,
+              "p99": 789,
+              "max": 791
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 75,
+              "p95": 740,
+              "p99": 749,
+              "max": 753
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 5486,
+              "p95": 18454,
+              "p99": 20050,
+              "max": 20147
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0007620000105816871,
+              "p95": 0.0016429999959655106,
+              "p99": 0.00393799997982569,
+              "max": 0.0821849999774713
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "views-1-2",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "views": 1
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "dropped": 0,
+            "elapsedMs": 23280.18921499999,
+            "successfulRunsPerSecond": 8.247355647620326,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 33,
+              "p95": 81,
+              "p99": 133,
+              "max": 169
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 51,
+              "p95": 107,
+              "p99": 158,
+              "max": 194
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 4794,
+              "p95": 11998,
+              "p99": 14812,
+              "max": 15714
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 5737,
+              "p95": 14280,
+              "p99": 16535,
+              "max": 18185
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0002300000051036477,
+              "p95": 0.0018139999883715063,
+              "p99": 0.009247999987564981,
+              "max": 0.055083999992348254
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "views-0-3",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096,
+            "views": 0
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "dropped": 0,
+            "elapsedMs": 19020.405027,
+            "successfulRunsPerSecond": 10.094422265322457,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 97,
+              "p95": 399,
+              "p99": 490,
+              "max": 495
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 246,
+              "p95": 968,
+              "p99": 991,
+              "max": 1014
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 4569,
+              "p95": 6773,
+              "p99": 7079,
+              "max": 7148
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.00035099999513477087,
+              "p95": 0.0008209999941755086,
+              "p99": 0.002054000011412427,
+              "max": 0.0026450000004842877
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "read-role-history",
+      "cleanupConfirmed": true,
+      "measurements": [
+        {
+          "profile": {
+            "name": "read-role-history",
+            "kind": "mcp",
+            "concurrency": 2,
+            "count": 8,
+            "firstByteMs": 100,
+            "chunkMs": 0,
+            "outputBytes": 2048,
+            "paddingBytes": 0,
+            "rounds": 32,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": true
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 4,
+            "failed": 4,
+            "dropped": 0,
+            "elapsedMs": 87075.34393300001,
+            "successfulRunsPerSecond": 0.04593722883343181,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 33,
+              "p95": 47,
+              "p99": 47,
+              "max": 47
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 40,
+              "p95": 56,
+              "p99": 56,
+              "max": 56
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 1003,
+              "p95": 1092,
+              "p99": 1092,
+              "max": 1092
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 16111,
+              "p95": 17251,
+              "p99": 17251,
+              "max": 17251
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.000490999998874031,
+              "p95": 0.04141900000104215,
+              "p99": 0.04141900000104215,
+              "max": 0.04141900000104215
+            },
+            "sseReconnects": 0,
+            "errors": [
+              {
+                "index": 2,
+                "code": "The control plane could not complete the request"
+              },
+              {
+                "index": 3,
+                "code": "The control plane could not complete the request"
+              },
+              {
+                "index": 4,
+                "code": "The control plane could not complete the request"
+              },
+              {
+                "index": 5,
+                "code": "The control plane could not complete the request"
+              }
+            ]
+          },
+          "historyPages": {
+            "count": 8,
+            "latencyMs": {
+              "count": 8,
+              "p50": 446.3906919999863,
+              "p95": 6511.074527000004,
+              "p99": 6511.074527000004,
+              "max": 6511.074527000004
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "frozen-paging",
+      "cleanupConfirmed": true,
+      "measurements": [
+        {
+          "profile": {
+            "name": "frozen-paging",
+            "kind": "mcp",
+            "concurrency": 2,
+            "count": 8,
+            "firstByteMs": 100,
+            "chunkMs": 0,
+            "outputBytes": 2048,
+            "paddingBytes": 0,
+            "rounds": 32,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": true
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "dropped": 0,
+            "elapsedMs": 80698.449975,
+            "successfulRunsPerSecond": 0.09913449393982614,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 20,
+              "p95": 40,
+              "p99": 40,
+              "max": 40
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 28,
+              "p95": 58,
+              "p99": 58,
+              "max": 58
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 984,
+              "p95": 1083,
+              "p99": 1083,
+              "max": 1083
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 15945,
+              "p95": 17695,
+              "p99": 17695,
+              "max": 17695
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0006710000016028062,
+              "p95": 0.021631000003253575,
+              "p99": 0.021631000003253575,
+              "max": 0.021631000003253575
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "historyPages": {
+            "count": 16,
+            "latencyMs": {
+              "count": 16,
+              "p50": 263.9478119999985,
+              "p95": 7233.853060000009,
+              "p99": 7233.853060000009,
+              "max": 7233.853060000009
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "historyOrderTrials": [
+    {
+      "modes": [
+        {
+          "order": 8,
+          "ms": 20245.402621000016,
+          "error": "57014"
+        },
+        {
+          "order": 1,
+          "ms": 268.16290200001094,
+          "items": 64,
+          "tools": 32
+        },
+        {
+          "order": 8,
+          "ms": 267.24471800000174,
+          "items": 64,
+          "tools": 32
+        }
+      ],
+      "successfulResultsEqual": true
+    },
+    {
+      "modes": [
+        {
+          "order": 8,
+          "ms": 20281.474535000016,
+          "error": "57014"
+        },
+        {
+          "order": 1,
+          "ms": 278.50102799999877,
+          "items": 64,
+          "tools": 32
+        },
+        {
+          "order": 8,
+          "ms": 246.99957300000824,
+          "items": 64,
+          "tools": 32
+        }
+      ],
+      "successfulResultsEqual": true
+    }
+  ],
+  "threadPoolControl": [
+    {
+      "pool": 4,
+      "consumers": 0,
+      "roots": 64,
+      "appends": 6,
+      "elapsedMs": 8553.214602,
+      "rootsPerSecond": 7.4825668451058,
+      "init": {
+        "count": 64,
+        "p50": 4519.516442,
+        "p95": 4785.580158999999,
+        "p99": 5052.330298999999,
+        "max": 5052.330298999999
+      },
+      "total": {
+        "count": 64,
+        "p50": 8494.654099000001,
+        "p95": 8508.40604,
+        "p99": 8552.693748,
+        "max": 8552.693748
+      },
+      "backgroundStat": {
+        "count": 17,
+        "p50": 269.75709199999983,
+        "p95": 2402.579135,
+        "p99": 2402.579135,
+        "max": 2402.579135
+      },
+      "methods": {
+        "connect": {
+          "count": 64,
+          "p50": 1429.0848309999997,
+          "p95": 2342.691339,
+          "p99": 2408.016413,
+          "max": 2408.016413
+        },
+        "initTransactions": {
+          "count": 64,
+          "p50": 3072.162868,
+          "p95": 3607.6691879999994,
+          "p99": 3670.8552449999997,
+          "max": 3670.8552449999997
+        },
+        "beginTransaction": {
+          "count": 384,
+          "p50": 208.31049100000018,
+          "p95": 471.88694899999973,
+          "p99": 613.0558230000006,
+          "max": 718.8169820000003
+        },
+        "commitTransaction": {
+          "count": 384,
+          "p50": 353.2371640000001,
+          "p95": 797.9232569999995,
+          "p99": 970.8921700000001,
+          "max": 973.5442920000005
+        },
+        "disconnect": {
+          "count": 64,
+          "p50": 144.8369240000011,
+          "p95": 289.7539960000013,
+          "p99": 291.69552900000053,
+          "max": 291.69552900000053
+        }
+      },
+      "cpu": {
+        "user": 1698444,
+        "system": 2059211
+      },
+      "rss": 229638144
+    },
+    {
+      "pool": 16,
+      "consumers": 0,
+      "roots": 64,
+      "appends": 6,
+      "elapsedMs": 5792.322167,
+      "rootsPerSecond": 11.049109175007668,
+      "init": {
+        "count": 64,
+        "p50": 3323.706604,
+        "p95": 3631.31949,
+        "p99": 3736.4719840000002,
+        "max": 3736.4719840000002
+      },
+      "total": {
+        "count": 64,
+        "p50": 5475.257759,
+        "p95": 5782.367003,
+        "p99": 5791.7680390000005,
+        "max": 5791.7680390000005
+      },
+      "backgroundStat": {
+        "count": 26,
+        "p50": 74.13940199999979,
+        "p95": 1394.3125219999997,
+        "p99": 1777.77453,
+        "max": 1777.77453
+      },
+      "methods": {
+        "connect": {
+          "count": 64,
+          "p50": 1428.1513839999998,
+          "p95": 2074.358034,
+          "p99": 2610.6617370000004,
+          "max": 2610.6617370000004
+        },
+        "initTransactions": {
+          "count": 64,
+          "p50": 1860.9395749999999,
+          "p95": 2580.32833,
+          "p99": 2588.164207,
+          "max": 2588.164207
+        },
+        "beginTransaction": {
+          "count": 384,
+          "p50": 97.13503400000081,
+          "p95": 327.02527499999997,
+          "p99": 739.5081450000007,
+          "max": 809.8452540000008
+        },
+        "commitTransaction": {
+          "count": 384,
+          "p50": 207.41920299999947,
+          "p95": 416.29463300000043,
+          "p99": 506.98025700000017,
+          "max": 576.4057480000001
+        },
+        "disconnect": {
+          "count": 64,
+          "p50": 107.15102999999999,
+          "p95": 225.03239500000018,
+          "p99": 227.79893699999957,
+          "max": 227.79893699999957
+        }
+      },
+      "cpu": {
+        "user": 1631765,
+        "system": 1400970
+      },
+      "rss": 226172928
+    },
+    {
+      "pool": 4,
+      "consumers": 0,
+      "roots": 64,
+      "appends": 6,
+      "elapsedMs": 6154.13998,
+      "rootsPerSecond": 10.39950345750829,
+      "init": {
+        "count": 64,
+        "p50": 2952.189228,
+        "p95": 3267.4957920000006,
+        "p99": 3334.7853980000004,
+        "max": 3334.7853980000004
+      },
+      "total": {
+        "count": 64,
+        "p50": 6136.7213409999995,
+        "p95": 6152.9225129999995,
+        "p99": 6153.647008,
+        "max": 6153.647008
+      },
+      "backgroundStat": {
+        "count": 15,
+        "p50": 260.1064059999999,
+        "p95": 2233.5883910000002,
+        "p99": 2233.5883910000002,
+        "max": 2233.5883910000002
+      },
+      "methods": {
+        "connect": {
+          "count": 64,
+          "p50": 1411.019041,
+          "p95": 2452.261695,
+          "p99": 2480.6102750000005,
+          "max": 2480.6102750000005
+        },
+        "initTransactions": {
+          "count": 64,
+          "p50": 1422.6146790000003,
+          "p95": 2266.678865,
+          "p99": 2317.220159,
+          "max": 2317.220159
+        },
+        "beginTransaction": {
+          "count": 384,
+          "p50": 200.6932569999999,
+          "p95": 453.43421599999965,
+          "p99": 594.1982210000006,
+          "max": 630.3795999999993
+        },
+        "commitTransaction": {
+          "count": 384,
+          "p50": 287.86790500000006,
+          "p95": 481.7768470000001,
+          "p99": 548.6105619999998,
+          "max": 565.4088510000001
+        },
+        "disconnect": {
+          "count": 64,
+          "p50": 197.83361200000036,
+          "p95": 382.34595100000024,
+          "p99": 383.3285139999998,
+          "max": 383.3285139999998
+        }
+      },
+      "cpu": {
+        "user": 1978561,
+        "system": 1519024
+      },
+      "rss": 226357248
+    },
+    {
+      "pool": 4,
+      "consumers": 2,
+      "roots": 64,
+      "appends": 6,
+      "elapsedMs": 5955.565816,
+      "rootsPerSecond": 10.746250142691732,
+      "init": {
+        "count": 64,
+        "p50": 2895.052539,
+        "p95": 3220.235534,
+        "p99": 3315.744318,
+        "max": 3315.744318
+      },
+      "total": {
+        "count": 64,
+        "p50": 5938.472803000001,
+        "p95": 5953.933865999999,
+        "p99": 5954.918072,
+        "max": 5954.918072
+      },
+      "backgroundStat": {
+        "count": 15,
+        "p50": 211.27773100000013,
+        "p95": 1515.89873,
+        "p99": 1515.89873,
+        "max": 1515.89873
+      },
+      "methods": {
+        "connect": {
+          "count": 64,
+          "p50": 1312.5471089999996,
+          "p95": 1666.1785289999998,
+          "p99": 2312.983197,
+          "max": 2312.983197
+        },
+        "initTransactions": {
+          "count": 64,
+          "p50": 1581.5284639999995,
+          "p95": 2066.9827219999997,
+          "p99": 2068.578699,
+          "max": 2068.578699
+        },
+        "beginTransaction": {
+          "count": 384,
+          "p50": 197.33120000000054,
+          "p95": 460.38890900000024,
+          "p99": 609.335865,
+          "max": 841.3140310000008
+        },
+        "commitTransaction": {
+          "count": 384,
+          "p50": 276.60947099999976,
+          "p95": 468.5398860000005,
+          "p99": 549.2902489999997,
+          "max": 551.2115000000003
+        },
+        "disconnect": {
+          "count": 64,
+          "p50": 136.73300699999982,
+          "p95": 299.32428400000026,
+          "p99": 301.1488420000005,
+          "max": 301.1488420000005
+        }
+      },
+      "cpu": {
+        "user": 2358649,
+        "system": 1635439
+      },
+      "rss": 229433344
+    },
+    {
+      "pool": 16,
+      "consumers": 2,
+      "roots": 64,
+      "appends": 6,
+      "elapsedMs": 6693.398045000001,
+      "rootsPerSecond": 9.561660545170819,
+      "init": {
+        "count": 64,
+        "p50": 3622.347942,
+        "p95": 4090.4120810000004,
+        "p99": 4189.908536000001,
+        "max": 4189.908536000001
+      },
+      "total": {
+        "count": 64,
+        "p50": 6287.640888000001,
+        "p95": 6609.1320350000005,
+        "p99": 6692.792921999999,
+        "max": 6692.792921999999
+      },
+      "backgroundStat": {
+        "count": 34,
+        "p50": 3.5785439999999653,
+        "p95": 1710.5325009999997,
+        "p99": 1829.2721339999998,
+        "max": 1829.2721339999998
+      },
+      "methods": {
+        "connect": {
+          "count": 64,
+          "p50": 1417.2157419999999,
+          "p95": 2157.5503540000004,
+          "p99": 2188.071943,
+          "max": 2188.071943
+        },
+        "initTransactions": {
+          "count": 64,
+          "p50": 2201.815068,
+          "p95": 2554.855136,
+          "p99": 2588.054455,
+          "max": 2588.054455
+        },
+        "beginTransaction": {
+          "count": 384,
+          "p50": 105.47291299999961,
+          "p95": 602.2978600000006,
+          "p99": 1136.6674940000003,
+          "max": 1206.2008420000002
+        },
+        "commitTransaction": {
+          "count": 384,
+          "p50": 274.8647010000004,
+          "p95": 397.36193300000014,
+          "p99": 572.8046569999997,
+          "max": 594.0475059999999
+        },
+        "disconnect": {
+          "count": 64,
+          "p50": 197.84793499999887,
+          "p95": 311.47452599999997,
+          "p99": 314.7859929999995,
+          "max": 314.7859929999995
+        }
+      },
+      "cpu": {
+        "user": 2291160,
+        "system": 1986740
+      },
+      "rss": 238555136
+    },
+    {
+      "pool": 4,
+      "consumers": 2,
+      "roots": 64,
+      "appends": 6,
+      "elapsedMs": 5998.289038999999,
+      "rootsPerSecond": 10.66970924273261,
+      "init": {
+        "count": 64,
+        "p50": 3046.135638,
+        "p95": 3340.3584410000003,
+        "p99": 3459.5618160000004,
+        "max": 3459.5618160000004
+      },
+      "total": {
+        "count": 64,
+        "p50": 5974.947441999999,
+        "p95": 5994.914102,
+        "p99": 5997.294941000001,
+        "max": 5997.294941000001
+      },
+      "backgroundStat": {
+        "count": 15,
+        "p50": 207.09554400000025,
+        "p95": 1558.2857210000002,
+        "p99": 1558.2857210000002,
+        "max": 1558.2857210000002
+      },
+      "methods": {
+        "connect": {
+          "count": 64,
+          "p50": 1441.145551,
+          "p95": 1793.61548,
+          "p99": 1824.3300900000004,
+          "max": 1824.3300900000004
+        },
+        "initTransactions": {
+          "count": 64,
+          "p50": 1601.170588,
+          "p95": 2128.005375,
+          "p99": 2147.9201429999994,
+          "max": 2147.9201429999994
+        },
+        "beginTransaction": {
+          "count": 384,
+          "p50": 183.26300300000003,
+          "p95": 461.39822599999934,
+          "p99": 802.8458229999997,
+          "max": 851.8599300000005
+        },
+        "commitTransaction": {
+          "count": 384,
+          "p50": 220.6099919999997,
+          "p95": 612.7306789999993,
+          "p99": 672.9186339999997,
+          "max": 694.6855479999995
+        },
+        "disconnect": {
+          "count": 64,
+          "p50": 119.6020380000009,
+          "p95": 285.64710000000014,
+          "p99": 312.2736269999996,
+          "max": 312.2736269999996
+        }
+      },
+      "cpu": {
+        "user": 2542304,
+        "system": 1766188
+      },
+      "rss": 232308736
+    }
+  ],
+  "measurementClassificationCheck": {
+    "completedRuns": 1,
+    "failedRuns": 0,
+    "historyFailures": 1,
+    "workloadAccepted": false,
+    "cleanupConfirmed": true
+  },
+  "preservation": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  }
+}

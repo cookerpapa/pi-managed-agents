@@ -117,6 +117,11 @@ export function summarizeLoad(load) {
     accepted: values.filter((v) => v.runId).length,
     completed: ok.length,
     failed: values.length - ok.length,
+    historyFailures: values.filter((v) => v.historyError).length,
+    historyErrors: values
+      .filter((v) => v.historyError)
+      .map((v) => ({ index: v.index, code: v.historyError }))
+      .slice(0, 20),
     dropped: load.dropped.length,
     elapsedMs: load.elapsedMs,
     successfulRunsPerSecond: ok.length / (load.elapsedMs / 1000),
@@ -131,5 +136,40 @@ export function summarizeLoad(load) {
       .filter((v) => !v.success)
       .map((v) => ({ index: v.index, code: v.error ?? v.state ?? "unknown" }))
       .slice(0, 20),
+  };
+}
+
+/** Pair timestamps for the same one-request Run, never subtract percentiles.
+ * Multi-request and fault samples have different boundaries and are excluded. */
+export function summarizeSingleRequestPhases(results, requests) {
+  const plans = new Map();
+  for (const request of requests) {
+    const group = plans.get(request.planId) ?? [];
+    group.push(request);
+    plans.set(request.planId, group);
+  }
+  const before = [],
+    provider = [],
+    after = [];
+  for (const result of results) {
+    const group = plans.get(result.planId);
+    if (!result.success || group?.length !== 1) continue;
+    const request = group[0];
+    const times = [result.submittedAt, request.startedAt, request.finishedAt, result.settledAt];
+    if (
+      request.outcome !== "completed" ||
+      !times.every(Number.isFinite) ||
+      times.some((time, index) => index > 0 && time < times[index - 1])
+    )
+      continue;
+    before.push(times[1] - times[0]);
+    provider.push(times[2] - times[1]);
+    after.push(times[3] - times[2]);
+  }
+  return {
+    samples: before.length,
+    beforeProviderMs: distribution(before),
+    providerMs: distribution(provider),
+    afterProviderMs: distribution(after),
   };
 }

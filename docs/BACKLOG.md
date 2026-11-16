@@ -16,10 +16,14 @@
 scenarios, a four-minute Tool soak, 64 simultaneous simulated model requests,
 native recovery and separate PG/Kafka/10,000-plan admission measurements.
 
-- [ ] Profile the cold writer/environment and projection waits around the observed
-  short-Run throughput plateau; retain durability, ordering and current authority.
-- [ ] Investigate the 6.87 s cold history-page outlier with more samples and query
-  timings before changing the history layout.
+- [x] Investigate cold-Run waits and the history-page outlier with paired request
+  timings, PG activity, native plan capture and serial controls. The
+  [diagnosis](reports/runtime-capacity-diagnosis-20261116.md) confirms severe frozen-page
+  join amplification and separates it from fixed startup and native commit costs.
+- [ ] Bound frozen position/body queries by existing immutable reference IDs;
+  validate pagination, Fork/prune visibility, off-page Tool arguments and byte budgets.
+- [ ] Evaluate empty-snapshot and presentation-capture reductions, then repeat the
+  full workload. No post-fix throughput or fleet capacity is claimed by the diagnosis.
 - [ ] Extend memory observation beyond four minutes. Worker/Session-runtime RSS
   increased during the cold-Session soak; this alone proves neither a leak nor a plateau.
 - [ ] Review the pinned Codex adapter's synthetic 429 usage-limit classification

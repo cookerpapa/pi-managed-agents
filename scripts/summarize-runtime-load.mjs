@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import { summarizeSingleRequestPhases } from "./lib/runtime-load-scheduler.mjs";
 
 const [output, ...inputs] = process.argv.slice(2);
 assert(output && inputs.length, "Usage: summarize-runtime-load.mjs output.json report.json ...");
@@ -134,6 +135,7 @@ for (const path of inputs) {
     evaluation.stages.push({
       profile,
       summary: m.summary,
+      singleRequestPhases: summarizeSingleRequestPhases(m.load?.results ?? [], m.samples ?? []),
       expectedOutcomesPassed: m.expectedOutcomesPassed,
       recovery: m.recovery?.summary,
       resources: {
