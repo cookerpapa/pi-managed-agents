@@ -16,6 +16,8 @@ and post-provider waits. Bounded immutable-reference paging, empty-history reads
 and conservative native presentation capture are implemented; live publication
 and comparative measurement are pending. Diagnostic settings were restored and
 no higher production capacity is claimed yet.
+The [repair verification](reports/history-query-repair-20261116.md) records 53
+passing tests and the build-input coupling that must be discussed before rollout.
 
 ## HTTP MCP tool integration — delivered
 

@@ -26,6 +26,12 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   queries for non-display native Task writes, preserving native storage/recovery.
 - [ ] Publish these query repairs and repeat the affected workloads. No post-fix
   throughput or fleet capacity is claimed until live acceptance completes.
+  [Source verification and release review](reports/history-query-repair-20261116.md):
+  53 relevant tests passed. Publication is stopped for the owner's requested
+  discussion: an unrelated fake-provider development dependency changes the
+  shared root lockfile, invalidating Guest/image inputs and requesting physical
+  maintenance. Workload-specific build inputs need a reviewed solution; do not
+  bypass artifact identity or maintenance checks.
 - [ ] Extend memory observation beyond four minutes. Worker/Session-runtime RSS
   increased during the cold-Session soak; this alone proves neither a leak nor a plateau.
 - [ ] Review the pinned Codex adapter's synthetic 429 usage-limit classification
