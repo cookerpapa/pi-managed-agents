@@ -1,6 +1,9 @@
 # History-query repair — November 16, 2026
 
 Follow-up to the [capacity diagnosis](runtime-capacity-diagnosis-20261116.md).
+Subsequently [published and measured](workload-release-throughput-20261116.md)
+after the owner authorized the build-boundary work. The sections below retain
+the evidence and publication decision at the initial repair checkpoint.
 Implementation: `8d96644b`. Source verification is complete; publication and
 post-fix live capacity measurement are pending the release-boundary discussion
 below. No increased production throughput is claimed.

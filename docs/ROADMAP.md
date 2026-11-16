@@ -12,13 +12,12 @@ operating points from unproven fleet scale and records latency/memory follow-ups
 
 The [November 16 diagnosis](reports/runtime-capacity-diagnosis-20261116.md)
 reproduces frozen-history join amplification and separates cold startup, provider
-and post-provider waits. Bounded immutable-reference paging, empty-history reads
-and conservative native presentation capture are implemented; live publication
-and comparative measurement are pending. Diagnostic settings were restored and
-no higher production capacity is claimed yet.
-The [repair verification](reports/history-query-repair-20261116.md) records 53
-passing tests. The owner authorized [ADR-0327](adr/0327-workload-build-inputs.md)
-to remove build-input coupling, then publish and repeat the affected workloads.
+and post-provider waits. Query and [ADR-0327](adr/0327-workload-build-inputs.md)
+build-boundary repairs are now [published and measured](reports/workload-release-throughput-20261116.md).
+The matched 64-concurrency case improved from 4.66 to 7.68/7.83 completed Runs/s;
+the reproduced history failures disappeared. High-concurrency settlement tails
+and sustained-rate saturation remain explicit follow-ups. Worker/Projector/Stop/
+reply recovery passed, original assets were preserved and no paid models were used.
 
 ## HTTP MCP tool integration — delivered
 

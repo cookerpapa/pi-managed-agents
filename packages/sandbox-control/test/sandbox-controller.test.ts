@@ -1017,6 +1017,98 @@ describe("provider-backed Sandbox controller", () => {
     },
   );
 
+  it.each(["fresh", "issued", "capsule"] as const)(
+    "records recovery-time no-create proof only from the validated creation path (%s)",
+    async (mode) => {
+      const fixture = providerFixture(),
+        repository = new InMemoryWorkspaceRuntimeStateRepository();
+      const identity = {
+        environmentId: ACTIVATION_ID,
+        allocationId: ACTIVATION_ID,
+        intentRevision: 1,
+        desiredState: "running" as const,
+        allocationClosed: false,
+        allocationAbsent: false,
+        tenantId: assignment.tenantId,
+        userId: "fixture-user",
+        projectId: assignment.projectId,
+        workspaceId: assignment.workspaceId,
+        environmentVersionId: environment.environmentVersionId,
+        generation: 1,
+        profileKey: "standard" as const,
+      };
+      await repository.reserveDevelopmentEnvironment(identity);
+      const spec: SandboxCreateSpec = {
+        activationId: ACTIVATION_ID,
+        assignment,
+        environment,
+        workspaceSeed: { kind: "sample_java" },
+        policy: CUBESANDBOX_TOOL_POLICY,
+        lifetime: "development_environment",
+        sandboxProfileKey: "standard",
+        toolRoot: "/home/user",
+      };
+      repository.creations.set(ACTIVATION_ID, { spec, issued: mode === "issued" });
+      const absence = vi.spyOn(repository, "confirmDevelopmentEnvironmentAbsent");
+      const create = vi
+        .spyOn(fixture.provider, "create")
+        .mockRejectedValueOnce(
+          new SandboxCreationError(new Error("preflight refused before send"), true),
+        );
+      if (mode === "issued")
+        vi.spyOn(fixture.provider, "recoverCreation").mockRejectedValue(
+          new SandboxCreationError(new Error("recovery refused locally"), true),
+        );
+      if (mode === "capsule") {
+        vi.spyOn(repository, "claimRecoverableDevelopmentEnvironments").mockResolvedValue([
+          {
+            reservation: identity,
+            state: "reconciling",
+            allocationAbsent: false,
+            runtimeCapsule: "existing-capsule",
+          },
+        ]);
+        vi.spyOn(fixture.provider, "adoptPersistentCapsule").mockRejectedValue(
+          new SandboxCreationError(new Error("local capsule refusal"), true),
+        );
+      }
+      const destroy = vi.spyOn(fixture.provider, "destroyRuntime");
+      const manager = testBroker({
+        provider: fixture.provider,
+        stateRepository: repository,
+        idGenerator: () => SECOND_ACTIVATION_ID,
+      });
+      try {
+        expect(await manager.recoverPersistentDevelopmentEnvironments()).toBe(0);
+        if (mode === "fresh") {
+          expect(absence).toHaveBeenCalledOnce();
+          expect(repository.absentAllocations.has(ACTIVATION_ID)).toBe(true);
+          expect(await manager.recoverPersistentDevelopmentEnvironments()).toBe(1);
+          expect(create.mock.calls.map(([s]) => s.activationId)).toEqual([
+            ACTIVATION_ID,
+            SECOND_ACTIVATION_ID,
+          ]);
+          const owner = await repository.developmentEnvironmentOwner(
+            identity.tenantId,
+            identity.userId,
+            identity.environmentId,
+          );
+          expect(owner).toMatchObject({
+            status: "owned",
+            reservation: { allocationId: SECOND_ACTIVATION_ID, allocationAbsent: false },
+          });
+          expect(destroy).not.toHaveBeenCalled();
+        } else {
+          expect(absence).not.toHaveBeenCalled();
+          expect(repository.closedAllocations.has(ACTIVATION_ID)).toBe(false);
+          expect(create).not.toHaveBeenCalled();
+        }
+      } finally {
+        await manager.close();
+      }
+    },
+  );
+
   it("coalesces concurrent provisioning of the same development machine", async () => {
     const fixture = providerFixture();
     const manager = testBroker({ provider: fixture.provider });

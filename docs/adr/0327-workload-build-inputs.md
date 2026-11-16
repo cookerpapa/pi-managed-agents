@@ -1,6 +1,6 @@
 # ADR-0327: Workload-owned dependency build inputs
 
-Date: 2026-11-16. Status: accepted; implementation in progress.
+Date: 2026-11-16. Status: accepted; implemented and live-verified.
 
 ## Problem and decision
 
@@ -65,3 +65,8 @@ the source pins, secret exclusion, actual Docker inputs, all role boot/import
 boundaries, scan provenance and the initial release plan. Serial live acceptance
 must retain original assets, exercise cancellation/recovery and compare identical
 fake-provider throughput/history workloads without paid model requests.
+
+[Delivery, measured throughput and remaining limits](../reports/workload-release-throughput-20261116.md).
+Dependency-only no-op publication, single-image history changes and genuine Guest
+maintenance were verified from temporary Git clones against deployed provenance.
+Shared host changes outside existing component scopes retain coordinated drains.

@@ -1,0 +1,4978 @@
+{
+  "format": "pma.workload-release-and-throughput.v1",
+  "runtimeRelease": "history-throughput-20261116-r2",
+  "runtimeSource": "500533bbd8dfeb8aee310af3bae44fe05f2a5fc1",
+  "operatorSource": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+  "deviceRelease": "workload-device-20261116",
+  "evaluations": [
+    {
+      "label": "before-cold-64",
+      "at": "2026-11-16T05:05:38.439Z",
+      "serving": "provider-sse-20261115-r1",
+      "driverRevision": "1c816358c38d86131bdfb770d1677d98fc357b93",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 568.684,
+          "p95_ms": 1000.42095,
+          "p99_ms": 1051.8719500000002
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 41220.753656999994,
+            "successfulRunsPerSecond": 4.657847879193133,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 16,
+              "p95": 32,
+              "p99": 78,
+              "max": 89
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 11759,
+              "p95": 15248,
+              "p99": 15632,
+              "max": 15637
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 12864,
+              "p95": 16170,
+              "p99": 16494,
+              "max": 16541
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 12962,
+              "p95": 16261,
+              "p99": 16565,
+              "max": 16589
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0005110000056447461,
+              "p95": 0.0012920000008307397,
+              "p99": 0.0022739999985788018,
+              "max": 0.027551999999559484
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 12508,
+              "p95": 16052,
+              "p99": 16388,
+              "max": 16462
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 3,
+              "p95": 9,
+              "p99": 12,
+              "max": 14
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 233,
+              "p95": 1355,
+              "p99": 1833,
+              "max": 2081
+            }
+          },
+          "resources": {
+            "samples": 21,
+            "peakActiveRootRuns": 34,
+            "peakQueuedRuns": 60,
+            "minimumAvailableMiB": 10778.3359375,
+            "maximumSwapUsedMiB": 85.50390625,
+            "walBytes": 29025624,
+            "transactions": 14997,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 162,
+            "kafkaSamples": 8,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 30,
+            "maximumMetricsScrapeMs": 2032
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.01347612538072287,
+              "peakInstanceRssMiB": 186.9609375,
+              "peakEventLoopP99Ms": 10.862591
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.6577743482744571,
+              "peakInstanceRssMiB": 531.6484375,
+              "peakEventLoopP99Ms": 21.610495
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.1761273712737136,
+              "peakInstanceRssMiB": 294.01953125,
+              "peakEventLoopP99Ms": 11.812863
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.5442518646425374,
+              "peakInstanceRssMiB": 409.8984375,
+              "peakEventLoopP99Ms": 13.787135000000001
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007157469362304606,
+              "peakInstanceRssMiB": 133.2734375,
+              "peakEventLoopP99Ms": 14.450687
+            }
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1567,
+              "meanMs": 31.266401478626456
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 697.4645439322901
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"pi_session_open\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 16.854689661462047
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"world_state_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 119.6454715207902
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"idle\"}": {
+              "count": 125,
+              "meanMs": 21.46759004797059
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"claimed\"}": {
+              "count": 192,
+              "meanMs": 763.6553438801202
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"transaction_begin\"}": {
+              "count": 192,
+              "meanMs": 0.6598848283174419
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"candidate_context\"}": {
+              "count": 192,
+              "meanMs": 725.410416906166
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"input_snapshot\"}": {
+              "count": 192,
+              "meanMs": 1.4096811979155317
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"configuration\"}": {
+              "count": 192,
+              "meanMs": 1.2607822551896422
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"ownership\"}": {
+              "count": 192,
+              "meanMs": 0.9883228801966931
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_session_lock\"}": {
+              "count": 192,
+              "meanMs": 1.2994262813493251
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_worker_lock\"}": {
+              "count": 192,
+              "meanMs": 0.7400452343766308
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_read\"}": {
+              "count": 192,
+              "meanMs": 0.6660912447550849
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_write\"}": {
+              "count": 192,
+              "meanMs": 1.0588680676592046
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"skill_catalog\"}": {
+              "count": 192,
+              "meanMs": 3.6838856927643344
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"admitted_running\"}": {
+              "count": 192,
+              "meanMs": 4.332961130179049
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"finish\"}": {
+              "count": 192,
+              "meanMs": 21.953325604137113
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_queue\"}": {
+              "count": 576,
+              "meanMs": 0.008589675401000958
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_ack\"}": {
+              "count": 576,
+              "meanMs": 19.802158381883878
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2335,
+              "meanMs": 37.21510754901447
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "before-long-history",
+      "at": "2026-11-16T05:09:35.636Z",
+      "serving": "provider-sse-20261115-r1",
+      "driverRevision": "1c816358c38d86131bdfb770d1677d98fc357b93",
+      "driverDirty": true,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": false,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 264,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 264,
+        "deliveryLatency": {
+          "events": 264,
+          "p50_ms": 631.4775,
+          "p95_ms": 1077.6179,
+          "p99_ms": 1100.40902
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "frozen-history",
+            "kind": "mcp",
+            "concurrency": 2,
+            "count": 8,
+            "firstByteMs": 100,
+            "chunkMs": 0,
+            "outputBytes": 2048,
+            "paddingBytes": 0,
+            "rounds": 32,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": true
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 2,
+            "historyErrors": [
+              {
+                "index": 0,
+                "code": "internal_error"
+              },
+              {
+                "index": 1,
+                "code": "internal_error"
+              }
+            ],
+            "dropped": 0,
+            "elapsedMs": 80348.672515,
+            "successfulRunsPerSecond": 0.09956605068374351,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 26,
+              "p95": 53,
+              "p99": 53,
+              "max": 53
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 42,
+              "p95": 59,
+              "p99": 59,
+              "max": 59
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1047,
+              "p95": 1131,
+              "p99": 1131,
+              "max": 1131
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 16960,
+              "p95": 17961,
+              "p99": 17961,
+              "max": 17961
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0007119999936548993,
+              "p95": 0.05525399999896763,
+              "p99": 0.05525399999896763,
+              "max": 0.05525399999896763
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 42,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11136.08984375,
+            "maximumSwapUsedMiB": 99.8359375,
+            "walBytes": 24073553,
+            "transactions": 5693,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 46,
+            "kafkaSamples": 15,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 5,
+            "lastKafkaObservationAgeMs": 17,
+            "maximumMetricsScrapeMs": 1504
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.011192027170659915,
+              "peakInstanceRssMiB": 186.9609375,
+              "peakEventLoopP99Ms": 10.903550999999998
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.39251194214018115,
+              "peakInstanceRssMiB": 534.67578125,
+              "peakEventLoopP99Ms": 14.295039000000001
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.04466173506163493,
+              "peakInstanceRssMiB": 241.88671875,
+              "peakEventLoopP99Ms": 11.083775000000001
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.29983554665070106,
+              "peakInstanceRssMiB": 390.46484375,
+              "peakEventLoopP99Ms": 12.214271
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.0066844098566941615,
+              "peakInstanceRssMiB": 133.2734375,
+              "peakEventLoopP99Ms": 10.346495
+            }
+          },
+          "historyReadsMs": {
+            "count": 8,
+            "p50": 712.143087000004,
+            "p95": 8815.829734000006,
+            "p99": 8815.829734000006,
+            "max": 8815.829734000006
+          },
+          "historyPages": {
+            "count": 12,
+            "latencyMs": {
+              "count": 12,
+              "p50": 265.39755499998864,
+              "p95": 514.7176829999953,
+              "p99": 514.7176829999953,
+              "max": 514.7176829999953
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "after-matrix",
+      "at": "2026-11-16T07:02:21.453Z",
+      "serving": "history-throughput-20261116-r2",
+      "driverRevision": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 1330,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 1331,
+        "deliveryLatency": {
+          "events": 1331,
+          "p50_ms": 815.881,
+          "p95_ms": 1293.495,
+          "p99_ms": 3022.7685
+        }
+      },
+      "history": {
+        "seedRuns": 12,
+        "seedOutputBytes": 196608,
+        "outcomes": {
+          "warmContinuation": true,
+          "expiredContextFallback": true,
+          "nativeCompaction": true
+        },
+        "timings": {
+          "warm": {
+            "settlementMs": 1006,
+            "firstTextMs": 945,
+            "historyMs": 255.00603899999987
+          },
+          "cold": {
+            "settlementMs": 941,
+            "firstTextMs": 881,
+            "historyMs": 64.45559199998388
+          },
+          "after": {
+            "settlementMs": 487,
+            "firstTextMs": 429,
+            "historyMs": 68.41256900003646
+          }
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-1",
+            "kind": "text",
+            "concurrency": 1,
+            "count": 8,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 10180.657959000004,
+            "successfulRunsPerSecond": 0.7858038284183552,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 28,
+              "p95": 82,
+              "p99": 82,
+              "max": 82
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 48,
+              "p95": 108,
+              "p99": 108,
+              "max": 108
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 957,
+              "p95": 1326,
+              "p99": 1326,
+              "max": 1326
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1044,
+              "p95": 1404,
+              "p99": 1404,
+              "max": 1404
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0009719999943627045,
+              "p95": 0.03290200000628829,
+              "p99": 0.03290200000628829,
+              "max": 0.03290200000628829
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 8,
+            "beforeProviderMs": {
+              "count": 8,
+              "p50": 865,
+              "p95": 1117,
+              "p99": 1117,
+              "max": 1117
+            },
+            "providerMs": {
+              "count": 8,
+              "p50": 4,
+              "p95": 8,
+              "p99": 8,
+              "max": 8
+            },
+            "afterProviderMs": {
+              "count": 8,
+              "p50": 162,
+              "p95": 279,
+              "p99": 279,
+              "max": 279
+            }
+          },
+          "resources": {
+            "samples": 7,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11930,
+            "maximumSwapUsedMiB": 452.578125,
+            "walBytes": 1624684,
+            "transactions": 664,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 19,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 1,
+            "lastKafkaObservationAgeMs": 30,
+            "maximumMetricsScrapeMs": 882
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.010532769359486835,
+              "peakInstanceRssMiB": 207.05859375,
+              "peakEventLoopP99Ms": 10.502143
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.3164991168541412,
+              "peakInstanceRssMiB": 262.90625,
+              "peakEventLoopP99Ms": 20.938751
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.06732639211676121,
+              "peakInstanceRssMiB": 217.94140625,
+              "peakEventLoopP99Ms": 11.034623
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.21393260202658818,
+              "peakInstanceRssMiB": 259.0390625,
+              "peakEventLoopP99Ms": 11.657215
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.006634284651854576,
+              "peakInstanceRssMiB": 139.99609375,
+              "peakEventLoopP99Ms": 10.272767
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-4",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 4163.31414599999,
+            "successfulRunsPerSecond": 2.882319128266914,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 29,
+              "p95": 117,
+              "p99": 117,
+              "max": 117
+            },
+            "queueMs": {
+              "count": 12,
+              "p50": 42,
+              "p95": 101,
+              "p99": 101,
+              "max": 101
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 1006,
+              "p95": 1302,
+              "p99": 1302,
+              "max": 1302
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 1065,
+              "p95": 1384,
+              "p99": 1384,
+              "max": 1384
+            },
+            "generatorDelayMs": {
+              "count": 12,
+              "p50": 0.0004810000100405887,
+              "p95": 0.007845000000088476,
+              "p99": 0.007845000000088476,
+              "max": 0.007845000000088476
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 12,
+            "beforeProviderMs": {
+              "count": 12,
+              "p50": 882,
+              "p95": 988,
+              "p99": 988,
+              "max": 988
+            },
+            "providerMs": {
+              "count": 12,
+              "p50": 5,
+              "p95": 8,
+              "p99": 8,
+              "max": 8
+            },
+            "afterProviderMs": {
+              "count": 12,
+              "p50": 238,
+              "p95": 494,
+              "p99": 494,
+              "max": 494
+            }
+          },
+          "resources": {
+            "samples": 4,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11775.78125,
+            "maximumSwapUsedMiB": 453.078125,
+            "walBytes": 1690691,
+            "transactions": 769,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 72,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 72,
+            "lastKafkaObservationAgeMs": 22,
+            "maximumMetricsScrapeMs": 554
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.030364349300550993,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 10.665983
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.5699175498092417,
+              "peakInstanceRssMiB": 284.65625,
+              "peakEventLoopP99Ms": 13.385727
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.12487664264518844,
+              "peakInstanceRssMiB": 219.44140625,
+              "peakEventLoopP99Ms": 10.960895
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.4673785502331513,
+              "peakInstanceRssMiB": 273.5390625,
+              "peakEventLoopP99Ms": 11.403263
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007015048749470147,
+              "peakInstanceRssMiB": 139.99609375,
+              "peakEventLoopP99Ms": 10.264574999999999
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-8",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 3366.4582970000047,
+            "successfulRunsPerSecond": 7.129154108752046,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 18,
+              "p95": 22,
+              "p99": 22,
+              "max": 22
+            },
+            "queueMs": {
+              "count": 24,
+              "p50": 23,
+              "p95": 32,
+              "p99": 40,
+              "max": 40
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 907,
+              "p95": 1032,
+              "p99": 1063,
+              "max": 1063
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 954,
+              "p95": 1103,
+              "p99": 1124,
+              "max": 1124
+            },
+            "generatorDelayMs": {
+              "count": 24,
+              "p50": 0.00034100000630132854,
+              "p95": 0.001101999994716607,
+              "p99": 0.0029360000044107437,
+              "max": 0.0029360000044107437
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 24,
+            "beforeProviderMs": {
+              "count": 24,
+              "p50": 769,
+              "p95": 933,
+              "p99": 939,
+              "max": 939
+            },
+            "providerMs": {
+              "count": 24,
+              "p50": 3,
+              "p95": 4,
+              "p99": 5,
+              "max": 5
+            },
+            "afterProviderMs": {
+              "count": 24,
+              "p50": 205,
+              "p95": 309,
+              "p99": 315,
+              "max": 315
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11565.25390625,
+            "maximumSwapUsedMiB": 454.3359375,
+            "walBytes": 3390310,
+            "transactions": 1479,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 149,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 149,
+            "lastKafkaObservationAgeMs": 25,
+            "maximumMetricsScrapeMs": 474
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.008203099946552602,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 10.821631
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.7903466060929977,
+              "peakInstanceRssMiB": 321.40625,
+              "peakEventLoopP99Ms": 13.754367
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.12125120256547275,
+              "peakInstanceRssMiB": 226.19140625,
+              "peakEventLoopP99Ms": 11.051007
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.6057215392838055,
+              "peakInstanceRssMiB": 303.51953125,
+              "peakEventLoopP99Ms": 11.296767
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007799572421165075,
+              "peakInstanceRssMiB": 140.24609375,
+              "peakEventLoopP99Ms": 10.264574999999999
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-16",
+            "kind": "text",
+            "concurrency": 16,
+            "count": 48,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 16,
+            "offered": 48,
+            "accepted": 48,
+            "completed": 48,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 4907.792067999995,
+            "successfulRunsPerSecond": 9.780365454553737,
+            "maximumInFlight": 16,
+            "acknowledgementMs": {
+              "count": 48,
+              "p50": 26,
+              "p95": 305,
+              "p99": 381,
+              "max": 381
+            },
+            "queueMs": {
+              "count": 48,
+              "p50": 36,
+              "p95": 67,
+              "p99": 69,
+              "max": 69
+            },
+            "firstDurableTextMs": {
+              "count": 48,
+              "p50": 1246,
+              "p95": 1798,
+              "p99": 1838,
+              "max": 1838
+            },
+            "settlementMs": {
+              "count": 48,
+              "p50": 1327,
+              "p95": 1854,
+              "p99": 1913,
+              "max": 1913
+            },
+            "generatorDelayMs": {
+              "count": 48,
+              "p50": 0.00035099999513477087,
+              "p95": 0.0010420000035082921,
+              "p99": 0.003867000006721355,
+              "max": 0.003867000006721355
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 48,
+            "beforeProviderMs": {
+              "count": 48,
+              "p50": 892,
+              "p95": 1363,
+              "p99": 1633,
+              "max": 1633
+            },
+            "providerMs": {
+              "count": 48,
+              "p50": 3,
+              "p95": 4,
+              "p99": 8,
+              "max": 8
+            },
+            "afterProviderMs": {
+              "count": 48,
+              "p50": 283,
+              "p95": 701,
+              "p99": 872,
+              "max": 872
+            }
+          },
+          "resources": {
+            "samples": 4,
+            "peakActiveRootRuns": 15,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 11291.10546875,
+            "maximumSwapUsedMiB": 455.84375,
+            "walBytes": 5530030,
+            "transactions": 2694,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 63,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 63,
+            "lastKafkaObservationAgeMs": 21,
+            "maximumMetricsScrapeMs": 465
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.00855208725084626,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 10.543103
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.0513313275667542,
+              "peakInstanceRssMiB": 367.65234375,
+              "peakEventLoopP99Ms": 15.097855000000001
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.19108405415569835,
+              "peakInstanceRssMiB": 239.94140625,
+              "peakEventLoopP99Ms": 11.403263
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.783019556224145,
+              "peakInstanceRssMiB": 309.51953125,
+              "peakEventLoopP99Ms": 11.747327
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.005755923279428404,
+              "peakInstanceRssMiB": 140.49609375,
+              "peakEventLoopP99Ms": 10.469375
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-32",
+            "kind": "text",
+            "concurrency": 32,
+            "count": 96,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 32,
+            "offered": 96,
+            "accepted": 96,
+            "completed": 96,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 8584.26941899999,
+            "successfulRunsPerSecond": 11.183246391069511,
+            "maximumInFlight": 32,
+            "acknowledgementMs": {
+              "count": 96,
+              "p50": 24,
+              "p95": 115,
+              "p99": 283,
+              "max": 283
+            },
+            "queueMs": {
+              "count": 96,
+              "p50": 83,
+              "p95": 443,
+              "p99": 469,
+              "max": 469
+            },
+            "firstDurableTextMs": {
+              "count": 96,
+              "p50": 2313,
+              "p95": 3315,
+              "p99": 3500,
+              "max": 3500
+            },
+            "settlementMs": {
+              "count": 96,
+              "p50": 2546,
+              "p95": 3467,
+              "p99": 4621,
+              "max": 4621
+            },
+            "generatorDelayMs": {
+              "count": 96,
+              "p50": 0.0003609999839682132,
+              "p95": 0.0010519999923417345,
+              "p99": 0.004238000023178756,
+              "max": 0.004238000023178756
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 96,
+            "beforeProviderMs": {
+              "count": 96,
+              "p50": 1934,
+              "p95": 2560,
+              "p99": 2635,
+              "max": 2635
+            },
+            "providerMs": {
+              "count": 96,
+              "p50": 3,
+              "p95": 4,
+              "p99": 4,
+              "max": 4
+            },
+            "afterProviderMs": {
+              "count": 96,
+              "p50": 454,
+              "p95": 1300,
+              "p99": 2022,
+              "max": 2022
+            }
+          },
+          "resources": {
+            "samples": 6,
+            "peakActiveRootRuns": 32,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 10937.7734375,
+            "maximumSwapUsedMiB": 456.34375,
+            "walBytes": 14442555,
+            "transactions": 6218,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 385,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 24,
+            "lastKafkaObservationAgeMs": 22,
+            "maximumMetricsScrapeMs": 671
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.009593029729428767,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 10.592255
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.183758044761162,
+              "peakInstanceRssMiB": 439.140625,
+              "peakEventLoopP99Ms": 19.906559
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.23416969157109413,
+              "peakInstanceRssMiB": 272.69140625,
+              "peakEventLoopP99Ms": 14.352383
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.856297739672643,
+              "peakInstanceRssMiB": 369.76953125,
+              "peakEventLoopP99Ms": 13.320191
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.006276249860817312,
+              "peakInstanceRssMiB": 140.74609375,
+              "peakEventLoopP99Ms": 10.321919000000001
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "paced-text",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 1000,
+            "chunkMs": 100,
+            "chunkBytes": 64,
+            "outputBytes": 1024
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 11552.898543000018,
+            "successfulRunsPerSecond": 2.0774007415257505,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 29,
+              "p95": 93,
+              "p99": 101,
+              "max": 101
+            },
+            "queueMs": {
+              "count": 24,
+              "p50": 87,
+              "p95": 307,
+              "p99": 314,
+              "max": 314
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 1908,
+              "p95": 2315,
+              "p99": 2318,
+              "max": 2318
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 3681,
+              "p95": 3958,
+              "p99": 4032,
+              "max": 4032
+            },
+            "generatorDelayMs": {
+              "count": 24,
+              "p50": 0.00034100000630132854,
+              "p95": 0.0012120000028517097,
+              "p99": 0.0016030000115279108,
+              "max": 0.0016030000115279108
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 24,
+            "beforeProviderMs": {
+              "count": 24,
+              "p50": 785,
+              "p95": 1188,
+              "p99": 1189,
+              "max": 1189
+            },
+            "providerMs": {
+              "count": 24,
+              "p50": 2606,
+              "p95": 2614,
+              "p99": 2614,
+              "max": 2614
+            },
+            "afterProviderMs": {
+              "count": 24,
+              "p50": 171,
+              "p95": 353,
+              "p99": 474,
+              "max": 474
+            }
+          },
+          "resources": {
+            "samples": 7,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10929.2578125,
+            "maximumSwapUsedMiB": 456.84375,
+            "walBytes": 4241022,
+            "transactions": 2209,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 44,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 12,
+            "lastKafkaObservationAgeMs": 42,
+            "maximumMetricsScrapeMs": 932
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.016515999665803183,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 10.706943
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.5679842092071186,
+              "peakInstanceRssMiB": 446.890625,
+              "peakEventLoopP99Ms": 16.973823
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.09838399197927991,
+              "peakInstanceRssMiB": 274.19921875,
+              "peakEventLoopP99Ms": 11.722751
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.4040392681092829,
+              "peakInstanceRssMiB": 371.76953125,
+              "peakEventLoopP99Ms": 12.599295
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.009629710084384686,
+              "peakInstanceRssMiB": 140.74609375,
+              "peakEventLoopP99Ms": 10.518526999999999
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-tools",
+            "kind": "mcp",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 100,
+            "rounds": 3
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 15673.194794999989,
+            "successfulRunsPerSecond": 1.5312768273419535,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 48,
+              "p95": 189,
+              "p99": 207,
+              "max": 207
+            },
+            "queueMs": {
+              "count": 24,
+              "p50": 119,
+              "p95": 245,
+              "p99": 305,
+              "max": 305
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 1318,
+              "p95": 1814,
+              "p99": 1864,
+              "max": 1864
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 4218,
+              "p95": 6451,
+              "p99": 6660,
+              "max": 6660
+            },
+            "generatorDelayMs": {
+              "count": 24,
+              "p50": 0.0007409999961964786,
+              "p95": 0.002966000000014901,
+              "p99": 0.01998700000694953,
+              "max": 0.01998700000694953
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 9,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10958.734375,
+            "maximumSwapUsedMiB": 456.84375,
+            "walBytes": 11117394,
+            "transactions": 3022,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 99,
+            "kafkaSamples": 4,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 5,
+            "lastKafkaObservationAgeMs": 34,
+            "maximumMetricsScrapeMs": 1525
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.015942545723258834,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 11.010047
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.1015173348112568,
+              "peakInstanceRssMiB": 449.390625,
+              "peakEventLoopP99Ms": 21.889023
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.13548007882258792,
+              "peakInstanceRssMiB": 275.44921875,
+              "peakEventLoopP99Ms": 11.894783
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.7582495227538643,
+              "peakInstanceRssMiB": 398.5703125,
+              "peakEventLoopP99Ms": 14.188543
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.009619311533961445,
+              "peakInstanceRssMiB": 140.74609375,
+              "peakEventLoopP99Ms": 10.567679
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "continuous-tool-loops",
+            "kind": "mcp",
+            "concurrency": 8,
+            "count": 8,
+            "firstByteMs": 100,
+            "rounds": 32,
+            "outputBytes": 1024
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 31765.91099199999,
+            "successfulRunsPerSecond": 0.2518422972983441,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 36,
+              "p95": 223,
+              "p99": 223,
+              "max": 223
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 56,
+              "p95": 215,
+              "p99": 215,
+              "max": 215
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1235,
+              "p95": 1862,
+              "p99": 1862,
+              "max": 1862
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 23566,
+              "p95": 31691,
+              "p99": 31691,
+              "max": 31691
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00012000001152046025,
+              "p95": 0.00031099998159334064,
+              "p99": 0.00031099998159334064,
+              "max": 0.00031099998159334064
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 17,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10938.21875,
+            "maximumSwapUsedMiB": 456.09375,
+            "walBytes": 22428573,
+            "transactions": 4876,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 106,
+            "kafkaSamples": 7,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 4,
+            "lastKafkaObservationAgeMs": 29,
+            "maximumMetricsScrapeMs": 1217
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.017772376543209935,
+              "peakInstanceRssMiB": 207.80859375,
+              "peakEventLoopP99Ms": 10.838014999999999
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.0047837654320997,
+              "peakInstanceRssMiB": 468.484375,
+              "peakEventLoopP99Ms": 16.318462999999998
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.07454138888888928,
+              "peakInstanceRssMiB": 300.44921875,
+              "peakEventLoopP99Ms": 11.173887
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.6651217901234565,
+              "peakInstanceRssMiB": 417.0703125,
+              "peakEventLoopP99Ms": 12.935167
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.00888364197530863,
+              "peakInstanceRssMiB": 140.74609375,
+              "peakEventLoopP99Ms": 10.797055
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "guest-tools",
+            "kind": "guest",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "rounds": 3,
+            "toolDelayMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 22993.221309999994,
+            "successfulRunsPerSecond": 0.34792863044904093,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 30,
+              "p95": 94,
+              "p99": 94,
+              "max": 94
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 58,
+              "p95": 103,
+              "p99": 103,
+              "max": 103
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1116,
+              "p95": 1219,
+              "p99": 1219,
+              "max": 1219
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 6898,
+              "p95": 16074,
+              "p99": 16074,
+              "max": 16074
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00033099998836405575,
+              "p95": 0.08887800000957213,
+              "p99": 0.08887800000957213,
+              "max": 0.08887800000957213
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 13,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10727.65234375,
+            "maximumSwapUsedMiB": 451.1015625,
+            "walBytes": 13224298,
+            "transactions": 1711,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 13,
+            "kafkaSamples": 5,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 13,
+            "lastKafkaObservationAgeMs": 31,
+            "maximumMetricsScrapeMs": 842
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.031222977855230188,
+              "peakInstanceRssMiB": 213.30859375,
+              "peakEventLoopP99Ms": 11.395071
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.24478960343435274,
+              "peakInstanceRssMiB": 467.9609375,
+              "peakEventLoopP99Ms": 12.443647
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.04503876397330692,
+              "peakInstanceRssMiB": 324.69921875,
+              "peakEventLoopP99Ms": 11.132927
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.22653487482466872,
+              "peakInstanceRssMiB": 419.02734375,
+              "peakEventLoopP99Ms": 11.321342999999999
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.009615675606749762,
+              "peakInstanceRssMiB": 141.74609375,
+              "peakEventLoopP99Ms": 10.600447
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "context-64k",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "paddingBytes": 65536,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 4437.60365200002,
+            "successfulRunsPerSecond": 2.7041621877590676,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 35,
+              "p95": 90,
+              "p99": 90,
+              "max": 90
+            },
+            "queueMs": {
+              "count": 12,
+              "p50": 46,
+              "p95": 97,
+              "p99": 97,
+              "max": 97
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 1102,
+              "p95": 1521,
+              "p99": 1521,
+              "max": 1521
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 1182,
+              "p95": 1591,
+              "p99": 1591,
+              "max": 1591
+            },
+            "generatorDelayMs": {
+              "count": 12,
+              "p50": 0.0004910000134259462,
+              "p95": 0.0009209999989252537,
+              "p99": 0.0009209999989252537,
+              "max": 0.0009209999989252537
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 12,
+            "beforeProviderMs": {
+              "count": 12,
+              "p50": 859,
+              "p95": 976,
+              "p99": 976,
+              "max": 976
+            },
+            "providerMs": {
+              "count": 12,
+              "p50": 102,
+              "p95": 104,
+              "p99": 104,
+              "max": 104
+            },
+            "afterProviderMs": {
+              "count": 12,
+              "p50": 191,
+              "p95": 661,
+              "p99": 661,
+              "max": 661
+            }
+          },
+          "resources": {
+            "samples": 4,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10656.2890625,
+            "maximumSwapUsedMiB": 449.8515625,
+            "walBytes": 2161511,
+            "transactions": 744,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 30,
+            "maximumMetricsScrapeMs": 571
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.032247803514376776,
+              "peakInstanceRssMiB": 213.30859375,
+              "peakEventLoopP99Ms": 10.616831
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.5046647364217223,
+              "peakInstanceRssMiB": 469.359375,
+              "peakEventLoopP99Ms": 13.590527
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.12726976837060724,
+              "peakInstanceRssMiB": 324.69921875,
+              "peakEventLoopP99Ms": 11.051007
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.3927931309904146,
+              "peakInstanceRssMiB": 420.52734375,
+              "peakEventLoopP99Ms": 11.542527
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.006789736421725107,
+              "peakInstanceRssMiB": 141.99609375,
+              "peakEventLoopP99Ms": 10.559486999999999
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "child-conversations",
+            "kind": "children",
+            "concurrency": 2,
+            "count": 6,
+            "children": 4,
+            "firstByteMs": 300,
+            "outputBytes": 512
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 6,
+            "accepted": 6,
+            "completed": 6,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 14014.563346999988,
+            "successfulRunsPerSecond": 0.4281260751006119,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 6,
+              "p50": 20,
+              "p95": 22,
+              "p99": 22,
+              "max": 22
+            },
+            "queueMs": {
+              "count": 6,
+              "p50": 26,
+              "p95": 30,
+              "p99": 30,
+              "max": 30
+            },
+            "firstDurableTextMs": {
+              "count": 6,
+              "p50": 1223,
+              "p95": 1336,
+              "p99": 1336,
+              "max": 1336
+            },
+            "settlementMs": {
+              "count": 6,
+              "p50": 3890,
+              "p95": 5944,
+              "p99": 5944,
+              "max": 5944
+            },
+            "generatorDelayMs": {
+              "count": 6,
+              "p50": 0.00037999998312443495,
+              "p95": 0.004978999990271404,
+              "p99": 0.004978999990271404,
+              "max": 0.004978999990271404
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 9,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10660.97265625,
+            "maximumSwapUsedMiB": 449.8515625,
+            "walBytes": 5877365,
+            "transactions": 1451,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 38,
+            "kafkaSamples": 4,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 9,
+            "lastKafkaObservationAgeMs": 45,
+            "maximumMetricsScrapeMs": 867
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.011386358953224861,
+              "peakInstanceRssMiB": 213.30859375,
+              "peakEventLoopP99Ms": 10.616831
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.33013132770107734,
+              "peakInstanceRssMiB": 469.359375,
+              "peakEventLoopP99Ms": 13.000703000000001
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.05067051308469002,
+              "peakInstanceRssMiB": 324.69921875,
+              "peakEventLoopP99Ms": 11.026431
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.3037025894635628,
+              "peakInstanceRssMiB": 421.27734375,
+              "peakEventLoopP99Ms": 11.354111
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007055841747372797,
+              "peakInstanceRssMiB": 142.24609375,
+              "peakEventLoopP99Ms": 10.362879
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "sse-fanout-history",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 16,
+            "views": 3,
+            "slowReaderMs": 80,
+            "readHistory": true,
+            "firstByteMs": 100,
+            "chunkMs": 30
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 16,
+            "accepted": 16,
+            "completed": 16,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 6459.313479000004,
+            "successfulRunsPerSecond": 2.4770434276054107,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 16,
+              "p50": 38,
+              "p95": 545,
+              "p99": 545,
+              "max": 545
+            },
+            "queueMs": {
+              "count": 16,
+              "p50": 47,
+              "p95": 113,
+              "p99": 113,
+              "max": 113
+            },
+            "firstDurableTextMs": {
+              "count": 16,
+              "p50": 1615,
+              "p95": 3489,
+              "p99": 3489,
+              "max": 3489
+            },
+            "settlementMs": {
+              "count": 16,
+              "p50": 1888,
+              "p95": 3804,
+              "p99": 3804,
+              "max": 3804
+            },
+            "generatorDelayMs": {
+              "count": 16,
+              "p50": 0.00018999999156221747,
+              "p95": 0.006932999996934086,
+              "p99": 0.006932999996934086,
+              "max": 0.006932999996934086
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 16,
+            "beforeProviderMs": {
+              "count": 16,
+              "p50": 953,
+              "p95": 1556,
+              "p99": 1556,
+              "max": 1556
+            },
+            "providerMs": {
+              "count": 16,
+              "p50": 345,
+              "p95": 349,
+              "p99": 349,
+              "max": 349
+            },
+            "afterProviderMs": {
+              "count": 16,
+              "p50": 536,
+              "p95": 1900,
+              "p99": 1900,
+              "max": 1900
+            }
+          },
+          "resources": {
+            "samples": 5,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10621.26953125,
+            "maximumSwapUsedMiB": 449.6015625,
+            "walBytes": 3060102,
+            "transactions": 1349,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 29,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 24,
+            "maximumMetricsScrapeMs": 629
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.013689525664209456,
+              "peakInstanceRssMiB": 213.30859375,
+              "peakEventLoopP99Ms": 10.739711000000002
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.5580503547085831,
+              "peakInstanceRssMiB": 467.25,
+              "peakEventLoopP99Ms": 16.072703
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.18537752121296458,
+              "peakInstanceRssMiB": 325.69921875,
+              "peakEventLoopP99Ms": 11.919359
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.6710790095979992,
+              "peakInstanceRssMiB": 306.81640625,
+              "peakEventLoopP99Ms": 13.156351
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.00842231186534994,
+              "peakInstanceRssMiB": 142.24609375,
+              "peakEventLoopP99Ms": 10.346495
+            }
+          },
+          "historyReadsMs": {
+            "count": 16,
+            "p50": 504.6667249999882,
+            "p95": 1007.1042200000084,
+            "p99": 1007.1042200000084,
+            "max": 1007.1042200000084
+          },
+          "historyPages": {
+            "count": 16,
+            "latencyMs": {
+              "count": 16,
+              "p50": 504.66540199998417,
+              "p95": 1007.094482000015,
+              "p99": 1007.094482000015,
+              "max": 1007.094482000015
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-images",
+            "kind": "mcp",
+            "concurrency": 4,
+            "count": 8,
+            "rounds": 1,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 3559.107089999976,
+            "successfulRunsPerSecond": 2.2477547872829122,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 20,
+              "p95": 25,
+              "p99": 25,
+              "max": 25
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 25,
+              "p95": 28,
+              "p99": 28,
+              "max": 28
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 916,
+              "p95": 1025,
+              "p99": 1025,
+              "max": 1025
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1663,
+              "p95": 1904,
+              "p99": 1904,
+              "max": 1904
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00015999999595806003,
+              "p95": 0.0002300000051036477,
+              "p99": 0.0002300000051036477,
+              "max": 0.0002300000051036477
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 3,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10338.70703125,
+            "maximumSwapUsedMiB": 450.1015625,
+            "walBytes": 1867871,
+            "transactions": 704,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 18,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 18,
+            "lastKafkaObservationAgeMs": 25,
+            "maximumMetricsScrapeMs": 407
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.012734528921444868,
+              "peakInstanceRssMiB": 213.30859375,
+              "peakEventLoopP99Ms": 10.690559
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.5345258903763597,
+              "peakInstanceRssMiB": 553.15625,
+              "peakEventLoopP99Ms": 21.299199
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.05310937105329671,
+              "peakInstanceRssMiB": 325.94921875,
+              "peakEventLoopP99Ms": 11.018239000000001
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.36181182116696053,
+              "peakInstanceRssMiB": 336.31640625,
+              "peakEventLoopP99Ms": 11.517951
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.005058600656731671,
+              "peakInstanceRssMiB": 142.24609375,
+              "peakEventLoopP99Ms": 10.297343
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-1",
+            "kind": "text",
+            "arrivalRate": 1,
+            "concurrency": 32,
+            "count": 45,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 45,
+            "accepted": 45,
+            "completed": 45,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 45324.32657599996,
+            "successfulRunsPerSecond": 0.9928443156136886,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 45,
+              "p50": 15,
+              "p95": 20,
+              "p99": 28,
+              "max": 28
+            },
+            "queueMs": {
+              "count": 45,
+              "p50": 19,
+              "p95": 30,
+              "p99": 35,
+              "max": 35
+            },
+            "firstDurableTextMs": {
+              "count": 45,
+              "p50": 1187,
+              "p95": 1240,
+              "p99": 1259,
+              "max": 1259
+            },
+            "settlementMs": {
+              "count": 45,
+              "p50": 1248,
+              "p95": 1312,
+              "p99": 1319,
+              "max": 1319
+            },
+            "generatorDelayMs": {
+              "count": 45,
+              "p50": 0,
+              "p95": 0.4886809999588877,
+              "p99": 0.585040999983903,
+              "max": 0.585040999983903
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 45,
+            "beforeProviderMs": {
+              "count": 45,
+              "p50": 823,
+              "p95": 872,
+              "p99": 883,
+              "max": 883
+            },
+            "providerMs": {
+              "count": 45,
+              "p50": 301,
+              "p95": 302,
+              "p99": 302,
+              "max": 302
+            },
+            "afterProviderMs": {
+              "count": 45,
+              "p50": 121,
+              "p95": 152,
+              "p99": 169,
+              "max": 169
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10340.05078125,
+            "maximumSwapUsedMiB": 450.3515625,
+            "walBytes": 8326123,
+            "transactions": 3786,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 25,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 5,
+            "lastKafkaObservationAgeMs": 32,
+            "maximumMetricsScrapeMs": 1072
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.011014066191291551,
+              "peakInstanceRssMiB": 213.55859375,
+              "peakEventLoopP99Ms": 10.690559
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.18512949998916167,
+              "peakInstanceRssMiB": 553.15625,
+              "peakEventLoopP99Ms": 11.599871
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.03881414855111762,
+              "peakInstanceRssMiB": 326.69921875,
+              "peakEventLoopP99Ms": 10.977279
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.186603090660831,
+              "peakInstanceRssMiB": 336.81640625,
+              "peakEventLoopP99Ms": 11.149311
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.006120462081969694,
+              "peakInstanceRssMiB": 142.74609375,
+              "peakEventLoopP99Ms": 10.354687
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-2",
+            "kind": "text",
+            "arrivalRate": 2,
+            "concurrency": 32,
+            "count": 90,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 90,
+            "accepted": 90,
+            "completed": 90,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 45851.289983000024,
+            "successfulRunsPerSecond": 1.9628673486257138,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 90,
+              "p50": 17,
+              "p95": 22,
+              "p99": 33,
+              "max": 33
+            },
+            "queueMs": {
+              "count": 90,
+              "p50": 22,
+              "p95": 33,
+              "p99": 41,
+              "max": 41
+            },
+            "firstDurableTextMs": {
+              "count": 90,
+              "p50": 1216,
+              "p95": 1279,
+              "p99": 1385,
+              "max": 1385
+            },
+            "settlementMs": {
+              "count": 90,
+              "p50": 1279,
+              "p95": 1381,
+              "p99": 1488,
+              "max": 1488
+            },
+            "generatorDelayMs": {
+              "count": 90,
+              "p50": 0,
+              "p95": 0.4355939999804832,
+              "p99": 1.0300690000294708,
+              "max": 1.0300690000294708
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 90,
+            "beforeProviderMs": {
+              "count": 90,
+              "p50": 841,
+              "p95": 890,
+              "p99": 945,
+              "max": 945
+            },
+            "providerMs": {
+              "count": 90,
+              "p50": 302,
+              "p95": 303,
+              "p99": 303,
+              "max": 303
+            },
+            "afterProviderMs": {
+              "count": 90,
+              "p50": 133,
+              "p95": 202,
+              "p99": 247,
+              "max": 247
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 3,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10469.703125,
+            "maximumSwapUsedMiB": 449.3515625,
+            "walBytes": 13912212,
+            "transactions": 6792,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 61,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 8,
+            "lastKafkaObservationAgeMs": 26,
+            "maximumMetricsScrapeMs": 841
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.01421515934539183,
+              "peakInstanceRssMiB": 213.55859375,
+              "peakEventLoopP99Ms": 10.747902999999999
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.3325170111972445,
+              "peakInstanceRssMiB": 500.4140625,
+              "peakEventLoopP99Ms": 12.599295
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.06107368647717496,
+              "peakInstanceRssMiB": 327.19921875,
+              "peakEventLoopP99Ms": 11.083775000000001
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.303595650301465,
+              "peakInstanceRssMiB": 385.8046875,
+              "peakEventLoopP99Ms": 11.640831
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007364470284237736,
+              "peakInstanceRssMiB": 142.74609375,
+              "peakEventLoopP99Ms": 10.346495
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-4",
+            "kind": "text",
+            "arrivalRate": 4,
+            "concurrency": 32,
+            "count": 180,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 180,
+            "accepted": 180,
+            "completed": 180,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 45730.95054799999,
+            "successfulRunsPerSecond": 3.9360651340730146,
+            "maximumInFlight": 10,
+            "acknowledgementMs": {
+              "count": 180,
+              "p50": 19,
+              "p95": 29,
+              "p99": 48,
+              "max": 50
+            },
+            "queueMs": {
+              "count": 180,
+              "p50": 26,
+              "p95": 49,
+              "p99": 64,
+              "max": 66
+            },
+            "firstDurableTextMs": {
+              "count": 180,
+              "p50": 1245,
+              "p95": 1379,
+              "p99": 1772,
+              "max": 1875
+            },
+            "settlementMs": {
+              "count": 180,
+              "p50": 1308,
+              "p95": 1530,
+              "p99": 1959,
+              "max": 2027
+            },
+            "generatorDelayMs": {
+              "count": 180,
+              "p50": 0,
+              "p95": 0.42217400000663474,
+              "p99": 0.5873389999615029,
+              "max": 0.6297989999875426
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 180,
+            "beforeProviderMs": {
+              "count": 180,
+              "p50": 858,
+              "p95": 947,
+              "p99": 979,
+              "max": 984
+            },
+            "providerMs": {
+              "count": 180,
+              "p50": 302,
+              "p95": 304,
+              "p99": 304,
+              "max": 305
+            },
+            "afterProviderMs": {
+              "count": 180,
+              "p50": 140,
+              "p95": 332,
+              "p99": 673,
+              "max": 747
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10326.1953125,
+            "maximumSwapUsedMiB": 449.609375,
+            "walBytes": 26778056,
+            "transactions": 12705,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 119,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 48,
+            "lastKafkaObservationAgeMs": 23,
+            "maximumMetricsScrapeMs": 1103
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.014697400803074145,
+              "peakInstanceRssMiB": 213.55859375,
+              "peakEventLoopP99Ms": 10.829823000000001
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.6099419714174683,
+              "peakInstanceRssMiB": 550.1640625,
+              "peakEventLoopP99Ms": 13.910015
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.1074817581278878,
+              "peakInstanceRssMiB": 328.69921875,
+              "peakEventLoopP99Ms": 11.476991
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.5220824230387286,
+              "peakInstanceRssMiB": 397.5546875,
+              "peakEventLoopP99Ms": 11.804670999999999
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007469819955960427,
+              "peakInstanceRssMiB": 142.74609375,
+              "peakEventLoopP99Ms": 10.616831
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-8",
+            "kind": "text",
+            "arrivalRate": 8,
+            "concurrency": 32,
+            "count": 360,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 360,
+            "accepted": 315,
+            "completed": 315,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 45,
+            "elapsedMs": 48173.85780900001,
+            "successfulRunsPerSecond": 6.538816161431659,
+            "maximumInFlight": 32,
+            "acknowledgementMs": {
+              "count": 315,
+              "p50": 29,
+              "p95": 61,
+              "p99": 94,
+              "max": 267
+            },
+            "queueMs": {
+              "count": 315,
+              "p50": 44,
+              "p95": 109,
+              "p99": 173,
+              "max": 291
+            },
+            "firstDurableTextMs": {
+              "count": 315,
+              "p50": 2273,
+              "p95": 7059,
+              "p99": 8544,
+              "max": 11477
+            },
+            "settlementMs": {
+              "count": 315,
+              "p50": 2527,
+              "p95": 7422,
+              "p99": 8978,
+              "max": 11616
+            },
+            "generatorDelayMs": {
+              "count": 315,
+              "p50": 0,
+              "p95": 0.7493569999933243,
+              "p99": 2.8639560000156052,
+              "max": 3.3118670000112616
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 315,
+            "beforeProviderMs": {
+              "count": 315,
+              "p50": 851,
+              "p95": 1255,
+              "p99": 1294,
+              "max": 1340
+            },
+            "providerMs": {
+              "count": 315,
+              "p50": 303,
+              "p95": 307,
+              "p99": 309,
+              "max": 313
+            },
+            "afterProviderMs": {
+              "count": 315,
+              "p50": 1254,
+              "p95": 6266,
+              "p99": 7636,
+              "max": 10345
+            }
+          },
+          "resources": {
+            "samples": 26,
+            "peakActiveRootRuns": 31,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 9998.51953125,
+            "maximumSwapUsedMiB": 450.359375,
+            "walBytes": 46350586,
+            "transactions": 22610,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 650,
+            "kafkaSamples": 10,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 39,
+            "maximumMetricsScrapeMs": 1824
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.029369654328540815,
+              "peakInstanceRssMiB": 213.7265625,
+              "peakEventLoopP99Ms": 12.607487
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.2741123279290305,
+              "peakInstanceRssMiB": 605.46875,
+              "peakEventLoopP99Ms": 23.199742999999998
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.24582249413684085,
+              "peakInstanceRssMiB": 330.44921875,
+              "peakEventLoopP99Ms": 13.926399
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 1.0112321810951361,
+              "peakInstanceRssMiB": 403.0546875,
+              "peakEventLoopP99Ms": 24.002558999999998
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.011168185989599287,
+              "peakInstanceRssMiB": 142.74609375,
+              "peakEventLoopP99Ms": 19.562495
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "after-cold-64",
+      "at": "2026-11-16T07:15:14.108Z",
+      "serving": "history-throughput-20261116-r2",
+      "driverRevision": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 721.3330000000001,
+          "p95_ms": 1236.1416,
+          "p99_ms": 1398.19635
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 24999.829779000007,
+            "successfulRunsPerSecond": 7.680052292247248,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 43,
+              "p95": 340,
+              "p99": 1737,
+              "max": 1755
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 97,
+              "p95": 6505,
+              "p99": 7028,
+              "max": 7136
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 5000,
+              "p95": 14801,
+              "p99": 16235,
+              "max": 16742
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 5442,
+              "p95": 15808,
+              "p99": 16886,
+              "max": 16928
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.000450999999884516,
+              "p95": 0.002585000009275973,
+              "p99": 0.01742299999750685,
+              "max": 0.15243800000462215
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 3316,
+              "p95": 7777,
+              "p99": 9435,
+              "max": 9672
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 4,
+              "p95": 24,
+              "p99": 50,
+              "max": 72
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 3391,
+              "p95": 9435,
+              "p99": 12035,
+              "max": 12097
+            }
+          },
+          "resources": {
+            "samples": 14,
+            "peakActiveRootRuns": 63,
+            "peakQueuedRuns": 37,
+            "minimumAvailableMiB": 10343.32421875,
+            "maximumSwapUsedMiB": 449.109375,
+            "walBytes": 27618979,
+            "transactions": 13762,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1316,
+            "kafkaSamples": 6,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 16,
+            "lastKafkaObservationAgeMs": 23,
+            "maximumMetricsScrapeMs": 1812
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.023707079403592787,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 12.943359
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.7660513833992089,
+              "peakInstanceRssMiB": 565.140625,
+              "peakEventLoopP99Ms": 68.354047
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.4103835948812271,
+              "peakInstanceRssMiB": 319.83203125,
+              "peakEventLoopP99Ms": 20.938751
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 1.1861288302743358,
+              "peakInstanceRssMiB": 403.5625,
+              "peakEventLoopP99Ms": 25.968639000000003
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.01227433178100413,
+              "peakInstanceRssMiB": 150.515625,
+              "peakEventLoopP99Ms": 14.352383
+            }
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1819,
+              "meanMs": 87.53670288784723
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 679.7558640156288
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"pi_session_open\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 36.00650998957039
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"world_state_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 320.09166285416484
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"idle\"}": {
+              "count": 885,
+              "meanMs": 54.42692879096275
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"claimed\"}": {
+              "count": 192,
+              "meanMs": 156.2253729479209
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"transaction_begin\"}": {
+              "count": 192,
+              "meanMs": 2.806851749998411
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"candidate_context\"}": {
+              "count": 192,
+              "meanMs": 101.69284943750489
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"input_snapshot\"}": {
+              "count": 192,
+              "meanMs": 3.09277805729168
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"configuration\"}": {
+              "count": 192,
+              "meanMs": 2.7134540156257563
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"ownership\"}": {
+              "count": 192,
+              "meanMs": 2.5019910729048833
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_session_lock\"}": {
+              "count": 192,
+              "meanMs": 3.7342896250059656
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_worker_lock\"}": {
+              "count": 192,
+              "meanMs": 2.119357124999322
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_read\"}": {
+              "count": 192,
+              "meanMs": 1.7829676093691291
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_write\"}": {
+              "count": 192,
+              "meanMs": 2.908023010427618
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"skill_catalog\"}": {
+              "count": 192,
+              "meanMs": 9.461684369787676
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"admitted_running\"}": {
+              "count": 192,
+              "meanMs": 10.792448671872984
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"finish\"}": {
+              "count": 192,
+              "meanMs": 12.291807421877236
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_queue\"}": {
+              "count": 576,
+              "meanMs": 0.013156723959079693
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_ack\"}": {
+              "count": 576,
+              "meanMs": 43.68870544617493
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2587,
+              "meanMs": 117.04024203788161
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "after-cold-64-repeat",
+      "at": "2026-11-16T07:24:31.760Z",
+      "serving": "history-throughput-20261116-r2",
+      "driverRevision": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 643.0635,
+          "p95_ms": 1214.87045,
+          "p99_ms": 1300.27269
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-repeat",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 24535.186943,
+            "successfulRunsPerSecond": 7.8254957032140515,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 29,
+              "p95": 87,
+              "p99": 219,
+              "max": 221
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 88,
+              "p95": 2035,
+              "p99": 4316,
+              "max": 4338
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 4005,
+              "p95": 14291,
+              "p99": 16998,
+              "max": 18554
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 4435,
+              "p95": 16478,
+              "p99": 19114,
+              "max": 20370
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.000570999996853061,
+              "p95": 0.0025850000020000152,
+              "p99": 0.04574699999648146,
+              "max": 0.1106290000025183
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 1315,
+              "p95": 6358,
+              "p99": 7055,
+              "max": 7254
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 4,
+              "p95": 19,
+              "p99": 28,
+              "max": 28
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 3123,
+              "p95": 10783,
+              "p99": 14002,
+              "max": 14342
+            }
+          },
+          "resources": {
+            "samples": 14,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 24,
+            "minimumAvailableMiB": 10309.1171875,
+            "maximumSwapUsedMiB": 448.1171875,
+            "walBytes": 26234135,
+            "transactions": 13748,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1405,
+            "kafkaSamples": 6,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 133,
+            "lastKafkaObservationAgeMs": 26,
+            "maximumMetricsScrapeMs": 1990
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.022417767345639765,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 12.345343
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.7203434516231684,
+              "peakInstanceRssMiB": 563.765625,
+              "peakEventLoopP99Ms": 142.47526299999998
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.41527076702737026,
+              "peakInstanceRssMiB": 309.65234375,
+              "peakEventLoopP99Ms": 14.721022999999999
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 1.2000027450668393,
+              "peakInstanceRssMiB": 412.80078125,
+              "peakEventLoopP99Ms": 31.145982999999998
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.012655832272437832,
+              "peakInstanceRssMiB": 152.265625,
+              "peakEventLoopP99Ms": 14.262271
+            }
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1950,
+              "meanMs": 86.79116189435668
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 639.6502233750117
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"pi_session_open\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 86.67576833333196
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"world_state_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 272.23028155729605
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"idle\"}": {
+              "count": 865,
+              "meanMs": 52.39695951791616
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"claimed\"}": {
+              "count": 192,
+              "meanMs": 135.82383521354868
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"transaction_begin\"}": {
+              "count": 192,
+              "meanMs": 3.611477713543232
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"candidate_context\"}": {
+              "count": 192,
+              "meanMs": 70.03764833331779
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"input_snapshot\"}": {
+              "count": 192,
+              "meanMs": 4.338630401052796
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"configuration\"}": {
+              "count": 192,
+              "meanMs": 5.269187182300811
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"ownership\"}": {
+              "count": 192,
+              "meanMs": 3.520367687489244
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_session_lock\"}": {
+              "count": 192,
+              "meanMs": 4.855535161461981
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_worker_lock\"}": {
+              "count": 192,
+              "meanMs": 3.101924614575788
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_read\"}": {
+              "count": 192,
+              "meanMs": 3.4109418593761838
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_write\"}": {
+              "count": 192,
+              "meanMs": 4.0270484531259525
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"skill_catalog\"}": {
+              "count": 192,
+              "meanMs": 11.263661911464924
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"admitted_running\"}": {
+              "count": 192,
+              "meanMs": 10.93310091664899
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"finish\"}": {
+              "count": 192,
+              "meanMs": 11.150385192723961
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_queue\"}": {
+              "count": 576,
+              "meanMs": 0.011521211806719216
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_ack\"}": {
+              "count": 576,
+              "meanMs": 34.80678547916479
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2718,
+              "meanMs": 121.66841723288887
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "after-long-history",
+      "at": "2026-11-16T07:21:00.287Z",
+      "serving": "history-throughput-20261116-r2",
+      "driverRevision": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 264,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 264,
+        "deliveryLatency": {
+          "events": 264,
+          "p50_ms": 640.2539999999999,
+          "p95_ms": 1090.21275,
+          "p99_ms": 1117.55201
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "frozen-history",
+            "kind": "mcp",
+            "concurrency": 2,
+            "count": 8,
+            "firstByteMs": 100,
+            "chunkMs": 0,
+            "outputBytes": 2048,
+            "paddingBytes": 0,
+            "rounds": 32,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": true
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 73139.58613099999,
+            "successfulRunsPerSecond": 0.10937989156338998,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 20,
+              "p95": 61,
+              "p99": 61,
+              "max": 61
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 33,
+              "p95": 74,
+              "p99": 74,
+              "max": 74
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1018,
+              "p95": 1134,
+              "p99": 1134,
+              "max": 1134
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 16723,
+              "p95": 18942,
+              "p99": 18942,
+              "max": 18942
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0006219999922905117,
+              "p95": 0.0412480000013602,
+              "p99": 0.0412480000013602,
+              "max": 0.0412480000013602
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 38,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11036.6875,
+            "maximumSwapUsedMiB": 448.859375,
+            "walBytes": 23827661,
+            "transactions": 5605,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 32,
+            "kafkaSamples": 14,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 35,
+            "maximumMetricsScrapeMs": 1039
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.01257721604314095,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.870783
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.39817372430064274,
+              "peakInstanceRssMiB": 471.65625,
+              "peakEventLoopP99Ms": 18.366463
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.047786895854398465,
+              "peakInstanceRssMiB": 226.40234375,
+              "peakEventLoopP99Ms": 11.124735
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.3145133265925169,
+              "peakInstanceRssMiB": 397.0234375,
+              "peakEventLoopP99Ms": 11.796479
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.0077204314122008575,
+              "peakInstanceRssMiB": 151.265625,
+              "peakEventLoopP99Ms": 10.592255
+            }
+          },
+          "historyReadsMs": {
+            "count": 8,
+            "p50": 780.1931489999988,
+            "p95": 1095.0589610000025,
+            "p99": 1095.0589610000025,
+            "max": 1095.0589610000025
+          },
+          "historyPages": {
+            "count": 16,
+            "latencyMs": {
+              "count": 16,
+              "p50": 328.83726800000295,
+              "p95": 595.3710189999983,
+              "p99": 595.3710189999983,
+              "max": 595.3710189999983
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "after-faults",
+      "at": "2026-11-16T07:29:14.375Z",
+      "serving": "history-throughput-20261116-r2",
+      "driverRevision": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 58,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 58,
+        "deliveryLatency": {
+          "events": 58,
+          "p50_ms": 691.5165,
+          "p95_ms": 9702.5735,
+          "p99_ms": 9938.41716
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "once-rate-limit",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "fault": "rate_limit_once"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 0,
+            "failed": 8,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 3286.3434419999976,
+            "successfulRunsPerSecond": 0,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 35,
+              "p95": 143,
+              "p99": 143,
+              "max": 143
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 44,
+              "p95": 137,
+              "p99": 137,
+              "max": 137
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1358,
+              "p95": 1449,
+              "p99": 1449,
+              "max": 1449
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0008019999950192869,
+              "p95": 0.04029600000649225,
+              "p99": 0.04029600000649225,
+              "max": 0.04029600000649225
+            },
+            "sseReconnects": 0,
+            "errorClasses": [
+              {
+                "index": 0,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 1,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 2,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 3,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 4,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 5,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 6,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 7,
+                "code": "native_task_failed"
+              }
+            ]
+          },
+          "expectedOutcomesPassed": true,
+          "recovery": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 4215.293146000011,
+            "successfulRunsPerSecond": 1.8978514003448097,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 26,
+              "p95": 35,
+              "p99": 35,
+              "max": 35
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 33,
+              "p95": 61,
+              "p99": 61,
+              "max": 61
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1190,
+              "p95": 1467,
+              "p99": 1467,
+              "max": 1467
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1263,
+              "p95": 1570,
+              "p99": 1570,
+              "max": 1570
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0004810000100405887,
+              "p95": 0.0010020000045187771,
+              "p99": 0.0010020000045187771,
+              "max": 0.0010020000045187771
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11145.0859375,
+            "maximumSwapUsedMiB": 446.3671875,
+            "walBytes": 566604,
+            "transactions": 394,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 14,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 14,
+            "lastKafkaObservationAgeMs": 36,
+            "maximumMetricsScrapeMs": 724
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.010521312322397683,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.747902999999999
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.6018165848617938,
+              "peakInstanceRssMiB": 432.51171875,
+              "peakEventLoopP99Ms": 13.058047
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.09995117540687104,
+              "peakInstanceRssMiB": 223.015625,
+              "peakEventLoopP99Ms": 10.936319
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.5471803151640391,
+              "peakInstanceRssMiB": 297.3515625,
+              "peakEventLoopP99Ms": 12.681215
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007607078274348001,
+              "peakInstanceRssMiB": 152.515625,
+              "peakEventLoopP99Ms": 10.403839
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "once-disconnect",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "fault": "disconnect_once"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 0,
+            "failed": 8,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 2752.4124900000024,
+            "successfulRunsPerSecond": 0,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 24,
+              "p95": 38,
+              "p99": 38,
+              "max": 38
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 34,
+              "p95": 77,
+              "p99": 77,
+              "max": 77
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1069,
+              "p95": 1158,
+              "p99": 1158,
+              "max": 1158
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1165,
+              "p95": 1256,
+              "p99": 1256,
+              "max": 1256
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.000450999999884516,
+              "p95": 0.001141999993706122,
+              "p99": 0.001141999993706122,
+              "max": 0.001141999993706122
+            },
+            "sseReconnects": 0,
+            "errorClasses": [
+              {
+                "index": 0,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 1,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 2,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 3,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 4,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 5,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 6,
+                "code": "native_task_failed"
+              },
+              {
+                "index": 7,
+                "code": "native_task_failed"
+              }
+            ]
+          },
+          "expectedOutcomesPassed": true,
+          "recovery": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 3215.104569000003,
+            "successfulRunsPerSecond": 2.488254993985545,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 18,
+              "p95": 31,
+              "p99": 31,
+              "max": 31
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 23,
+              "p95": 38,
+              "p99": 38,
+              "max": 38
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 937,
+              "p95": 1166,
+              "p99": 1166,
+              "max": 1166
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 979,
+              "p95": 1239,
+              "p99": 1239,
+              "max": 1239
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00019999999494757503,
+              "p95": 0.0004599999956553802,
+              "p99": 0.0004599999956553802,
+              "max": 0.0004599999956553802
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11062.7578125,
+            "maximumSwapUsedMiB": 446.3671875,
+            "walBytes": 1049417,
+            "transactions": 769,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 32,
+            "maximumMetricsScrapeMs": 606
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.01040460526315805,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.461183
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.44613755980861214,
+              "peakInstanceRssMiB": 454.51171875,
+              "peakEventLoopP99Ms": 12.247039
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.1521824162679432,
+              "peakInstanceRssMiB": 226.765625,
+              "peakEventLoopP99Ms": 11.157502999999998
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.41968690191387764,
+              "peakInstanceRssMiB": 311.6015625,
+              "peakEventLoopP99Ms": 11.157502999999998
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.008909389952153032,
+              "peakInstanceRssMiB": 152.515625,
+              "peakEventLoopP99Ms": 10.518526999999999
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "worker-handoff",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 22977.56414100001,
+            "successfulRunsPerSecond": 0.1740828564531173,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 24,
+              "p95": 84,
+              "p99": 84,
+              "max": 84
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 26,
+              "p95": 57,
+              "p99": 57,
+              "max": 57
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 903,
+              "p95": 932,
+              "p99": 932,
+              "max": 932
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 18746,
+              "p95": 22316,
+              "p99": 22316,
+              "max": 22316
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "expectedOutcomesPassed": true,
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 13,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10967.6953125,
+            "maximumSwapUsedMiB": 446.3671875,
+            "walBytes": 3595106,
+            "transactions": 6865,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 22,
+            "kafkaSamples": 5,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 22,
+            "maximumMetricsScrapeMs": 1502
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.007711858499608081,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.600447
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.08326596671603897,
+              "peakInstanceRssMiB": 481.7265625,
+              "peakEventLoopP99Ms": 11.616255
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.027570924457610273,
+              "peakInstanceRssMiB": 232.765625,
+              "peakEventLoopP99Ms": 10.928127
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.1011985274897611,
+              "peakInstanceRssMiB": 340.8515625,
+              "peakEventLoopP99Ms": 11.091966999999999
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.00542280212599105,
+              "peakInstanceRssMiB": 152.515625,
+              "peakEventLoopP99Ms": 10.321919000000001
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "projector-restart",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 45215.374590999985,
+            "successfulRunsPerSecond": 0.08846548405674805,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 25,
+              "p95": 29,
+              "p99": 29,
+              "max": 29
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 41,
+              "p95": 49,
+              "p99": 49,
+              "max": 49
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 42753,
+              "p95": 42892,
+              "p99": 42892,
+              "max": 42892
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 135,
+            "errorClasses": []
+          },
+          "expectedOutcomesPassed": true,
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 25,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11066.7265625,
+            "maximumSwapUsedMiB": 446.3671875,
+            "walBytes": 2154793,
+            "transactions": 18250,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 436,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 32,
+            "maximumMetricsScrapeMs": 1504
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.011990182825485127,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.797055
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.06242741274238288,
+              "peakInstanceRssMiB": 485.5703125,
+              "peakEventLoopP99Ms": 60.293119
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.04371738504155089,
+              "peakInstanceRssMiB": 245.015625,
+              "peakEventLoopP99Ms": 11.042815
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.06223115789473685,
+              "peakInstanceRssMiB": 390.4375,
+              "peakEventLoopP99Ms": 11.812863
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.006984110803324106,
+              "peakInstanceRssMiB": 152.765625,
+              "peakEventLoopP99Ms": 10.608639
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "stop-under-load",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 2,
+            "failed": 2,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 4090.558109000005,
+            "successfulRunsPerSecond": 0.4889308369925414,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 94,
+              "p95": 103,
+              "p99": 103,
+              "max": 103
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 103,
+              "p95": 185,
+              "p99": 185,
+              "max": 185
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 1263,
+              "p95": 1498,
+              "p99": 1498,
+              "max": 1498
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 2150,
+              "p95": 2937,
+              "p99": 2937,
+              "max": 2937
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 0,
+            "errorClasses": [
+              {
+                "code": "cancelled"
+              },
+              {
+                "code": "cancelled"
+              }
+            ]
+          },
+          "expectedOutcomesPassed": true,
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10909.12890625,
+            "maximumSwapUsedMiB": 446.3671875,
+            "walBytes": 842980,
+            "transactions": 364,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 6,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 6,
+            "lastKafkaObservationAgeMs": 31,
+            "maximumMetricsScrapeMs": 869
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.010053879865945864,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.444799
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.5953619489559203,
+              "peakInstanceRssMiB": 485.87890625,
+              "peakEventLoopP99Ms": 24.772606999999997
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.07755503995874959,
+              "peakInstanceRssMiB": 245.765625,
+              "peakEventLoopP99Ms": 11.132927
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.35384815674142833,
+              "peakInstanceRssMiB": 391.9375,
+              "peakEventLoopP99Ms": 11.411454999999998
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.006936323794792096,
+              "peakInstanceRssMiB": 152.765625,
+              "peakEventLoopP99Ms": 10.379263
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "lost-tool-reply",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 2958.4996790000005,
+            "successfulRunsPerSecond": 1.352036651682868,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 31,
+              "p95": 37,
+              "p99": 37,
+              "max": 37
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 67,
+              "p95": 76,
+              "p99": 76,
+              "max": 76
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 1170,
+              "p95": 1279,
+              "p99": 1279,
+              "max": 1279
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 1865,
+              "p95": 1983,
+              "p99": 1983,
+              "max": 1983
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 0,
+            "errorClasses": []
+          },
+          "expectedOutcomesPassed": true,
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10868.73828125,
+            "maximumSwapUsedMiB": 446.3671875,
+            "walBytes": 1036461,
+            "transactions": 361,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 36,
+            "maximumMetricsScrapeMs": 589
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.012628474576270247,
+              "peakInstanceRssMiB": 263.7265625,
+              "peakEventLoopP99Ms": 10.559486999999999
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.6412088135593221,
+              "peakInstanceRssMiB": 486.12890625,
+              "peakEventLoopP99Ms": 13.197311
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.07503728813559464,
+              "peakInstanceRssMiB": 245.765625,
+              "peakEventLoopP99Ms": 11.599871
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.44144779661016953,
+              "peakInstanceRssMiB": 397.7265625,
+              "peakEventLoopP99Ms": 11.567103000000001
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.007762372881356158,
+              "peakInstanceRssMiB": 152.765625,
+              "peakEventLoopP99Ms": 10.256383000000001
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "releaseScope": {
+    "servingRevision": "500533bbd8dfeb8aee310af3bae44fe05f2a5fc1",
+    "checks": [
+      {
+        "name": "test-only dependency",
+        "mode": "none",
+        "build": [],
+        "roles": [],
+        "drainRoles": [],
+        "physical": false
+      },
+      {
+        "name": "history implementation",
+        "mode": "matched",
+        "build": ["control-plane"],
+        "roles": [
+          "controlPlane",
+          "sessionRuntime",
+          "sessionApi",
+          "toolCompletion",
+          "metering",
+          "toolHost"
+        ],
+        "drainRoles": [
+          "web",
+          "sshGateway",
+          "worker",
+          "sessionRuntime",
+          "sessionApi",
+          "toolCompletion",
+          "toolHost",
+          "controlPlane",
+          "volumeGateway",
+          "metering",
+          "workspaceQuota"
+        ],
+        "physical": false
+      },
+      {
+        "name": "Guest implementation",
+        "mode": "matched",
+        "build": ["cubesandbox-tool"],
+        "roles": ["guest"],
+        "drainRoles": [
+          "web",
+          "sshGateway",
+          "worker",
+          "sessionRuntime",
+          "sessionApi",
+          "toolCompletion",
+          "toolHost",
+          "controlPlane",
+          "volumeGateway",
+          "metering",
+          "workspaceQuota"
+        ],
+        "physical": true
+      }
+    ],
+    "passed": true
+  },
+  "health": {
+    "deviceLinkHealthy": 200,
+    "workloads": 10,
+    "notReady": [],
+    "remainingLoadPods": 0
+  },
+  "preservation": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  },
+  "scanDatabase": {
+    "policy": "reuse-local-cache",
+    "vulnerabilityUpdatedAt": "2026-11-15T01:07:39.649898494Z",
+    "javaUpdatedAt": "2026-11-13T01:08:15.464357406Z"
+  }
+}

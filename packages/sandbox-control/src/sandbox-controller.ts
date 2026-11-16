@@ -738,6 +738,19 @@ export class SandboxController {
     let handle = environment?.handle;
     let adopted = false;
     let physicalVerified = false;
+    const create = async (spec: SandboxCreateSpec): Promise<SandboxHandle> => {
+      try {
+        return await this.#createPhysical(spec, "development_environment");
+      } catch (error) {
+        // createPhysical accepts no-effect evidence only for a fresh send (or
+        // confirmed cleanup), never for a recovery-time local refusal.
+        if (error instanceof SandboxCreationError && error.absenceConfirmed) {
+          await this.#stateRepository.confirmDevelopmentEnvironmentAbsent(identity);
+          this.#admission.release(identity.allocationId);
+        }
+        throw error;
+      }
+    };
     let bootstrap =
       candidate.creation?.spec ??
       (candidate.environment
@@ -822,7 +835,7 @@ export class SandboxController {
         environment = undefined;
         handle = undefined;
         await this.#admission.acquire(identity.allocationId, spec.assignment);
-        handle = await this.#createPhysical(spec, "development_environment");
+        handle = await create(spec);
         adopted = true;
       } else {
         if (observation?.presence === "unavailable") return 0;
@@ -846,10 +859,12 @@ export class SandboxController {
             identity = { ...identity, environmentVersionId: environment.environmentVersionId };
             bootstrap = { ...bootstrap, environment };
           }
-          handle =
-            !candidate.runtimeCapsule && !candidate.creation && bootstrap
-              ? await this.#createPhysical(bootstrap)
-              : await this.#recoverPhysical(candidate);
+          if (candidate.runtimeCapsule)
+            handle = await this.#provider.adoptPersistentCapsule!(candidate.runtimeCapsule);
+          else {
+            if (!bootstrap) throw new Error("Runtime creation identity is unavailable");
+            handle = await create(bootstrap);
+          }
           adopted = true;
         }
       }

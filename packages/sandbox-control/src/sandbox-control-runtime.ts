@@ -5,6 +5,7 @@ import { type ConfiguredImageAttachments } from "@pi-cloud/session-attachments";
 import type { Kysely } from "kysely";
 import { SandboxControlServer } from "./sandbox-control-server.ts";
 import { SandboxController } from "./sandbox-controller.ts";
+import { SandboxCreationError } from "./sandbox-provider.ts";
 import { createSandboxRuntimeTransport } from "./sandbox-runtime-transport.ts";
 import { PostgresWorkspaceRuntimeStateRepository } from "./workspace-runtime-state-repository.ts";
 import { PostgresSandboxHttpServiceRegistry } from "./sandbox-http-service-registry.ts";
@@ -105,11 +106,20 @@ export async function createSandboxControl(options: {
       onProbeSample: (stage, ms, outcome) =>
         metrics.sandboxDuration.observe({ operation: `health_${stage}`, outcome }, ms / 1000),
       serviceRegistry: new PostgresSandboxHttpServiceRegistry({ database }),
-      onMaintenanceError: () =>
+      onMaintenanceError: (error) =>
         operationalLog({
           service: "pi-cloud-control-plane",
           level: "warn",
           event: "sandbox.maintenance_failed",
+          attributes: {
+            failureCode:
+              typeof (error as { code?: unknown })?.code === "string"
+                ? String((error as { code: string }).code).slice(0, 100)
+                : "unknown",
+            ...(error instanceof SandboxCreationError
+              ? { absenceConfirmed: error.absenceConfirmed }
+              : {}),
+          },
         }),
     });
     controllerOwns = true;

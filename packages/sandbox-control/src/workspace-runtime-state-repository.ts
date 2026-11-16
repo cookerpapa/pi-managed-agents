@@ -1695,6 +1695,7 @@ export class PostgresWorkspaceRuntimeStateRepository implements WorkspaceRuntime
         allocationId,
         generation: Number(result.generation),
         allocationClosed: false,
+        allocationAbsent: false,
       };
     });
   }

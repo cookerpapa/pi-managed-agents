@@ -51,6 +51,9 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+- [Workload build isolation and throughput, November 16](reports/workload-release-throughput-20261116.md):
+  published query/build repairs, measured improvements and remaining saturation limits.
+
 - [Full repository review, November 1](reports/repository-review-20261101.md):
   feature coverage, confirmed issues, architecture tradeoffs and validation limits.
 - [Current ADR index](adr/README.md): why the maintained design was chosen.

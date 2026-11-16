@@ -59,6 +59,7 @@ export class InMemoryWorkspaceRuntimeStateRepository implements WorkspaceRuntime
     { spec: SandboxCreateSpec; issued: boolean; receipt?: string }
   >();
   readonly closedAllocations = new Set<string>();
+  readonly absentAllocations = new Set<string>();
   async beginCreation(
     spec: SandboxCreateSpec,
     _kind?: AllocationKind,
@@ -85,6 +86,9 @@ export class InMemoryWorkspaceRuntimeStateRepository implements WorkspaceRuntime
   }
   async closeAllocation(id: string, _kind: AllocationKind): Promise<AllocationClosure> {
     this.closedAllocations.add(id);
+    for (const e of this.#developmentEnvironments.values())
+      if (e.reservation.allocationId === id)
+        e.reservation = { ...e.reservation, allocationClosed: true };
     this.onQuarantine?.(id);
     const prior = this.creations.get(id);
     return prior?.issued
@@ -290,7 +294,7 @@ export class InMemoryWorkspaceRuntimeStateRepository implements WorkspaceRuntime
       .filter((e) => !excluded.includes(e.reservation.environmentId) || e.state !== "ready")
       .map((e) => ({
         ...e,
-        allocationAbsent: false,
+        allocationAbsent: this.absentAllocations.has(e.reservation.allocationId),
         ...(this.creations.has(e.reservation.allocationId)
           ? { creation: this.creations.get(e.reservation.allocationId)! }
           : {}),
@@ -300,6 +304,10 @@ export class InMemoryWorkspaceRuntimeStateRepository implements WorkspaceRuntime
     identity: DevelopmentEnvironmentReservation,
   ): Promise<void> {
     this.closedAllocations.add(identity.allocationId);
+    this.absentAllocations.add(identity.allocationId);
+    const e = this.#developmentEnvironments.get(identity.environmentId);
+    if (e?.reservation.allocationId === identity.allocationId)
+      e.reservation = { ...e.reservation, allocationAbsent: true };
   }
   async prepareDevelopmentEnvironmentImage(
     identity: DevelopmentEnvironmentReservation,
@@ -319,6 +327,7 @@ export class InMemoryWorkspaceRuntimeStateRepository implements WorkspaceRuntime
       allocationId: spec.activationId,
       generation: identity.generation + 1,
       allocationClosed: false,
+      allocationAbsent: false,
     };
     this.#developmentEnvironments.set(identity.environmentId, {
       reservation: next,

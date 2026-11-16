@@ -1,5 +1,13 @@
 # Delivery and research evidence
 
+- [Workload build isolation and measured query repairs](workload-release-throughput-20261116.md):
+  derived dependency inputs, Worker source boundaries, no-op publication,
+  cached scans, original-asset preservation and before/after throughput/history
+  measurements, including saturation limits and recovery acceptance.
+- [Capacity diagnosis](runtime-capacity-diagnosis-20261116.md) and
+  [initial baseline](runtime-capacity-20261115.md): frozen-query amplification,
+  cold-Run costs and bounded single-host measurements through the real runtime.
+
 - [Shared clients, local execution and platform service minutes](client-service-delivery-20261114.md):
   #38/#39, cloud-owned Pi loops, outbound Linux tools, independent minute settlement,
   real Cube/BoxLite/Android receipts, recovery, publication repairs and preserved assets.
