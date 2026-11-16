@@ -42,9 +42,14 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   absence on the new allocation, and restore the two affected original machines.
   The 66 controller and 31 real-PG state tests pass. Both originals are running
   with their files preserved; no generic absence inference or uncertain replay.
+- [x] Capture the Run-claim plan under load: the
+  [diagnosis](reports/run-claim-query-diagnosis-20261116.md) records 6,401 repeated
+  tenant-prefix Session scans, 1.10 million discarded combinations and 6.17 s
+  server execution. Diagnostic configuration was restored; implementation is pending.
+- [ ] Restructure candidate eligibility/context as keyed lookups while preserving
+  ordering, SKIP LOCKED, partition restrictions and original ownership checks.
 - [ ] Investigate post-provider publication/projection/settlement queueing under
-  cold-Run bursts and capture the Run-claim SQL plan under load. Final r3 also
-  exposed 3–5-second `candidate_context` stages and settlement p95 up to 58 s. Do not
+  cold-Run bursts. Final r3 also exposed settlement p95 up to 58 s. Do not
   treat the 32-concurrency 11.18/s burst as a sustained capacity guarantee.
 - [ ] Repeat sustained-rate admission controls: the 8/s, 45-second case completed
   315 requests and dropped 45 at the generator's in-flight bound; 4/s completed

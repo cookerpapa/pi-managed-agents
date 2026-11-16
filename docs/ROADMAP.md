@@ -21,6 +21,11 @@ repaired. Loaded claim-query latency, settlement tails and saturation remain
 explicit follow-ups. Worker/Projector/Stop/
 reply recovery passed, original assets were preserved and no paid models were used.
 
+The subsequent [claim-query investigation](reports/run-claim-query-diagnosis-20261116.md)
+captured the actual slow plan and identified repeated tenant-prefix joins before
+the final Session-ID check. A bounded keyed-query rewrite is proposed; the queue,
+lease and fencing architecture remains unchanged and implementation is pending.
+
 ## HTTP MCP tool integration — delivered
 
 Issue #40 is [implemented, published and live-verified](reports/http-mcp-delivery-20261115.md)

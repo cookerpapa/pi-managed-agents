@@ -1,5 +1,9 @@
 # Delivery and research evidence
 
+- [Run-claim query diagnosis](run-claim-query-diagnosis-20261116.md): actual loaded
+  plans isolate tenant-prefix join amplification; proposed correction preserves
+  current PG ownership and queue semantics. No production query change yet.
+
 - [Workload build isolation and measured query repairs](workload-release-throughput-20261116.md):
   derived dependency inputs, Worker source boundaries, no-op publication,
   cached scans, original-asset preservation and before/after throughput/history

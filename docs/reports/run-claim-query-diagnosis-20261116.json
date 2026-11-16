@@ -1,0 +1,721 @@
+{
+  "format": "pma.run-claim-query-diagnosis.v1",
+  "sourceRevision": "327099e7acd3c2ba017cafcf86d230ecf195c295",
+  "serving": "history-throughput-20261116-r3",
+  "workload": {
+    "concurrency": 64,
+    "count": 192,
+    "outputBytes": 4096,
+    "simulatedFirstByteMs": 0,
+    "instrumented": true
+  },
+  "outcome": {
+    "completed": 192,
+    "failed": 0,
+    "diagnosticRunsPerSecond": 8.275738132652725,
+    "cleanupConfirmed": true,
+    "configuration": {
+      "restored": true,
+      "modelRemoved": true,
+      "providerRestored": true
+    },
+    "modelMetering": {
+      "calls": 192,
+      "foreign_models": 0,
+      "charged": 0,
+      "usage_receipts": 192,
+      "deliveryLatency": {
+        "events": 192,
+        "p50_ms": 747.403,
+        "p95_ms": 1227.1903,
+        "p99_ms": 1398.5020100000002
+      }
+    }
+  },
+  "plansCaptured": 1368,
+  "plansOver100Ms": 19,
+  "slowExample": {
+    "serverExecutionMs": 6174.996,
+    "clientMs": 6328.608368999994,
+    "planningMs": 134.826,
+    "jitSectionPresent": false,
+    "tree": {
+      "Node Type": "Nested Loop",
+      "Join Type": "Inner",
+      "Plan Rows": 1,
+      "Actual Rows": 1,
+      "Actual Loops": 1,
+      "Rows Removed by Join Filter": 19,
+      "Shared Hit Blocks": 1427511,
+      "Shared Read Blocks": 0,
+      "Total Cost": 39.67,
+      "Plans": [
+        {
+          "Node Type": "Limit",
+          "Plan Rows": 1,
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Shared Hit Blocks": 1427485,
+          "Shared Read Blocks": 0,
+          "Total Cost": 31.65,
+          "Plans": [
+            {
+              "Node Type": "LockRows",
+              "Plan Rows": 1,
+              "Actual Rows": 1,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 1427485,
+              "Shared Read Blocks": 0,
+              "Total Cost": 31.65,
+              "Plans": [
+                {
+                  "Node Type": "Sort",
+                  "Plan Rows": 1,
+                  "Actual Rows": 16,
+                  "Actual Loops": 1,
+                  "Shared Hit Blocks": 1427428,
+                  "Shared Read Blocks": 0,
+                  "Total Cost": 31.64,
+                  "Sort Method": "quicksort",
+                  "Plans": [
+                    {
+                      "Node Type": "Nested Loop",
+                      "Join Type": "Inner",
+                      "Plan Rows": 1,
+                      "Actual Rows": 37,
+                      "Actual Loops": 1,
+                      "Shared Hit Blocks": 1427428,
+                      "Shared Read Blocks": 0,
+                      "Total Cost": 31.63,
+                      "Plans": [
+                        {
+                          "Node Type": "Nested Loop",
+                          "Join Type": "Inner",
+                          "Plan Rows": 1,
+                          "Actual Rows": 37,
+                          "Actual Loops": 1,
+                          "Rows Removed by Join Filter": 1104683,
+                          "Shared Hit Blocks": 1427354,
+                          "Shared Read Blocks": 0,
+                          "Total Cost": 18.11,
+                          "Plans": [
+                            {
+                              "Node Type": "Nested Loop",
+                              "Join Type": "Inner",
+                              "Plan Rows": 1,
+                              "Actual Rows": 6401,
+                              "Actual Loops": 1,
+                              "Rows Removed by Join Filter": 148,
+                              "Shared Hit Blocks": 128,
+                              "Shared Read Blocks": 0,
+                              "Total Cost": 14.5,
+                              "Plans": [
+                                {
+                                  "Node Type": "Index Scan",
+                                  "Relation Name": "runs",
+                                  "Alias": "candidate",
+                                  "Index Name": "runs_agent_queue_idx",
+                                  "Plan Rows": 1,
+                                  "Actual Rows": 37,
+                                  "Actual Loops": 1,
+                                  "Rows Removed by Filter": 0,
+                                  "Shared Hit Blocks": 46,
+                                  "Shared Read Blocks": 0,
+                                  "Total Cost": 5.9
+                                },
+                                {
+                                  "Node Type": "Merge Join",
+                                  "Join Type": "Inner",
+                                  "Plan Rows": 3,
+                                  "Actual Rows": 177,
+                                  "Actual Loops": 37,
+                                  "Rows Removed by Join Filter": 33055,
+                                  "Shared Hit Blocks": 82,
+                                  "Shared Read Blocks": 0,
+                                  "Total Cost": 8.56,
+                                  "Plans": [
+                                    {
+                                      "Node Type": "Nested Loop",
+                                      "Join Type": "Inner",
+                                      "Plan Rows": 11,
+                                      "Actual Rows": 196,
+                                      "Actual Loops": 37,
+                                      "Rows Removed by Join Filter": 8036,
+                                      "Shared Hit Blocks": 77,
+                                      "Shared Read Blocks": 0,
+                                      "Total Cost": 23.36,
+                                      "Plans": [
+                                        {
+                                          "Node Type": "Index Scan",
+                                          "Relation Name": "tenant_runtime_policies",
+                                          "Alias": "candidate_policy",
+                                          "Index Name": "tenant_runtime_policies_pkey",
+                                          "Plan Rows": 42,
+                                          "Actual Rows": 42,
+                                          "Actual Loops": 37,
+                                          "Rows Removed by Filter": 0,
+                                          "Shared Hit Blocks": 74,
+                                          "Shared Read Blocks": 0,
+                                          "Total Cost": 12.77
+                                        },
+                                        {
+                                          "Node Type": "Materialize",
+                                          "Plan Rows": 11,
+                                          "Actual Rows": 196,
+                                          "Actual Loops": 1554,
+                                          "Shared Hit Blocks": 3,
+                                          "Shared Read Blocks": 0,
+                                          "Total Cost": 3.69,
+                                          "Plans": [
+                                            {
+                                              "Node Type": "Seq Scan",
+                                              "Relation Name": "pi_sessions",
+                                              "Alias": "publication_session",
+                                              "Plan Rows": 11,
+                                              "Actual Rows": 196,
+                                              "Actual Loops": 1,
+                                              "Rows Removed by Filter": 0,
+                                              "Shared Hit Blocks": 3,
+                                              "Shared Read Blocks": 0,
+                                              "Total Cost": 3.63
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "Node Type": "Sort",
+                                      "Plan Rows": 11,
+                                      "Actual Rows": 33041,
+                                      "Actual Loops": 37,
+                                      "Shared Hit Blocks": 5,
+                                      "Shared Read Blocks": 0,
+                                      "Total Cost": 6.25,
+                                      "Sort Method": "quicksort",
+                                      "Plans": [
+                                        {
+                                          "Node Type": "Aggregate",
+                                          "Plan Rows": 11,
+                                          "Actual Rows": 177,
+                                          "Actual Loops": 1,
+                                          "Shared Hit Blocks": 5,
+                                          "Shared Read Blocks": 0,
+                                          "Total Cost": 6.03,
+                                          "Plans": [
+                                            {
+                                              "Node Type": "Nested Loop",
+                                              "Join Type": "Anti",
+                                              "Plan Rows": 11,
+                                              "Actual Rows": 177,
+                                              "Actual Loops": 1,
+                                              "Rows Removed by Join Filter": 3534,
+                                              "Shared Hit Blocks": 5,
+                                              "Shared Read Blocks": 0,
+                                              "Total Cost": 5.86,
+                                              "Plans": [
+                                                {
+                                                  "Node Type": "Seq Scan",
+                                                  "Relation Name": "pi_sessions",
+                                                  "Alias": "p",
+                                                  "Plan Rows": 12,
+                                                  "Actual Rows": 196,
+                                                  "Actual Loops": 1,
+                                                  "Shared Hit Blocks": 3,
+                                                  "Shared Read Blocks": 0,
+                                                  "Total Cost": 3.12
+                                                },
+                                                {
+                                                  "Node Type": "Materialize",
+                                                  "Plan Rows": 1,
+                                                  "Actual Rows": 18,
+                                                  "Actual Loops": 196,
+                                                  "Shared Hit Blocks": 2,
+                                                  "Shared Read Blocks": 0,
+                                                  "Total Cost": 2.54,
+                                                  "Plans": [
+                                                    {
+                                                      "Node Type": "Seq Scan",
+                                                      "Relation Name": "session_leases",
+                                                      "Alias": "l",
+                                                      "Plan Rows": 1,
+                                                      "Actual Rows": 19,
+                                                      "Actual Loops": 1,
+                                                      "Rows Removed by Filter": 53,
+                                                      "Shared Hit Blocks": 2,
+                                                      "Shared Read Blocks": 0,
+                                                      "Total Cost": 2.53
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "Node Type": "Index Scan",
+                              "Relation Name": "sessions",
+                              "Alias": "candidate_session",
+                              "Index Name": "sessions_tenant_id_id_unique",
+                              "Plan Rows": 3,
+                              "Actual Rows": 173,
+                              "Actual Loops": 6401,
+                              "Rows Removed by Filter": 19,
+                              "Shared Hit Blocks": 1427193,
+                              "Shared Read Blocks": 0,
+                              "Total Cost": 3.56
+                            }
+                          ]
+                        },
+                        {
+                          "Node Type": "Index Scan",
+                          "Relation Name": "agent_revisions",
+                          "Alias": "candidate_agent",
+                          "Index Name": "agent_revisions_pkey",
+                          "Plan Rows": 1,
+                          "Actual Rows": 1,
+                          "Actual Loops": 37,
+                          "Rows Removed by Filter": 0,
+                          "Shared Hit Blocks": 74,
+                          "Shared Read Blocks": 0,
+                          "Total Cost": 8.17
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Node Type": "Hash Join",
+          "Join Type": "Inner",
+          "Plan Rows": 1,
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Rows Removed by Join Filter": 0,
+          "Shared Hit Blocks": 1427488,
+          "Shared Read Blocks": 0,
+          "Total Cost": 4.41,
+          "Plans": [
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "workspaces",
+              "Alias": "workspace_row",
+              "Plan Rows": 64,
+              "Actual Rows": 65,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 3,
+              "Shared Read Blocks": 0,
+              "Total Cost": 3.64
+            },
+            {
+              "Node Type": "Hash",
+              "Plan Rows": 1,
+              "Actual Rows": 1,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 1427485,
+              "Shared Read Blocks": 0,
+              "Total Cost": 0.02,
+              "Plans": [
+                {
+                  "Node Type": "CTE Scan",
+                  "Alias": "run",
+                  "Plan Rows": 1,
+                  "Actual Rows": 1,
+                  "Actual Loops": 1,
+                  "Rows Removed by Filter": 0,
+                  "Shared Hit Blocks": 1427485,
+                  "Shared Read Blocks": 0,
+                  "Total Cost": 0.02
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "sessions",
+          "Alias": "session_row",
+          "Index Name": "sessions_tenant_id_id_unique",
+          "Plan Rows": 1,
+          "Actual Rows": 20,
+          "Actual Loops": 1,
+          "Rows Removed by Filter": 0,
+          "Shared Hit Blocks": 22,
+          "Shared Read Blocks": 0,
+          "Total Cost": 2.42
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "turn_control_requests",
+          "Alias": "c",
+          "Plan Rows": 1,
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Rows Removed by Filter": 7,
+          "Shared Hit Blocks": 1,
+          "Shared Read Blocks": 0,
+          "Total Cost": 1.13
+        }
+      ]
+    }
+  },
+  "fastExample": {
+    "serverExecutionMs": 7.196,
+    "sameBackendAsSlowExample": true,
+    "jitSectionPresent": false,
+    "tree": {
+      "Node Type": "Nested Loop",
+      "Join Type": "Inner",
+      "Plan Rows": 1,
+      "Actual Rows": 1,
+      "Actual Loops": 1,
+      "Rows Removed by Join Filter": 143,
+      "Shared Hit Blocks": 6590,
+      "Shared Read Blocks": 0,
+      "Total Cost": 40.99,
+      "Plans": [
+        {
+          "Node Type": "Limit",
+          "Plan Rows": 1,
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Shared Hit Blocks": 6400,
+          "Shared Read Blocks": 0,
+          "Total Cost": 32.59,
+          "Plans": [
+            {
+              "Node Type": "LockRows",
+              "Plan Rows": 1,
+              "Actual Rows": 1,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 6400,
+              "Shared Read Blocks": 0,
+              "Total Cost": 32.59,
+              "Plans": [
+                {
+                  "Node Type": "Sort",
+                  "Plan Rows": 1,
+                  "Actual Rows": 2,
+                  "Actual Loops": 1,
+                  "Shared Hit Blocks": 6398,
+                  "Shared Read Blocks": 0,
+                  "Total Cost": 32.58,
+                  "Sort Method": "quicksort",
+                  "Plans": [
+                    {
+                      "Node Type": "Nested Loop",
+                      "Join Type": "Inner",
+                      "Plan Rows": 1,
+                      "Actual Rows": 44,
+                      "Actual Loops": 1,
+                      "Rows Removed by Join Filter": 0,
+                      "Shared Hit Blocks": 6398,
+                      "Shared Read Blocks": 0,
+                      "Total Cost": 32.56,
+                      "Plans": [
+                        {
+                          "Node Type": "Nested Loop",
+                          "Join Type": "Inner",
+                          "Plan Rows": 1,
+                          "Actual Rows": 44,
+                          "Actual Loops": 1,
+                          "Shared Hit Blocks": 6266,
+                          "Shared Read Blocks": 0,
+                          "Total Cost": 30.14,
+                          "Plans": [
+                            {
+                              "Node Type": "Nested Loop",
+                              "Join Type": "Semi",
+                              "Plan Rows": 1,
+                              "Actual Rows": 44,
+                              "Actual Loops": 1,
+                              "Shared Hit Blocks": 6178,
+                              "Shared Read Blocks": 0,
+                              "Total Cost": 16.63,
+                              "Plans": [
+                                {
+                                  "Node Type": "Nested Loop",
+                                  "Join Type": "Inner",
+                                  "Plan Rows": 1,
+                                  "Actual Rows": 44,
+                                  "Actual Loops": 1,
+                                  "Rows Removed by Join Filter": 4170,
+                                  "Shared Hit Blocks": 6002,
+                                  "Shared Read Blocks": 0,
+                                  "Total Cost": 10.88,
+                                  "Plans": [
+                                    {
+                                      "Node Type": "Merge Join",
+                                      "Join Type": "Inner",
+                                      "Plan Rows": 1,
+                                      "Actual Rows": 44,
+                                      "Actual Loops": 1,
+                                      "Shared Hit Blocks": 52,
+                                      "Shared Read Blocks": 0,
+                                      "Total Cost": 6.67,
+                                      "Plans": [
+                                        {
+                                          "Node Type": "Index Scan",
+                                          "Relation Name": "tenant_runtime_policies",
+                                          "Alias": "candidate_policy",
+                                          "Index Name": "tenant_runtime_policies_pkey",
+                                          "Plan Rows": 42,
+                                          "Actual Rows": 15,
+                                          "Actual Loops": 1,
+                                          "Rows Removed by Filter": 0,
+                                          "Shared Hit Blocks": 2,
+                                          "Shared Read Blocks": 0,
+                                          "Total Cost": 12.77
+                                        },
+                                        {
+                                          "Node Type": "Sort",
+                                          "Plan Rows": 1,
+                                          "Actual Rows": 44,
+                                          "Actual Loops": 1,
+                                          "Shared Hit Blocks": 50,
+                                          "Shared Read Blocks": 0,
+                                          "Total Cost": 5.91,
+                                          "Sort Method": "quicksort",
+                                          "Plans": [
+                                            {
+                                              "Node Type": "Index Scan",
+                                              "Relation Name": "runs",
+                                              "Alias": "candidate",
+                                              "Index Name": "runs_agent_queue_idx",
+                                              "Plan Rows": 1,
+                                              "Actual Rows": 44,
+                                              "Actual Loops": 1,
+                                              "Rows Removed by Filter": 0,
+                                              "Shared Hit Blocks": 50,
+                                              "Shared Read Blocks": 0,
+                                              "Total Cost": 5.9
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "Node Type": "Index Scan",
+                                      "Relation Name": "sessions",
+                                      "Alias": "candidate_session",
+                                      "Index Name": "sessions_tenant_id_id_unique",
+                                      "Plan Rows": 4,
+                                      "Actual Rows": 96,
+                                      "Actual Loops": 44,
+                                      "Rows Removed by Filter": 10,
+                                      "Shared Hit Blocks": 5915,
+                                      "Shared Read Blocks": 0,
+                                      "Total Cost": 4.14
+                                    }
+                                  ]
+                                },
+                                {
+                                  "Node Type": "Nested Loop",
+                                  "Join Type": "Anti",
+                                  "Plan Rows": 1,
+                                  "Actual Rows": 1,
+                                  "Actual Loops": 44,
+                                  "Shared Hit Blocks": 176,
+                                  "Shared Read Blocks": 0,
+                                  "Total Cost": 5.74,
+                                  "Plans": [
+                                    {
+                                      "Node Type": "Index Scan",
+                                      "Relation Name": "pi_sessions",
+                                      "Alias": "p",
+                                      "Index Name": "pi_sessions_pkey",
+                                      "Plan Rows": 1,
+                                      "Actual Rows": 1,
+                                      "Actual Loops": 44,
+                                      "Shared Hit Blocks": 132,
+                                      "Shared Read Blocks": 0,
+                                      "Total Cost": 2.37
+                                    },
+                                    {
+                                      "Node Type": "Index Scan",
+                                      "Relation Name": "session_leases",
+                                      "Alias": "l",
+                                      "Index Name": "session_leases_current_owner",
+                                      "Plan Rows": 1,
+                                      "Actual Rows": 0,
+                                      "Actual Loops": 44,
+                                      "Rows Removed by Filter": 0,
+                                      "Shared Hit Blocks": 44,
+                                      "Shared Read Blocks": 0,
+                                      "Total Cost": 1.75
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "Node Type": "Index Scan",
+                              "Relation Name": "agent_revisions",
+                              "Alias": "candidate_agent",
+                              "Index Name": "agent_revisions_pkey",
+                              "Plan Rows": 1,
+                              "Actual Rows": 1,
+                              "Actual Loops": 44,
+                              "Rows Removed by Filter": 0,
+                              "Shared Hit Blocks": 88,
+                              "Shared Read Blocks": 0,
+                              "Total Cost": 8.17
+                            }
+                          ]
+                        },
+                        {
+                          "Node Type": "Index Scan",
+                          "Relation Name": "pi_sessions",
+                          "Alias": "publication_session",
+                          "Index Name": "pi_sessions_pkey",
+                          "Plan Rows": 1,
+                          "Actual Rows": 1,
+                          "Actual Loops": 44,
+                          "Rows Removed by Filter": 0,
+                          "Shared Hit Blocks": 132,
+                          "Shared Read Blocks": 0,
+                          "Total Cost": 2.41
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Node Type": "Hash Join",
+          "Join Type": "Inner",
+          "Plan Rows": 1,
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Rows Removed by Join Filter": 0,
+          "Shared Hit Blocks": 6403,
+          "Shared Read Blocks": 0,
+          "Total Cost": 4.41,
+          "Plans": [
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "workspaces",
+              "Alias": "workspace_row",
+              "Plan Rows": 64,
+              "Actual Rows": 65,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 3,
+              "Shared Read Blocks": 0,
+              "Total Cost": 3.64
+            },
+            {
+              "Node Type": "Hash",
+              "Plan Rows": 1,
+              "Actual Rows": 1,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 6400,
+              "Shared Read Blocks": 0,
+              "Total Cost": 0.02,
+              "Plans": [
+                {
+                  "Node Type": "CTE Scan",
+                  "Alias": "run",
+                  "Plan Rows": 1,
+                  "Actual Rows": 1,
+                  "Actual Loops": 1,
+                  "Rows Removed by Filter": 0,
+                  "Shared Hit Blocks": 6400,
+                  "Shared Read Blocks": 0,
+                  "Total Cost": 0.02
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "sessions",
+          "Alias": "session_row",
+          "Index Name": "sessions_tenant_id_id_unique",
+          "Plan Rows": 1,
+          "Actual Rows": 144,
+          "Actual Loops": 1,
+          "Rows Removed by Filter": 0,
+          "Shared Hit Blocks": 186,
+          "Shared Read Blocks": 0,
+          "Total Cost": 2.8
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "turn_control_requests",
+          "Alias": "c",
+          "Plan Rows": 1,
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Rows Removed by Filter": 7,
+          "Shared Hit Blocks": 1,
+          "Shared Read Blocks": 0,
+          "Total Cost": 1.13
+        }
+      ]
+    }
+  },
+  "plannerObservations": {
+    "count": 56,
+    "maxMs": 162.206,
+    "over100Ms": 2
+  },
+  "waitSamples": {
+    "intervalMs": 200,
+    "activeClaimSamples": 273,
+    "types": {
+      "no_pg_wait_event": 270,
+      "Client:ClientRead": 3
+    }
+  },
+  "preparedPlanEvidence": {
+    "slow6175ms": {
+      "genericPlans": 0,
+      "customPlans": 2
+    },
+    "slow2331ms": {
+      "genericPlans": 1,
+      "customPlans": 5
+    }
+  },
+  "restoration": {
+    "workerTemplateRestored": true,
+    "diagnosticConfigMaps": 0,
+    "settings": {
+      "jit": "on",
+      "plan_cache_mode": "auto",
+      "planner_stats": "off",
+      "explain_threshold": "-1",
+      "diagnostic_connections": 0
+    },
+    "machines": [
+      {
+        "state": "ready",
+        "desired_state": "running",
+        "failure_code": null
+      },
+      {
+        "state": "ready",
+        "desired_state": "running",
+        "failure_code": null
+      }
+    ]
+  },
+  "preservation": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  }
+}
