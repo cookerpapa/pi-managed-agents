@@ -79,6 +79,19 @@ changes with unchanged artifact inputs produce a no-op candidate.
 
 ## Apply and recover
 
+If preparation finished building images but the evidence step was interrupted,
+resume that step without rebuilding or replacing the serving baseline:
+
+```sh
+node --import tsx scripts/run-matched-release.mjs resume-prepare /private/releases/candidate-1
+```
+
+The frozen plan retains its original artifact revision. A newer operator revision
+may contain only reviewed operator/docs/test changes; evidence records that
+revision separately. Missing images, changed labels/reused digests, Guest inputs
+or serving/native plans fail the resume. It completes evidence and preflight only;
+the same `apply` command below still owns writer draining and resource maintenance.
+
 ```sh
 node --import tsx scripts/run-matched-release.mjs apply /private/releases/candidate-1
 ```

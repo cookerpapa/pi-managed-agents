@@ -74,3 +74,7 @@ databases for routine private-deployment checks. The operator defaults to cached
 databases and performs an update only when explicitly requested or the cache is
 absent. Evidence retains actual database dates/identities; no freshness is
 invented and the existing immutable-image/scan comparison remains in force.
+Interrupted evidence preparation can resume from completed images under the
+existing frozen plan, with no rebuild or serving mutation. Evidence distinguishes
+artifact source from a subsequently updated, reviewed operator; normal preflight,
+image identities and the separate apply/drain boundary remain mandatory.

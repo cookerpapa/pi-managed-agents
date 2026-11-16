@@ -17,7 +17,9 @@ import {
   digest,
   assertServingComponents,
   assertMatchedServingComponents,
+  assertOperatorRevisionChanges,
 } from "./lib/component-release.mjs";
+import { cubeReleaseDigest } from "./lib/cube-release-policy.mjs";
 import { parseModelCatalogConfiguration } from "../packages/protocol/src/model-catalog.ts";
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
@@ -67,12 +69,12 @@ const [action, path, version, option] = process.argv.slice(2);
 assert(option === undefined, "Unknown matched publication option");
 if (action === "--help") {
   console.log(
-    "Usage: node --import tsx scripts/run-matched-release.mjs prepare DIRECTORY VERSION | preflight DIRECTORY | apply DIRECTORY\nPrepare builds/scans locally without changing the serving catalog. Apply drains settled Runs/writers, then deploys matched artifacts. Compute is retired with confirmed absence; stable machine intent and Workspace files are preserved. See docs/MATCHED_RELEASE.md.",
+    "Usage: node --import tsx scripts/run-matched-release.mjs prepare DIRECTORY VERSION | resume-prepare DIRECTORY | preflight DIRECTORY | apply DIRECTORY\nPrepare builds/scans locally without changing the serving catalog. Apply drains settled Runs/writers, then deploys matched artifacts. Compute is retired with confirmed absence; stable machine intent and Workspace files are preserved. See docs/MATCHED_RELEASE.md.",
   );
   process.exit(0);
 }
 assert(
-  ["prepare", "preflight", "apply"].includes(action) && path,
+  ["prepare", "resume-prepare", "preflight", "apply"].includes(action) && path,
   "Invalid matched-release command",
 );
 serializeRelease(runtimeDirectory);
@@ -118,7 +120,7 @@ const componentOperator = (args) =>
     ["--import", "tsx", "scripts/run-component-release.mjs", ...args],
     { cwd: root, stdio: "inherit", env: process.env },
   );
-if (action !== "prepare") {
+if (action !== "prepare" && action !== "resume-prepare") {
   const prepared = JSON.parse(await readFile(resolve(directory, "candidate.json"), "utf8"));
   if (prepared.scope) {
     componentOperator([action, directory]);
@@ -317,6 +319,77 @@ if (action === "prepare") {
         revision: capture("git", ["rev-parse", "HEAD"]),
         guestIdentity: await guestBuildIdentity(root),
         cubeReleasePlanDigest,
+      },
+      null,
+      2,
+    ) + "\n",
+    { mode: 0o600, flag: "wx" },
+  );
+}
+if (action === "resume-prepare") {
+  // A failed scan must not rebuild already finished, revision-labelled images.
+  // This path cannot build missing artifacts or change the recorded plan.
+  const plan = JSON.parse(await readFile(resolve(directory, "release-plan.json"), "utf8"));
+  assert.equal(plan.mode, "matched", "Use the scoped operator for a component preparation");
+  assert.equal(capture("git", ["status", "--porcelain", "--untracked-files=all"]), "");
+  const operatorRevision = capture("git", ["rev-parse", "HEAD"]);
+  capture("git", ["merge-base", "--is-ancestor", plan.revision, operatorRevision]);
+  assertOperatorRevisionChanges(
+    capture("git", ["diff", "--name-only", "--no-renames", `${plan.revision}..${operatorRevision}`])
+      .split("\n")
+      .filter(Boolean),
+  );
+  assert.equal(
+    digest(JSON.parse(await readFile(resolve(runtimeDirectory, "k3s/deployment.json"), "utf8"))),
+    plan.baselineDigest,
+    "Serving baseline changed",
+  );
+  assert.equal(
+    digest(JSON.parse(await readFile(resolve(directory, "baseline.json"), "utf8"))),
+    plan.baselineDigest,
+  );
+  assert.equal(await guestBuildIdentity(root), plan.guestIdentity, "Prepared Guest inputs changed");
+  for (const artifact of plan.artifacts) {
+    const image = JSON.parse(capture("docker", ["image", "inspect", artifact.reference]))[0];
+    if (artifact.action === "build") {
+      assert.equal(
+        image.Config.Labels["org.opencontainers.image.revision"],
+        artifact.sourceRevision,
+        "Prepared image source changed",
+      );
+    } else if (artifact.action === "reuse") {
+      assert.equal(image.Id, artifact.expectedImageId, "Reused image identity changed");
+    } else {
+      // Official native pins are checked by the frozen Cube plan and scanner.
+      assert.equal(artifact.action, "pull", "Unknown prepared artifact action");
+    }
+  }
+  const native = await verifyCubeUpgradePlan(cubeOptions(plan.nativeVersion));
+  phase("resume evidence from completed images without rebuilding or touching serving workloads");
+  run(
+    "scripts/generate-release-evidence.mjs",
+    [
+      "--image-version",
+      plan.version,
+      "--output-dir",
+      resolve(directory, "evidence"),
+      "--plan",
+      resolve(directory, "release-plan.json"),
+    ],
+    environment(plan.version, plan.nativeVersion),
+  );
+  await writeFile(
+    resolve(directory, "candidate.json"),
+    JSON.stringify(
+      {
+        formatVersion: 2,
+        version: plan.version,
+        nativeVersion: plan.nativeVersion,
+        releasePlanDigest: digest(plan),
+        baselineDigest: plan.baselineDigest,
+        revision: plan.revision,
+        guestIdentity: plan.guestIdentity,
+        cubeReleasePlanDigest: cubeReleaseDigest(native.plan),
       },
       null,
       2,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { digest } from "./lib/component-release.mjs";
+import { digest, assertOperatorRevisionChanges } from "./lib/component-release.mjs";
 import {
   acceptedStockCubeImage,
   STOCK_CUBE_EXCEPTION_PATH,
@@ -264,8 +264,27 @@ async function prepareDestination(path) {
 const options = parseArguments(process.argv.slice(2));
 if (!["bridge", "host"].includes(process.env.PI_CLOUD_TRIVY_DOWNLOAD_NETWORK ?? "bridge"))
   throw new Error("PI_CLOUD_TRIVY_DOWNLOAD_NETWORK must be bridge or host");
-const revision = await capture("git", ["rev-parse", "HEAD"]);
+const operatorRevision = await capture("git", ["rev-parse", "HEAD"]);
+const preparedPlan = options.planPath
+  ? JSON.parse(await readFile(options.planPath, "utf8"))
+  : undefined;
+const revision = preparedPlan?.revision ?? operatorRevision;
 if (!/^[0-9a-f]{40}$/.test(revision)) throw new Error("Git HEAD is not a full commit SHA");
+if (operatorRevision !== revision) {
+  await capture("git", ["merge-base", "--is-ancestor", revision, operatorRevision]);
+  assertOperatorRevisionChanges(
+    (
+      await capture("git", [
+        "diff",
+        "--name-only",
+        "--no-renames",
+        `${revision}..${operatorRevision}`,
+      ])
+    )
+      .split("\n")
+      .filter(Boolean),
+  );
+}
 const dirty = (await capture("git", ["status", "--porcelain"])).length > 0;
 if (dirty && !options.allowDirty) {
   throw new Error("Refusing release evidence from a dirty worktree; commit or pass --allow-dirty");
@@ -429,7 +448,7 @@ try {
       "all",
       "A matched artifact plan cannot override a component scan",
     );
-    const plan = JSON.parse(await readFile(options.planPath, "utf8"));
+    const plan = preparedPlan;
     assert.equal(plan.formatVersion, 1);
     assert.equal(plan.revision, revision);
     assert.equal(plan.version, options.imageVersion);
@@ -614,7 +633,7 @@ try {
   const manifest = {
     format: "pi-cloud.release-evidence.v1",
     generatedAt: new Date().toISOString(),
-    git: { revision, dirty },
+    git: { revision, operatorRevision, dirty },
     imageVersion: options.imageVersion,
     scope: options.component,
     policy: {
