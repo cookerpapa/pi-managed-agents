@@ -1,5 +1,5 @@
 import { settleHistoryTurn } from "./presentation-settlement.ts";
-import { HistoryDirectory } from "@pi-cloud/pi-session-postgres/durable";
+import { HistoryDirectory, type StoredDurableBatch } from "@pi-cloud/pi-session-postgres/durable";
 import { PostgresPresentationDirectory } from "./presentation-directory.ts";
 import { retainedUploadReferences } from "@pi-cloud/session-attachments";
 import { createHash, randomUUID } from "node:crypto";
@@ -40,6 +40,23 @@ export type HistoryTurnRow = {
   created_at: Date;
   frozen: boolean;
 };
+
+/** A conservative gate for the SQL capture below, never a Storage-write filter.
+ * Retry checkpoints and terminal Tool/compaction Tasks can carry display content;
+ * their result/reference eligibility still belongs to the capture transaction. */
+export function mayCaptureNativePresentation(writes: StoredDurableBatch["writes"]): boolean {
+  return writes.some((write) => {
+    if (write.type === "entry") return true;
+    if (write.type !== "task") return false;
+    const task = write.value;
+    return (
+      ("checkpoint" in task.state &&
+        (task.state.checkpoint as { phase?: unknown } | null)?.phase === "retry") ||
+      (task.state.status === "terminal" &&
+        (task.kind === "pi.tool" || task.kind === "pi.compaction"))
+    );
+  });
+}
 
 /** Capture display-only descriptors in the source commit, while its native Task
  * and input metadata are still available. Forks share these retained objects. */

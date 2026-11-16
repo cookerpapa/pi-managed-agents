@@ -337,6 +337,14 @@ See [ADR-0243](adr/0243-native-input-current-state.md),
 [ADR-0244](adr/0244-kafka-backed-native-live-state.md) and
 [ADR-0245](adr/0245-native-commit-text-presentation.md).
 
+Frozen history paging fixes a bounded set of visible positions before resolving
+their immutable record/body IDs. Body loading does not reopen the shared history
+view. Ordinary empty Sessions avoid history expansion only when the same PG
+snapshot has neither an owned Run nor a shared presentation root; child views
+retain their native lineage. Projector skips presentation capture for native
+Task phases without display content, while persisting every native write.
+Retry checkpoints and terminal Tool/compaction Tasks retain transactional capture.
+
 Cold open loads the latest applicable Compaction and active suffix, plus state
 for active native Tasks. It does not replay lifetime JSONL or all historical
 subagents. Image references reconstruct native image content with tenant,

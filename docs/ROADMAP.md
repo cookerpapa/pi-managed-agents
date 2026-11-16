@@ -12,8 +12,10 @@ operating points from unproven fleet scale and records latency/memory follow-ups
 
 The [November 16 diagnosis](reports/runtime-capacity-diagnosis-20261116.md)
 reproduces frozen-history join amplification and separates cold startup, provider
-and post-provider waits. Query repairs remain a follow-up; diagnostic settings
-were restored and no higher production capacity is claimed yet.
+and post-provider waits. Bounded immutable-reference paging, empty-history reads
+and conservative native presentation capture are implemented; live publication
+and comparative measurement are pending. Diagnostic settings were restored and
+no higher production capacity is claimed yet.
 
 ## HTTP MCP tool integration — delivered
 

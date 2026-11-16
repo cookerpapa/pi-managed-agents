@@ -313,6 +313,13 @@ export class ConversationReader {
         "workspace.seed_kind as workspaceSeedKind",
         "session_row.next_event_seq as nextEventSequence",
         "session_row.pi_session_id as piSessionId",
+        // A Fork may have no Runs of its own but still own a shared history root.
+        // Read these indexed facts in the same snapshot as the Session metadata.
+        sql<boolean>`session_row.session_kind='conversation'
+          and not exists(select 1 from runs r where r.tenant_id=session_row.tenant_id
+            and r.session_id=session_row.id and r.pruned_at is null)
+          and not exists(select 1 from pi_history_views v where v.tenant_id=session_row.tenant_id
+            and v.session_id=session_row.id)`.as("emptyHistory"),
       ])
       .where("session_row.tenant_id", "=", this.#tenantId)
       .where("session_row.id", "=", sessionId)
@@ -410,14 +417,16 @@ export class ConversationReader {
         position.ordinal = record.ordinal;
       } else direction = "after";
     }
-    const rows = (
-      await sql<HistoryTurnRow>`select * from pi_history_turns where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
+    const rows = conversation.emptyHistory
+      ? []
+      : (
+          await sql<HistoryTurnRow>`select * from pi_history_turns where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
       ${filters.completedOnly ? sql`and state in ('completed','failed','cancelled','timed_out') and not waiting_for_seal` : sql``}
       ${cutoff ? sql`and mailbox_position<=${cutoff.mailbox_position}::bigint` : sql``}
       ${anchor ? sql`and mailbox_position ${sql.raw(direction === "before" ? "<=" : ">=")} ${anchor.mailbox_position}::bigint` : sql``}
       order by mailbox_position ${sql.raw(direction === "before" ? "desc" : "asc")},turn_id ${sql.raw(direction === "before" ? "desc" : "asc")}
       limit ${MAX_CONVERSATION_TURNS + 1}`.execute(this.#database)
-    ).rows;
+        ).rows;
     const lineageTurnRows: ConversationHistoryRow[] = rows.map((r) => ({
       piSessionId: r.pi_session_id,
       coverage: r.output_display_seq,

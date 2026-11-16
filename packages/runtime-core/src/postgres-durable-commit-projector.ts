@@ -8,7 +8,7 @@ import {
 import type { AcceptedDurableCommitFact } from "./accepted-fact.ts";
 import { recordFactProjection, type FactPosition } from "./accepted-fact-recovery.ts";
 import { projectionTransaction, type ProjectionBudget } from "./projection-transaction.ts";
-import { captureNativePresentation } from "./frozen-history.ts";
+import { captureNativePresentation, mayCaptureNativePresentation } from "./frozen-history.ts";
 
 function cloudMetadata(fact: AcceptedDurableCommitFact) {
   const controlTools = fact.tools.filter((tool) => tool.target === "control");
@@ -146,17 +146,15 @@ export class PostgresDurableCommitProjector {
           )
             throw new Error("Native display has no admitted Conversation view");
         }
+        const batch = fact.commit as unknown as StoredDurableBatch;
         const appended = await view.applyIn(
           tx,
-          fact.commit as unknown as StoredDurableBatch,
+          batch,
           fact.origins,
           { state, position },
           cloudMetadata(fact),
         );
-        if (
-          appended &&
-          fact.commit.writes.some((write) => write.type === "entry" || write.type === "task")
-        )
+        if (appended && mayCaptureNativePresentation(batch.writes))
           await captureNativePresentation(
             tx,
             { tenantId: fact.scope.tenantId, sessionId: fact.scope.piSessionId },

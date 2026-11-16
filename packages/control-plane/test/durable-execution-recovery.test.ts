@@ -15,6 +15,7 @@ import type {
 } from "../../runtime-core/src/accepted-fact.ts";
 import { PostgresDurableCommitProjector } from "../../runtime-core/src/postgres-durable-commit-projector.ts";
 import { confirmAgentExit } from "../../runtime-core/src/quarantined-session-recovery.ts";
+import { captureNativePresentation } from "../../runtime-core/src/frozen-history.ts";
 
 let db: Kysely<Database>, store: ControlPlaneStore, tenantId: string;
 beforeAll(async () => {
@@ -36,6 +37,169 @@ beforeAll(async () => {
 }, 60000);
 afterAll(async () => {
   await db?.destroy();
+});
+
+it("persists non-display Tasks without presentation queries and preserves retries and terminal failures", async () => {
+  const project = await store.createProject({ name: "Presentation", source: { kind: "empty" } });
+  await db
+    .updateTable("environment_versions")
+    .set({ state: "validated", validated_at: new Date() })
+    .where("id", "=", project.environment.environmentVersionId)
+    .execute();
+  const session = await store.createSession(
+    project.projectId,
+    project.workspaceId,
+    "Presentation",
+    "elastic",
+  );
+  const turn = await store.acceptTurn(session.sessionId, crypto.randomUUID(), {
+    prompt: "capture",
+  });
+  const worker = await createTestWorker(db);
+  const queries: string[] = [];
+  const observed = db.withPlugin({
+    transformQuery(args) {
+      queries.push(db.getExecutor().compileQuery(args.node, args.queryId).sql);
+      return args.node;
+    },
+    async transformResult(args) {
+      return args.result;
+    },
+  });
+  const projector = new PostgresDurableCommitProjector(observed);
+  const executor = worker.executor({
+    async execute(_request, _lifecycle, admission) {
+      const scope = admission.publication.scope;
+      let seq = 0;
+      const publish = async (
+        writes: AcceptedDurableCommitFact["commit"]["writes"],
+        capture: boolean,
+      ) => {
+        const fact: AcceptedDurableCommitFact = {
+          kind: "durable_commit",
+          factId: crypto.randomUUID(),
+          scope,
+          occurredAt: new Date().toISOString(),
+          commit: { seq: ++seq, nextId: 10, writes },
+          origins: writes.map((w) => ({
+            recordId: (w.value as { id: number }).id,
+            runId: turn.runId,
+            turnId: turn.turnId,
+            sessionId: session.sessionId,
+          })),
+          tools: [],
+          cancellations: [],
+          display: [],
+        };
+        queries.length = 0;
+        await projector.project(fact, {
+          topic: "presentation-" + turn.runId,
+          partition: 0,
+          offset: BigInt(seq),
+        });
+        expect(queries.some((q) => q.includes("select g.id as retained_id"))).toBe(capture);
+      };
+      const task = (id: number, kind: string, state: Record<string, unknown>) => ({
+        type: "task",
+        value: {
+          id,
+          conversationId: 1,
+          kind,
+          version: 1,
+          input: {},
+          background: false,
+          abortRequested: false,
+          state,
+        },
+      });
+      await publish([{ type: "conversation", value: { id: 1 } }], false);
+      await publish(
+        [task(2, "pi.generation", { status: "running", checkpoint: { phase: "request" } })],
+        false,
+      );
+      await publish(
+        [
+          task(2, "pi.generation", {
+            status: "running",
+            checkpoint: { phase: "retry", attempt: 1, until: Date.now() },
+          }),
+        ],
+        true,
+      );
+      await publish(
+        [
+          task(2, "pi.generation", {
+            status: "terminal",
+            outcome: { status: "completed", result: {} },
+          }),
+        ],
+        false,
+      );
+      await publish(
+        [task(3, "pi.tool", { status: "running", checkpoint: { phase: "execute" } })],
+        false,
+      );
+      await publish(
+        [task(3, "pi.tool", { status: "terminal", outcome: { status: "aborted" } })],
+        true,
+      );
+      await publish(
+        [task(4, "pi.compaction", { status: "running", checkpoint: { phase: "summarize" } })],
+        false,
+      );
+      await publish(
+        [
+          task(4, "pi.compaction", {
+            status: "terminal",
+            outcome: { status: "failed", error: "fixture failure" },
+          }),
+        ],
+        true,
+      );
+      await publish(
+        [
+          {
+            type: "entry",
+            value: {
+              id: 5,
+              conversationId: 1,
+              kind: "pi.assistant",
+              model: [
+                {
+                  role: "assistant",
+                  stopReason: "stop",
+                  content: [{ type: "text", text: "retained" }],
+                },
+              ],
+            },
+          },
+        ],
+        true,
+      );
+      const frames = () =>
+        sql<{ seq: string; ordinal: number }>`select f.seq::text,f.ordinal
+        from pi_history_frames f join pi_history_blocks b on b.tenant_id=f.tenant_id and b.id=f.block_id
+        where b.tenant_id=${tenantId}::uuid and b.source_pi_session_id=${scope.piSessionId} order by f.seq,f.ordinal`.execute(
+          db,
+        );
+      expect((await frames()).rows.map((r) => Number(r.seq))).toEqual([3, 6, 8, 9]);
+      const retained = await sql<{ count: string }>`select count(*) from pi_durable_write_refs
+        where tenant_id=${tenantId}::uuid and session_id=${scope.piSessionId}`.execute(db);
+      expect(Number(retained.rows[0]!.count)).toBe(seq);
+      // Ungated cold reconstruction is an independent oracle: it must not add
+      // any display record that the live publication gate omitted.
+      const before = (await frames()).rows;
+      for (let n = 1; n <= seq; n++)
+        await db
+          .transaction()
+          .execute((tx) =>
+            captureNativePresentation(tx, { tenantId, sessionId: scope.piSessionId }, n),
+          );
+      expect((await frames()).rows).toEqual(before);
+      return { stopReason: "stop", lastEventSeq: 0 };
+    },
+  });
+  expect((await executor.dispatchRun(turn.runId)).status).toBe("completed");
 });
 
 it.each(

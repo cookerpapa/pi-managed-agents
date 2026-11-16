@@ -20,10 +20,12 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   timings, PG activity, native plan capture and serial controls. The
   [diagnosis](reports/runtime-capacity-diagnosis-20261116.md) confirms severe frozen-page
   join amplification and separates it from fixed startup and native commit costs.
-- [ ] Bound frozen position/body queries by existing immutable reference IDs;
+- [x] Bound frozen position/body queries by existing immutable reference IDs;
   validate pagination, Fork/prune visibility, off-page Tool arguments and byte budgets.
-- [ ] Evaluate empty-snapshot and presentation-capture reductions, then repeat the
-  full workload. No post-fix throughput or fleet capacity is claimed by the diagnosis.
+- [x] Avoid history expansion for proven empty ordinary Sessions and presentation
+  queries for non-display native Task writes, preserving native storage/recovery.
+- [ ] Publish these query repairs and repeat the affected workloads. No post-fix
+  throughput or fleet capacity is claimed until live acceptance completes.
 - [ ] Extend memory observation beyond four minutes. Worker/Session-runtime RSS
   increased during the cold-Session soak; this alone proves neither a leak nor a plateau.
 - [ ] Review the pinned Codex adapter's synthetic 429 usage-limit classification

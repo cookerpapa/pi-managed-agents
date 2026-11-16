@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { sql, type Kysely } from "kysely";
+import { sql, type Kysely, type CompiledQuery } from "kysely";
 import { createDatabase, runMigrations, type Database } from "@pi-cloud/database";
 import { DurablePostgresProjection } from "@pi-cloud/pi-session-postgres/durable";
 import {
@@ -13,6 +13,10 @@ import { createPrivateTenant } from "../src/tenant-administration.ts";
 import { ControlPlaneStore } from "../src/control-plane-store.ts";
 import { ConversationTreeService } from "../src/conversation-tree-service.ts";
 import { conversationMarkdown } from "@pi-cloud/runtime-core/conversation-markdown";
+import { captureNativePresentation } from "../../runtime-core/src/frozen-history.ts";
+import { settleHistoryTurn } from "../../runtime-core/src/presentation-settlement.ts";
+import { readFrozenHistoryWindow } from "../../runtime-core/src/frozen-history-window.ts";
+import { decodeHistoryPosition } from "../../runtime-core/src/history-position.ts";
 
 let db: Kysely<Database>, admin: Pool, name: string;
 beforeAll(async () => {
@@ -127,6 +131,24 @@ async function fixture() {
     append,
     apply,
     finish,
+    freeze: async () => {
+      await finish();
+      for (let seq = 1; seq <= sequence; seq++)
+        await db
+          .transaction()
+          .execute((tx) =>
+            captureNativePresentation(
+              tx,
+              { tenantId: tenant.tenantId, sessionId: native.pi_session_id },
+              seq,
+            ),
+          );
+      await db
+        .transaction()
+        .execute((tx) =>
+          settleHistoryTurn(tx, tenant.tenantId, session.sessionId, accepted.turnId),
+        );
+    },
     projection,
     native,
     nextId: () => nextId,
@@ -136,6 +158,74 @@ async function fixture() {
     },
   };
 }
+
+it("fetches a tiny frozen page by immutable references even with underestimated tenant statistics", async () => {
+  // Analyse before adding a new tenant, reproducing the small-row estimate that
+  // made joins scan an entire tenant repeatedly in the live capacity workload.
+  for (const table of ["pi_history_records", "pi_history_bodies", "pi_history_frames"])
+    await sql.raw(`analyze ${table}`).execute(db);
+  const f = await fixture();
+  const entries = Array.from({ length: 512 }, (_, i) => ({
+    type: "entry",
+    value: {
+      id: i + 2,
+      conversationId: 1,
+      kind: "pi.assistant",
+      model: [
+        { role: "assistant", stopReason: "stop", content: [{ type: "text", text: `item-${i}` }] },
+      ],
+    },
+  }));
+  f.setId(514);
+  await f.apply(entries);
+  await f.freeze();
+  const queries: CompiledQuery[] = [];
+  const observed = db.withPlugin({
+    transformQuery(args) {
+      queries.push(db.getExecutor().compileQuery(args.node, args.queryId));
+      return args.node;
+    },
+    async transformResult(args) {
+      return args.result;
+    },
+  });
+  const page = await readFrozenHistoryWindow(observed, {
+    tenantId: f.tenant.tenantId,
+    sessionId: f.session.sessionId,
+    direction: "before",
+    maxRecords: 3,
+    turns: [
+      {
+        turnId: f.accepted.turnId,
+        originSessionId: f.session.sessionId,
+        piSessionId: f.native.pi_session_id,
+        operationKind: "chat",
+        frozen: true,
+      },
+    ],
+  });
+  expect(page.positions).toHaveLength(3);
+  expect(page.more).toBe(true);
+  expect(
+    page.transcripts
+      .get(f.accepted.turnId)
+      ?.items.map((i) => (i.kind === "text" ? i.text : i.kind)),
+  ).toEqual(["item-509", "item-510", "item-511"]);
+  // Bound measured work, not a specific plan string or machine-dependent time.
+  // The regression performed millions of buffer accesses for three results.
+  for (const q of queries) {
+    const explained = await db.executeQuery<{
+      "QUERY PLAN": Array<{ Plan: Record<string, number> }>;
+    }>({
+      ...q,
+      sql: `explain (analyze,buffers,format json) ${q.sql}`,
+    });
+    const plan = explained.rows[0]!["QUERY PLAN"][0]!.Plan;
+    expect((plan["Shared Hit Blocks"] ?? 0) + (plan["Shared Read Blocks"] ?? 0)).toBeLessThan(
+      20_000,
+    );
+  }
+}, 30000);
 
 it("pages inside one long Run in both directions and seeks an Entry without earlier bodies", async () => {
   const f = await fixture();
@@ -174,17 +264,22 @@ it("applies the byte budget before body fetching and retains every page", async 
   const f = await fixture();
   for (let i = 0; i < 40; i++) await f.append(`${i}:` + "x".repeat(180000));
   await f.finish();
-  let page = await f.store.getConversation(f.session.sessionId),
-    seen = 0;
-  for (;;) {
-    expect(Buffer.byteLength(JSON.stringify(page))).toBeLessThan(HISTORY_PAGE_BYTES + 65536);
-    seen += page.turns
-      .flatMap((t) => t.transcript?.items ?? [])
-      .filter((i) => i.kind === "text").length;
-    if (!page.history.hasBefore) break;
-    page = await f.store.getConversation(f.session.sessionId, { before: page.history.before! });
+  await checkPages();
+  await f.freeze();
+  await checkPages();
+  async function checkPages() {
+    let page = await f.store.getConversation(f.session.sessionId),
+      seen = 0;
+    for (;;) {
+      expect(Buffer.byteLength(JSON.stringify(page))).toBeLessThan(HISTORY_PAGE_BYTES + 65536);
+      seen += page.turns
+        .flatMap((t) => t.transcript?.items ?? [])
+        .filter((i) => i.kind === "text").length;
+      if (!page.history.hasBefore) break;
+      page = await f.store.getConversation(f.session.sessionId, { before: page.history.before! });
+    }
+    expect(seen).toBe(40);
   }
-  expect(seen).toBe(40);
 }, 30000);
 
 it("rejects a cursor or Entry outside the visible Session and preserves empty history", async () => {
@@ -206,6 +301,49 @@ it("rejects a cursor or Entry outside the visible Session and preserves empty hi
   expect((await b.store.getConversation(b.session.sessionId)).turns[0]?.transcript?.items).toEqual(
     [],
   );
+});
+
+it("reads a new empty conversation without expanding history, then sees its accepted Run", async () => {
+  const f = await fixture();
+  const session = await f.store.createSession(
+    f.session.projectId,
+    f.session.workspaceId,
+    "empty",
+    "elastic",
+  );
+  const queries: string[] = [];
+  const observed = db.withPlugin({
+    transformQuery(args) {
+      queries.push(db.getExecutor().compileQuery(args.node, args.queryId).sql);
+      return args.node;
+    },
+    async transformResult(args) {
+      return args.result;
+    },
+  });
+  const store = new ControlPlaneStore({ database: observed, ...f.tenant });
+  const empty = parseConversationDetailResource(await store.getConversation(session.sessionId));
+  expect(empty.turns).toEqual([]);
+  expect(empty.history).toMatchObject({ hasBefore: false, hasAfter: false });
+  expect(queries.some((q) => q.includes("from pi_history_turns"))).toBe(false);
+  await expect(
+    store.getConversation(session.sessionId, { turnId: f.accepted.turnId }),
+  ).rejects.toMatchObject({ code: "not_found" });
+  await expect(
+    store.getConversation(session.sessionId, { before: "invalid" }),
+  ).rejects.toMatchObject({ code: "invalid_request" });
+  const accepted = await store.acceptTurn(session.sessionId, randomUUID(), { prompt: "new input" });
+  queries.length = 0;
+  await store.getConversation(session.sessionId);
+  expect(queries.some((q) => q.includes("from pi_history_turns"))).toBe(true);
+  await db
+    .updateTable("runs")
+    .set({ state: "completed", started_at: new Date(), settled_at: new Date() })
+    .where("id", "=", accepted.runId)
+    .execute();
+  const active = await store.getConversation(session.sessionId);
+  expect(active.turns).toHaveLength(1);
+  expect(active.turns[0]).toMatchObject({ runId: accepted.runId, prompt: "new input" });
 });
 
 it("pairs off-page Tool arguments by Task even when provider call IDs repeat", async () => {
@@ -302,6 +440,18 @@ it("pairs off-page Tool arguments by Task even when provider call IDs repeat", a
     [`task:${tasks[1]}`, { path: "second.ts" }],
     [`task:${tasks[0]}`, { path: "first.ts" }],
   ]);
+  await f.freeze();
+  const frozen = await f.store.getConversation(f.session.sessionId);
+  const canonical = (items: typeof tools) =>
+    items.map((i) => ({
+      ...i,
+      historyCursor: decodeHistoryPosition(i.historyCursor!, f.session.sessionId),
+    }));
+  expect(
+    canonical(
+      frozen.turns.flatMap((t) => t.transcript?.items ?? []).filter((i) => i.kind === "tool"),
+    ),
+  ).toEqual(canonical(tools));
 });
 
 it("reads only a consumed input's metadata slice, preserving JSON escapes and Unicode", async () => {
