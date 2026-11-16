@@ -1,5 +1,8 @@
 # Delivery and research evidence
 
+- [Terminal history query repair](terminal-history-query-repair-20261117.md): direct
+  root metadata, bounded child selection, published before/after measurements,
+  child/history/recovery acceptance and the separate Kafka-client follow-up.
 - [Cold Run latency diagnosis](run-latency-diagnosis-20261116.md): paired startup,
   provider and terminal timings, native-client contention, history-query planning
   cost, clean reproduction and the separate diagnostic allocator-abort limitation.

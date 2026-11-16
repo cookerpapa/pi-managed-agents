@@ -33,8 +33,11 @@ publication/projection/settlement latency remains separate work.
 The subsequent [latency decomposition](reports/run-latency-diagnosis-20261116.md)
 locates cold producer initialization, shared native-client background work and
 expensive family-history selection during terminal projection. A clean repeat
-still completed all 192 Runs but reached only 4.41/s. The proposed bounded query
-and client investigations remain pending; no ownership or protocol was changed.
+still completed all 192 Runs but reached only 4.41/s. The bounded terminal-query
+repair is now [deployed and verified](reports/terminal-history-query-repair-20261117.md):
+47 source tests, child/history and failure acceptance, with paired throughput
+4.92/s before and 6.29/9.04/s after. Kafka initialization and remaining queueing
+are separate follow-ups; no ownership or protocol was changed.
 
 ## HTTP MCP tool integration — delivered
 

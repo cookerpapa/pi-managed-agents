@@ -6,6 +6,9 @@ No production query, ownership rule, schema, Kafka durability setting or permane
 runtime configuration changed. [Aggregate evidence](run-latency-diagnosis-20261116.json)
 excludes request bodies, credentials and Session/Run identities.
 
+The bounded [terminal-query repair](terminal-history-query-repair-20261117.md) is
+subsequently deployed and verified. Client initialization remains separate work.
+
 ## What the seconds contain
 
 The original two workloads each completed 192 cold, single-request text Runs at

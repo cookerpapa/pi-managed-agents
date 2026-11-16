@@ -1,0 +1,369 @@
+{
+  "format": "pma-terminal-history-repair-20261117",
+  "runtimeRevision": "d0378ee423a9afe36164e895bbaca9efca4e362b",
+  "release": "settlement-keyed-20261117-r1",
+  "schema": 225,
+  "sourceTestsPassed": 47,
+  "builtImages": 1,
+  "reusedImages": 13,
+  "physicalMaintenance": false,
+  "queryPlans": [
+    {
+      "name": "old-header",
+      "planningMs": 52.731,
+      "executionMs": 2.95,
+      "rows": 1,
+      "bufferHits": 14,
+      "bufferReads": 0
+    },
+    {
+      "name": "new-header",
+      "planningMs": 0.4,
+      "executionMs": 0.229,
+      "rows": 1,
+      "bufferHits": 6,
+      "bufferReads": 0
+    },
+    {
+      "name": "old-family",
+      "planningMs": 48.372,
+      "executionMs": 4.049,
+      "rows": 0,
+      "bufferHits": 32,
+      "bufferReads": 0
+    },
+    {
+      "name": "new-child-identity",
+      "planningMs": 0.105,
+      "executionMs": 0.02,
+      "rows": 0,
+      "bufferHits": 2,
+      "bufferReads": 0
+    },
+    {
+      "name": "old-header-repeat",
+      "planningMs": 30.501,
+      "executionMs": 2.572,
+      "rows": 1,
+      "bufferHits": 11,
+      "bufferReads": 0
+    },
+    {
+      "name": "new-header-repeat",
+      "planningMs": 0.491,
+      "executionMs": 0.166,
+      "rows": 1,
+      "bufferHits": 6,
+      "bufferReads": 0
+    }
+  ],
+  "comparison": {
+    "before": {
+      "completed": 192,
+      "runsPerSecond": 4.918855233465758,
+      "elapsedMs": 39033.47240099999,
+      "phaseMs": {
+        "beforeProviderMs": {
+          "count": 192,
+          "mean": 2625.3020833333335,
+          "p50": 1105,
+          "p95": 6953,
+          "max": 8197
+        },
+        "providerMs": {
+          "count": 192,
+          "mean": 8.59375,
+          "p50": 8,
+          "p95": 20,
+          "max": 34
+        },
+        "afterProviderMs": {
+          "count": 192,
+          "mean": 7782.807291666667,
+          "p50": 4152,
+          "p95": 23111,
+          "max": 26826
+        },
+        "settlementMs": {
+          "count": 192,
+          "mean": 10416.703125,
+          "p50": 8814,
+          "p95": 24975,
+          "max": 31469
+        }
+      },
+      "peakKafkaLag": 1550
+    },
+    "after": {
+      "completed": 192,
+      "runsPerSecond": 6.290403568037521,
+      "elapsedMs": 30522.683946000005,
+      "phaseMs": {
+        "beforeProviderMs": {
+          "count": 192,
+          "mean": 2795.046875,
+          "p50": 1222,
+          "p95": 6866,
+          "max": 8108
+        },
+        "providerMs": {
+          "count": 192,
+          "mean": 8.567708333333334,
+          "p50": 7,
+          "p95": 17,
+          "max": 23
+        },
+        "afterProviderMs": {
+          "count": 192,
+          "mean": 6004.619791666667,
+          "p50": 5080,
+          "p95": 12076,
+          "max": 13506
+        },
+        "settlementMs": {
+          "count": 192,
+          "mean": 8808.234375,
+          "p50": 8515,
+          "p95": 16589,
+          "max": 18967
+        }
+      },
+      "peakKafkaLag": 1481,
+      "claimCounts": {
+        "runs": 192,
+        "maximumClaimsPerRun": 1
+      },
+      "slowProjectionRecords": 0,
+      "writerPrepareMs": {
+        "count": 192,
+        "mean": 833.6774991145825,
+        "p50": 581.8781589999999,
+        "p95": 2209.53983400001,
+        "max": 2693.341969000001
+      }
+    },
+    "after-repeat": {
+      "completed": 192,
+      "runsPerSecond": 9.040395284699402,
+      "elapsedMs": 21238.009396,
+      "phaseMs": {
+        "beforeProviderMs": {
+          "count": 192,
+          "mean": 3658.078125,
+          "p50": 3388,
+          "p95": 7054,
+          "max": 8426
+        },
+        "providerMs": {
+          "count": 192,
+          "mean": 6.270833333333333,
+          "p50": 5,
+          "p95": 15,
+          "max": 23
+        },
+        "afterProviderMs": {
+          "count": 192,
+          "mean": 2666.3177083333335,
+          "p50": 1790,
+          "p95": 7102,
+          "max": 7891
+        },
+        "settlementMs": {
+          "count": 192,
+          "mean": 6330.666666666667,
+          "p50": 5029,
+          "p95": 14118,
+          "max": 14809
+        }
+      },
+      "peakKafkaLag": 1412,
+      "claimCounts": {
+        "runs": 192,
+        "maximumClaimsPerRun": 1
+      },
+      "slowProjectionRecords": 0,
+      "writerPrepareMs": {
+        "count": 192,
+        "mean": 1327.853964953125,
+        "p50": 868.7920809999923,
+        "p95": 2952.5518819999998,
+        "max": 3035.1963099999994
+      }
+    }
+  },
+  "preservation": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  },
+  "health": {
+    "machines": [
+      {
+        "state": "ready",
+        "desired_state": "running",
+        "failure_code": null
+      },
+      {
+        "state": "ready",
+        "desired_state": "running",
+        "failure_code": null
+      }
+    ],
+    "roles": [
+      {
+        "role": "trusted-pi-worker",
+        "ready": true
+      },
+      {
+        "role": "trusted-pi-worker",
+        "ready": true
+      },
+      {
+        "role": "session-api",
+        "ready": true
+      },
+      {
+        "role": "session-runtime",
+        "ready": true
+      }
+    ],
+    "loadPods": 0
+  },
+  "evaluations": {
+    "before": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0
+      }
+    },
+    "after": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0
+      }
+    },
+    "after-repeat": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0
+      }
+    },
+    "children": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 16,
+        "foreign_models": 0,
+        "charged": 0
+      },
+      "results": {
+        "completedParents": 4,
+        "childModelRequests": 8,
+        "toolResults": 8,
+        "historyPages": 4,
+        "historyFailures": 0
+      }
+    },
+    "faults": {
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "configuration": {
+        "restored": true,
+        "modelRemoved": true,
+        "providerRestored": true
+      },
+      "metering": {
+        "calls": 58,
+        "foreign_models": 0,
+        "charged": 0
+      },
+      "profiles": [
+        {
+          "name": "once-rate-limit",
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "terminalFailure": 8,
+            "subsequentUserRequestsCompleted": 8,
+            "automaticReplayClaimed": false
+          }
+        },
+        {
+          "name": "once-disconnect",
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "terminalFailure": 8,
+            "subsequentUserRequestsCompleted": 8,
+            "automaticReplayClaimed": false
+          }
+        },
+        {
+          "name": "worker-handoff",
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "sameRun": true,
+            "writerChanged": true,
+            "physicalCalls": 4
+          }
+        },
+        {
+          "name": "projector-restart",
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "writersPreserved": true,
+            "sseReconnects": 126
+          }
+        },
+        {
+          "name": "stop-under-load",
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "cancelled": 2,
+            "lateReplyIgnored": true
+          }
+        },
+        {
+          "name": "lost-tool-reply",
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "physicalWrites": 4
+          }
+        }
+      ]
+    }
+  }
+}

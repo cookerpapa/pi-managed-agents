@@ -64,15 +64,19 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
 - [x] Narrow terminal/family history selection to known identities while retaining
   child/Fork/prune eligibility. Root metadata no longer expands native child
   state; a Run with no children skips the family-history view. Targeted source
-  checks and read-only plan comparisons pass; matched publication is next.
-- [ ] Publish the terminal-query repair and repeat cold-Run, child/history and
-  recovery acceptance before claiming relief of the measured projection backlog.
+  checks and read-only plan comparisons pass.
+- [x] Publish the terminal-query repair and repeat cold-Run, child/history and
+  recovery acceptance. The [delivery](reports/terminal-history-query-repair-20261117.md)
+  records 47 source tests, preserved original assets and before/after throughput
+  of 4.92 versus 6.29/9.04 Runs/s. All three text cases completed 192 Runs;
+  the query improvement does not establish a stable new capacity ceiling.
 - [ ] Evaluate Kafka client initialization/background scheduling without weakening
   Session producer fencing. Investigate the allocator abort seen in the injected
   diagnostic repetition; its recovery tails are not ordinary latency evidence.
 - [ ] Remeasure publication/projection/settlement saturation after the bounded
-  repairs. The clean 64-concurrency repetition completed 192 Runs at 4.41/s with
-  settlement p95 26.47 s. No sustainable or fleet-scale rate is established.
+  repairs. Terminal-query acceptance reduced the paired settlement p95 from
+  24.98 s to 16.59/14.12 s, but substantial backlog and variability remain.
+  No sustainable or fleet-scale rate is established.
 - [ ] Repeat sustained-rate admission controls: the 8/s, 45-second case completed
   315 requests and dropped 45 at the generator's in-flight bound; 4/s completed
   all 180. Record offered/submitted/completed work separately.

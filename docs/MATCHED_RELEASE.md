@@ -5,11 +5,14 @@ serving roles and physical maintenance separately under
 [ADR-0320](adr/0320-release-plans-and-artifact-reuse.md). Preparation does not change
 the serving catalog. All builds and native/live checks on the WSL host run serially.
 
-The current verified record is `claim-keyed-20261116-r1`, schema 225, catalog v2, Session
+The current verified record is `settlement-keyed-20261117-r1`, schema 225, catalog v2, Session
 topic v21, reply topic v4, resource capsule 4, provider contract 1, Guest executor
 1, fixed Tool payload 7, Android executor 2 and public terminal 2. Core, Tool-host
 and Web artifacts retain their own source revisions. The
-[latest delivery](reports/run-claim-query-repair-20261116.md) records bounded Run
+[latest delivery](reports/terminal-history-query-repair-20261117.md) records direct
+terminal metadata and bounded family selection, one built/thirteen reused
+artifacts, preserved original assets and serial load/recovery acceptance. The
+[claim-query delivery](reports/run-claim-query-repair-20261116.md) records bounded Run
 claim lookups, two built/twelve reused artifacts, loaded plans, recovery and
 remaining throughput variability. The
 [preceding throughput delivery](reports/workload-release-throughput-20261116.md)
