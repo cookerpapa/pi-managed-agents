@@ -2,10 +2,12 @@
 
 The [query repairs](history-query-repair-20261116.md) and
 [ADR-0327 build boundaries](../adr/0327-workload-build-inputs.md) are deployed as
-`history-throughput-20261116-r2`, runtime source `500533bb`. The independent device
-receiver is published as `workload-device-20261116`. The later operator source
-`acfb8cea` adds cached scanning and interrupted-evidence resumption without
-relabeling the previously built runtime artifacts.
+`history-throughput-20261116-r3`, with final shared-host source `b76dd404` and
+unchanged Worker/Guest artifacts from r2 (`500533bb`). The independent device
+receiver is published as `workload-device-20261116`. Cached scanning and evidence
+resumption preserve the actual source of previously built runtime artifacts.
+The build isolation and history repair passed, but the complete measurement set
+does **not** establish a stable throughput improvement.
 
 [Content-free measurement data](workload-release-throughput-20261116.json)
 retains all selected samples, including the failed before-history check and
@@ -38,6 +40,11 @@ This initial packaging cutover built six artifacts and reused eight, then
 verified the complete 14-artifact plan. Original account/provider/model records,
 two development-machine intents and 393 Workspace files were preserved. Ten core
 and receiver Pods were ready at final inspection; no load-fixture Pods remained.
+The subsequent machine-recovery repair rebuilt only the shared host image and
+reused the other 13, with no native-compute maintenance. Both original machines
+were then verified `ready/running` in PG and `running` through native Cube reads.
+The Guest cutover replaced VM compute while retaining Workspace bytes; project
+servers previously launched inside those VMs are not restored by the platform.
 
 ## Short Run throughput
 
@@ -52,9 +59,12 @@ were in progress; serving application images were still the original release.
 | Before | 192/192 | 4.66 | 16.26 s |
 | After | 192/192 | 7.68 | 15.81 s |
 | After, repeated | 192/192 | 7.83 | 16.48 s |
+| Final r3, original machines restored | 192/192 | 1.90 | 58.13 s |
+| Final r3, repeated | 192/192 | 5.02 | 20.75 s |
 
-Throughput improved in this comparison, but high-concurrency tail latency did
-not materially improve. The separate short matrix measured 0.79, 2.88, 7.13,
+The first comparison improved, but the final validation exposed substantial
+variation. It would be misleading to report only the 7.68/7.83 samples as the
+new capacity. The separate r2 short matrix measured 0.79, 2.88, 7.13,
 9.78 and 11.18 Runs/s at concurrency 1, 4, 8, 16 and 32 respectively. These are
 bounded observations, not a universal maximum or a production capacity promise.
 
@@ -72,6 +82,17 @@ Observed Kafka lag peaks rose from 162 to 1,316/1,405 and active Root Runs from 
 to 63/64. These measurements support investigating the downstream queue, but do
 not isolate its exact split between writer acknowledgements and PG projection.
 
+In the slow final r3 sample, submission-to-provider p95 reached 57.72 s while the
+simulated provider remained 12 ms and post-provider settlement 794 ms. Worker logs
+locate most successful-claim time in `candidate_context`: about 1.90/1.96 s mean
+in 88 sampled claims per Worker, with individual examples at 3.28 and 4.30 s.
+Both Workers were processing requests and all 192 completed. The later repetition
+had much shorter queue waits but remained below the earlier r2 burst throughput.
+The exact slow query plan was not captured. Read-only EXPLAIN after drainage had
+low estimated cost and 6.7–20.6 ms planning time; that does not explain the loaded
+failure. No global JIT/planner setting was changed. Actual under-load claim plans
+and downstream queueing need the next focused investigation before more rewriting.
+
 Fixed-rate trials lasted 45 seconds. At 4 offered Runs/s, all 180 completed.
 At 8/s, the generator reached its 32-in-flight bound: 315 completed and 45 were
 never submitted, with settlement p95 7.42 s. The driver's functional acceptance
@@ -84,12 +105,14 @@ The matched history case uses eight Runs, concurrency two and 32 MCP Tool rounds
 per Run. Before deployment all Runs completed but two history reads failed;
 after deployment all eight history loads and all 16 requested pages succeeded.
 
-| Measurement | Before | After |
-| --- | --- | --- |
-| Whole history load p50 | 712 ms | 780 ms |
-| Whole history load p95/max (eight samples) | 8,816 ms | 1,095 ms |
-| Subsequent-page p95 | 515 ms, 12 successful pages | 595 ms, 16 successful pages |
-| History failures | 2 | 0 |
+| Measurement | Before | After r2 | Final r3 |
+| --- | --- | --- | --- |
+| Whole history load p50 | 712 ms | 780 ms | 573 ms |
+| Whole history load p95/max (eight samples) | 8,816 ms | 1,095 ms | 936 ms |
+| History failures | 2 | 0 | 0 |
+
+Subsequent-page p95 was 515 ms over 12 successful before pages and 595 ms over
+all 16 r2 pages. All 16 final r3 pages also succeeded.
 
 The improvement is removal of the reproduced severe outlier/failure, not a claim
 that every ordinary page became faster. Source regression also bounds real PG
@@ -128,5 +151,13 @@ the initial provision path already did. A later recovery therefore treated the
 allocation as uncertain. The repair reuses the existing absence field and fresh-
 send validation; capsule adoption and recovery-time local errors cannot claim
 absence. A replacement also clears the old allocation's in-memory absence flag.
-The 66 controller and 31 real-PG state checks pass. Publication and restoration
-of the two affected originals are still pending at this report checkpoint.
+The 66 controller and 31 real-PG state checks passed. This was published in r3.
+The two original stuck allocations were separately audited against the exact
+original recovery code, continuous original ownership, no intervening lifecycle
+operations and the prior cutover targets. In those specific cases the closed flag
+identified the validated fresh no-effect branch whose absence fact was omitted.
+A guarded, allocation-specific correction restored that fact; native inventory
+was only a contradiction check, not an absence authority. No generic unknown-to-
+absent migration or uncertain-create replay was introduced. Ordinary recovery
+then allocated new identities and restored both machines. Final native state and
+the original-file preservation checks passed.

@@ -5,7 +5,7 @@ serving roles and physical maintenance separately under
 [ADR-0320](adr/0320-release-plans-and-artifact-reuse.md). Preparation does not change
 the serving catalog. All builds and native/live checks on the WSL host run serially.
 
-The current verified record is `history-throughput-20261116-r2`, schema 225, catalog v2, Session
+The current verified record is `history-throughput-20261116-r3`, schema 225, catalog v2, Session
 topic v21, reply topic v4, resource capsule 4, provider contract 1, Guest executor
 1, fixed Tool payload 7, Android executor 2 and public terminal 2. Core, Tool-host
 and Web artifacts retain their own source revisions. The

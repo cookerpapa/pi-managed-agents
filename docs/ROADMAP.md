@@ -14,9 +14,11 @@ The [November 16 diagnosis](reports/runtime-capacity-diagnosis-20261116.md)
 reproduces frozen-history join amplification and separates cold startup, provider
 and post-provider waits. Query and [ADR-0327](adr/0327-workload-build-inputs.md)
 build-boundary repairs are now [published and measured](reports/workload-release-throughput-20261116.md).
-The matched 64-concurrency case improved from 4.66 to 7.68/7.83 completed Runs/s;
-the reproduced history failures disappeared. High-concurrency settlement tails
-and sustained-rate saturation remain explicit follow-ups. Worker/Projector/Stop/
+The initial 64-concurrency cases reached 7.68/7.83 completed Runs/s, but final r3
+checks measured 1.90/5.02; stable throughput improvement is not established.
+The reproduced history failures disappeared, and original-machine recovery was
+repaired. Loaded claim-query latency, settlement tails and saturation remain
+explicit follow-ups. Worker/Projector/Stop/
 reply recovery passed, original assets were preserved and no paid models were used.
 
 ## HTTP MCP tool integration — delivered

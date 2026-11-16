@@ -1,8 +1,8 @@
 {
   "format": "pma.workload-release-and-throughput.v1",
-  "runtimeRelease": "history-throughput-20261116-r2",
-  "runtimeSource": "500533bbd8dfeb8aee310af3bae44fe05f2a5fc1",
-  "operatorSource": "acfb8ceacdb4dada6871cab1cfd847baf1c81149",
+  "runtimeRelease": "history-throughput-20261116-r3",
+  "runtimeSource": "b76dd4041ad6ea6572783469cf16584b57065187",
+  "operatorSource": "b76dd4041ad6ea6572783469cf16584b57065187",
   "deviceRelease": "workload-device-20261116",
   "evaluations": [
     {
@@ -4895,6 +4895,787 @@
           }
         }
       ]
+    },
+    {
+      "label": "final-cold-64",
+      "at": "2026-11-16T09:17:10.521Z",
+      "serving": "history-throughput-20261116-r3",
+      "driverRevision": "b76dd4041ad6ea6572783469cf16584b57065187",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 577.2829999999999,
+          "p95_ms": 994.4569499999999,
+          "p99_ms": 1035.45345
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-final",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 100891.07241,
+            "successfulRunsPerSecond": 1.903042513214178,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 43,
+              "p95": 979,
+              "p99": 1515,
+              "max": 1519
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 28406,
+              "p95": 56513,
+              "p99": 58757,
+              "max": 58906
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 29288,
+              "p95": 58072,
+              "p99": 61391,
+              "max": 61480
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 29351,
+              "p95": 58128,
+              "p99": 61458,
+              "max": 61559
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.000570999996853061,
+              "p95": 0.002243999988422729,
+              "p99": 0.014215999995940365,
+              "max": 0.051848000002792105
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 29172,
+              "p95": 57721,
+              "p99": 61091,
+              "max": 61236
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 5,
+              "p95": 12,
+              "p99": 20,
+              "max": 37
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 365,
+              "p95": 794,
+              "p99": 1270,
+              "max": 1413
+            }
+          },
+          "resources": {
+            "samples": 52,
+            "peakActiveRootRuns": 15,
+            "peakQueuedRuns": 64,
+            "minimumAvailableMiB": 10662.9765625,
+            "maximumSwapUsedMiB": 440.7109375,
+            "walBytes": 28777414,
+            "transactions": 23153,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 173,
+            "kafkaSamples": 18,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 8,
+            "lastKafkaObservationAgeMs": 22,
+            "maximumMetricsScrapeMs": 1757
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.021242129821038343,
+              "peakInstanceRssMiB": 208.4140625,
+              "peakEventLoopP99Ms": 11.460607
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.4905133482960252,
+              "peakInstanceRssMiB": 370.08984375,
+              "peakEventLoopP99Ms": 59.441151
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.24021414368121596,
+              "peakInstanceRssMiB": 388.71484375,
+              "peakEventLoopP99Ms": 17.711102999999998
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.4380940680802473,
+              "peakInstanceRssMiB": 361.0859375,
+              "peakEventLoopP99Ms": 27.410431
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.010566111472053236,
+              "peakInstanceRssMiB": 133.08203125,
+              "peakEventLoopP99Ms": 10.969087
+            }
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"idle\"}": {
+              "count": 102,
+              "meanMs": 10.748900529413769
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "final-cold-64-repeat",
+      "at": "2026-11-16T09:42:22.067Z",
+      "serving": "history-throughput-20261116-r3",
+      "driverRevision": "b76dd4041ad6ea6572783469cf16584b57065187",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 702.8344999999999,
+          "p95_ms": 1147.7268499999998,
+          "p99_ms": 1233.6484500000001
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-final-repeat",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 38209.93786599999,
+            "successfulRunsPerSecond": 5.024870772450161,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 43,
+              "p95": 170,
+              "p99": 2393,
+              "max": 2409
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 119,
+              "p95": 353,
+              "p99": 1201,
+              "max": 1513
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 7281,
+              "p95": 19414,
+              "p99": 26834,
+              "max": 27884
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 7692,
+              "p95": 20747,
+              "p99": 30902,
+              "max": 32834
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0004810000100405887,
+              "p95": 0.0027249999984633178,
+              "p99": 0.01385600000503473,
+              "max": 0.03704999999899883
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 1624,
+              "p95": 9468,
+              "p99": 10397,
+              "max": 10406
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 7,
+              "p95": 20,
+              "p99": 26,
+              "max": 28
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 4827,
+              "p95": 17921,
+              "p99": 21164,
+              "max": 22419
+            }
+          },
+          "resources": {
+            "samples": 21,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 7,
+            "minimumAvailableMiB": 10353.34375,
+            "maximumSwapUsedMiB": 440.46875,
+            "walBytes": 28194068,
+            "transactions": 15520,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1272,
+            "kafkaSamples": 8,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 6,
+            "lastKafkaObservationAgeMs": 27,
+            "maximumMetricsScrapeMs": 1854
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.020040105920765067,
+              "peakInstanceRssMiB": 245.6640625,
+              "peakEventLoopP99Ms": 13.524991
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 1.3843048049978144,
+              "peakInstanceRssMiB": 493.2265625,
+              "peakEventLoopP99Ms": 217.055231
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.34878242537984877,
+              "peakInstanceRssMiB": 327.62109375,
+              "peakEventLoopP99Ms": 16.007167
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.8948045350541162,
+              "peakInstanceRssMiB": 402.66015625,
+              "peakEventLoopP99Ms": 25.624575
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.011802632593773168,
+              "peakInstanceRssMiB": 141.1875,
+              "peakEventLoopP99Ms": 13.860863
+            }
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1940,
+              "meanMs": 102.19858394432944
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 1115.0001355885427
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"pi_session_open\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 259.3604195676999
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"world_state_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 359.46320195313456
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"idle\"}": {
+              "count": 1266,
+              "meanMs": 25.992787039489492
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"claimed\"}": {
+              "count": 192,
+              "meanMs": 83.07073043228493
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"transaction_begin\"}": {
+              "count": 192,
+              "meanMs": 3.085274453123324
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"candidate_context\"}": {
+              "count": 192,
+              "meanMs": 20.623230052083514
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"input_snapshot\"}": {
+              "count": 192,
+              "meanMs": 4.162327953128015
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"configuration\"}": {
+              "count": 192,
+              "meanMs": 4.321352593751122
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"ownership\"}": {
+              "count": 192,
+              "meanMs": 2.897173078137713
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_session_lock\"}": {
+              "count": 192,
+              "meanMs": 4.045855130190225
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_worker_lock\"}": {
+              "count": 192,
+              "meanMs": 2.616148812493824
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_read\"}": {
+              "count": 192,
+              "meanMs": 2.6634462239635455
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_write\"}": {
+              "count": 192,
+              "meanMs": 4.019784244796029
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"skill_catalog\"}": {
+              "count": 192,
+              "meanMs": 12.262705270830336
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"admitted_running\"}": {
+              "count": 192,
+              "meanMs": 12.748504817718645
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"finish\"}": {
+              "count": 192,
+              "meanMs": 9.28152939581681
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_queue\"}": {
+              "count": 576,
+              "meanMs": 0.011319753476224603
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_ack\"}": {
+              "count": 576,
+              "meanMs": 46.25874514756523
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2708,
+              "meanMs": 136.53657095974788
+            }
+          },
+          "historyReadsMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "final-long-history",
+      "at": "2026-11-16T09:34:27.532Z",
+      "serving": "history-throughput-20261116-r3",
+      "driverRevision": "b76dd4041ad6ea6572783469cf16584b57065187",
+      "driverDirty": false,
+      "driverSourceSha256": {
+        "scripts/run-runtime-load.mjs": "0bcdd9df49bb64560b07da3a23f8b5aa2f971d6ef13a956cfa22fc9a7887c14c",
+        "scripts/lib/runtime-load-fixture.mjs": "c277034b0512db478ddc12dfebe56c921e0bff7ffc305aee76bd3c487b7ee0ae",
+        "scripts/lib/runtime-load-metrics.mjs": "fe91191ffb3ed422f1e631caba20692654ab61d26f258f5fe0ad0917aa1ded5f",
+        "scripts/lib/runtime-load-scheduler.mjs": "151479a7b9a1dc5e6a22e40a80daae5c365af91309e0c33e089e3df0872f8928",
+        "packages/fake-model-server/src/responses-server.ts": "56a1557c797075e0f64393b51d7d472acde8382364a95a31f2607702109cdfbf",
+        "packages/control-plane/test/mcp/http-fixture.ts": "2be139159bef5c79806926a520bcb35ecb50b920226eefe87b925655eb2b921c"
+      },
+      "hardware": {
+        "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+        "logicalCpus": 32,
+        "memoryBytes": 25195307008,
+        "platform": "linux",
+        "architecture": "x64",
+        "node": "v24.12.0"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "configurationRestored": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 264,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 264,
+        "deliveryLatency": {
+          "events": 264,
+          "p50_ms": 628.22,
+          "p95_ms": 1085.9225000000001,
+          "p99_ms": 1119.3911699999999
+        }
+      },
+      "drained": {
+        "queued": 0,
+        "running": 0,
+        "settling": 0,
+        "owners": 0,
+        "lock_waiters": 0,
+        "kafkaLag": 0
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "frozen-history-final",
+            "kind": "mcp",
+            "concurrency": 2,
+            "count": 8,
+            "firstByteMs": 100,
+            "chunkMs": 0,
+            "outputBytes": 2048,
+            "paddingBytes": 0,
+            "rounds": 32,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": true
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 71607.45114800001,
+            "successfulRunsPerSecond": 0.11172021726433758,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 18,
+              "p95": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 28,
+              "p95": 42,
+              "p99": 42,
+              "max": 42
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 1032,
+              "p95": 1075,
+              "p99": 1075,
+              "max": 1075
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 17873,
+              "p95": 18221,
+              "p99": 18221,
+              "max": 18221
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0005709999823011458,
+              "p95": 0.034485000011045486,
+              "p99": 0.034485000011045486,
+              "max": 0.034485000011045486
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 37,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11039.06640625,
+            "maximumSwapUsedMiB": 438.4609375,
+            "walBytes": 24285800,
+            "transactions": 5528,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 41,
+            "kafkaSamples": 13,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 33,
+            "maximumMetricsScrapeMs": 916
+          },
+          "components": {
+            "pi-cloud-control-plane": {
+              "averageCpuCores": 0.012919102122458087,
+              "peakInstanceRssMiB": 245.4140625,
+              "peakEventLoopP99Ms": 10.870783
+            },
+            "pi-cloud-pi-worker-primary-v1": {
+              "averageCpuCores": 0.4061567813090339,
+              "peakInstanceRssMiB": 362.5390625,
+              "peakEventLoopP99Ms": 13.295615
+            },
+            "pi-cloud-session-api": {
+              "averageCpuCores": 0.049327564173797356,
+              "peakInstanceRssMiB": 223.37109375,
+              "peakEventLoopP99Ms": 13.508607000000001
+            },
+            "pi-cloud-session-runtime": {
+              "averageCpuCores": 0.29832745305033864,
+              "peakInstanceRssMiB": 382.41015625,
+              "peakEventLoopP99Ms": 11.526143000000001
+            },
+            "pi-cloud-workspace-volume-gateway": {
+              "averageCpuCores": 0.00703117013001437,
+              "peakInstanceRssMiB": 141.1875,
+              "peakEventLoopP99Ms": 10.452991
+            }
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 2368,
+              "meanMs": 20.44369131630206
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 538.1594134999608
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"pi_session_open\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 5.161398875032308
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"world_state_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 60.581982874922666
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"idle\"}": {
+              "count": 344,
+              "meanMs": 4.077322813958437
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_seconds{service=\"pi-cloud-trusted-runner\",outcome=\"claimed\"}": {
+              "count": 8,
+              "meanMs": 24.60134825002669
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"transaction_begin\"}": {
+              "count": 8,
+              "meanMs": 0.4160827499872493
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"candidate_context\"}": {
+              "count": 8,
+              "meanMs": 1.7635647499965046
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"input_snapshot\"}": {
+              "count": 8,
+              "meanMs": 0.9351437500154137
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"configuration\"}": {
+              "count": 8,
+              "meanMs": 1.3203419999335935
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"ownership\"}": {
+              "count": 8,
+              "meanMs": 0.8172947500715948
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_session_lock\"}": {
+              "count": 8,
+              "meanMs": 1.838451374991567
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_worker_lock\"}": {
+              "count": 8,
+              "meanMs": 0.7115006249805451
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_read\"}": {
+              "count": 8,
+              "meanMs": 0.5446866250131289
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"lease_write\"}": {
+              "count": 8,
+              "meanMs": 1.403921750024892
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"skill_catalog\"}": {
+              "count": 8,
+              "meanMs": 4.446152374992386
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"admitted_running\"}": {
+              "count": 8,
+              "meanMs": 6.17148999997881
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_claim_stage_seconds{service=\"pi-cloud-trusted-runner\",stage=\"finish\"}": {
+              "count": 8,
+              "meanMs": 3.980157624988351
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_queue\"}": {
+              "count": 24,
+              "meanMs": 0.006558208289789032
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-session-runtime\",stage=\"producer_ack\"}": {
+              "count": 24,
+              "meanMs": 20.663492041698223
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2912,
+              "meanMs": 19.84704272596207
+            }
+          },
+          "historyReadsMs": {
+            "count": 8,
+            "p50": 572.8132880000048,
+            "p95": 935.7108160000062,
+            "p99": 935.7108160000062,
+            "max": 935.7108160000062
+          },
+          "historyPages": {
+            "count": 16,
+            "latencyMs": {
+              "count": 16,
+              "p50": 299.2723560000013,
+              "p95": 588.169934000005,
+              "p99": 588.169934000005,
+              "max": 588.169934000005
+            }
+          }
+        }
+      ]
     }
   ],
   "releaseScope": {
@@ -4959,7 +5740,6 @@
     "passed": true
   },
   "health": {
-    "deviceLinkHealthy": 200,
     "workloads": 10,
     "notReady": [],
     "remainingLoadPods": 0
@@ -4974,5 +5754,37 @@
     "policy": "reuse-local-cache",
     "vulnerabilityUpdatedAt": "2026-11-15T01:07:39.649898494Z",
     "javaUpdatedAt": "2026-11-13T01:08:15.464357406Z"
+  },
+  "originalMachines": [
+    {
+      "state": "ready",
+      "desiredState": "running",
+      "nativeState": "running",
+      "failure": null
+    },
+    {
+      "state": "ready",
+      "desiredState": "running",
+      "nativeState": "running",
+      "failure": null
+    }
+  ],
+  "finalClaimObservation": {
+    "sampledClaimsPerWorker": 88,
+    "meanCandidateContextMs": [1896, 1963],
+    "maximumClaimMs": [5695, 5060],
+    "sampledSlowCandidateContextMs": [4302, 3279],
+    "actualSlowPlanCaptured": false,
+    "postDrainExplain": {
+      "blocked0": {
+        "planningMs": 20.649,
+        "totalCost": 31.92
+      },
+      "blocked32": {
+        "planningMs": 6.652,
+        "totalCost": 31.78
+      }
+    },
+    "globalPlannerSettingsChanged": false
   }
 }
