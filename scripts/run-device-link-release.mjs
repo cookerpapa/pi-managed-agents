@@ -29,8 +29,8 @@ if (action === "prepare") {
   assert(!existsSync(directory), "Use a fresh release directory");
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const image = `pi-cloud/device-link:${version}`;
-  run("docker", [
-    "build",
+  run(process.execPath, [
+    "scripts/build-workload-image.mjs",
     "--network=host",
     "-f",
     "packages/device-link/Dockerfile",

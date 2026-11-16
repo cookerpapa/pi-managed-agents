@@ -72,9 +72,9 @@ if (reused) {
   execFileSync("docker", ["tag", registered, image]);
 } else
   execFileSync(
-    "docker",
+    process.execPath,
     [
-      "build",
+      "scripts/build-workload-image.mjs",
       "--network=host",
       ...proxyArgs,
       "--file",

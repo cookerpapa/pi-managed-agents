@@ -5,6 +5,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./execution-publication": "./src/execution-publication.ts",
+    "./run-skill-catalog": "./src/run-skill-catalog.ts",
     ".": "./src/index.ts",
     "./canonical-pi-conversation": "./src/canonical-pi-conversation.ts",
     "./frozen-history": "./src/frozen-history.ts",

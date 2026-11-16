@@ -54,7 +54,7 @@ const dockerfile = await readFile(
 );
 for (const name of [...closure].sort()) {
   const workspace = workspaces.get(name);
-  const packageCopy = `COPY packages/${workspace.directory}/package.json packages/${workspace.directory}/package.json`;
+  const packageCopy = `COPY --from=pma-dependencies packages/${workspace.directory}/package.json packages/${workspace.directory}/package.json`;
   const packageCopies = dockerfile.split(packageCopy).length - 1;
   assert.equal(
     packageCopies,
@@ -62,8 +62,11 @@ for (const name of [...closure].sort()) {
     `${name} must copy its package.json into both Supervisor image stages`,
   );
   const sourceCopy = `COPY packages/${workspace.directory}/src packages/${workspace.directory}/src`;
-  if (name === "@pi-cloud/sandbox-control")
-    assert(!dockerfile.includes(sourceCopy), "Worker must copy only its sandbox client source");
+  if (["@pi-cloud/sandbox-control", "@pi-cloud/runtime-core"].includes(name))
+    assert(
+      !dockerfile.includes(sourceCopy),
+      "Worker must copy only its role-owned client/runtime source",
+    );
   else
     assert(
       dockerfile.includes(sourceCopy),

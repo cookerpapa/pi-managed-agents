@@ -1,3 +1,4 @@
+# pma-build-root: esbuild
 ARG CUBE_BASE_IMAGE=ghcr.io/tencentcloud/cubesandbox-base:2026.16@sha256:34ea312a63a5534e66ab17005c23d7fbaf33c38bccd5411ee402d901e63a3193
 ARG PYTHON_BASE_IMAGE=python:3.11.13-slim-bookworm@sha256:86adf8dbadc3d6e82ee5dd2c74bec2e1c2467cdad47886280501df722372d2e1
 ARG NODE_BASE_IMAGE=node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
@@ -45,13 +46,13 @@ FROM ${NODE_BASE_IMAGE} AS node-runtime
 
 FROM ${NODE_BASE_IMAGE} AS tool-worker-builder
 WORKDIR /src
-COPY package.json package-lock.json tsconfig.base.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
+COPY tsconfig.base.json ./
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
-COPY packages/protocol/package.json packages/protocol/package.json
-COPY packages/tool-sandbox/package.json packages/tool-sandbox/package.json
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
-RUN sh scripts/retry-npm-command.sh ci --omit=dev --ignore-scripts \
-    && sh scripts/retry-npm-command.sh install --no-save --ignore-scripts esbuild@0.28.1
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/tool-sandbox/package.json packages/tool-sandbox/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+RUN sh scripts/retry-npm-command.sh ci --ignore-scripts
 COPY packages/protocol/src/development-environment-profile.ts \
   packages/protocol/src/environment.ts \
   packages/protocol/src/execution-reference.ts \
@@ -166,11 +167,11 @@ RUN if ! getent group 1000 >/dev/null; then groupadd --gid 1000 pi-cloud; fi \
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
-COPY packages/protocol/package.json packages/protocol/package.json
-COPY packages/tool-sandbox/package.json packages/tool-sandbox/package.json
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/tool-sandbox/package.json packages/tool-sandbox/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 RUN sh scripts/retry-npm-command.sh install --global npm@12.0.2 \
     && sh scripts/retry-npm-command.sh pack --pack-destination /tmp \
          brace-expansion@5.0.12 \

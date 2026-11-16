@@ -22,6 +22,25 @@ if (
   }
 }
 const result = releaseImpact(files);
+// Source policy selects the required gates; actual build inputs select images.
+// Missing history or generation evidence keeps the conservative full matrix.
+if (files && result.buildImages) {
+  try {
+    const { artifactInputIdentity } = await import("./lib/release-plan.mjs");
+    const before = execFileSync("git", ["merge-base", base, head], { encoding: "utf8" }).trim();
+    const after = execFileSync("git", ["rev-parse", head], { encoding: "utf8" }).trim();
+    const changed = [];
+    for (const artifact of result.matrix.include) {
+      const a = await artifactInputIdentity(process.cwd(), before, artifact.dockerfile);
+      const b = await artifactInputIdentity(process.cwd(), after, artifact.dockerfile);
+      if (a.identity !== b.identity) changed.push(artifact);
+    }
+    result.matrix = { include: changed };
+    result.buildImages = changed.length > 0;
+  } catch (error) {
+    console.error("Keeping full image verification: " + error.message);
+  }
+}
 if (process.env.GITHUB_OUTPUT)
   for (const [key, value] of Object.entries(result))
     appendFileSync(

@@ -3,8 +3,8 @@ COPY scripts/install-node-os-security-updates.sh scripts/install-host-os-securit
 RUN sh /tmp/install-host-os-security-updates.sh && sh /tmp/install-node-os-security-updates.sh \
     && rm /tmp/install-node-os-security-updates.sh /tmp/install-host-os-security-updates.sh
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY packages/device-link/package.json packages/device-link/package.json
+COPY --from=pma-dependencies package.json package-lock.json ./
+COPY --from=pma-dependencies packages/device-link/package.json packages/device-link/package.json
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
 RUN sh scripts/retry-npm-command.sh ci --workspace @pi-cloud/device-link --include-workspace-root=false --omit=dev --ignore-scripts \
     && rm -rf /usr/local/lib/node_modules/npm \

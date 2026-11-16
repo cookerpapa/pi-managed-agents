@@ -36,7 +36,7 @@ import {
 } from "@pi-cloud/runtime-core/run-executor";
 import type { Database } from "@pi-cloud/database";
 import type { Transaction } from "kysely";
-import { createExecutionPublication } from "@pi-cloud/runtime-core";
+import { createExecutionPublication } from "@pi-cloud/runtime-core/execution-publication";
 import type { ExecutionLogWriter, ExecutionLogFactory } from "@pi-cloud/runtime-core/execution-log";
 import {
   SessionLeaseCoordinator,

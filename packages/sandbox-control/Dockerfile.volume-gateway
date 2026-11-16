@@ -23,17 +23,17 @@ FROM os-base AS dependencies
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV npm_config_registry=${NPM_CONFIG_REGISTRY}
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
-COPY packages/session-attachments/package.json packages/session-attachments/package.json
-COPY packages/database/package.json packages/database/package.json
-COPY packages/domain/package.json packages/domain/package.json
-COPY packages/event-log/package.json packages/event-log/package.json
-COPY packages/observability/package.json packages/observability/package.json
-COPY packages/protocol/package.json packages/protocol/package.json
-COPY packages/sandbox-control/package.json packages/sandbox-control/package.json
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/session-attachments/package.json packages/session-attachments/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/event-log/package.json packages/event-log/package.json
+COPY --from=pma-dependencies packages/observability/package.json packages/observability/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/sandbox-control/package.json packages/sandbox-control/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 RUN sh scripts/retry-npm-command.sh ci --omit=dev --ignore-scripts \
     && npm cache clean --force
 
@@ -76,19 +76,20 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     test "$installed" = 1
 WORKDIR /app
 COPY --from=dependencies /app/node_modules /app/node_modules
+COPY --from=dependencies /app/packages /app/packages
 COPY --from=quota-builder /out/workspace-quota /app/bin/workspace-quota
 COPY --from=quota-builder /out/file-exchange /opt/pi-cloud/bin/file-exchange
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
-COPY packages/session-attachments/package.json packages/session-attachments/package.json
-COPY packages/database/package.json packages/database/package.json
-COPY packages/domain/package.json packages/domain/package.json
-COPY packages/event-log/package.json packages/event-log/package.json
-COPY packages/observability/package.json packages/observability/package.json
+COPY --from=pma-dependencies packages/session-attachments/package.json packages/session-attachments/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/event-log/package.json packages/event-log/package.json
+COPY --from=pma-dependencies packages/observability/package.json packages/observability/package.json
 COPY packages/observability/src packages/observability/src
-COPY packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
 COPY packages/protocol/src packages/protocol/src
-COPY packages/sandbox-control/package.json packages/sandbox-control/package.json
+COPY --from=pma-dependencies packages/sandbox-control/package.json packages/sandbox-control/package.json
 COPY packages/sandbox-control/tsconfig.json packages/sandbox-control/tsconfig.json
 COPY packages/sandbox-control/src/filesystem-workspace-volume-gateway-lock.ts packages/sandbox-control/src/filesystem-workspace-volume-gateway-lock.ts
 COPY packages/sandbox-control/src/persistent-volume-workspace-volume-gateway.ts packages/sandbox-control/src/persistent-volume-workspace-volume-gateway.ts
@@ -102,7 +103,7 @@ COPY packages/sandbox-control/src/workspace-volume-gateway-contract.ts packages/
 COPY packages/sandbox-control/src/workspace-volume-gateway-main.ts packages/sandbox-control/src/workspace-volume-gateway-main.ts
 COPY packages/sandbox-control/src/workspace-volume-gateway-transport.ts packages/sandbox-control/src/workspace-volume-gateway-transport.ts
 COPY packages/sandbox-control/src/workspace-volume-gateway.ts packages/sandbox-control/src/workspace-volume-gateway.ts
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 COPY packages/workspace-runtime/src packages/workspace-runtime/src
 RUN cd /app/packages/sandbox-control \
     && node --import tsx --input-type=module --eval "await import('./src/workspace-volume-gateway.ts'); await import('./src/postgres-workspace-persistence.ts'); await import('./src/workspace-quota-client.ts'); await import('undici')" \

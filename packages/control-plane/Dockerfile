@@ -6,25 +6,25 @@ RUN sh /tmp/install-host-os-security-updates.sh && sh /tmp/install-node-os-secur
 FROM os-base AS dependencies
 
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
 COPY scripts/prepare-json-parser.mjs scripts/prepare-json-parser.mjs
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
-COPY packages/accounting/package.json packages/accounting/package.json
-COPY packages/cube-completion/package.json packages/cube-completion/package.json
-COPY packages/control-plane/package.json packages/control-plane/package.json
+COPY --from=pma-dependencies packages/accounting/package.json packages/accounting/package.json
+COPY --from=pma-dependencies packages/cube-completion/package.json packages/cube-completion/package.json
+COPY --from=pma-dependencies packages/control-plane/package.json packages/control-plane/package.json
 COPY packages/control-plane/tsconfig.json packages/control-plane/tsconfig.json
-COPY packages/session-attachments/package.json packages/session-attachments/package.json
-COPY packages/database/package.json packages/database/package.json
-COPY packages/domain/package.json packages/domain/package.json
-COPY packages/event-log/package.json packages/event-log/package.json
-COPY packages/observability/package.json packages/observability/package.json
-COPY packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
-COPY packages/protocol/package.json packages/protocol/package.json
-COPY packages/runtime-core/package.json packages/runtime-core/package.json
-COPY packages/sandbox-control/package.json packages/sandbox-control/package.json
-COPY packages/subagent-control/package.json packages/subagent-control/package.json
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/session-attachments/package.json packages/session-attachments/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/event-log/package.json packages/event-log/package.json
+COPY --from=pma-dependencies packages/observability/package.json packages/observability/package.json
+COPY --from=pma-dependencies packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/runtime-core/package.json packages/runtime-core/package.json
+COPY --from=pma-dependencies packages/sandbox-control/package.json packages/sandbox-control/package.json
+COPY --from=pma-dependencies packages/subagent-control/package.json packages/subagent-control/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 RUN sh scripts/retry-npm-command.sh ci --omit=dev --ignore-scripts \
     && sh scripts/retry-npm-command.sh rebuild @confluentinc/kafka-javascript \
     && node scripts/prepare-json-parser.mjs \
@@ -45,37 +45,37 @@ ENV PI_CLOUD_TOOL_RELEASE_ID=${PI_CLOUD_REVISION}:${PI_CLOUD_VERSION}
 WORKDIR /app
 COPY --from=dependencies /app/node_modules /app/node_modules
 COPY --from=dependencies /app/packages /app/packages
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
-COPY packages/accounting/package.json packages/accounting/package.json
-COPY packages/cube-completion/package.json packages/cube-completion/package.json
-COPY packages/control-plane/package.json packages/control-plane/package.json
+COPY --from=pma-dependencies packages/accounting/package.json packages/accounting/package.json
+COPY --from=pma-dependencies packages/cube-completion/package.json packages/cube-completion/package.json
+COPY --from=pma-dependencies packages/control-plane/package.json packages/control-plane/package.json
 COPY packages/control-plane/tsconfig.json packages/control-plane/tsconfig.json
 COPY packages/accounting/src packages/accounting/src
 COPY packages/cube-completion/src packages/cube-completion/src
 COPY packages/control-plane/src packages/control-plane/src
 COPY deploy/helm/pi-cloud-platform/files/model-catalog.json deploy/helm/pi-cloud-platform/files/model-catalog.json
-COPY packages/session-attachments/package.json packages/session-attachments/package.json
-COPY packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/session-attachments/package.json packages/session-attachments/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
 COPY packages/session-attachments/src packages/session-attachments/src
 COPY packages/database/src packages/database/src
-COPY packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
 COPY packages/domain/src packages/domain/src
-COPY packages/event-log/package.json packages/event-log/package.json
-COPY packages/observability/package.json packages/observability/package.json
+COPY --from=pma-dependencies packages/event-log/package.json packages/event-log/package.json
+COPY --from=pma-dependencies packages/observability/package.json packages/observability/package.json
 COPY packages/event-log/src packages/event-log/src
 COPY packages/observability/src packages/observability/src
-COPY packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
+COPY --from=pma-dependencies packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
 COPY packages/pi-session-postgres/src packages/pi-session-postgres/src
-COPY packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
 COPY packages/protocol/src packages/protocol/src
-COPY packages/runtime-core/package.json packages/runtime-core/package.json
+COPY --from=pma-dependencies packages/runtime-core/package.json packages/runtime-core/package.json
 COPY packages/runtime-core/src packages/runtime-core/src
-COPY packages/sandbox-control/package.json packages/sandbox-control/package.json
+COPY --from=pma-dependencies packages/sandbox-control/package.json packages/sandbox-control/package.json
 COPY packages/sandbox-control/src packages/sandbox-control/src
-COPY packages/subagent-control/package.json packages/subagent-control/package.json
+COPY --from=pma-dependencies packages/subagent-control/package.json packages/subagent-control/package.json
 COPY packages/subagent-control/src packages/subagent-control/src
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 COPY packages/workspace-runtime/src packages/workspace-runtime/src
 RUN node --import tsx --input-type=module --eval "await import('@pi-cloud/sandbox-control/runtime'); await import('@pi-cloud/sandbox-control/session-runtime'); await import('@pi-cloud/runtime-core/session-projector')" \
     && rm -rf /usr/local/lib/node_modules/npm \

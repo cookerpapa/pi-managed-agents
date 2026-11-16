@@ -1,5 +1,8 @@
 # Current architecture decisions
 
+[ADR-0327](0327-workload-build-inputs.md) makes generated dependency inputs and
+Worker source imports follow their workload, preserving real artifact provenance.
+
 [ADR-0326](0326-runtime-capacity-benchmarks.md) defines deterministic-provider
 capacity measurements through the real runtime with owned fixtures and restored configuration (#42).
 

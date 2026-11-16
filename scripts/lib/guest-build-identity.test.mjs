@@ -66,15 +66,33 @@ it("bundles the real guest using only declared COPY inputs, without model/API mo
 it("the actual guest identity ignores model edits but includes copied protocol and Tool changes", async () => {
   const root = await mkdtemp(join(tmpdir(), "pi-cloud-guest-closure-"));
   try {
-    const copied = guestCopyInputs(
-      await readFile(join(repository, "deploy/cubesandbox/Dockerfile.tool"), "utf8"),
+    const dockerfile = await readFile(
+      join(repository, "deploy/cubesandbox/Dockerfile.tool"),
+      "utf8",
     );
+    const copied = [
+      ...guestCopyInputs(dockerfile),
+      "package.json",
+      "package-lock.json",
+      "scripts/lib/workload-dependencies.mjs",
+      ...new Set(
+        dockerfile
+          .split("\n")
+          .filter((line) => line.startsWith("COPY --from=pma-dependencies packages/"))
+          .map((line) => line.split(/\s+/)[2]),
+      ),
+    ];
     for (const input of copied) {
       const target = join(root, input);
       await mkdir(dirname(target), { recursive: true });
       await cp(join(repository, input), target, { recursive: true });
     }
     const original = await guestBuildIdentity(root);
+    const lockPath = join(root, "package-lock.json");
+    const lock = JSON.parse(await readFile(lockPath, "utf8"));
+    lock.packages["packages/fake-model-server"].devDependencies.ws = "8.21.2";
+    await writeFile(lockPath, JSON.stringify(lock));
+    expect(await guestBuildIdentity(root)).toBe(original);
     await writeFile(
       join(root, "packages/protocol/src/model-catalog.ts"),
       "// an unrelated model change\n",

@@ -55,6 +55,7 @@ export async function checkRoleSourceClosure(root, outputPath) {
           : undefined;
     if (dockerfile) {
       const copies = (await readFile(root + "/" + dockerfile, "utf8"))
+        .replace(/\\\r?\n\s*/g, " ")
         .split("\n")
         .filter((line) => line.startsWith("COPY ") && !line.includes("--from="))
         .flatMap((line) => line.trim().split(/\s+/).slice(1, -1));
@@ -79,7 +80,10 @@ export async function checkRoleSourceClosure(root, outputPath) {
     if (role === "worker")
       for (const path of imported)
         assert(
-          !/^packages\/(control-plane|accounting)\//.test(path),
+          !/^packages\/(control-plane|accounting)\//.test(path) &&
+            !/^packages\/runtime-core\/src\/(?:index|session-projector|postgres-durable-commit-projector|frozen-history(?:-window)?)\.ts$/.test(
+              path,
+            ),
           `Worker runtime import crosses its role: ${path}`,
         );
     if (role === "volumeGateway")

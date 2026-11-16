@@ -6,6 +6,11 @@ import { createHash } from "node:crypto";
 import { dockerSourceInputs } from "./component-release.mjs";
 import { releaseImpact, imageReleaseTargets } from "./release-impact.mjs";
 import { guestBuildIdentityAtRevision } from "./guest-build-identity.mjs";
+import {
+  workloadDependencyInputs,
+  dependencyRecipe,
+  dependencyContextName,
+} from "./workload-dependencies.mjs";
 
 export const applicationArtifacts = Object.freeze([
   {
@@ -101,11 +106,23 @@ export async function artifactInputIdentity(root, revision, dockerfile) {
   const files = await tree(root, revision);
   const content = await git(root, ["show", `${revision}:${dockerfile}`]);
   const inputs = dockerSourceInputs(dockerfile, [...files.keys()], content);
+  const generated = await workloadDependencyInputs(
+    (path) => git(root, ["show", `${revision}:${path}`]),
+    dockerfile,
+  );
+  if (generated) inputs.push(dependencyRecipe);
   const entries = inputs.map((path) => {
     const entry = files.get(path);
     assert(entry, `Missing declared artifact input ${path}`);
     return { path, ...entry };
   });
+  if (generated)
+    for (const [path, bytes] of [...generated].sort(([a], [b]) => a.localeCompare(b)))
+      entries.push({
+        path: `${dependencyContextName}/${path}`,
+        mode: "100644",
+        object: hash(bytes),
+      });
   return { identity: hash({ format: 1, entries }), files: inputs };
 }
 

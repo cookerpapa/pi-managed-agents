@@ -17,7 +17,8 @@ and conservative native presentation capture are implemented; live publication
 and comparative measurement are pending. Diagnostic settings were restored and
 no higher production capacity is claimed yet.
 The [repair verification](reports/history-query-repair-20261116.md) records 53
-passing tests and the build-input coupling that must be discussed before rollout.
+passing tests. The owner authorized [ADR-0327](adr/0327-workload-build-inputs.md)
+to remove build-input coupling, then publish and repeat the affected workloads.
 
 ## HTTP MCP tool integration — delivered
 

@@ -1,13 +1,14 @@
+# pma-build-workspaces: @pi-cloud/web-ui
 FROM node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS builder
 
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
 COPY scripts/prepare-json-parser.mjs scripts/prepare-json-parser.mjs
-COPY packages/protocol/package.json packages/protocol/package.json
-COPY packages/session-client/package.json packages/session-client/package.json
-COPY packages/web-ui/package.json packages/web-ui/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/session-client/package.json packages/session-client/package.json
+COPY --from=pma-dependencies packages/web-ui/package.json packages/web-ui/package.json
 RUN sh scripts/retry-npm-command.sh ci --ignore-scripts \
     && node scripts/prepare-json-parser.mjs \
     && node scripts/prepare-json-parser.mjs --check

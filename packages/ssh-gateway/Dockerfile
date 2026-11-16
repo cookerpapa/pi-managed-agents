@@ -7,11 +7,13 @@ FROM os-base AS dependencies
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 
 WORKDIR /app
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY packages/ssh-gateway/package.json packages/ssh-gateway/package.json
+COPY --from=pma-dependencies package.json package-lock.json ./
+COPY tsconfig.base.json ./
+COPY --from=pma-dependencies packages/ssh-gateway/package.json packages/ssh-gateway/package.json
 COPY packages/ssh-gateway/tsconfig.json packages/ssh-gateway/tsconfig.json
-COPY packages/database/package.json packages/database/package.json
-COPY packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
 RUN sh scripts/retry-npm-command.sh ci --omit=dev --ignore-scripts && npm cache clean --force
 
@@ -27,13 +29,17 @@ LABEL org.opencontainers.image.title="PiCloud SSH gateway" \
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=dependencies /app/node_modules /app/node_modules
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY packages/ssh-gateway/package.json packages/ssh-gateway/package.json
+COPY --from=dependencies /app/packages /app/packages
+COPY --from=pma-dependencies package.json package-lock.json ./
+COPY tsconfig.base.json ./
+COPY --from=pma-dependencies packages/ssh-gateway/package.json packages/ssh-gateway/package.json
 COPY packages/ssh-gateway/tsconfig.json packages/ssh-gateway/tsconfig.json
 COPY packages/ssh-gateway/src packages/ssh-gateway/src
-COPY packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
 COPY packages/database/src packages/database/src
-COPY packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
+COPY packages/domain/src packages/domain/src
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
 COPY packages/protocol/src packages/protocol/src
 RUN rm -rf /usr/local/lib/node_modules/npm \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack

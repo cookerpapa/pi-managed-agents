@@ -6,24 +6,24 @@ RUN sh /tmp/install-host-os-security-updates.sh && sh /tmp/install-node-os-secur
 FROM os-base AS dependencies
 
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
 COPY scripts/prepare-json-parser.mjs scripts/prepare-json-parser.mjs
 COPY scripts/retry-npm-command.sh scripts/retry-npm-command.sh
-COPY packages/session-attachments/package.json packages/session-attachments/package.json
-COPY packages/database/package.json packages/database/package.json
-COPY packages/domain/package.json packages/domain/package.json
-COPY packages/event-log/package.json packages/event-log/package.json
-COPY packages/observability/package.json packages/observability/package.json
-COPY packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
-COPY packages/protocol/package.json packages/protocol/package.json
-COPY packages/runtime-core/package.json packages/runtime-core/package.json
-COPY packages/sandbox-control/package.json packages/sandbox-control/package.json
-COPY packages/subagent-control/package.json packages/subagent-control/package.json
-COPY packages/sandbox-supervisor/package.json packages/sandbox-supervisor/package.json
-COPY packages/supervisor-host/package.json packages/supervisor-host/package.json
+COPY --from=pma-dependencies packages/session-attachments/package.json packages/session-attachments/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/event-log/package.json packages/event-log/package.json
+COPY --from=pma-dependencies packages/observability/package.json packages/observability/package.json
+COPY --from=pma-dependencies packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/runtime-core/package.json packages/runtime-core/package.json
+COPY --from=pma-dependencies packages/sandbox-control/package.json packages/sandbox-control/package.json
+COPY --from=pma-dependencies packages/subagent-control/package.json packages/subagent-control/package.json
+COPY --from=pma-dependencies packages/sandbox-supervisor/package.json packages/sandbox-supervisor/package.json
+COPY --from=pma-dependencies packages/supervisor-host/package.json packages/supervisor-host/package.json
 COPY packages/supervisor-host/tsconfig.json packages/supervisor-host/tsconfig.json
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 RUN sh scripts/retry-npm-command.sh ci --omit=dev --ignore-scripts \
     && sh scripts/retry-npm-command.sh rebuild @confluentinc/kafka-javascript \
     && node scripts/prepare-json-parser.mjs \
@@ -42,36 +42,57 @@ LABEL org.opencontainers.image.title="Pi Managed Agents Worker" \
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=dependencies /app/node_modules /app/node_modules
-COPY package.json package-lock.json ./
+COPY --from=pma-dependencies package.json package-lock.json ./
 COPY tsconfig.base.json ./
-COPY packages/session-attachments/package.json packages/session-attachments/package.json
-COPY packages/database/package.json packages/database/package.json
+COPY --from=pma-dependencies packages/session-attachments/package.json packages/session-attachments/package.json
+COPY --from=pma-dependencies packages/database/package.json packages/database/package.json
 COPY packages/session-attachments/src packages/session-attachments/src
 COPY packages/database/src packages/database/src
-COPY packages/domain/package.json packages/domain/package.json
+COPY --from=pma-dependencies packages/domain/package.json packages/domain/package.json
 COPY packages/domain/src packages/domain/src
-COPY packages/event-log/package.json packages/event-log/package.json
-COPY packages/observability/package.json packages/observability/package.json
+COPY --from=pma-dependencies packages/event-log/package.json packages/event-log/package.json
+COPY --from=pma-dependencies packages/observability/package.json packages/observability/package.json
 COPY packages/event-log/src packages/event-log/src
 COPY packages/observability/src packages/observability/src
-COPY packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
+COPY --from=pma-dependencies packages/pi-session-postgres/package.json packages/pi-session-postgres/package.json
 COPY packages/pi-session-postgres/src packages/pi-session-postgres/src
-COPY packages/protocol/package.json packages/protocol/package.json
+COPY --from=pma-dependencies packages/protocol/package.json packages/protocol/package.json
 COPY packages/protocol/src packages/protocol/src
-COPY packages/runtime-core/package.json packages/runtime-core/package.json
-COPY packages/runtime-core/src packages/runtime-core/src
-COPY packages/sandbox-control/package.json packages/sandbox-control/package.json
+COPY --from=pma-dependencies packages/runtime-core/package.json packages/runtime-core/package.json
+COPY packages/runtime-core/src/accepted-fact.ts \
+  packages/runtime-core/src/direct-session-kafka.ts \
+  packages/runtime-core/src/durable-session-publisher.ts \
+  packages/runtime-core/src/environment-failure.ts \
+  packages/runtime-core/src/execution-log-topic.ts \
+  packages/runtime-core/src/execution-publication.ts \
+  packages/runtime-core/src/execution-stream-seal.ts \
+  packages/runtime-core/src/kafka-accepted-fact.ts \
+  packages/runtime-core/src/pi-session-worker-ownership.ts \
+  packages/runtime-core/src/prepare-execution-fact.ts \
+  packages/runtime-core/src/quarantined-session-recovery.ts \
+  packages/runtime-core/src/run-cancellation-executor.ts \
+  packages/runtime-core/src/run-executor.ts \
+  packages/runtime-core/src/run-readiness.ts \
+  packages/runtime-core/src/run-skill-catalog.ts \
+  packages/runtime-core/src/run-state.ts \
+  packages/runtime-core/src/session-lease-coordinator.ts \
+  packages/runtime-core/src/session-lease-release.ts \
+  packages/runtime-core/src/session-log-envelope.ts \
+  packages/runtime-core/src/tool-invocation-fact.ts \
+  packages/runtime-core/src/worker-execution-log.ts \
+  packages/runtime-core/src/
+COPY --from=pma-dependencies packages/sandbox-control/package.json packages/sandbox-control/package.json
 COPY packages/sandbox-control/src/sandbox-control-client.ts packages/sandbox-control/src/sandbox-control-client.ts
 COPY packages/sandbox-control/src/upload-http.ts packages/sandbox-control/src/upload-http.ts
 COPY packages/sandbox-control/src/workspace-file-transfer-http.ts packages/sandbox-control/src/workspace-file-transfer-http.ts
-COPY packages/subagent-control/package.json packages/subagent-control/package.json
+COPY --from=pma-dependencies packages/subagent-control/package.json packages/subagent-control/package.json
 COPY packages/subagent-control/src packages/subagent-control/src
-COPY packages/sandbox-supervisor/package.json packages/sandbox-supervisor/package.json
+COPY --from=pma-dependencies packages/sandbox-supervisor/package.json packages/sandbox-supervisor/package.json
 COPY packages/sandbox-supervisor/src packages/sandbox-supervisor/src
-COPY packages/supervisor-host/package.json packages/supervisor-host/package.json
+COPY --from=pma-dependencies packages/supervisor-host/package.json packages/supervisor-host/package.json
 COPY packages/supervisor-host/tsconfig.json packages/supervisor-host/tsconfig.json
 COPY packages/supervisor-host/src packages/supervisor-host/src
-COPY packages/workspace-runtime/package.json packages/workspace-runtime/package.json
+COPY --from=pma-dependencies packages/workspace-runtime/package.json packages/workspace-runtime/package.json
 COPY packages/workspace-runtime/src packages/workspace-runtime/src
 RUN test ! -e /app/packages/control-plane && test ! -e /app/packages/accounting \
     && cd /app/packages/supervisor-host \

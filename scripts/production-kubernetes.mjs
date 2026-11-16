@@ -190,9 +190,9 @@ async function build() {
     if (selected && key !== selected) continue;
     images[key] = `pi-cloud/${name}:${version}`;
     run(
-      "docker",
+      process.execPath,
       [
-        "build",
+        "scripts/build-workload-image.mjs",
         "--network=host",
         "-f",
         file,

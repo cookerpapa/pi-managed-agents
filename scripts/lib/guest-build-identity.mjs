@@ -4,6 +4,11 @@ import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { lstat, readFile, readdir, readlink, realpath, mkdtemp, rm } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep, join } from "node:path";
+import {
+  workloadDependencyInputs,
+  dependencyRecipe,
+  dependencyContextName,
+} from "./workload-dependencies.mjs";
 
 const guestDockerfile = "deploy/cubesandbox/Dockerfile.tool";
 
@@ -100,5 +105,14 @@ async function buildIdentity(repositoryRoot, dockerfilePath, prefix, extraInputs
   }
   for (const input of [...guestCopyInputs(dockerfile, dockerfilePath), ...extraInputs])
     await visit(resolve(root, input));
+  const generated = await workloadDependencyInputs(
+    (path) => readFile(resolve(root, path), "utf8"),
+    dockerfilePath,
+  );
+  if (generated) {
+    await visit(resolve(root, dependencyRecipe));
+    for (const [path, bytes] of [...generated].sort(([a], [b]) => a.localeCompare(b)))
+      hash.update(JSON.stringify([dependencyContextName, path, bytes]));
+  }
   return hash.digest("hex").slice(0, 40);
 }

@@ -1,4 +1,4 @@
-import { readRunSkillCatalog } from "@pi-cloud/runtime-core";
+import { readRunSkillCatalog } from "@pi-cloud/runtime-core/run-skill-catalog";
 import { createHash, randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
 import { type Database } from "@pi-cloud/database";
