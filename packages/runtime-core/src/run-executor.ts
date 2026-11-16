@@ -28,7 +28,6 @@ import { randomUUID } from "node:crypto";
 import { transitionCurrentRun } from "./run-state.ts";
 import {
   lockPiSessionWorkerOwnership,
-  piSessionWorkerAvailable,
   type LockedPiSessionOwnership,
 } from "./pi-session-worker-ownership.ts";
 import { requestExecutionStreamSeal } from "./execution-stream-seal.ts";
@@ -616,19 +615,11 @@ export class RunExecutor {
     });
   }
 
-  #familyAdmission(alias: string, admission?: RunClaimAdmission) {
+  #familyKeysAllowed(alias: string, admission?: RunClaimAdmission) {
     if (!admission) return sql<boolean>`true`;
     const key = sql<string>`concat(${sql.ref(`${alias}.tenant_id`)}::text, ':', ${sql.ref(`${alias}.pi_session_id`)})`;
     return sql<boolean>`(${admission.allowedFamilyKeys === undefined ? sql`true` : sql`${key} = any(${[...admission.allowedFamilyKeys]}::text[])`})
-      and not (${key} = any(${[...admission.blockedFamilyKeys]}::text[]))
-      and (${
-        admission.publication
-          ? sql`exists(select 1 from pi_sessions publication_session
-        where publication_session.tenant_id=${sql.ref(`${alias}.tenant_id`)}
-          and publication_session.id=${sql.ref(`${alias}.pi_session_id`)}
-          and publication_session.session_hash % ${admission.publication.partitionCount} = any(${[...admission.publication.partitions]}::int[]))`
-          : sql`true`
-      })`;
+      and not (${key} = any(${[...admission.blockedFamilyKeys]}::text[]))`;
   }
 
   async #claimNext(
@@ -649,22 +640,68 @@ export class RunExecutor {
       committedCandidate = undefined;
       stages.length = 0;
       mark("transaction_begin");
+      // Each dependent entity is a unique-key lookup. Keep that boundary explicit
+      // even under stale tenant statistics; eligibility still precedes the one
+      // winning Run's row lock. LIMIT 1 reflects each entity's unique constraint.
       const candidate = transaction
         .selectFrom("runs as candidate")
-        .innerJoin(
-          "agent_revisions as candidate_agent",
-          "candidate_agent.id",
-          "candidate.agent_revision_id",
+        .innerJoinLateral(
+          (eb) =>
+            eb
+              .selectFrom("sessions as s")
+              .select(["s.id", "s.tenant_id", "s.pi_session_id"])
+              .whereRef("s.tenant_id", "=", "candidate.tenant_id")
+              .whereRef("s.id", "=", "candidate.session_id")
+              .where("s.state", "in", ["cold", "idle"])
+              .where("s.pi_conversation_id", "is not", null)
+              .where("s.session_kind", "=", "conversation")
+              .where(this.#familyKeysAllowed("s", admission))
+              .limit(1)
+              .as("candidate_session"),
+          (join) => join.onTrue(),
         )
-        .innerJoin("sessions as candidate_session", (join) =>
-          join
-            .onRef("candidate_session.tenant_id", "=", "candidate.tenant_id")
-            .onRef("candidate_session.id", "=", "candidate.session_id"),
+        .innerJoinLateral(
+          (eb) =>
+            eb
+              .selectFrom("pi_sessions as physical")
+              .select("physical.id")
+              .whereRef("physical.tenant_id", "=", "candidate_session.tenant_id")
+              .whereRef("physical.id", "=", "candidate_session.pi_session_id")
+              .where(
+                admission?.publication
+                  ? sql<boolean>`physical.session_hash % ${admission.publication.partitionCount} = any(${[...admission.publication.partitions]}::int[])`
+                  : sql<boolean>`true`,
+              )
+              .where(
+                sql<boolean>`not exists(select 1 from session_leases l
+              where l.tenant_id=physical.tenant_id and l.pi_session_id=physical.id
+                and l.released_at is null)`,
+              )
+              .limit(1)
+              .as("candidate_physical"),
+          (join) => join.onTrue(),
         )
-        .innerJoin(
-          "tenant_runtime_policies as candidate_policy",
-          "candidate_policy.tenant_id",
-          "candidate.tenant_id",
+        .innerJoinLateral(
+          (eb) =>
+            eb
+              .selectFrom("agent_revisions as a")
+              .select("a.id")
+              .whereRef("a.id", "=", "candidate.agent_revision_id")
+              .where("a.runtime_kind", "=", this.#agentRuntimeKind)
+              .limit(1)
+              .as("candidate_agent"),
+          (join) => join.onTrue(),
+        )
+        .innerJoinLateral(
+          (eb) =>
+            eb
+              .selectFrom("tenant_runtime_policies as p")
+              .select("p.tenant_id")
+              .whereRef("p.tenant_id", "=", "candidate.tenant_id")
+              .where("p.enabled", "=", true)
+              .limit(1)
+              .as("candidate_policy"),
+          (join) => join.onTrue(),
         )
         .selectAll("candidate")
         .$if(runId !== undefined, (q) => q.where("candidate.id", "=", runId!))
@@ -672,18 +709,6 @@ export class RunExecutor {
         // These code-owned states are also the partial ready-index predicate.
         // Parameters prevent a generic prepared plan from proving that match.
         .where(sql<boolean>`candidate.state = 'queued' and candidate.ready_at is not null`)
-        .where("candidate_session.state", "in", ["cold", "idle"])
-        .where("candidate_session.pi_conversation_id", "is not", null)
-        .where("candidate_session.session_kind", "=", "conversation")
-        .where(this.#familyAdmission("candidate_session", admission))
-        .where("candidate_policy.enabled", "=", true)
-        .where("candidate_agent.runtime_kind", "=", this.#agentRuntimeKind)
-        .where(
-          piSessionWorkerAvailable(
-            sql.ref("candidate_session.tenant_id"),
-            sql.ref("candidate_session.pi_session_id"),
-          ),
-        )
         .orderBy("candidate.available_at", "asc")
         .orderBy("candidate.created_at", "asc")
         .orderBy("candidate.id", "asc")
@@ -698,15 +723,27 @@ export class RunExecutor {
           () => candidate,
         )
         .selectFrom("claim_candidate as run")
-        .innerJoin("sessions as session_row", (join) =>
-          join
-            .onRef("session_row.tenant_id", "=", "run.tenant_id")
-            .onRef("session_row.id", "=", "run.session_id"),
+        .innerJoinLateral(
+          (eb) =>
+            eb
+              .selectFrom("sessions as s")
+              .selectAll("s")
+              .whereRef("s.tenant_id", "=", "run.tenant_id")
+              .whereRef("s.id", "=", "run.session_id")
+              .limit(1)
+              .as("session_row"),
+          (join) => join.onTrue(),
         )
-        .innerJoin("workspaces as workspace_row", (join) =>
-          join
-            .onRef("workspace_row.tenant_id", "=", "session_row.tenant_id")
-            .onRef("workspace_row.id", "=", "session_row.workspace_id"),
+        .innerJoinLateral(
+          (eb) =>
+            eb
+              .selectFrom("workspaces as w")
+              .selectAll("w")
+              .whereRef("w.tenant_id", "=", "session_row.tenant_id")
+              .whereRef("w.id", "=", "session_row.workspace_id")
+              .limit(1)
+              .as("workspace_row"),
+          (join) => join.onTrue(),
         )
         .select([
           "run.tenant_id as tenantId",

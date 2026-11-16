@@ -77,6 +77,12 @@ atomically issues its Session lease, records the publication scope and marks the
 Run running. PG time after locks decides authority. There is no RunAttempt,
 claimed stage, per-child occupancy counter or child Run queue.
 
+Candidate eligibility uses bounded tenant/ID entity lookups before the ordered
+Run lock. One physical-Session lookup checks both publication partitions and the
+absence of an unreleased writer. This avoids tenant-wide intermediate joins under
+skewed statistics; it does not skip ownership validation. After obtaining the Run
+lock, the next READ COMMITTED statement still reads the latest editable input.
+
 Each active physical Session occupies one Worker family slot and owns one native
 Harness and serial writer. Its main and child Agent Loops can run concurrently.
 Model permits are separate, fair Worker-local capacity and are released while

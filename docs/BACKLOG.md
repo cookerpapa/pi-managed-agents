@@ -46,8 +46,11 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   [diagnosis](reports/run-claim-query-diagnosis-20261116.md) records 6,401 repeated
   tenant-prefix Session scans, 1.10 million discarded combinations and 6.17 s
   server execution. Diagnostic configuration was restored; implementation is pending.
-- [ ] Restructure candidate eligibility/context as keyed lookups while preserving
+- [x] Restructure candidate eligibility/context as keyed lookups while preserving
   ordering, SKIP LOCKED, partition restrictions and original ownership checks.
+  Source and skewed-PG checks pass; publication and loaded-plan acceptance pending.
+- [ ] Publish the claim-query repair and verify actual loaded plans, throughput,
+  original-writer recovery and original-resource preservation.
 - [ ] Investigate post-provider publication/projection/settlement queueing under
   cold-Run bursts. Final r3 also exposed settlement p95 up to 58 s. Do not
   treat the 32-concurrency 11.18/s burst as a sustained capacity guarantee.
