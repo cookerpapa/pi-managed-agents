@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { dockerSourceInputs } from "./component-release.mjs";
-import { releaseImpact, imageReleaseTargets } from "./release-impact.mjs";
+import { releaseImpact, imageReleaseTargets, operatorSources } from "./release-impact.mjs";
 import { guestBuildIdentityAtRevision } from "./guest-build-identity.mjs";
 import {
   workloadDependencyInputs,
@@ -323,7 +323,14 @@ export async function prepareReleasePlan({
     !physical && !schemaChanged && Object.hasOwn(imageReleaseTargets, impact.scope)
       ? impact.scope
       : undefined;
+  // Consulted only after every artifact input compares equal. Unconsumed
+  // workspace source and reviewed operators do not change serving process bytes.
+  // Deployment/Helm inputs still require their explicit publication path.
   const neutral = (file) =>
+    file === "package.json" ||
+    file === "package-lock.json" ||
+    file.startsWith("packages/") ||
+    operatorSources.has(file) ||
     file === "README.md" ||
     file === "AGENTS.md" ||
     file.startsWith("docs/") ||
