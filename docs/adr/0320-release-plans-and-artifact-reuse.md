@@ -68,3 +68,9 @@ backend registration without existing Pod restarts. Keep all original assets and
 report measured build/rollout scope, not a theoretical speedup.
 
 Implementation and measured limits: [November 13 delivery](../reports/decoupling-delivery-20261113.md).
+
+On 2026-11-16 the owner explicitly authorized using the existing vulnerability
+databases for routine private-deployment checks. The operator defaults to cached
+databases and performs an update only when explicitly requested or the cache is
+absent. Evidence retains actual database dates/identities; no freshness is
+invented and the existing immutable-image/scan comparison remains in force.

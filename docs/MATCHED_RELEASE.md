@@ -64,6 +64,14 @@ The four exact official Cube images retain the owner's
 [fixed exception](adr/0310-stock-cube-release-exception.md); no general scan bypass
 or hidden source/dependency patch is allowed.
 
+For this private deployment, the owner explicitly chose cached vulnerability
+databases on 2026-11-16. Publication now reuses an existing local vulnerability
+and Java database even after its advertised `NextUpdate`, preserving the original
+dates and recording `reuse-local-cache` in the evidence. Only an absent cache
+bootstraps a download. Set `PI_CLOUD_REFRESH_VULNERABILITY_DATABASES=1` for a
+deliberate refresh, or pass `--refresh-databases` to the evidence command.
+This changes download freshness policy, not scan findings or artifact provenance.
+
 A pure root Chart version change is validated against the complete installed
 manifest. Only the top-level informational chart label may differ. It uses
 `--no-hooks`, builds no image and verifies unchanged Pod UIDs. Documentation-only

@@ -25,6 +25,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { guestBuildIdentity } from "./lib/guest-build-identity.mjs";
+import { scanDatabaseDownloadRequired } from "./lib/scan-database-policy.mjs";
 import { inspectReleaseImage, assertGuestInventory } from "./lib/release-image-evidence.mjs";
 
 configureBuildProxy();
@@ -60,6 +61,7 @@ function parseArguments(argv) {
       resolve(repositoryRoot, ".cache/pi-cloud-trivy"),
     imageVersion: process.env.PI_CLOUD_IMAGE_VERSION ?? "production",
     allowDirty: false,
+    refreshDatabases: process.env.PI_CLOUD_REFRESH_VULNERABILITY_DATABASES === "1",
     component: "all",
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -94,9 +96,13 @@ function parseArguments(argv) {
       result.allowDirty = true;
       continue;
     }
+    if (argument === "--refresh-databases") {
+      result.refreshDatabases = true;
+      continue;
+    }
     if (argument === "--help") {
       process.stdout.write(
-        "Usage: npm run release:evidence -- [--output-dir EMPTY_PATH] [--cache-dir PATH] [--image-version VERSION] [--component all|host|provider|web|tool-host|session-decoder|session-api|session-retention|worker-bootstrap|android|boxlite|device-link] [--allow-dirty]\n",
+        "Usage: npm run release:evidence -- [--output-dir EMPTY_PATH] [--cache-dir PATH] [--image-version VERSION] [--component all|host|provider|web|tool-host|session-decoder|session-api|session-retention|worker-bootstrap|android|boxlite|device-link] [--allow-dirty] [--refresh-databases]\n",
       );
       process.exit(0);
     }
@@ -299,21 +305,31 @@ try {
     // exceeds 128 MiB. Image scans below retain their separate 256 MiB bound.
     temporaryMiB: 512,
   });
-  await run("docker", [
-    ...trivyBase,
-    "image",
-    "--cache-dir",
-    "/cache",
-    "--download-db-only",
-    "--timeout",
-    "15m",
-    "--no-progress",
-    ...(process.env.PI_CLOUD_TRIVY_DB_REPOSITORY
-      ? ["--db-repository", process.env.PI_CLOUD_TRIVY_DB_REPOSITORY]
-      : []),
-  ]);
+  if (
+    await scanDatabaseDownloadRequired(
+      options.cacheDirectory,
+      "vulnerability",
+      options.refreshDatabases,
+    )
+  )
+    await run("docker", [
+      ...trivyBase,
+      "image",
+      "--cache-dir",
+      "/cache",
+      "--download-db-only",
+      "--timeout",
+      "15m",
+      "--no-progress",
+      ...(process.env.PI_CLOUD_TRIVY_DB_REPOSITORY
+        ? ["--db-repository", process.env.PI_CLOUD_TRIVY_DB_REPOSITORY]
+        : []),
+    ]);
 
-  if (options.component === "all" || options.component === "android") {
+  if (
+    (options.component === "all" || options.component === "android") &&
+    (await scanDatabaseDownloadRequired(options.cacheDirectory, "java", options.refreshDatabases))
+  ) {
     // The Java index downloader keeps multiple archive copies. Use owned disk
     // scratch, not a multi-GiB tmpfs competing with running VMs.
     const javaScratch = resolve(temporaryDirectory, "java-download");
@@ -603,6 +619,7 @@ try {
     scope: options.component,
     policy: {
       scanner: TRIVY_IMAGE,
+      databaseUpdatePolicy: options.refreshDatabases ? "explicit-refresh" : "reuse-local-cache",
       databaseIdentity,
       ...(javaDatabaseIdentity ? { javaDatabaseIdentity } : {}),
       severities: ["HIGH", "CRITICAL"],
