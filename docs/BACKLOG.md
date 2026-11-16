@@ -61,8 +61,12 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   initialization/shared background contention and expensive terminal-history
   selection on the ordered projection path. It does not attribute all delay to
   one statement or establish a stable capacity guarantee.
-- [ ] Narrow terminal/family history selection to known identities while retaining
-  child/Fork/prune eligibility; verify planning cost, atomicity and backlog relief.
+- [x] Narrow terminal/family history selection to known identities while retaining
+  child/Fork/prune eligibility. Root metadata no longer expands native child
+  state; a Run with no children skips the family-history view. Targeted source
+  checks and read-only plan comparisons pass; matched publication is next.
+- [ ] Publish the terminal-query repair and repeat cold-Run, child/history and
+  recovery acceptance before claiming relief of the measured projection backlog.
 - [ ] Evaluate Kafka client initialization/background scheduling without weakening
   Session producer fencing. Investigate the allocator abort seen in the injected
   diagnostic repetition; its recovery tails are not ordinary latency evidence.

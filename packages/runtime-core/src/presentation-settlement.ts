@@ -13,6 +13,19 @@ export async function settleHistoryTurn(
   sessionId: string,
   turnId: string,
 ): Promise<void> {
+  const session = await tx
+    .selectFrom("sessions")
+    .select("session_kind")
+    .where("tenant_id", "=", tenantId)
+    .where("id", "=", sessionId)
+    .where("pruned_at", "is", null)
+    .executeTakeFirst();
+  if (!session) return;
+  // A root Turn is already a Run row. Expanding conversation_turns here also
+  // plans native child-state/history joins even when this Session has no child.
+  // Children retain the existing native-derived state and input-source view.
+  const child = session.session_kind === "subagent";
+  const turns = sql.table(child ? "conversation_turns" : "runs");
   const row = (
     await sql<{
       pi_session_id: string;
@@ -27,10 +40,10 @@ export async function settleHistoryTurn(
       header: HistoryHeader;
     }>`select s.pi_session_id,r.id as run_id,r.mailbox_position::text as position,r.state,r.stop_reason,r.operation_kind,
       r.output_display_seq::text as coverage,r.output_display_native_seq::text as native_coverage,r.created_at,
-      jsonb_build_object('input_text',r.input_text,'input_source',r.input_source,'input_uploads',r.input_uploads,'scheduled_origin',r.scheduled_origin,
+      jsonb_build_object('input_text',r.input_text,'input_source',${child ? sql`r.input_source` : sql`null::text`},'input_uploads',r.input_uploads,'scheduled_origin',r.scheduled_origin,
         'output_display_seq',r.output_display_seq::text,'terminal',case when e.turn_id is not null then
           jsonb_build_object('seq',e.seq::text,'type',e.type,'payload',e.payload,'occurred_at',e.occurred_at) end) as header
-    from conversation_turns r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
+    from ${turns} r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
     left join lateral(select * from session_terminal_events e where e.tenant_id=r.tenant_id and e.turn_id=r.turn_id order by e.seq desc limit 1) e on true
     where r.tenant_id=${tenantId}::uuid and r.session_id=${sessionId}::uuid and r.turn_id=${turnId}::uuid
       and r.pruned_at is null and s.pruned_at is null and r.state in ('completed','failed','cancelled','timed_out')
@@ -38,26 +51,16 @@ export async function settleHistoryTurn(
       and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)`.execute(tx)
   ).rows[0];
   if (!row) return;
-  const retained = (
+  const historical = (
     await sql`select 1 from pi_history_views v
     cross join lateral pi_history_view_ranges(v.tenant_id,v.root_id,${row.position}::bigint,${row.position}::bigint) n
     join pi_history_blocks b on b.tenant_id=v.tenant_id and b.id=n.block_id
-    where v.tenant_id=${tenantId}::uuid and v.session_id=${sessionId}::uuid and b.turn_id=${turnId}::uuid limit 1`.execute(
+    where v.tenant_id=${tenantId}::uuid and v.session_id=${sessionId}::uuid and b.turn_id=${turnId}::uuid
+      and (b.source_session_id<>${sessionId}::uuid or b.source_pi_session_id<>${row.pi_session_id}) limit 1`.execute(
       tx,
     )
   ).rows;
-  if (retained.length) {
-    const historical = (
-      await sql`select 1 from pi_history_views v
-      cross join lateral pi_history_view_ranges(v.tenant_id,v.root_id,${row.position}::bigint,${row.position}::bigint) n
-      join pi_history_blocks b on b.tenant_id=v.tenant_id and b.id=n.block_id
-      where v.tenant_id=${tenantId}::uuid and v.session_id=${sessionId}::uuid and b.turn_id=${turnId}::uuid
-        and (b.source_session_id<>${sessionId}::uuid or b.source_pi_session_id<>${row.pi_session_id}) limit 1`.execute(
-        tx,
-      )
-    ).rows;
-    if (historical.length) return;
-  }
+  if (historical.length) return;
   const block = (
     await sql<{
       id: string;
@@ -107,17 +110,27 @@ export async function settleHistoryTurn(
   await appendPresentationBlock(tx, tenantId, sessionId, block.id);
 }
 
-export async function settleFamilyHistory(
+/** The caller has settled the root. Only its actual children can remain dirty. */
+export async function settleChildHistory(
   tx: Transaction<Database>,
   tenantId: string,
   runId: string,
 ): Promise<void> {
+  const children = await tx
+    .selectFrom("subagent_conversations")
+    .select("child_session_id")
+    .where("tenant_id", "=", tenantId)
+    .where("root_run_id", "=", runId)
+    .execute();
+  if (!children.length) return;
   const rows = (
     await sql<{
       session_id: string;
       turn_id: string;
     }>`select session_id,turn_id from pi_history_live_turns
-    where tenant_id=${tenantId}::uuid and run_id=${runId}::uuid and state in ('completed','failed','cancelled','timed_out') and not waiting_for_seal
+    where tenant_id=${tenantId}::uuid and run_id=${runId}::uuid
+      and session_id=any(${children.map((child) => child.child_session_id)}::uuid[])
+      and state in ('completed','failed','cancelled','timed_out') and not waiting_for_seal
     order by session_id,mailbox_position`.execute(tx)
   ).rows;
   for (const row of rows) await settleHistoryTurn(tx, tenantId, row.session_id, row.turn_id);

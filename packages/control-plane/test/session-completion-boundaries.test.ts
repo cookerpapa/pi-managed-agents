@@ -304,14 +304,18 @@ it("uses one locked Run read for normal completion", async () => {
   const runReads = queries.filter(
     (query) => /^select\b/.test(query) && query.includes('from "runs"'),
   );
-  expect(runReads).toHaveLength(1);
-  // Includes one immutable presentation header/root; Run authority is still read once.
-  expect(queries.length).toBeLessThanOrEqual(27);
+  const authorityReads = runReads.filter((query) => /\bfor (?:no key )?update\b/.test(query));
+  expect(authorityReads).toHaveLength(1);
+  // The presentation header now reads runs directly instead of expanding the
+  // child-state view. It is a read, not a second authority/locking decision.
+  expect(runReads).toHaveLength(2);
+  expect(queries.length).toBeLessThanOrEqual(28);
   process.stdout.write(
     JSON.stringify({
       measurement: "normal_finish_sql",
       totalStatements: queries.length,
       runReads: runReads.length,
+      authorityReads: authorityReads.length,
     }) + "\n",
   );
 }, 30000);

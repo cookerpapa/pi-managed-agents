@@ -1,4 +1,4 @@
-import { settleHistoryTurn, settleFamilyHistory } from "./presentation-settlement.ts";
+import { settleHistoryTurn, settleChildHistory } from "./presentation-settlement.ts";
 import { transitionLockedRun } from "./run-state.ts";
 import { PostgresDurableCommitProjector } from "./postgres-durable-commit-projector.ts";
 import type { Database } from "@pi-cloud/database";
@@ -681,7 +681,7 @@ export class ExecutionStreamProjector {
         fact.scope.sessionId,
         fact.scope.turnId,
       );
-      await settleFamilyHistory(transaction, fact.scope.tenantId, fact.scope.runId);
+      await settleChildHistory(transaction, fact.scope.tenantId, fact.scope.runId);
       if (
         event.type !== "turn.completed" &&
         event.type !== "turn.failed" &&

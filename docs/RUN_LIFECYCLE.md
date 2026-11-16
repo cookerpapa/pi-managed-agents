@@ -170,6 +170,13 @@ Under the Session lock it advances successor readiness. The completion code
 reuses its already locked Run data, preserving version checks across cancellation
 transitions.
 
+Terminal history uses the known Session kind: root headers read their Run row,
+while child headers retain native-derived conversation state. After freezing the
+root, the Projector enumerates that Run's actual child identities before checking
+which child histories need settlement. A root without children does not expand
+the native child/shared-history view. These reads remain in the same terminal
+transaction and do not introduce another ownership decision.
+
 The stored terminal then reaches the live view/browser. If the PG commit
 succeeded but its return was lost, replay returns that same persisted event and
 coverage; duplicate delivery changes neither the Run nor its event identity.
