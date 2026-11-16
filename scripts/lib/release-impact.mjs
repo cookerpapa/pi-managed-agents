@@ -1,6 +1,7 @@
 export const catalogSeed = "deploy/helm/pi-cloud-platform/files/model-catalog.json";
 export const operatorSources = new Set([
   "scripts/lib/scan-database-policy.mjs",
+  "scripts/lib/scan-database-policy.test.mjs",
   "scripts/lib/android-recovery-acceptance.mjs",
   "scripts/prefetch-cubesandbox-images.mjs",
   "scripts/lib/cube-upstream-images.mjs",
