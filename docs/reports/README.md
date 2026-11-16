@@ -1,8 +1,11 @@
 # Delivery and research evidence
 
+- [Run-claim query repair](run-claim-query-repair-20261116.md): bounded keyed
+  eligibility, deployed plan measurements, normal throughput repetitions and
+  recovery/preservation acceptance. Downstream throughput variability remains open.
 - [Run-claim query diagnosis](run-claim-query-diagnosis-20261116.md): actual loaded
-  plans isolate tenant-prefix join amplification; proposed correction preserves
-  current PG ownership and queue semantics. No production query change yet.
+  plans isolate tenant-prefix join amplification; the subsequent repair above
+  preserves current PG ownership and queue semantics.
 
 - [Workload build isolation and measured query repairs](workload-release-throughput-20261116.md):
   derived dependency inputs, Worker source boundaries, no-op publication,

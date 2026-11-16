@@ -6,6 +6,9 @@ The owner requested investigation of the first remaining bottleneck, before
 deciding how to change it. No production business SQL, schema, ownership rule or
 planner setting was changed in this investigation.
 
+The subsequent [repair and acceptance](run-claim-query-repair-20261116.md) are now
+deployed. This document retains the original diagnostic evidence.
+
 ## Confirmed finding
 
 The actual loaded claim query can generate a severely amplified join plan.

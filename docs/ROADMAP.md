@@ -17,14 +17,18 @@ build-boundary repairs are now [published and measured](reports/workload-release
 The initial 64-concurrency cases reached 7.68/7.83 completed Runs/s, but final r3
 checks measured 1.90/5.02; stable throughput improvement is not established.
 The reproduced history failures disappeared, and original-machine recovery was
-repaired. Loaded claim-query latency, settlement tails and saturation remain
-explicit follow-ups. Worker/Projector/Stop/
+repaired. Loaded claim-query latency was investigated next; settlement tails and
+saturation remain explicit follow-ups. Worker/Projector/Stop/
 reply recovery passed, original assets were preserved and no paid models were used.
 
 The subsequent [claim-query investigation](reports/run-claim-query-diagnosis-20261116.md)
 captured the actual slow plan and identified repeated tenant-prefix joins before
-the final Session-ID check. A bounded keyed-query rewrite is proposed; the queue,
-lease and fencing architecture remains unchanged and implementation is pending.
+the final Session-ID check. The bounded keyed-query rewrite is now
+[deployed and verified](reports/run-claim-query-repair-20261116.md), preserving
+queue, lease and fencing semantics. Actual captured statement execution stayed
+below 16 ms, and normal candidate-query p95 was approximately 9 ms. Repeated
+64-concurrency bursts completed all 192 Runs at 9.49/6.44 per second; variable
+publication/projection/settlement latency remains separate work.
 
 ## HTTP MCP tool integration — delivered
 
