@@ -99,7 +99,7 @@ export class ExecutionStreamProjector {
         ))
       ) {
         await this.#durable.replay(fact, record, current);
-        return;
+        return { admitted: false };
       }
       const projected = await this.#durable.project(fact, record, current);
       const sessions = new Set([...scopes.values()].map((scope) => scope.sessionId));
@@ -138,7 +138,7 @@ export class ExecutionStreamProjector {
         this.#closeWriter(fact.scope.writerId, record.offset);
         return terminal ? { terminal, canonicalThroughSequence: terminal.seq } : undefined;
       }
-      return;
+      return { admitted: false };
     }
     const existingPrefix = this.#prefixes.get(
       `${fact.scope.writerId}:${fact.scope.runId}:${fact.scope.sessionId}`,

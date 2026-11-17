@@ -38,6 +38,8 @@ display text. Expose their sizes and pending-event identities separately from th
 identity cache. Remove rejected/replayed empty holders and release settled/closed
 writer state only at its existing durable boundary. A late old closure cannot
 remove successor state. Keep Inbox, tasks, reply/attachment references durable.
+Already sealed history replay is explicitly read-only: it may reconstruct native
+checkpoint state but cannot refill the live display or authorize fresh effects.
 
 Audit completed/empty display-holder retention without truncating active tails.
 Empty disposable metadata may have a bounded retention policy only where its

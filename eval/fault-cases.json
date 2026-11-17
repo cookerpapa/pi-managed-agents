@@ -3221,6 +3221,13 @@
       "file": "test/session-live-view.test.ts",
       "test": "bounds empty holder metadata without evicting an unfinished answer",
       "invariant": "Completed display metadata is bounded while pending visible text survives until covered."
+    },
+    {
+      "id": "projector-closed-history-memory",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/execution-stream-seal.test.ts",
+      "test": "keeps sealed history replay read-only without recreating live display state",
+      "invariant": "Closed-history replay cannot refill transient presentation state or authorize new effects; canonical history remains available."
     }
   ]
 }

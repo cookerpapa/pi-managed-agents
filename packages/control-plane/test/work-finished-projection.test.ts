@@ -245,7 +245,11 @@ it("retires all child prefix identities on forced closure and preserves their ne
     partition: 0,
     offset: 11n,
   });
-  expect(f.projector.statistics()).toEqual({ prefixes: 3, pendingEventIds: 2 });
+  expect(f.projector.statistics()).toMatchObject({
+    prefixes: 3,
+    pendingEventIds: 2,
+    nativeLive: { views: 1, pendingDocuments: 2 },
+  });
   const sealId = crypto.randomUUID();
   await f.database.transaction().execute((tx) =>
     requestExecutionStreamSeal(tx, {
@@ -262,7 +266,12 @@ it("retires all child prefix identities on forced closure and preserves their ne
     .where("id", "=", sealId)
     .executeTakeFirstOrThrow();
   await f.project(seal.payload as unknown as AcceptedExecutionSealFact, 20n);
-  expect(f.projector.statistics()).toEqual({ prefixes: 0, pendingEventIds: 0 });
+  expect(f.projector.statistics()).toMatchObject({
+    prefixes: 0,
+    pendingEventIds: 0,
+    prefixEstimatedBytes: 0,
+    nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+  });
   for (const [i, child] of children.entries()) {
     const view = await f.database
       .selectFrom("sessions")
@@ -272,5 +281,10 @@ it("retires all child prefix identities on forced closure and preserves their ne
     expect(Number(view.next_event_seq)).toBe(13 + i);
   }
   await f.project(seal.payload as unknown as AcceptedExecutionSealFact, 20n);
-  expect(f.projector.statistics()).toEqual({ prefixes: 0, pendingEventIds: 0 });
+  expect(f.projector.statistics()).toMatchObject({
+    prefixes: 0,
+    pendingEventIds: 0,
+    prefixEstimatedBytes: 0,
+    nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+  });
 }, 30_000);

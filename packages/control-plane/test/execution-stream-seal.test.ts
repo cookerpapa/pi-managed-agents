@@ -298,6 +298,28 @@ describe.sequential("native execution closure", () => {
       )?.items,
     ).toHaveLength(1);
   });
+  it("keeps sealed history replay read-only without recreating live display state", async () => {
+    const f = await fixture(),
+      projection = new ExecutionStreamProjector(db);
+    const native = f.record(f.mutation("retained closed text", "aborted"), 20n);
+    const delta = f.record(f.delta(1, "retained closed text"), 21n);
+    await projection.project(native);
+    await projection.project(delta);
+    await projection.project(f.record(f.seal, 22n));
+    const replacement = new ExecutionStreamProjector(db);
+    expect(await replacement.project(native)).toEqual({ admitted: false });
+    expect(await replacement.project(delta)).toEqual({ admitted: false });
+    expect(replacement.statistics()).toMatchObject({
+      prefixes: 0,
+      pendingEventIds: 0,
+      nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+    });
+    expect(
+      (await readCanonicalPiTurnTranscripts(db, { tenantId, turnIds: [f.first.turnId] })).get(
+        f.first.turnId,
+      )?.items,
+    ).toHaveLength(1);
+  });
   it("rejects a native sequence hole without advancing projection progress", async () => {
     const f = await fixture(),
       fact = f.mutation("hole");

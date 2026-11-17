@@ -266,7 +266,12 @@ it.each([true, false])(
       0,
     );
     expect(retainedBytes).toBe(0);
-    expect(projector.statistics()).toEqual({ prefixes: 0, pendingEventIds: 0 });
+    expect(projector.statistics()).toMatchObject({
+      prefixes: 0,
+      pendingEventIds: 0,
+      prefixEstimatedBytes: 0,
+      nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+    });
     process.stdout.write(
       JSON.stringify({
         measurement: "seal_lost_commit_return",

@@ -312,15 +312,22 @@ it("does not move commit backwards while rebuilding memory", async () => {
 });
 
 it("does not add a synchronous commit for every text fragment", async () => {
-  const test = await fixture();
+  vi.useFakeTimers();
+  const starting = fixture();
+  await vi.advanceTimersByTimeAsync(100);
+  const test = await starting;
   try {
     for (let n = 3; n < 103; n++) await test.deliver([[n, false]]);
+    expect(f.commit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);
     expect(f.commit).toHaveBeenCalledOnce();
+    expect(f.commit.mock.calls[0]![0].offset).toBe("103");
     await test.deliver([[103, true]]);
     expect(f.commit.mock.calls.at(-1)![0].offset).toBe("104");
     expect(test.effects).toEqual([103]);
   } finally {
     await test.consumer.close();
+    vi.useRealTimers();
   }
 });
 
