@@ -4,9 +4,9 @@
 audit exception for an unpatched advisory, retaining raw findings and runtime gates.
 
 [ADR-0331](0331-bounded-partition-prefetch.md) records bounded prefetch,
-per-partition serial delivery and coalesced progress commits (#47), in progress.
+per-partition serial delivery and coalesced progress commits (#47), deployed November 18.
 [ADR-0332](0332-projector-memory-lifetimes.md) records coherent bounded identity
-caches and safe live-state cleanup/measurement (#46), in progress.
+caches and safe live-state cleanup/measurement (#46), deployed November 18.
 
 [ADR-0330](0330-model-charge-eligibility.md) separates actual model usage from
 customer charge eligibility using native settlement and writer closure facts (#45).

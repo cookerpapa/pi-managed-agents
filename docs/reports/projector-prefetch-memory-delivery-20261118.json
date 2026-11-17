@@ -1,0 +1,5691 @@
+{
+  "format": "pma.projector-prefetch-memory-delivery.v1",
+  "generatedAt": "2026-11-17T19:18:37.444438+00:00",
+  "release": {
+    "version": "prefetch-cache-20261118-r1",
+    "revision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+    "schema": 226,
+    "topic": "pi-cloud.execution-log.v22",
+    "maintenance": {
+      "storage": false,
+      "native": false,
+      "reasons": [],
+      "physical": false,
+      "schemaChanged": false
+    },
+    "artifacts": [
+      {
+        "name": "control-plane",
+        "action": "build",
+        "reference": "pi-cloud/control-plane:prefetch-cache-20261118-r1",
+        "sourceRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc"
+      },
+      {
+        "name": "supervisor-host",
+        "action": "build",
+        "reference": "pi-cloud/supervisor-host:prefetch-cache-20261118-r1",
+        "sourceRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc"
+      },
+      {
+        "name": "workspace-volume-gateway",
+        "action": "build",
+        "reference": "pi-cloud/workspace-volume-gateway:prefetch-cache-20261118-r1",
+        "sourceRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc"
+      },
+      {
+        "name": "web-ui",
+        "action": "reuse",
+        "reference": "pi-cloud/web-ui:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "provider-egress-relay",
+        "action": "reuse",
+        "reference": "pi-cloud/provider-egress-relay:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "ssh-gateway",
+        "action": "reuse",
+        "reference": "pi-cloud/ssh-gateway:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "cli-proxy-api",
+        "action": "reuse",
+        "reference": "pi-cloud/cli-proxy-api:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "cube-api-authorizer",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-api-authorizer:decoupled-backends-20261113-r2",
+        "sourceRevision": "7360b956f3da4738ade424d4648ce25c9a93178b"
+      },
+      {
+        "name": "cube-egress-gateway",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-egress-gateway:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cube-api",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-api:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cube-master",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-master:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cube-templatecenter",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-templatecenter:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cubelet",
+        "action": "reuse",
+        "reference": "pi-cloud/cubelet:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cubesandbox-tool",
+        "action": "reuse",
+        "reference": "localhost:5000/pi-cloud/cubesandbox-tool:f9afddbf062af3c0dd7fb713dcf7d55dc7e43e12",
+        "sourceRevision": "500533bbd8dfeb8aee310af3bae44fe05f2a5fc1"
+      }
+    ]
+  },
+  "sourceVerification": {
+    "faults": {
+      "format": "pi-cloud.fault-eval-report.v1",
+      "piCloudRevision": "4300eeab4c36c3e4a985ded9b8e3dae87bb20d4d",
+      "dirtyWorktree": false,
+      "generatedAt": "2026-11-17T18:03:13.173Z",
+      "methodology": "deterministic_targeted_fault_injection",
+      "executionGroups": 134,
+      "executionDurationMs": 1179248,
+      "durationMetric": "Vitest target assertion duration; shared file setup/process cost is groupDurationMs",
+      "liveChaosExperiment": false,
+      "caseCount": 461,
+      "successful": 461,
+      "successRate": 1,
+      "p50DurationMs": 90,
+      "p95DurationMs": 8398
+    },
+    "realRf3Tests": 12,
+    "releaseHelperTestsPassed": 352,
+    "guestAdmissionTests": 11,
+    "postFaultRealPgAndAuditTests": 7,
+    "workspaceChecks": "Complete run followed by successful targeted reruns of corrected assertions; typecheck/build/format/docs/Helm/observability/image-boundaries passed",
+    "audit": "Exact development-only ADR-0333 review; raw HIGH packages 6, effective blockers 0. Runtime images scanned with cached databases."
+  },
+  "reader": {
+    "report": {
+      "at": "2026-11-17T18:33:22.149Z",
+      "version": "2.15.1",
+      "partitions": 32,
+      "total": 2048,
+      "results": [
+        {
+          "kind": "maintained",
+          "waitMs": 10,
+          "seen": 2048,
+          "wallMs": 4960.278819,
+          "deliveryMs": 929.7066560000003,
+          "recordsPerSecond": 2202.845367173535,
+          "cpuMs": 498.861,
+          "nativeStatistics": {
+            "receivedRecords": 2112,
+            "receivedMessageBytes": 4394102,
+            "fetchRequests": 210
+          },
+          "buffer": {
+            "records": 0,
+            "estimatedBytes": 0,
+            "queuedRecords": 0,
+            "peakRecords": 1601,
+            "peakEstimatedBytes": 4234144,
+            "activePartitions": 0,
+            "pausedPartitions": 0,
+            "pendingOffsetCommits": 0
+          }
+        },
+        {
+          "kind": "controlled-pause",
+          "waitMs": 10,
+          "maxActive": 29,
+          "averageActive": 1.4616872356542236,
+          "gapsMs": {
+            "count": 2016,
+            "mean": 180.63752668749999,
+            "p95": 975.5153430000009,
+            "max": 1001.0557600000011
+          },
+          "pollMs": {
+            "count": 2442,
+            "mean": 4.959983747338237,
+            "p95": 25.292382999999973,
+            "max": 26.21475599999758
+          },
+          "nativeStats": {
+            "rxmsgs": 66557,
+            "rxmsgBytes": 138482557,
+            "rxbytes": 281034007,
+            "fetchRequests": 741
+          },
+          "seen": 2048,
+          "wallMs": 14323.987355,
+          "deliveryMs": 14298.8684,
+          "recordsPerSecond": 143.2281172683567,
+          "cpuMs": 1220.762
+        },
+        {
+          "kind": "controlled-buffered",
+          "waitMs": 10,
+          "maxActive": 32,
+          "averageActive": 23.534114457256983,
+          "gapsMs": {
+            "count": 2016,
+            "mean": 0.0007438209326109143,
+            "p95": 0.0016130000003613532,
+            "max": 0.0405270000010205
+          },
+          "pollMs": {
+            "count": 2048,
+            "mean": 0.11834758496092945,
+            "p95": 0.1801000000014028,
+            "max": 9.512738999997964
+          },
+          "nativeStats": {
+            "rxmsgs": 1600,
+            "rxmsgBytes": 3328710,
+            "rxbytes": 3435540,
+            "fetchRequests": 6
+          },
+          "seen": 2048,
+          "wallMs": 896.0108110000001,
+          "deliveryMs": 881.7013160000024,
+          "recordsPerSecond": 2322.7820610398117,
+          "cpuMs": 310.826
+        },
+        {
+          "kind": "controlled-buffered",
+          "waitMs": 50,
+          "maxActive": 32,
+          "averageActive": 29.93379861359586,
+          "gapsMs": {
+            "count": 2016,
+            "mean": 0.0009261929563611678,
+            "p95": 0.0020939999994880054,
+            "max": 0.06190699999933713
+          },
+          "pollMs": {
+            "count": 2048,
+            "mean": 0.10850838818354447,
+            "p95": 0.16791799999919022,
+            "max": 5.411447999998927
+          },
+          "nativeStats": {
+            "rxmsgs": 1600,
+            "rxmsgBytes": 3328710,
+            "rxbytes": 3447059,
+            "fetchRequests": 5
+          },
+          "seen": 2048,
+          "wallMs": 3488.0228319999987,
+          "deliveryMs": 3430.1293330000008,
+          "recordsPerSecond": 597.0620350366828,
+          "cpuMs": 374.548
+        },
+        {
+          "kind": "controlled-pause",
+          "waitMs": 50,
+          "maxActive": 32,
+          "averageActive": 1.6302178922788988,
+          "gapsMs": {
+            "count": 2016,
+            "mean": 951.1537749419638,
+            "p95": 955.3142329999973,
+            "max": 965.0177240000048
+          },
+          "pollMs": {
+            "count": 4040,
+            "mean": 13.040360992574216,
+            "p95": 26.00237400000333,
+            "max": 27.99585400000069
+          },
+          "nativeStats": {
+            "rxmsgs": 66528,
+            "rxmsgBytes": 138422218,
+            "rxbytes": 276823172,
+            "fetchRequests": 378
+          },
+          "seen": 2048,
+          "wallMs": 63228.28380600001,
+          "deliveryMs": 63165.44933100001,
+          "recordsPerSecond": 32.42278843403862,
+          "cpuMs": 2415.273
+        }
+      ]
+    },
+    "cleanupConfirmed": true
+  },
+  "isolatedMemory": {
+    "format": "pma.projector-memory-check.v1",
+    "at": "2026-11-17T16:37:27.388Z",
+    "node": "v24.12.0",
+    "scope": "Mock PG authority; real cache/live-view implementations. Forced-GC heap deltas, not a process RSS bound.",
+    "limits": {
+      "maximumEntries": 65536,
+      "maximumBytes": 33554432
+    },
+    "samples": [
+      {
+        "identities": 10000,
+        "heapGrowthBytes": 5856288,
+        "cache": {
+          "entries": 10000,
+          "estimatedBytes": 11580000,
+          "peakEstimatedBytes": 11580000,
+          "pendingLoads": 0,
+          "hits": 0,
+          "misses": 10000,
+          "loads": 10000,
+          "coalesced": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "identities": 50000,
+        "heapGrowthBytes": 17979904,
+        "cache": {
+          "entries": 28976,
+          "estimatedBytes": 33554208,
+          "peakEstimatedBytes": 33554208,
+          "pendingLoads": 0,
+          "hits": 0,
+          "misses": 50000,
+          "loads": 50000,
+          "coalesced": 0,
+          "evictions": 21024
+        }
+      },
+      {
+        "identities": 100000,
+        "heapGrowthBytes": 18018704,
+        "cache": {
+          "entries": 28976,
+          "estimatedBytes": 33554208,
+          "peakEstimatedBytes": 33554208,
+          "pendingLoads": 0,
+          "hits": 0,
+          "misses": 100000,
+          "loads": 100000,
+          "coalesced": 0,
+          "evictions": 71024
+        }
+      }
+    ],
+    "afterReset": {
+      "heapGrowthBytes": -25792,
+      "cache": {
+        "entries": 0,
+        "estimatedBytes": 0,
+        "peakEstimatedBytes": 33554208,
+        "pendingLoads": 0,
+        "hits": 1000,
+        "misses": 100000,
+        "loads": 100000,
+        "coalesced": 0,
+        "evictions": 71024
+      }
+    },
+    "hotReads": 1000,
+    "hotSqlQueries": 0,
+    "live": {
+      "beforeSettlement": {
+        "activeSessionTails": 4097,
+        "activeTextTails": 1,
+        "emptyHolders": 4096,
+        "emptyEstimatedBytes": 2695168,
+        "evictedEmptyHolders": 15904,
+        "cachedEvents": 1,
+        "cachedBytes": 1048860,
+        "acceptedEvents": 20001,
+        "duplicateEvents": 0,
+        "evictedEvents": 20000
+      },
+      "afterSettlement": {
+        "activeSessionTails": 4096,
+        "activeTextTails": 0,
+        "emptyHolders": 4096,
+        "emptyEstimatedBytes": 2695168,
+        "evictedEmptyHolders": 15905,
+        "cachedEvents": 0,
+        "cachedBytes": 0,
+        "acceptedEvents": 20001,
+        "duplicateEvents": 0,
+        "evictedEvents": 20001
+      }
+    }
+  },
+  "load": [
+    {
+      "mode": "smoke",
+      "at": "2026-11-17T18:25:56.574Z",
+      "driverRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 8,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 8,
+        "eligibility": {
+          "billable": 8,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 8,
+          "p50_ms": 461.169,
+          "p95_ms": 1045.39435,
+          "p99_ms": 1057.65247
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "text-smoke",
+            "kind": "text",
+            "concurrency": 1,
+            "count": 2,
+            "firstByteMs": 100,
+            "chunkMs": 20
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 2,
+            "accepted": 2,
+            "completed": 2,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1420.4059940000006,
+            "successfulRunsPerSecond": 1.4080481274003966,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 2,
+              "p50": 21,
+              "p95": 50,
+              "p99": 50,
+              "max": 50
+            },
+            "queueMs": {
+              "count": 2,
+              "p50": 34,
+              "p95": 66,
+              "p99": 66,
+              "max": 66
+            },
+            "firstDurableTextMs": {
+              "count": 2,
+              "p50": 367,
+              "p95": 507,
+              "p99": 507,
+              "max": 507
+            },
+            "settlementMs": {
+              "count": 2,
+              "p50": 510,
+              "p95": 673,
+              "p99": 673,
+              "max": 673
+            },
+            "generatorDelayMs": {
+              "count": 2,
+              "p50": 0.0006009999997331761,
+              "p95": 0.024806000001262873,
+              "p99": 0.024806000001262873,
+              "max": 0.024806000001262873
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10533.3671875,
+            "maximumSwapUsedMiB": 563.2734375,
+            "walBytes": 506760,
+            "transactions": 134,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [380, 392],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1158,
+                "native_live": 768,
+                "display_tail": 393,
+                "empty_display": 0,
+                "event_ids": 136,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 1,
+                "identity_loads": 0,
+                "native_views": 1,
+                "native_live": 1,
+                "display_tail": 1,
+                "empty_display": 0,
+                "event_ids": 1,
+                "prefetch": 0
+              },
+              "observations": 28
+            }
+          },
+          "provider": {
+            "requests": 2,
+            "completed": 2,
+            "errors": 0,
+            "cpuSeconds": 0.026921,
+            "receivedBytes": 48178,
+            "sentBytes": 26172,
+            "incrementalRequests": 0,
+            "websocketRequests": 2,
+            "httpRequests": 0,
+            "maximumRss": 66433024,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 2,
+            "mean": 119,
+            "p50": 102,
+            "p95": 136,
+            "max": 136
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 26,
+                "meanMs": 24.45292361538472
+              },
+              "boundary": {
+                "count": 24,
+                "meanMs": 0.012423916667709511
+              },
+              "view_notify": {
+                "count": 26,
+                "meanMs": 0.019467461537435435
+              },
+              "record": {
+                "count": 26,
+                "meanMs": 25.22667157692474
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-smoke",
+            "kind": "mcp",
+            "toolName": "owned MCP tool",
+            "concurrency": 1,
+            "count": 2,
+            "firstByteMs": 50,
+            "rounds": 2
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 2,
+            "accepted": 2,
+            "completed": 2,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1732.0080909999997,
+            "successfulRunsPerSecond": 1.1547290167941833,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 2,
+              "p50": 19,
+              "p95": 19,
+              "p99": 19,
+              "max": 19
+            },
+            "queueMs": {
+              "count": 2,
+              "p50": 23,
+              "p95": 36,
+              "p99": 36,
+              "max": 36
+            },
+            "firstDurableTextMs": {
+              "count": 2,
+              "p50": 218,
+              "p95": 344,
+              "p99": 344,
+              "max": 344
+            },
+            "settlementMs": {
+              "count": 2,
+              "p50": 693,
+              "p95": 890,
+              "p99": 890,
+              "max": 890
+            },
+            "generatorDelayMs": {
+              "count": 2,
+              "p50": 0.00029100000028847717,
+              "p95": 0.0005610000007436611,
+              "p99": 0.0005610000007436611,
+              "max": 0.0005610000007436611
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10505.890625,
+            "maximumSwapUsedMiB": 563.2734375,
+            "walBytes": 517049,
+            "transactions": 159,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [376, 377],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1158,
+                "native_live": 768,
+                "display_tail": 393,
+                "empty_display": 0,
+                "event_ids": 136,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 1,
+                "identity_loads": 0,
+                "native_views": 1,
+                "native_live": 1,
+                "display_tail": 1,
+                "empty_display": 0,
+                "event_ids": 1,
+                "prefetch": 0
+              },
+              "observations": 28
+            }
+          },
+          "provider": {
+            "requests": 6,
+            "completed": 6,
+            "errors": 0,
+            "cpuSeconds": 0.038438,
+            "receivedBytes": 148478,
+            "sentBytes": 64868,
+            "incrementalRequests": 4,
+            "websocketRequests": 6,
+            "httpRequests": 0,
+            "maximumRss": 67219456,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 2,
+            "mean": 65.5,
+            "p50": 57,
+            "p95": 74,
+            "max": 74
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 68,
+                "meanMs": 13.805231367648753
+              },
+              "boundary": {
+                "count": 66,
+                "meanMs": 0.010145060605392442
+              },
+              "view_notify": {
+                "count": 68,
+                "meanMs": 0.006089088236288209
+              },
+              "record": {
+                "count": 68,
+                "meanMs": 14.60341932352929
+              },
+              "dispatch_commit": {
+                "count": 4,
+                "meanMs": 8.72500525000214
+              }
+            }
+          }
+        }
+      ],
+      "label": "smoke"
+    },
+    {
+      "mode": "custom",
+      "at": "2026-11-17T18:27:20.703Z",
+      "driverRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "eligibility": {
+          "billable": 192,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 704.0615,
+          "p95_ms": 1105.53695,
+          "p99_ms": 1176.38547
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-r1",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "toolName": "owned MCP tool",
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 23172.235183999997,
+            "successfulRunsPerSecond": 8.285778151111312,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 42,
+              "p95": 102,
+              "p99": 188,
+              "max": 306
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 66,
+              "p95": 2071,
+              "p99": 2314,
+              "max": 2366
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 5288,
+              "p95": 10748,
+              "p99": 15899,
+              "max": 15917
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 5815,
+              "p95": 12622,
+              "p99": 16446,
+              "max": 17405
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.000742000003810972,
+              "p95": 0.001972999998542946,
+              "p99": 0.0077049999963492155,
+              "max": 0.04066700000112178
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 13,
+            "peakActiveRootRuns": 62,
+            "peakQueuedRuns": 19,
+            "minimumAvailableMiB": 10444.7109375,
+            "maximumSwapUsedMiB": 562.2734375,
+            "walBytes": 27475500,
+            "transactions": 13012,
+            "maximumLockWaiters": 1,
+            "maximumObservedKafkaLag": 931,
+            "kafkaSamples": 5,
+            "scrapeMs": [568, 61, 52, 1163, 21, 17, 1267, 23, 21, 1398, 15, 9, 593],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 194544,
+                "native_live": 24808,
+                "display_tail": 13132,
+                "empty_display": 101332,
+                "event_ids": 2856,
+                "prefetch": 2362554
+              },
+              "peakInstanceEntries": {
+                "identity": 168,
+                "identity_loads": 2,
+                "native_views": 31,
+                "native_live": 11,
+                "display_tail": 18,
+                "empty_display": 154,
+                "event_ids": 21,
+                "prefetch": 633
+              },
+              "observations": 182
+            }
+          },
+          "provider": {
+            "requests": 192,
+            "completed": 192,
+            "errors": 0,
+            "cpuSeconds": 2.033497,
+            "receivedBytes": 4635840,
+            "sentBytes": 4703520,
+            "incrementalRequests": 0,
+            "websocketRequests": 192,
+            "httpRequests": 0,
+            "maximumRss": 67682304,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 192,
+            "mean": 5427.244791666667,
+            "p50": 4940,
+            "p95": 11043,
+            "max": 15132
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 2423,
+                "meanMs": 159.10869690218732
+              },
+              "boundary": {
+                "count": 2231,
+                "meanMs": 0.013707121470132708
+              },
+              "view_notify": {
+                "count": 2423,
+                "meanMs": 0.023219642178461578
+              },
+              "record": {
+                "count": 2423,
+                "meanMs": 162.13135046842754
+              }
+            }
+          }
+        }
+      ],
+      "label": "cold64-r1"
+    },
+    {
+      "mode": "custom",
+      "at": "2026-11-17T18:29:52.449Z",
+      "driverRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "eligibility": {
+          "billable": 192,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 738.265,
+          "p95_ms": 1261.2581499999997,
+          "p99_ms": 1424.27548
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-r2",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "toolName": "owned MCP tool",
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 10388.835936999996,
+            "successfulRunsPerSecond": 18.481377621547484,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 23,
+              "p95": 76,
+              "p99": 1501,
+              "max": 1503
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 33,
+              "p95": 153,
+              "p99": 193,
+              "max": 211
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 2038,
+              "p95": 5080,
+              "p99": 6136,
+              "max": 6242
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 2319,
+              "p95": 5245,
+              "p99": 6210,
+              "max": 6470
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.000291000003926456,
+              "p95": 0.000862000000779517,
+              "p99": 0.0013429999962681904,
+              "max": 0.02168099999835249
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 7,
+            "peakActiveRootRuns": 62,
+            "peakQueuedRuns": 2,
+            "minimumAvailableMiB": 10355.15234375,
+            "maximumSwapUsedMiB": 561.5234375,
+            "walBytes": 25035206,
+            "transactions": 11005,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1069,
+            "kafkaSamples": 3,
+            "scrapeMs": [404, 14, 13, 745, 10, 5, 418],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 375192,
+                "native_live": 14584,
+                "display_tail": 7756,
+                "empty_display": 203980,
+                "event_ids": 1360,
+                "prefetch": 2275552
+              },
+              "peakInstanceEntries": {
+                "identity": 324,
+                "identity_loads": 5,
+                "native_views": 24,
+                "native_live": 7,
+                "display_tail": 10,
+                "empty_display": 310,
+                "event_ids": 10,
+                "prefetch": 615
+              },
+              "observations": 98
+            }
+          },
+          "provider": {
+            "requests": 192,
+            "completed": 192,
+            "errors": 0,
+            "cpuSeconds": 0.741668,
+            "receivedBytes": 4635840,
+            "sentBytes": 4703520,
+            "incrementalRequests": 0,
+            "websocketRequests": 192,
+            "httpRequests": 0,
+            "maximumRss": 69115904,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 192,
+            "mean": 2200.34375,
+            "p50": 1877,
+            "p95": 4847,
+            "max": 5869
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 2353,
+                "meanMs": 71.47625341436463
+              },
+              "boundary": {
+                "count": 2161,
+                "meanMs": 0.008667579823870042
+              },
+              "view_notify": {
+                "count": 2353,
+                "meanMs": 0.012359797280211275
+              },
+              "record": {
+                "count": 2353,
+                "meanMs": 73.12165349553749
+              }
+            }
+          }
+        }
+      ],
+      "label": "cold64-r2"
+    },
+    {
+      "mode": "matrix",
+      "at": "2026-11-17T18:34:55.637Z",
+      "driverRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 1375,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 1376,
+        "eligibility": {
+          "billable": 1374,
+          "platform": 2,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 1376,
+          "p50_ms": 776.1605,
+          "p95_ms": 1266.1445,
+          "p99_ms": 3043.6375
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-1",
+            "kind": "text",
+            "concurrency": 1,
+            "count": 8,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2352.186001000009,
+            "successfulRunsPerSecond": 3.4010915788967697,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 13,
+              "p95": 27,
+              "p99": 27,
+              "max": 27
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 19,
+              "p95": 32,
+              "p99": 32,
+              "max": 32
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 188,
+              "p95": 277,
+              "p99": 277,
+              "max": 277
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 204,
+              "p95": 316,
+              "p99": 316,
+              "max": 316
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0006809999904362485,
+              "p95": 0.024256000004243106,
+              "p99": 0.024256000004243106,
+              "max": 0.024256000004243106
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11167.29296875,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 998143,
+            "transactions": 411,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 22,
+            "kafkaSamples": 2,
+            "scrapeMs": [432, 8, 436],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 452778,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 128310,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 391,
+                "identity_loads": 0,
+                "native_views": 0,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 195,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "observations": 42
+            }
+          },
+          "provider": {
+            "requests": 8,
+            "completed": 8,
+            "errors": 0,
+            "cpuSeconds": 0.054166,
+            "receivedBytes": 192688,
+            "sentBytes": 195704,
+            "incrementalRequests": 0,
+            "websocketRequests": 8,
+            "httpRequests": 0,
+            "maximumRss": 68161536,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 8,
+            "mean": 122.625,
+            "p50": 88,
+            "p95": 207,
+            "max": 207
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 96,
+                "meanMs": 16.775309645839325
+              },
+              "boundary": {
+                "count": 88,
+                "meanMs": 0.010082250000612735
+              },
+              "view_notify": {
+                "count": 96,
+                "meanMs": 0.00903948958026988
+              },
+              "record": {
+                "count": 96,
+                "meanMs": 17.305774562500414
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-4",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1287.5268729999952,
+            "successfulRunsPerSecond": 9.320193816257568,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 15,
+              "p95": 25,
+              "p99": 25,
+              "max": 25
+            },
+            "queueMs": {
+              "count": 12,
+              "p50": 20,
+              "p95": 34,
+              "p99": 34,
+              "max": 34
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 231,
+              "p95": 397,
+              "p99": 397,
+              "max": 397
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 270,
+              "p95": 460,
+              "p99": 460,
+              "max": 460
+            },
+            "generatorDelayMs": {
+              "count": 12,
+              "p50": 0.00029000001086387783,
+              "p95": 0.0006810000049881637,
+              "p99": 0.0006810000049881637,
+              "max": 0.0006810000049881637
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11073.5546875,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 1520378,
+            "transactions": 547,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 11,
+            "kafkaSamples": 2,
+            "scrapeMs": [436, 416],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 452778,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 128310,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 391,
+                "identity_loads": 0,
+                "native_views": 0,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 195,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "observations": 28
+            }
+          },
+          "provider": {
+            "requests": 12,
+            "completed": 12,
+            "errors": 0,
+            "cpuSeconds": 0.057853,
+            "receivedBytes": 289032,
+            "sentBytes": 293820,
+            "incrementalRequests": 0,
+            "websocketRequests": 12,
+            "httpRequests": 0,
+            "maximumRss": 68423680,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 12,
+            "mean": 191.83333333333334,
+            "p50": 149,
+            "p95": 316,
+            "max": 316
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 144,
+                "meanMs": 21.008226951395496
+              },
+              "boundary": {
+                "count": 132,
+                "meanMs": 0.010369257572826886
+              },
+              "view_notify": {
+                "count": 144,
+                "meanMs": 0.009985465275854082
+              },
+              "record": {
+                "count": 144,
+                "meanMs": 21.68186393750599
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-8",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1582.3302929999918,
+            "successfulRunsPerSecond": 15.167503337433814,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 20,
+              "p95": 115,
+              "p99": 120,
+              "max": 120
+            },
+            "queueMs": {
+              "count": 24,
+              "p50": 28,
+              "p95": 77,
+              "p99": 85,
+              "max": 85
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 315,
+              "p95": 551,
+              "p99": 653,
+              "max": 653
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 353,
+              "p95": 599,
+              "p99": 709,
+              "max": 709
+            },
+            "generatorDelayMs": {
+              "count": 24,
+              "p50": 0.00025100000493694097,
+              "p95": 0.0005010000022593886,
+              "p99": 0.0005210000090301037,
+              "max": 0.0005210000090301037
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10899.5078125,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 3311365,
+            "transactions": 1308,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 114,
+            "kafkaSamples": 2,
+            "scrapeMs": [571, 430],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 452778,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 128310,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 391,
+                "identity_loads": 0,
+                "native_views": 0,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 195,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "observations": 28
+            }
+          },
+          "provider": {
+            "requests": 24,
+            "completed": 24,
+            "errors": 0,
+            "cpuSeconds": 0.09695,
+            "receivedBytes": 578064,
+            "sentBytes": 587688,
+            "incrementalRequests": 0,
+            "websocketRequests": 24,
+            "httpRequests": 0,
+            "maximumRss": 69210112,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 24,
+            "mean": 225.33333333333334,
+            "p50": 176,
+            "p95": 378,
+            "max": 509
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 288,
+                "meanMs": 26.00221154514928
+              },
+              "boundary": {
+                "count": 264,
+                "meanMs": 0.009315541671116296
+              },
+              "view_notify": {
+                "count": 288,
+                "meanMs": 0.00834337152991791
+              },
+              "record": {
+                "count": 288,
+                "meanMs": 26.773766059025977
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-16",
+            "kind": "text",
+            "concurrency": 16,
+            "count": 48,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 16,
+            "offered": 48,
+            "accepted": 48,
+            "completed": 48,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2573.575948999991,
+            "successfulRunsPerSecond": 18.651091302998562,
+            "maximumInFlight": 16,
+            "acknowledgementMs": {
+              "count": 48,
+              "p50": 31,
+              "p95": 193,
+              "p99": 209,
+              "max": 209
+            },
+            "queueMs": {
+              "count": 48,
+              "p50": 38,
+              "p95": 127,
+              "p99": 140,
+              "max": 140
+            },
+            "firstDurableTextMs": {
+              "count": 48,
+              "p50": 529,
+              "p95": 895,
+              "p99": 1372,
+              "max": 1372
+            },
+            "settlementMs": {
+              "count": 48,
+              "p50": 581,
+              "p95": 934,
+              "p99": 1438,
+              "max": 1438
+            },
+            "generatorDelayMs": {
+              "count": 48,
+              "p50": 0.0003299999953014776,
+              "p95": 0.000941999998758547,
+              "p99": 0.00271499999507796,
+              "max": 0.00271499999507796
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 15,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 10657.40234375,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 6465077,
+            "transactions": 2615,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [377, 9, 435],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 517626,
+                "native_live": 768,
+                "display_tail": 680,
+                "empty_display": 163842,
+                "event_ids": 680,
+                "prefetch": 327169
+              },
+              "peakInstanceEntries": {
+                "identity": 447,
+                "identity_loads": 0,
+                "native_views": 15,
+                "native_live": 1,
+                "display_tail": 2,
+                "empty_display": 249,
+                "event_ids": 5,
+                "prefetch": 61
+              },
+              "observations": 42
+            }
+          },
+          "provider": {
+            "requests": 48,
+            "completed": 48,
+            "errors": 0,
+            "cpuSeconds": 0.17138,
+            "receivedBytes": 1156128,
+            "sentBytes": 1175376,
+            "incrementalRequests": 0,
+            "websocketRequests": 48,
+            "httpRequests": 0,
+            "maximumRss": 69472256,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 48,
+            "mean": 393.8958333333333,
+            "p50": 345,
+            "p95": 699,
+            "max": 874
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 577,
+                "meanMs": 38.682802918545875
+              },
+              "boundary": {
+                "count": 529,
+                "meanMs": 0.007585899811722205
+              },
+              "view_notify": {
+                "count": 577,
+                "meanMs": 0.008144114386012655
+              },
+              "record": {
+                "count": 577,
+                "meanMs": 39.92907132062552
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-32",
+            "kind": "text",
+            "concurrency": 32,
+            "count": 96,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 32,
+            "offered": 96,
+            "accepted": 96,
+            "completed": 96,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 7943.658426000009,
+            "successfulRunsPerSecond": 12.085111777438339,
+            "maximumInFlight": 32,
+            "acknowledgementMs": {
+              "count": 96,
+              "p50": 36,
+              "p95": 158,
+              "p99": 209,
+              "max": 209
+            },
+            "queueMs": {
+              "count": 96,
+              "p50": 54,
+              "p95": 434,
+              "p99": 494,
+              "max": 494
+            },
+            "firstDurableTextMs": {
+              "count": 96,
+              "p50": 1583,
+              "p95": 4150,
+              "p99": 4991,
+              "max": 4991
+            },
+            "settlementMs": {
+              "count": 96,
+              "p50": 1733,
+              "p95": 4282,
+              "p99": 5119,
+              "max": 5119
+            },
+            "generatorDelayMs": {
+              "count": 96,
+              "p50": 0.000331000002915971,
+              "p95": 0.0016429999959655106,
+              "p99": 0.0031660000095143914,
+              "max": 0.0031660000095143914
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 5,
+            "peakActiveRootRuns": 30,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 10365.40625,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 14508573,
+            "transactions": 6018,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 152,
+            "kafkaSamples": 3,
+            "scrapeMs": [393, 8, 19, 1094, 583],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 657744,
+                "native_live": 3072,
+                "display_tail": 2146,
+                "empty_display": 236222,
+                "event_ids": 816,
+                "prefetch": 1124488
+              },
+              "peakInstanceEntries": {
+                "identity": 568,
+                "identity_loads": 0,
+                "native_views": 20,
+                "native_live": 4,
+                "display_tail": 6,
+                "empty_display": 359,
+                "event_ids": 6,
+                "prefetch": 273
+              },
+              "observations": 70
+            }
+          },
+          "provider": {
+            "requests": 96,
+            "completed": 96,
+            "errors": 0,
+            "cpuSeconds": 0.529199,
+            "receivedBytes": 2312256,
+            "sentBytes": 2352888,
+            "incrementalRequests": 0,
+            "websocketRequests": 96,
+            "httpRequests": 0,
+            "maximumRss": 69996544,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 96,
+            "mean": 1645.46875,
+            "p50": 1297,
+            "p95": 4135,
+            "max": 4905
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 1167,
+                "meanMs": 85.09905595373115
+              },
+              "boundary": {
+                "count": 1071,
+                "meanMs": 0.011752500465851976
+              },
+              "view_notify": {
+                "count": 1167,
+                "meanMs": 0.01370817223604117
+              },
+              "record": {
+                "count": 1167,
+                "meanMs": 87.62734329306012
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "paced-text",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 1000,
+            "chunkMs": 100,
+            "chunkBytes": 64,
+            "outputBytes": 1024
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 9784.605360999994,
+            "successfulRunsPerSecond": 2.4528327014250864,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 35,
+              "p95": 50,
+              "p99": 54,
+              "max": 54
+            },
+            "queueMs": {
+              "count": 24,
+              "p50": 64,
+              "p95": 100,
+              "p99": 155,
+              "max": 155
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 1396,
+              "p95": 1452,
+              "p99": 1499,
+              "max": 1499
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 3046,
+              "p95": 3148,
+              "p99": 3232,
+              "max": 3232
+            },
+            "generatorDelayMs": {
+              "count": 24,
+              "p50": 0.0008309999975608662,
+              "p95": 0.002414000002318062,
+              "p99": 0.003495999990263954,
+              "max": 0.003495999990263954
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 6,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10474.56640625,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 4300435,
+            "transactions": 1970,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 79,
+            "kafkaSamples": 3,
+            "scrapeMs": [571, 8, 10, 1141, 7, 667],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 685536,
+                "native_live": 24800,
+                "display_tail": 11074,
+                "empty_display": 255304,
+                "event_ids": 8296,
+                "prefetch": 1124488
+              },
+              "peakInstanceEntries": {
+                "identity": 592,
+                "identity_loads": 0,
+                "native_views": 20,
+                "native_live": 8,
+                "display_tail": 16,
+                "empty_display": 388,
+                "event_ids": 61,
+                "prefetch": 273
+              },
+              "observations": 84
+            }
+          },
+          "provider": {
+            "requests": 24,
+            "completed": 24,
+            "errors": 0,
+            "cpuSeconds": 0.274862,
+            "receivedBytes": 578160,
+            "sentBytes": 219600,
+            "incrementalRequests": 0,
+            "websocketRequests": 24,
+            "httpRequests": 0,
+            "maximumRss": 72355840,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 24,
+            "mean": 155.16666666666666,
+            "p50": 141,
+            "p95": 270,
+            "max": 369
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 542,
+                "meanMs": 27.770899101477465
+              },
+              "boundary": {
+                "count": 518,
+                "meanMs": 0.012683698840971612
+              },
+              "view_notify": {
+                "count": 542,
+                "meanMs": 0.009429199267539549
+              },
+              "record": {
+                "count": 542,
+                "meanMs": 28.47687270480205
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-tools",
+            "kind": "mcp",
+            "toolName": "owned MCP tool",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 100,
+            "rounds": 3
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 8283.490464999995,
+            "successfulRunsPerSecond": 2.8973293446049757,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 40,
+              "p95": 170,
+              "p99": 181,
+              "max": 181
+            },
+            "queueMs": {
+              "count": 24,
+              "p50": 56,
+              "p95": 176,
+              "p99": 217,
+              "max": 217
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 621,
+              "p95": 1192,
+              "p99": 1707,
+              "max": 1707
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 2211,
+              "p95": 3692,
+              "p99": 3823,
+              "max": 3823
+            },
+            "generatorDelayMs": {
+              "count": 24,
+              "p50": 0.0008110000053420663,
+              "p95": 0.0016330000071320683,
+              "p99": 0.0030560000013792887,
+              "max": 0.0030560000013792887
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 6,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10468.1875,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 9179134,
+            "transactions": 2574,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 64,
+            "kafkaSamples": 3,
+            "scrapeMs": [1017, 12, 1283, 13, 14, 624],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 711012,
+                "native_live": 24800,
+                "display_tail": 11074,
+                "empty_display": 255304,
+                "event_ids": 8296,
+                "prefetch": 171235
+              },
+              "peakInstanceEntries": {
+                "identity": 614,
+                "identity_loads": 0,
+                "native_views": 8,
+                "native_live": 8,
+                "display_tail": 16,
+                "empty_display": 388,
+                "event_ids": 61,
+                "prefetch": 40
+              },
+              "observations": 84
+            }
+          },
+          "provider": {
+            "requests": 96,
+            "completed": 96,
+            "errors": 0,
+            "cpuSeconds": 0.668826,
+            "receivedBytes": 2383032,
+            "sentBytes": 1015680,
+            "incrementalRequests": 72,
+            "websocketRequests": 96,
+            "httpRequests": 0,
+            "maximumRss": 73666560,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 24,
+            "mean": 238,
+            "p50": 183,
+            "p95": 527,
+            "max": 583
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 1080,
+                "meanMs": 38.55517971111108
+              },
+              "boundary": {
+                "count": 1056,
+                "meanMs": 0.015074289772725012
+              },
+              "view_notify": {
+                "count": 1080,
+                "meanMs": 0.007655955556913747
+              },
+              "record": {
+                "count": 1080,
+                "meanMs": 39.78449673703682
+              },
+              "dispatch_commit": {
+                "count": 72,
+                "meanMs": 11.697468138891665
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "continuous-tool-loops",
+            "kind": "mcp",
+            "toolName": "owned MCP tool",
+            "concurrency": 8,
+            "count": 8,
+            "firstByteMs": 100,
+            "rounds": 32,
+            "outputBytes": 1024
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 17386.293411999985,
+            "successfulRunsPerSecond": 0.46013257745198394,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 43,
+              "p95": 212,
+              "p99": 212,
+              "max": 212
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 46,
+              "p95": 176,
+              "p99": 176,
+              "max": 176
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 617,
+              "p95": 912,
+              "p99": 912,
+              "max": 912
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 16899,
+              "p95": 17311,
+              "p99": 17311,
+              "max": 17311
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 9.99999901978299e-5,
+              "p95": 0.0003100000030826777,
+              "p99": 0.0003100000030826777,
+              "max": 0.0003100000030826777
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 10,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10407.17578125,
+            "maximumSwapUsedMiB": 561.0234375,
+            "walBytes": 23903077,
+            "transactions": 4414,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 76,
+            "kafkaSamples": 4,
+            "scrapeMs": [625, 24, 16, 1144, 28, 18, 1151, 19, 22, 581],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 731856,
+                "native_live": 4758,
+                "display_tail": 5455,
+                "empty_display": 158578,
+                "event_ids": 680,
+                "prefetch": 171235
+              },
+              "peakInstanceEntries": {
+                "identity": 632,
+                "identity_loads": 0,
+                "native_views": 8,
+                "native_live": 5,
+                "display_tail": 5,
+                "empty_display": 241,
+                "event_ids": 5,
+                "prefetch": 40
+              },
+              "observations": 140
+            }
+          },
+          "provider": {
+            "requests": 264,
+            "completed": 264,
+            "errors": 0,
+            "cpuSeconds": 1.753833,
+            "receivedBytes": 6606072,
+            "sentBytes": 2557088,
+            "incrementalRequests": 256,
+            "websocketRequests": 264,
+            "httpRequests": 0,
+            "maximumRss": 78909440,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 8,
+            "mean": 146.5,
+            "p50": 148,
+            "p95": 172,
+            "max": 172
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 2912,
+                "meanMs": 39.650951820740815
+              },
+              "boundary": {
+                "count": 2904,
+                "meanMs": 0.017326112603287654
+              },
+              "view_notify": {
+                "count": 2912,
+                "meanMs": 0.005182414491383285
+              },
+              "record": {
+                "count": 2912,
+                "meanMs": 40.94024361607045
+              },
+              "dispatch_commit": {
+                "count": 256,
+                "meanMs": 12.130051175783144
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "guest-tools",
+            "kind": "guest",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "rounds": 3,
+            "toolDelayMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 18232.63177400001,
+            "successfulRunsPerSecond": 0.4387737381614931,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 28,
+              "p95": 86,
+              "p99": 86,
+              "max": 86
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 37,
+              "p95": 93,
+              "p99": 93,
+              "max": 93
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 338,
+              "p95": 487,
+              "p99": 487,
+              "max": 487
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 5819,
+              "p95": 12372,
+              "p99": 12372,
+              "max": 12372
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0003000000142492354,
+              "p95": 0.07491199998185039,
+              "p99": 0.07491199998185039,
+              "max": 0.07491199998185039
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 11,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10132.69140625,
+            "maximumSwapUsedMiB": 562.28125,
+            "walBytes": 4018759,
+            "transactions": 1635,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 59,
+            "kafkaSamples": 5,
+            "scrapeMs": [578, 8, 10, 891, 7, 9, 780, 8, 8, 581, 649],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 741120,
+                "native_live": 4000,
+                "display_tail": 2120,
+                "empty_display": 163184,
+                "event_ids": 544,
+                "prefetch": 71340
+              },
+              "peakInstanceEntries": {
+                "identity": 640,
+                "identity_loads": 0,
+                "native_views": 8,
+                "native_live": 4,
+                "display_tail": 4,
+                "empty_display": 248,
+                "event_ids": 4,
+                "prefetch": 29
+              },
+              "observations": 154
+            }
+          },
+          "provider": {
+            "requests": 32,
+            "completed": 32,
+            "errors": 0,
+            "cpuSeconds": 0.139597,
+            "receivedBytes": 772272,
+            "sentBytes": 189224,
+            "incrementalRequests": 24,
+            "websocketRequests": 32,
+            "httpRequests": 0,
+            "maximumRss": 79433728,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 8,
+            "mean": 106.375,
+            "p50": 99,
+            "p95": 132,
+            "max": 132
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 376,
+                "meanMs": 20.517547925538672
+              },
+              "boundary": {
+                "count": 368,
+                "meanMs": 0.01173491575900693
+              },
+              "view_notify": {
+                "count": 376,
+                "meanMs": 0.020107571807184713
+              },
+              "record": {
+                "count": 376,
+                "meanMs": 21.99793922340149
+              },
+              "dispatch_commit": {
+                "count": 24,
+                "meanMs": 9.56233137499172
+              },
+              "tool_route": {
+                "count": 24,
+                "meanMs": 0.5324752083203445
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "context-64k",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "paddingBytes": 65536,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2391.542069999996,
+            "successfulRunsPerSecond": 5.01768300484048,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 28,
+              "p95": 37,
+              "p99": 37,
+              "max": 37
+            },
+            "queueMs": {
+              "count": 12,
+              "p50": 38,
+              "p95": 50,
+              "p99": 50,
+              "max": 50
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 530,
+              "p95": 1013,
+              "p99": 1013,
+              "max": 1013
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 555,
+              "p95": 1066,
+              "p99": 1066,
+              "max": 1066
+            },
+            "generatorDelayMs": {
+              "count": 12,
+              "p50": 0.0005010000022593886,
+              "p95": 0.001352999999653548,
+              "p99": 0.001352999999653548,
+              "max": 0.001352999999653548
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 3,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10145.46484375,
+            "maximumSwapUsedMiB": 562.28125,
+            "walBytes": 1158213,
+            "transactions": 661,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 16,
+            "kafkaSamples": 2,
+            "scrapeMs": [878, 12, 704],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 755016,
+                "native_live": 4000,
+                "display_tail": 2062,
+                "empty_display": 171738,
+                "event_ids": 544,
+                "prefetch": 213230
+              },
+              "peakInstanceEntries": {
+                "identity": 652,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 4,
+                "display_tail": 4,
+                "empty_display": 261,
+                "event_ids": 4,
+                "prefetch": 17
+              },
+              "observations": 42
+            }
+          },
+          "provider": {
+            "requests": 12,
+            "completed": 12,
+            "errors": 0,
+            "cpuSeconds": 0.090504,
+            "receivedBytes": 1075488,
+            "sentBytes": 157440,
+            "incrementalRequests": 0,
+            "websocketRequests": 12,
+            "httpRequests": 0,
+            "maximumRss": 81133568,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 12,
+            "mean": 311.25,
+            "p50": 266,
+            "p95": 789,
+            "max": 789
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 144,
+                "meanMs": 34.13762108332858
+              },
+              "boundary": {
+                "count": 132,
+                "meanMs": 0.010190606057277795
+              },
+              "view_notify": {
+                "count": 144,
+                "meanMs": 0.011728256947309695
+              },
+              "record": {
+                "count": 144,
+                "meanMs": 34.92591192361042
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "child-conversations",
+            "kind": "children",
+            "concurrency": 2,
+            "count": 6,
+            "children": 4,
+            "firstByteMs": 300,
+            "outputBytes": 512
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 6,
+            "accepted": 6,
+            "completed": 6,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 8405.331601000013,
+            "successfulRunsPerSecond": 0.7138326344300513,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 6,
+              "p50": 20,
+              "p95": 37,
+              "p99": 37,
+              "max": 37
+            },
+            "queueMs": {
+              "count": 6,
+              "p50": 27,
+              "p95": 45,
+              "p99": 45,
+              "max": 45
+            },
+            "firstDurableTextMs": {
+              "count": 6,
+              "p50": 521,
+              "p95": 562,
+              "p99": 562,
+              "max": 562
+            },
+            "settlementMs": {
+              "count": 6,
+              "p50": 2558,
+              "p95": 3050,
+              "p99": 3050,
+              "max": 3050
+            },
+            "generatorDelayMs": {
+              "count": 6,
+              "p50": 0.0004110000154469162,
+              "p95": 0.0009520000021439046,
+              "p99": 0.0009520000021439046,
+              "max": 0.0009520000021439046
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 6,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10139.55859375,
+            "maximumSwapUsedMiB": 562.28125,
+            "walBytes": 6059468,
+            "transactions": 1386,
+            "maximumLockWaiters": 1,
+            "maximumObservedKafkaLag": 67,
+            "kafkaSamples": 3,
+            "scrapeMs": [567, 13, 20, 650, 9, 717],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 761964,
+                "native_live": 9078,
+                "display_tail": 7734,
+                "empty_display": 187530,
+                "event_ids": 2040,
+                "prefetch": 213230
+              },
+              "peakInstanceEntries": {
+                "identity": 658,
+                "identity_loads": 0,
+                "native_views": 3,
+                "native_live": 9,
+                "display_tail": 15,
+                "empty_display": 285,
+                "event_ids": 15,
+                "prefetch": 22
+              },
+              "observations": 84
+            }
+          },
+          "provider": {
+            "requests": 36,
+            "completed": 36,
+            "errors": 0,
+            "cpuSeconds": 0.142222,
+            "receivedBytes": 536520,
+            "sentBytes": 201198,
+            "incrementalRequests": 6,
+            "websocketRequests": 36,
+            "httpRequests": 0,
+            "maximumRss": 81133568,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 6,
+            "mean": 110.16666666666667,
+            "p50": 85,
+            "p95": 172,
+            "max": 172
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 462,
+                "meanMs": 29.878654987008794
+              },
+              "boundary": {
+                "count": 456,
+                "meanMs": 0.012735730264562161
+              },
+              "view_notify": {
+                "count": 462,
+                "meanMs": 0.005061729433915974
+              },
+              "record": {
+                "count": 462,
+                "meanMs": 30.110135826847994
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "sse-fanout-history",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 16,
+            "views": 3,
+            "slowReaderMs": 80,
+            "readHistory": true,
+            "firstByteMs": 100,
+            "chunkMs": 30
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 16,
+            "accepted": 16,
+            "completed": 16,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 5166.155109999992,
+            "successfulRunsPerSecond": 3.0970808385193886,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 16,
+              "p50": 38,
+              "p95": 791,
+              "p99": 791,
+              "max": 791
+            },
+            "queueMs": {
+              "count": 16,
+              "p50": 62,
+              "p95": 489,
+              "p99": 489,
+              "max": 489
+            },
+            "firstDurableTextMs": {
+              "count": 16,
+              "p50": 943,
+              "p95": 1660,
+              "p99": 1660,
+              "max": 1660
+            },
+            "settlementMs": {
+              "count": 16,
+              "p50": 1141,
+              "p95": 2109,
+              "p99": 2109,
+              "max": 2109
+            },
+            "generatorDelayMs": {
+              "count": 16,
+              "p50": 0.00035099999513477087,
+              "p95": 0.0036869999894406646,
+              "p99": 0.0036869999894406646,
+              "max": 0.0036869999894406646
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 4,
+            "peakActiveRootRuns": 5,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 9957.125,
+            "maximumSwapUsedMiB": 563.03125,
+            "walBytes": 2223941,
+            "transactions": 1266,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 4,
+            "kafkaSamples": 2,
+            "scrapeMs": [537, 18, 19, 683],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 761964,
+                "native_live": 9078,
+                "display_tail": 7734,
+                "empty_display": 187530,
+                "event_ids": 2040,
+                "prefetch": 56584
+              },
+              "peakInstanceEntries": {
+                "identity": 658,
+                "identity_loads": 0,
+                "native_views": 2,
+                "native_live": 9,
+                "display_tail": 15,
+                "empty_display": 285,
+                "event_ids": 15,
+                "prefetch": 22
+              },
+              "observations": 56
+            }
+          },
+          "provider": {
+            "requests": 16,
+            "completed": 16,
+            "errors": 0,
+            "cpuSeconds": 0.263851,
+            "receivedBytes": 385424,
+            "sentBytes": 209888,
+            "incrementalRequests": 0,
+            "websocketRequests": 16,
+            "httpRequests": 0,
+            "maximumRss": 81498112,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 16,
+            "latencyMs": {
+              "count": 16,
+              "p50": 742.3761109999905,
+              "p95": 1695.5181940000039,
+              "p99": 1695.5181940000039,
+              "max": 1695.5181940000039
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 16,
+            "mean": 660.9375,
+            "p50": 513,
+            "p95": 1136,
+            "max": 1136
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 222,
+                "meanMs": 74.42337322522782
+              },
+              "boundary": {
+                "count": 206,
+                "meanMs": 0.01728366504680978
+              },
+              "view_notify": {
+                "count": 222,
+                "meanMs": 0.02074525675417567
+              },
+              "record": {
+                "count": 222,
+                "meanMs": 75.75314880631161
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-images",
+            "kind": "mcp",
+            "toolName": "owned MCP tool",
+            "concurrency": 4,
+            "count": 8,
+            "rounds": 1,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 3033.180358999991,
+            "successfulRunsPerSecond": 2.6374956491665795,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 23,
+              "p95": 38,
+              "p99": 38,
+              "max": 38
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 31,
+              "p95": 51,
+              "p99": 51,
+              "max": 51
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 418,
+              "p95": 502,
+              "p99": 502,
+              "max": 502
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1313,
+              "p95": 1494,
+              "p99": 1494,
+              "max": 1494
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00027099999715574086,
+              "p95": 0.0010519999777898192,
+              "p99": 0.0010519999777898192,
+              "max": 0.0010519999777898192
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9729.30078125,
+            "maximumSwapUsedMiB": 563.7890625,
+            "walBytes": 2012178,
+            "transactions": 648,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [1007, 11, 790],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 780492,
+                "native_live": 9078,
+                "display_tail": 7734,
+                "empty_display": 203980,
+                "event_ids": 2040,
+                "prefetch": 56584
+              },
+              "peakInstanceEntries": {
+                "identity": 674,
+                "identity_loads": 0,
+                "native_views": 2,
+                "native_live": 9,
+                "display_tail": 15,
+                "empty_display": 310,
+                "event_ids": 15,
+                "prefetch": 22
+              },
+              "observations": 42
+            }
+          },
+          "provider": {
+            "requests": 16,
+            "completed": 16,
+            "errors": 0,
+            "cpuSeconds": 0.383865,
+            "receivedBytes": 8782968,
+            "sentBytes": 182840,
+            "incrementalRequests": 8,
+            "websocketRequests": 16,
+            "httpRequests": 0,
+            "maximumRss": 100261888,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 8,
+            "mean": 197.125,
+            "p50": 188,
+            "p95": 284,
+            "max": 284
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 184,
+                "meanMs": 35.05631835869849
+              },
+              "boundary": {
+                "count": 176,
+                "meanMs": 0.011955056811777868
+              },
+              "view_notify": {
+                "count": 184,
+                "meanMs": 0.00767715760688921
+              },
+              "record": {
+                "count": 184,
+                "meanMs": 36.10729114130236
+              },
+              "dispatch_commit": {
+                "count": 8,
+                "meanMs": 11.888532124998186
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-1",
+            "kind": "text",
+            "arrivalRate": 1,
+            "concurrency": 32,
+            "count": 45,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 45,
+            "accepted": 45,
+            "completed": 45,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 44553.71728099999,
+            "successfulRunsPerSecond": 1.0100167336472803,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 45,
+              "p50": 13,
+              "p95": 17,
+              "p99": 24,
+              "max": 24
+            },
+            "queueMs": {
+              "count": 45,
+              "p50": 17,
+              "p95": 22,
+              "p99": 32,
+              "max": 32
+            },
+            "firstDurableTextMs": {
+              "count": 45,
+              "p50": 458,
+              "p95": 488,
+              "p99": 516,
+              "max": 516
+            },
+            "settlementMs": {
+              "count": 45,
+              "p50": 470,
+              "p95": 507,
+              "p99": 535,
+              "max": 535
+            },
+            "generatorDelayMs": {
+              "count": 45,
+              "p50": 0,
+              "p95": 0.6328769999963697,
+              "p99": 0.874971999990521,
+              "max": 0.874971999990521
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9703.0546875,
+            "maximumSwapUsedMiB": 564.0390625,
+            "walBytes": 7544395,
+            "transactions": 3644,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 19,
+            "kafkaSamples": 9,
+            "scrapeMs": [
+              575, 7, 7, 600, 7, 7, 394, 6, 7, 396, 6, 6, 1147, 7, 6, 481, 6, 6, 505, 8, 6, 1146, 6,
+              697
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 840708,
+                "native_live": 768,
+                "display_tail": 393,
+                "empty_display": 237538,
+                "event_ids": 136,
+                "prefetch": 27649
+              },
+              "peakInstanceEntries": {
+                "identity": 726,
+                "identity_loads": 0,
+                "native_views": 1,
+                "native_live": 1,
+                "display_tail": 1,
+                "empty_display": 361,
+                "event_ids": 1,
+                "prefetch": 3
+              },
+              "observations": 336
+            }
+          },
+          "provider": {
+            "requests": 45,
+            "completed": 45,
+            "errors": 0,
+            "cpuSeconds": 0.245312,
+            "receivedBytes": 1083960,
+            "sentBytes": 590310,
+            "incrementalRequests": 0,
+            "websocketRequests": 45,
+            "httpRequests": 0,
+            "maximumRss": 100261888,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 45,
+            "mean": 68,
+            "p50": 67,
+            "p95": 93,
+            "max": 98
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 540,
+                "meanMs": 15.843045766663872
+              },
+              "boundary": {
+                "count": 495,
+                "meanMs": 0.009539644445076082
+              },
+              "view_notify": {
+                "count": 540,
+                "meanMs": 0.010206448147289084
+              },
+              "record": {
+                "count": 540,
+                "meanMs": 16.355937112961396
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-2",
+            "kind": "text",
+            "arrivalRate": 2,
+            "concurrency": 32,
+            "count": 90,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 90,
+            "accepted": 90,
+            "completed": 90,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 45050.246109,
+            "successfulRunsPerSecond": 1.9977693303215958,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 90,
+              "p50": 17,
+              "p95": 21,
+              "p99": 24,
+              "max": 24
+            },
+            "queueMs": {
+              "count": 90,
+              "p50": 22,
+              "p95": 32,
+              "p99": 39,
+              "max": 39
+            },
+            "firstDurableTextMs": {
+              "count": 90,
+              "p50": 488,
+              "p95": 540,
+              "p99": 597,
+              "max": 597
+            },
+            "settlementMs": {
+              "count": 90,
+              "p50": 506,
+              "p95": 563,
+              "p99": 617,
+              "max": 617
+            },
+            "generatorDelayMs": {
+              "count": 90,
+              "p50": 0,
+              "p95": 0.5627969999914058,
+              "p99": 0.8164080000133254,
+              "max": 0.8164080000133254
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9959.3984375,
+            "maximumSwapUsedMiB": 564.0390625,
+            "walBytes": 18711917,
+            "transactions": 6113,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 38,
+            "kafkaSamples": 9,
+            "scrapeMs": [
+              590, 8, 7, 611, 7, 7, 715, 9, 12, 746, 8, 8, 1328, 11, 10, 698, 10, 9, 609, 6, 7, 651,
+              8, 560
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 924084,
+                "native_live": 768,
+                "display_tail": 393,
+                "empty_display": 284914,
+                "event_ids": 136,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 798,
+                "identity_loads": 0,
+                "native_views": 1,
+                "native_live": 1,
+                "display_tail": 1,
+                "empty_display": 433,
+                "event_ids": 1,
+                "prefetch": 0
+              },
+              "observations": 336
+            }
+          },
+          "provider": {
+            "requests": 90,
+            "completed": 90,
+            "errors": 0,
+            "cpuSeconds": 0.440511,
+            "receivedBytes": 2167920,
+            "sentBytes": 1180620,
+            "incrementalRequests": 0,
+            "websocketRequests": 90,
+            "httpRequests": 0,
+            "maximumRss": 100261888,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 90,
+            "mean": 80.14444444444445,
+            "p50": 76,
+            "p95": 104,
+            "max": 130
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 1080,
+                "meanMs": 21.812472063887792
+              },
+              "boundary": {
+                "count": 990,
+                "meanMs": 0.011599393939891133
+              },
+              "view_notify": {
+                "count": 1080,
+                "meanMs": 0.011934623147977193
+              },
+              "record": {
+                "count": 1080,
+                "meanMs": 22.452413012963166
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-4",
+            "kind": "text",
+            "arrivalRate": 4,
+            "concurrency": 32,
+            "count": 180,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 180,
+            "accepted": 180,
+            "completed": 180,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 45305.16380500002,
+            "successfulRunsPerSecond": 3.973057039915936,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 180,
+              "p50": 17,
+              "p95": 22,
+              "p99": 30,
+              "max": 30
+            },
+            "queueMs": {
+              "count": 180,
+              "p50": 22,
+              "p95": 29,
+              "p99": 43,
+              "max": 57
+            },
+            "firstDurableTextMs": {
+              "count": 180,
+              "p50": 497,
+              "p95": 541,
+              "p99": 586,
+              "max": 589
+            },
+            "settlementMs": {
+              "count": 180,
+              "p50": 513,
+              "p95": 571,
+              "p99": 616,
+              "max": 621
+            },
+            "generatorDelayMs": {
+              "count": 180,
+              "p50": 0,
+              "p95": 0.7115770000382327,
+              "p99": 0.8871250000083819,
+              "max": 0.9245100000407547
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9991.890625,
+            "maximumSwapUsedMiB": 564.0390625,
+            "walBytes": 36050854,
+            "transactions": 12241,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 65,
+            "kafkaSamples": 9,
+            "scrapeMs": [
+              635, 11, 9, 681, 10, 11, 814, 12, 8, 1335, 8, 9, 688, 8, 7, 650, 10, 9, 644, 7, 9,
+              686, 11, 555
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1154526,
+                "native_live": 768,
+                "display_tail": 393,
+                "empty_display": 416514,
+                "event_ids": 136,
+                "prefetch": 11562
+              },
+              "peakInstanceEntries": {
+                "identity": 997,
+                "identity_loads": 0,
+                "native_views": 2,
+                "native_live": 1,
+                "display_tail": 1,
+                "empty_display": 633,
+                "event_ids": 1,
+                "prefetch": 5
+              },
+              "observations": 336
+            }
+          },
+          "provider": {
+            "requests": 180,
+            "completed": 180,
+            "errors": 0,
+            "cpuSeconds": 0.895858,
+            "receivedBytes": 4335840,
+            "sentBytes": 2361240,
+            "incrementalRequests": 0,
+            "websocketRequests": 180,
+            "httpRequests": 0,
+            "maximumRss": 100261888,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 180,
+            "mean": 88.67222222222222,
+            "p50": 84,
+            "p95": 137,
+            "max": 167
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 2160,
+                "meanMs": 22.04727115370333
+              },
+              "boundary": {
+                "count": 1980,
+                "meanMs": 0.010590394444921419
+              },
+              "view_notify": {
+                "count": 2160,
+                "meanMs": 0.011819758797517092
+              },
+              "record": {
+                "count": 2160,
+                "meanMs": 22.711290023612577
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-8",
+            "kind": "text",
+            "arrivalRate": 8,
+            "concurrency": 32,
+            "count": 360,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 360,
+            "accepted": 360,
+            "completed": 360,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 46838.28794899996,
+            "successfulRunsPerSecond": 7.6860196169421755,
+            "maximumInFlight": 27,
+            "acknowledgementMs": {
+              "count": 360,
+              "p50": 14,
+              "p95": 42,
+              "p99": 65,
+              "max": 304
+            },
+            "queueMs": {
+              "count": 360,
+              "p50": 18,
+              "p95": 68,
+              "p99": 96,
+              "max": 313
+            },
+            "firstDurableTextMs": {
+              "count": 360,
+              "p50": 450,
+              "p95": 2089,
+              "p99": 3459,
+              "max": 4255
+            },
+            "settlementMs": {
+              "count": 360,
+              "p50": 464,
+              "p95": 2444,
+              "p99": 3666,
+              "max": 4481
+            },
+            "generatorDelayMs": {
+              "count": 360,
+              "p50": 0,
+              "p95": 0.6398469999548979,
+              "p99": 0.8623009999864735,
+              "max": 0.9360379999852739
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 25,
+            "peakActiveRootRuns": 21,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 9703.3359375,
+            "maximumSwapUsedMiB": 566.296875,
+            "walBytes": 55960917,
+            "transactions": 23971,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 246,
+            "kafkaSamples": 9,
+            "scrapeMs": [
+              545, 13, 10, 1111, 6, 8, 516, 6, 7, 449, 5, 8, 502, 6, 6, 537, 6, 7, 527, 7, 27, 1713,
+              24, 18, 843
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1544772,
+                "native_live": 2304,
+                "display_tail": 1466,
+                "empty_display": 632996,
+                "event_ids": 544,
+                "prefetch": 424964
+              },
+              "peakInstanceEntries": {
+                "identity": 1334,
+                "identity_loads": 0,
+                "native_views": 11,
+                "native_live": 3,
+                "display_tail": 4,
+                "empty_display": 962,
+                "event_ids": 4,
+                "prefetch": 103
+              },
+              "observations": 350
+            }
+          },
+          "provider": {
+            "requests": 360,
+            "completed": 360,
+            "errors": 0,
+            "cpuSeconds": 1.683184,
+            "receivedBytes": 8671680,
+            "sentBytes": 4728240,
+            "incrementalRequests": 0,
+            "websocketRequests": 360,
+            "httpRequests": 0,
+            "maximumRss": 100261888,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 360,
+            "mean": 299.0027777777778,
+            "p50": 61,
+            "p95": 1802,
+            "max": 3920
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 4320,
+                "meanMs": 34.67647279976876
+              },
+              "boundary": {
+                "count": 3960,
+                "meanMs": 0.009596502525682515
+              },
+              "view_notify": {
+                "count": 4320,
+                "meanMs": 0.012153586110582794
+              },
+              "record": {
+                "count": 4320,
+                "meanMs": 35.61095643912127
+              }
+            }
+          }
+        }
+      ],
+      "history": {
+        "seedRuns": 12,
+        "seedOutputBytes": 196608,
+        "outcomes": {
+          "warmContinuation": true,
+          "expiredContextFallback": true,
+          "nativeCompaction": true
+        },
+        "continuations": {
+          "warm": {
+            "success": true,
+            "state": "completed",
+            "settlementMs": 322,
+            "historyMs": 301.2728830000269,
+            "historyPages": 1,
+            "historyPageMs": [301.2715409999946]
+          },
+          "cold": {
+            "success": true,
+            "state": "completed",
+            "settlementMs": 344,
+            "historyMs": 68.18469399999594,
+            "historyPages": 1,
+            "historyPageMs": [68.18371199996909]
+          },
+          "after": {
+            "success": true,
+            "state": "completed",
+            "settlementMs": 331,
+            "historyMs": 74.83423899998888,
+            "historyPages": 1,
+            "historyPageMs": [74.83265699999174]
+          }
+        },
+        "requests": [
+          {
+            "transport": "websocket",
+            "bytes": 24037,
+            "inputItems": 1,
+            "imageCount": 0,
+            "incremental": true,
+            "outcome": "completed"
+          },
+          {
+            "transport": "websocket",
+            "bytes": 24037,
+            "inputItems": 1,
+            "imageCount": 0,
+            "incremental": true,
+            "outcome": "rejected"
+          },
+          {
+            "transport": "websocket",
+            "bytes": 275497,
+            "inputItems": 27,
+            "imageCount": 0,
+            "incremental": false,
+            "outcome": "completed"
+          },
+          {
+            "transport": "websocket",
+            "bytes": 171183,
+            "inputItems": 1,
+            "imageCount": 0,
+            "incremental": false,
+            "outcome": "completed"
+          },
+          {
+            "transport": "websocket",
+            "bytes": 122401,
+            "inputItems": 13,
+            "imageCount": 0,
+            "incremental": false,
+            "outcome": "completed"
+          }
+        ]
+      },
+      "label": "matrix"
+    },
+    {
+      "mode": "capacity",
+      "at": "2026-11-17T18:43:56.672Z",
+      "driverRevision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 915,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 915,
+        "eligibility": {
+          "billable": 915,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 915,
+          "p50_ms": 845.11,
+          "p95_ms": 10495.6251,
+          "p99_ms": 10953.0291
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "context-64k",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "paddingBytes": 65536,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2559.8543930000014,
+            "successfulRunsPerSecond": 4.687766629545164,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 42,
+              "p95": 134,
+              "p99": 134,
+              "max": 134
+            },
+            "queueMs": {
+              "count": 12,
+              "p50": 51,
+              "p95": 116,
+              "p99": 116,
+              "max": 116
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 532,
+              "p95": 1253,
+              "p99": 1253,
+              "max": 1253
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 612,
+              "p95": 1328,
+              "p99": 1328,
+              "max": 1328
+            },
+            "generatorDelayMs": {
+              "count": 12,
+              "p50": 0.0007519999926444143,
+              "p95": 0.039315000001806766,
+              "p99": 0.039315000001806766,
+              "max": 0.039315000001806766
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10540.31640625,
+            "maximumSwapUsedMiB": 566.546875,
+            "walBytes": 2028961,
+            "transactions": 662,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [655, 15, 1433],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1589948,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 343476,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "peakInstanceEntries": {
+                "identity": 1373,
+                "identity_loads": 0,
+                "native_views": 0,
+                "native_live": 0,
+                "display_tail": 0,
+                "empty_display": 522,
+                "event_ids": 0,
+                "prefetch": 0
+              },
+              "observations": 42
+            }
+          },
+          "provider": {
+            "requests": 12,
+            "completed": 12,
+            "errors": 0,
+            "cpuSeconds": 0.150818,
+            "receivedBytes": 1075488,
+            "sentBytes": 157104,
+            "incrementalRequests": 0,
+            "websocketRequests": 12,
+            "httpRequests": 0,
+            "maximumRss": 66949120,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 12,
+            "mean": 319.4166666666667,
+            "p50": 228,
+            "p95": 835,
+            "max": 835
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 144,
+                "meanMs": 42.394249951393526
+              },
+              "boundary": {
+                "count": 132,
+                "meanMs": 0.014005037874802426
+              },
+              "view_notify": {
+                "count": 144,
+                "meanMs": 0.012633881950426204
+              },
+              "record": {
+                "count": 144,
+                "meanMs": 43.15550955555776
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-64",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 22216.08369,
+            "successfulRunsPerSecond": 8.642387320787051,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 39,
+              "p95": 221,
+              "p99": 1244,
+              "max": 1274
+            },
+            "queueMs": {
+              "count": 192,
+              "p50": 62,
+              "p95": 2143,
+              "p99": 2492,
+              "max": 2624
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 5288,
+              "p95": 11484,
+              "p99": 15171,
+              "max": 16502
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 5551,
+              "p95": 12044,
+              "p99": 16566,
+              "max": 17339
+            },
+            "generatorDelayMs": {
+              "count": 192,
+              "p50": 0.0008110000053420663,
+              "p95": 0.002314999990630895,
+              "p99": 0.019375999996555038,
+              "max": 0.11191200000757817
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 13,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 32,
+            "minimumAvailableMiB": 9976.1328125,
+            "maximumSwapUsedMiB": 566.546875,
+            "walBytes": 26971504,
+            "transactions": 13075,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1033,
+            "kafkaSamples": 5,
+            "scrapeMs": [565, 46, 45, 1516, 19, 31, 1280, 19, 23, 1402, 11, 10, 392],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1782176,
+                "native_live": 28632,
+                "display_tail": 13471,
+                "empty_display": 444808,
+                "event_ids": 2720,
+                "prefetch": 2885294
+              },
+              "peakInstanceEntries": {
+                "identity": 1539,
+                "identity_loads": 1,
+                "native_views": 34,
+                "native_live": 14,
+                "display_tail": 19,
+                "empty_display": 676,
+                "event_ids": 20,
+                "prefetch": 762
+              },
+              "observations": 182
+            }
+          },
+          "provider": {
+            "requests": 192,
+            "completed": 192,
+            "errors": 0,
+            "cpuSeconds": 2.035701,
+            "receivedBytes": 4624512,
+            "sentBytes": 4704024,
+            "incrementalRequests": 0,
+            "websocketRequests": 192,
+            "httpRequests": 0,
+            "maximumRss": 68964352,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 192,
+            "mean": 5621.380208333333,
+            "p50": 5122,
+            "p95": 11170,
+            "max": 14831
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 2404,
+                "meanMs": 164.43795673752305
+              },
+              "boundary": {
+                "count": 2212,
+                "meanMs": 0.01450821112053604
+              },
+              "view_notify": {
+                "count": 2404,
+                "meanMs": 0.021898099835714082
+              },
+              "record": {
+                "count": 2404,
+                "meanMs": 167.3420002250375
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "waiting-model-64",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 64,
+            "firstByteMs": 10000,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 64,
+            "accepted": 64,
+            "completed": 64,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 11753.262271,
+            "successfulRunsPerSecond": 5.445296678005188,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 64,
+              "p50": 261,
+              "p95": 397,
+              "p99": 420,
+              "max": 420
+            },
+            "queueMs": {
+              "count": 64,
+              "p50": 476,
+              "p95": 589,
+              "p99": 611,
+              "max": 611
+            },
+            "firstDurableTextMs": {
+              "count": 64,
+              "p50": 10925,
+              "p95": 11385,
+              "p99": 11502,
+              "max": 11502
+            },
+            "settlementMs": {
+              "count": 64,
+              "p50": 10958,
+              "p95": 11416,
+              "p99": 11515,
+              "max": 11515
+            },
+            "generatorDelayMs": {
+              "count": 64,
+              "p50": 6.0000005760230124e-5,
+              "p95": 9.000000136438757e-5,
+              "p99": 0.05677699999068864,
+              "max": 0.05677699999068864
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 7,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9837.25390625,
+            "maximumSwapUsedMiB": 566.296875,
+            "walBytes": 12320638,
+            "transactions": 4931,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 3,
+            "scrapeMs": [398, 6, 5, 463, 7, 6, 1233],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 1900292,
+                "native_live": 49152,
+                "display_tail": 25152,
+                "empty_display": 477708,
+                "event_ids": 8704,
+                "prefetch": 2885294
+              },
+              "peakInstanceEntries": {
+                "identity": 1641,
+                "identity_loads": 1,
+                "native_views": 64,
+                "native_live": 64,
+                "display_tail": 64,
+                "empty_display": 726,
+                "event_ids": 64,
+                "prefetch": 762
+              },
+              "observations": 98
+            }
+          },
+          "provider": {
+            "requests": 64,
+            "completed": 64,
+            "errors": 0,
+            "cpuSeconds": 0.251726,
+            "receivedBytes": 1541760,
+            "sentBytes": 839552,
+            "incrementalRequests": 0,
+            "websocketRequests": 64,
+            "httpRequests": 0,
+            "maximumRss": 71847936,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 64,
+            "mean": 114.234375,
+            "p50": 99,
+            "p95": 180,
+            "max": 266
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 768,
+                "meanMs": 37.04069277734116
+              },
+              "boundary": {
+                "count": 704,
+                "meanMs": 0.005985353690035296
+              },
+              "view_notify": {
+                "count": 768,
+                "meanMs": 0.013499565103909419
+              },
+              "record": {
+                "count": 768,
+                "meanMs": 37.81216222396585
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-16",
+            "kind": "text",
+            "concurrency": 64,
+            "arrivalRate": 16,
+            "count": 480,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 64,
+            "offered": 480,
+            "accepted": 352,
+            "completed": 352,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 128,
+            "elapsedMs": 34308.15420300001,
+            "successfulRunsPerSecond": 10.259951553127273,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 352,
+              "p50": 27,
+              "p95": 62,
+              "p99": 124,
+              "max": 306
+            },
+            "queueMs": {
+              "count": 352,
+              "p50": 40,
+              "p95": 154,
+              "p99": 226,
+              "max": 273
+            },
+            "firstDurableTextMs": {
+              "count": 352,
+              "p50": 2393,
+              "p95": 9670,
+              "p99": 11918,
+              "max": 12641
+            },
+            "settlementMs": {
+              "count": 352,
+              "p50": 2719,
+              "p95": 10047,
+              "p99": 12024,
+              "max": 12748
+            },
+            "generatorDelayMs": {
+              "count": 352,
+              "p50": 0,
+              "p95": 0.9300070000172127,
+              "p99": 3.2275729999964824,
+              "max": 8.778871999995317
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 18,
+            "peakActiveRootRuns": 62,
+            "peakQueuedRuns": 2,
+            "minimumAvailableMiB": 9549.01171875,
+            "maximumSwapUsedMiB": 575.0859375,
+            "walBytes": 50818009,
+            "transactions": 23922,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 903,
+            "kafkaSamples": 7,
+            "scrapeMs": [
+              407, 7, 7, 601, 7, 7, 2112, 35, 1617, 28, 20, 1543, 24, 22, 1264, 15, 10, 653
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 2225690,
+                "native_live": 3840,
+                "display_tail": 2433,
+                "empty_display": 526400,
+                "event_ids": 1088,
+                "prefetch": 2496728
+              },
+              "peakInstanceEntries": {
+                "identity": 1922,
+                "identity_loads": 3,
+                "native_views": 24,
+                "native_live": 5,
+                "display_tail": 7,
+                "empty_display": 800,
+                "event_ids": 8,
+                "prefetch": 685
+              },
+              "observations": 252
+            }
+          },
+          "provider": {
+            "requests": 352,
+            "completed": 352,
+            "errors": 0,
+            "cpuSeconds": 2.395097,
+            "receivedBytes": 8478976,
+            "sentBytes": 4617536,
+            "incrementalRequests": 0,
+            "websocketRequests": 352,
+            "httpRequests": 0,
+            "maximumRss": 80236544,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 352,
+            "mean": 3097.6704545454545,
+            "p50": 2173,
+            "p95": 9475,
+            "max": 12156
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 4234,
+                "meanMs": 111.54600612376015
+              },
+              "boundary": {
+                "count": 3882,
+                "meanMs": 0.011427850335825135
+              },
+              "view_notify": {
+                "count": 4234,
+                "meanMs": 0.01700785167628118
+              },
+              "record": {
+                "count": 4234,
+                "meanMs": 113.7791136400563
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-32",
+            "kind": "text",
+            "concurrency": 64,
+            "arrivalRate": 32,
+            "count": 960,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 64,
+            "offered": 960,
+            "accepted": 295,
+            "completed": 295,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 665,
+            "elapsedMs": 33738.033125999995,
+            "successfulRunsPerSecond": 8.743841079836399,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 295,
+              "p50": 35,
+              "p95": 88,
+              "p99": 359,
+              "max": 425
+            },
+            "queueMs": {
+              "count": 295,
+              "p50": 56,
+              "p95": 1047,
+              "p99": 1246,
+              "max": 1248
+            },
+            "firstDurableTextMs": {
+              "count": 295,
+              "p50": 5383,
+              "p95": 10945,
+              "p99": 13211,
+              "max": 13514
+            },
+            "settlementMs": {
+              "count": 295,
+              "p50": 5692,
+              "p95": 11336,
+              "p99": 13553,
+              "max": 13809
+            },
+            "generatorDelayMs": {
+              "count": 295,
+              "p50": 0,
+              "p95": 0.9918919999909122,
+              "p99": 3.653052999987267,
+              "max": 6.728852000000188
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 18,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 25,
+            "minimumAvailableMiB": 9468.87109375,
+            "maximumSwapUsedMiB": 577.09375,
+            "walBytes": 43404156,
+            "transactions": 20487,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 854,
+            "kafkaSamples": 7,
+            "scrapeMs": [
+              591, 33, 19, 1458, 18, 20, 1702, 35, 20, 1235, 24, 21, 1130, 29, 23, 1164, 12, 585
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 2542982,
+                "native_live": 21492,
+                "display_tail": 10311,
+                "empty_display": 582330,
+                "event_ids": 1904,
+                "prefetch": 2539827
+              },
+              "peakInstanceEntries": {
+                "identity": 2196,
+                "identity_loads": 2,
+                "native_views": 33,
+                "native_live": 10,
+                "display_tail": 13,
+                "empty_display": 885,
+                "event_ids": 14,
+                "prefetch": 705
+              },
+              "observations": 252
+            }
+          },
+          "provider": {
+            "requests": 295,
+            "completed": 295,
+            "errors": 0,
+            "cpuSeconds": 2.600477,
+            "receivedBytes": 7105960,
+            "sentBytes": 3869810,
+            "incrementalRequests": 0,
+            "websocketRequests": 295,
+            "httpRequests": 0,
+            "maximumRss": 82333696,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "providerFinishToSettlementMs": {
+            "count": 295,
+            "mean": 5522.633898305085,
+            "p50": 4959,
+            "p95": 10685,
+            "max": 13268
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 3573,
+                "meanMs": 185.98443179121065
+              },
+              "boundary": {
+                "count": 3278,
+                "meanMs": 0.015553550030527809
+              },
+              "view_notify": {
+                "count": 3573,
+                "meanMs": 0.022069493420875545
+              },
+              "record": {
+                "count": 3573,
+                "meanMs": 189.12810499384318
+              }
+            }
+          }
+        }
+      ],
+      "label": "capacity"
+    },
+    {
+      "mode": "faults",
+      "at": "2026-11-17T19:04:32.355Z",
+      "driverRevision": "450fe3d64aae44a0b8e5e22fc1c8b0a8ba5fc906",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 58,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 58,
+        "eligibility": {
+          "billable": 42,
+          "platform": 16,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 58,
+          "p50_ms": 675.668,
+          "p95_ms": 9729.5512,
+          "p99_ms": 10028.21856
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "once-rate-limit",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "fault": "rate_limit_once"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 0,
+            "failed": 8,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1685.2255140000052,
+            "successfulRunsPerSecond": 0,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 34,
+              "p95": 43,
+              "p99": 43,
+              "max": 43
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 46,
+              "p95": 55,
+              "p99": 55,
+              "max": 55
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 542,
+              "p95": 785,
+              "p99": 785,
+              "max": 785
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0007109999860404059,
+              "p95": 0.03506699998979457,
+              "p99": 0.03506699998979457,
+              "max": 0.03506699998979457
+            },
+            "sseReconnects": 0,
+            "errorsCount": 8,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10895.68359375,
+            "maximumSwapUsedMiB": 579.3671875,
+            "walBytes": 1418573,
+            "transactions": 340,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 11,
+            "kafkaSamples": 2,
+            "scrapeMs": [565, 642],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 17866,
+                "native_live": 0,
+                "display_tail": 574,
+                "empty_display": 0,
+                "event_ids": 272,
+                "prefetch": 171228
+              },
+              "peakInstanceEntries": {
+                "identity": 15,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 0,
+                "display_tail": 2,
+                "empty_display": 0,
+                "event_ids": 2,
+                "prefetch": 40
+              },
+              "observations": 28
+            }
+          },
+          "provider": {
+            "requests": 8,
+            "completed": 0,
+            "errors": 8,
+            "cpuSeconds": 0.066838,
+            "receivedBytes": 192944,
+            "sentBytes": 1872,
+            "incrementalRequests": 0,
+            "websocketRequests": 8,
+            "httpRequests": 0,
+            "maximumRss": 67543040,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "terminalFailure": 8,
+            "subsequentUserRequestsCompleted": 8,
+            "automaticReplayClaimed": false
+          },
+          "providerFinishToSettlementMs": {
+            "count": 8,
+            "mean": 399.625,
+            "p50": 365,
+            "p95": 540,
+            "max": 540
+          },
+          "recovery": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 2932.7748189999984,
+            "successfulRunsPerSecond": 2.7277921060191717,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 29,
+              "p95": 210,
+              "p99": 210,
+              "max": 210
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 42,
+              "p95": 148,
+              "p99": 148,
+              "max": 148
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 654,
+              "p95": 999,
+              "p99": 999,
+              "max": 999
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 726,
+              "p95": 1027,
+              "p99": 1027,
+              "max": 1027
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00044099999649915844,
+              "p95": 0.0010820000024978071,
+              "p99": 0.0010820000024978071,
+              "max": 0.0010820000024978071
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 96,
+                "meanMs": 44.92543238540752
+              },
+              "boundary": {
+                "count": 88,
+                "meanMs": 0.013503090904454089
+              },
+              "view_notify": {
+                "count": 96,
+                "meanMs": 0.015485468748617401
+              },
+              "record": {
+                "count": 96,
+                "meanMs": 45.84103868749781
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "once-disconnect",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "fault": "disconnect_once"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 0,
+            "failed": 8,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1166.865322999991,
+            "successfulRunsPerSecond": 0,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 25,
+              "p95": 35,
+              "p99": 35,
+              "max": 35
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 34,
+              "p95": 49,
+              "p99": 49,
+              "max": 49
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 412,
+              "p95": 456,
+              "p99": 456,
+              "max": 456
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 458,
+              "p95": 523,
+              "p99": 523,
+              "max": 523
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00029999999969732016,
+              "p95": 0.000981999997748062,
+              "p99": 0.000981999997748062,
+              "max": 0.000981999997748062
+            },
+            "sseReconnects": 0,
+            "errorsCount": 8,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10778.69140625,
+            "maximumSwapUsedMiB": 579.3671875,
+            "walBytes": 1174578,
+            "transactions": 707,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [563, 1204],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 17866,
+                "native_live": 0,
+                "display_tail": 574,
+                "empty_display": 0,
+                "event_ids": 272,
+                "prefetch": 171228
+              },
+              "peakInstanceEntries": {
+                "identity": 15,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 0,
+                "display_tail": 2,
+                "empty_display": 0,
+                "event_ids": 2,
+                "prefetch": 40
+              },
+              "observations": 28
+            }
+          },
+          "provider": {
+            "requests": 8,
+            "completed": 0,
+            "errors": 8,
+            "cpuSeconds": 0.044269,
+            "receivedBytes": 192944,
+            "sentBytes": 7872,
+            "incrementalRequests": 0,
+            "websocketRequests": 8,
+            "httpRequests": 0,
+            "maximumRss": 68329472,
+            "inflight": 0
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "terminalFailure": 8,
+            "subsequentUserRequestsCompleted": 8,
+            "automaticReplayClaimed": false
+          },
+          "providerFinishToSettlementMs": {
+            "count": 8,
+            "mean": 175.875,
+            "p50": 167,
+            "p95": 228,
+            "max": 228
+          },
+          "recovery": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 2590.5280360000033,
+            "successfulRunsPerSecond": 3.08817348773136,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 31,
+              "p95": 45,
+              "p99": 45,
+              "max": 45
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 36,
+              "p95": 55,
+              "p99": 55,
+              "max": 55
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 523,
+              "p95": 807,
+              "p99": 807,
+              "max": 807
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 549,
+              "p95": 826,
+              "p99": 826,
+              "max": 826
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00025100000493694097,
+              "p95": 0.0008410000009462237,
+              "p99": 0.0008410000009462237,
+              "max": 0.0008410000009462237
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 96,
+                "meanMs": 33.48525702083618
+              },
+              "boundary": {
+                "count": 88,
+                "meanMs": 0.012218011361917224
+              },
+              "view_notify": {
+                "count": 96,
+                "meanMs": 0.013455072921108965
+              },
+              "record": {
+                "count": 96,
+                "meanMs": 34.21755216666739
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "worker-handoff",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 22098.77313999999,
+            "successfulRunsPerSecond": 0.1810055234586657,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 31,
+              "p95": 39,
+              "p99": 39,
+              "max": 39
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 34,
+              "p95": 85,
+              "p99": 85,
+              "max": 85
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 512,
+              "p95": 572,
+              "p99": 572,
+              "max": 572
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 17158,
+              "p95": 21346,
+              "p99": 21346,
+              "max": 21346
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 12,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10671.60546875,
+            "maximumSwapUsedMiB": 579.3671875,
+            "walBytes": 1589061,
+            "transactions": 1714,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 5,
+            "kafkaSamples": 5,
+            "scrapeMs": [594, 11, 1502, 1502, 1502, 1502, 1502, 1502, 1501, 955, 7, 618],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 57238,
+                "native_live": 4288,
+                "display_tail": 6212,
+                "empty_display": 11844,
+                "event_ids": 544,
+                "prefetch": 2322
+              },
+              "peakInstanceEntries": {
+                "identity": 49,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 4,
+                "display_tail": 4,
+                "empty_display": 18,
+                "event_ids": 4,
+                "prefetch": 2
+              },
+              "observations": 168
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "sameRun": true,
+            "writerChanged": true,
+            "physicalCalls": 4
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 100,
+                "meanMs": 28.79759558999904
+              },
+              "boundary": {
+                "count": 94,
+                "meanMs": 0.01249534042522388
+              },
+              "view_notify": {
+                "count": 100,
+                "meanMs": 0.01487992000416852
+              },
+              "record": {
+                "count": 100,
+                "meanMs": 30.15114578000727
+              },
+              "dispatch_commit": {
+                "count": 4,
+                "meanMs": 21.941194500017446
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "projector-restart",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 40498.762981999986,
+            "successfulRunsPerSecond": 0.0987684488481249,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 20,
+              "p95": 23,
+              "p99": 23,
+              "max": 23
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 30,
+              "p95": 71,
+              "p99": 71,
+              "max": 71
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 37771,
+              "p95": 38496,
+              "p99": 38496,
+              "max": 38496
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 124,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 22,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10662.88671875,
+            "maximumSwapUsedMiB": 579.3671875,
+            "walBytes": 2467494,
+            "transactions": 2152,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 183,
+            "kafkaSamples": 8,
+            "scrapeMs": [
+              571, 1502, 1502, 1502, 1503, 1510, 1502, 1503, 1503, 1501, 1503, 1502, 2298, 543, 10,
+              12, 541, 7, 6, 530, 8, 523
+            ],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 57238,
+                "native_live": 5434,
+                "display_tail": 3106,
+                "empty_display": 11844,
+                "event_ids": 1224,
+                "prefetch": 373950
+              },
+              "peakInstanceEntries": {
+                "identity": 49,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 3,
+                "display_tail": 5,
+                "empty_display": 18,
+                "event_ids": 9,
+                "prefetch": 181
+              },
+              "observations": 140
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "writersPreserved": true,
+            "sseReconnects": 124
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": -601,
+                "meanMs": 29.961506121461273
+              },
+              "boundary": {
+                "count": -556,
+                "meanMs": 0.010696872301660547
+              },
+              "view_notify": {
+                "count": -601,
+                "meanMs": 0.011513835275966767
+              },
+              "record": {
+                "count": -601,
+                "meanMs": 30.970812663894424
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "stop-under-load",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 2,
+            "failed": 2,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2965.825363000011,
+            "successfulRunsPerSecond": 0.6743485388421344,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 87,
+              "p95": 93,
+              "p99": 93,
+              "max": 93
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 103,
+              "p95": 124,
+              "p99": 124,
+              "max": 124
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 613,
+              "p95": 770,
+              "p99": 770,
+              "max": 770
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 1540,
+              "p95": 2210,
+              "p99": 2210,
+              "max": 2210
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 0,
+            "errorsCount": 2,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10664.1875,
+            "maximumSwapUsedMiB": 579.3671875,
+            "walBytes": 385249,
+            "transactions": 304,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "scrapeMs": [1100, 14, 566],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 5128,
+                "native_live": 5434,
+                "display_tail": 2319,
+                "empty_display": 658,
+                "event_ids": 1224,
+                "prefetch": 373950
+              },
+              "peakInstanceEntries": {
+                "identity": 4,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 3,
+                "display_tail": 5,
+                "empty_display": 1,
+                "event_ids": 9,
+                "prefetch": 181
+              },
+              "observations": 42
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "cancelled": 2,
+            "lateReplyIgnored": true
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 82,
+                "meanMs": 41.19360647560924
+              },
+              "boundary": {
+                "count": 78,
+                "meanMs": 0.012848192307641348
+              },
+              "view_notify": {
+                "count": 82,
+                "meanMs": 0.012476512195174047
+              },
+              "record": {
+                "count": 82,
+                "meanMs": 42.34228048780493
+              },
+              "dispatch_commit": {
+                "count": 4,
+                "meanMs": 10.751758750000592
+              }
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "lost-tool-reply",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1825.7164270000067,
+            "successfulRunsPerSecond": 2.1909207480664166,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 36,
+              "p95": 84,
+              "p99": 84,
+              "max": 84
+            },
+            "queueMs": {
+              "count": 4,
+              "p50": 43,
+              "p95": 123,
+              "p99": 123,
+              "max": 123
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 465,
+              "p95": 567,
+              "p99": 567,
+              "max": 567
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 976,
+              "p95": 1074,
+              "p99": 1074,
+              "max": 1074
+            },
+            "generatorDelayMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "sseReconnects": 0,
+            "errorsCount": 0,
+            "historyErrorsCount": 0
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10630.55859375,
+            "maximumSwapUsedMiB": 579.3671875,
+            "walBytes": 1450264,
+            "transactions": 399,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 19,
+            "kafkaSamples": 2,
+            "scrapeMs": [555, 556],
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "projectorMemory": {
+              "peakInstanceEstimatedBytes": {
+                "identity": 9760,
+                "native_live": 5434,
+                "display_tail": 2319,
+                "empty_display": 5264,
+                "event_ids": 1224,
+                "prefetch": 373950
+              },
+              "peakInstanceEntries": {
+                "identity": 8,
+                "identity_loads": 0,
+                "native_views": 4,
+                "native_live": 3,
+                "display_tail": 5,
+                "empty_display": 8,
+                "event_ids": 9,
+                "prefetch": 181
+              },
+              "observations": 28
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "physicalWrites": 4
+          },
+          "projectionTiming": {
+            "scope": "scraped counter differences; projection includes its internal authority/PG/application waits; boundary is the separate post-projection admission check",
+            "stages": {
+              "projection": {
+                "count": 92,
+                "meanMs": 34.34514886956593
+              },
+              "boundary": {
+                "count": 88,
+                "meanMs": 0.01244555681825497
+              },
+              "view_notify": {
+                "count": 92,
+                "meanMs": 0.012404586957294987
+              },
+              "record": {
+                "count": 92,
+                "meanMs": 35.401388184782334
+              },
+              "dispatch_commit": {
+                "count": 4,
+                "meanMs": 10.629912250000416
+              }
+            }
+          }
+        }
+      ],
+      "label": "faults-r2"
+    }
+  ],
+  "initialFaultAcceptance": {
+    "accepted": false,
+    "cleanupConfirmed": true,
+    "failure": "Owned Tool admission timed out",
+    "scope": "Lost-reply admission expected four Tools, but only three corresponding Runs were found in Worker claim logs. Their canonical results were UNKNOWN. The initial driver did not retain the fourth operation outcome before cleanup; its exact pre-admission cause is unconfirmed. Diagnostic capture was added without changing admission count or pass criteria; the full rerun passed."
+  },
+  "settledMemory": {
+    "afterCold": {
+      "at": "2026-11-17T18:32:50.676Z",
+      "state": {
+        "active_runs": 0,
+        "active_leases": 0
+      },
+      "instances": [
+        {
+          "estimatedBytes": {
+            "identity": 449304,
+            "native_live": 0,
+            "display_tail": 0,
+            "empty_display": 252672,
+            "event_ids": 0,
+            "prefetch": 0
+          },
+          "entries": {
+            "identity": 388,
+            "identity_loads": 0,
+            "native_views": 0,
+            "native_live": 0,
+            "display_tail": 0,
+            "empty_display": 384,
+            "event_ids": 0,
+            "prefetch": 0
+          },
+          "cacheOperations": {
+            "hits": 9555,
+            "misses": 388,
+            "loads": 388,
+            "coalesced": 0,
+            "evictions": 0
+          },
+          "process": {
+            "process_resident_memory_bytes": 424456192,
+            "nodejs_heap_size_used_bytes": 90736696
+          }
+        }
+      ]
+    },
+    "afterCapacity": {
+      "at": "2026-11-17T18:49:24.002Z",
+      "state": {
+        "active_runs": 0,
+        "active_leases": 0
+      },
+      "instances": [
+        {
+          "estimatedBytes": {
+            "identity": 2649518,
+            "native_live": 0,
+            "display_tail": 0,
+            "empty_display": 602070,
+            "event_ids": 0,
+            "prefetch": 0
+          },
+          "entries": {
+            "identity": 2288,
+            "identity_loads": 0,
+            "native_views": 0,
+            "native_live": 0,
+            "display_tail": 0,
+            "empty_display": 915,
+            "event_ids": 0,
+            "prefetch": 0
+          },
+          "cacheOperations": {
+            "hits": 63223,
+            "misses": 2288,
+            "loads": 2288,
+            "coalesced": 0,
+            "evictions": 0
+          },
+          "process": {
+            "process_resident_memory_bytes": 452046848,
+            "nodejs_heap_size_used_bytes": 146006432
+          }
+        }
+      ]
+    },
+    "final": {
+      "at": "2026-11-17T19:13:16.578Z",
+      "state": {
+        "active_runs": 0,
+        "active_leases": 0
+      },
+      "instances": [
+        {
+          "estimatedBytes": {
+            "identity": 2440,
+            "native_live": 0,
+            "display_tail": 0,
+            "empty_display": 658,
+            "event_ids": 0,
+            "prefetch": 0
+          },
+          "entries": {
+            "identity": 2,
+            "identity_loads": 0,
+            "native_views": 0,
+            "native_live": 0,
+            "display_tail": 0,
+            "empty_display": 1,
+            "event_ids": 0,
+            "prefetch": 0
+          },
+          "cacheOperations": {
+            "hits": 97,
+            "misses": 2,
+            "loads": 2,
+            "coalesced": 0,
+            "evictions": 0
+          },
+          "process": {
+            "process_resident_memory_bytes": 339513344,
+            "nodejs_heap_size_used_bytes": 92491688
+          }
+        }
+      ]
+    }
+  },
+  "cleanupObservation": {
+    "lastSettlementAt": 1794941237554,
+    "firstFreshAllZeroAt": 1794941238950,
+    "observedUpperBoundMs": 1396,
+    "operationalSampleAt": 1794941238034.0,
+    "sampling": "1 Hz read-only HTTP, existing 10-second metric refresh; observed upper bound, not a cleanup SLA",
+    "entries": {
+      "identity": 2288,
+      "identity_loads": 0,
+      "native_views": 0,
+      "native_live": 0,
+      "display_tail": 0,
+      "empty_display": 915,
+      "event_ids": 0,
+      "prefetch": 0
+    }
+  },
+  "nativeInputAcceptance": {
+    "checkedAt": "2026-11-17T19:09:33.954Z",
+    "model": "gpt-6-luna",
+    "scriptSha256": "dc9d255ed35ca06da846394d682f4989013ad4b9a1f240407e2b034c5a71044a",
+    "nativeProgressSha256": "acf69a76990b75ba6ef8397abd19e5fc78218c56a865138c3f98609df91c169e",
+    "nativeObservationsSha256": "4f1ac5e5f0165fbd223190a04e36493c0fb918956dbab32ff3a0c3281dfdb23e",
+    "accepted": true,
+    "cleanupConfirmed": true,
+    "cases": [
+      {
+        "scenario": "consume",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "stop",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "recover",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true,
+        "crash": {
+          "exitCode": 137,
+          "restartCount": 2,
+          "signal": "SIGKILL",
+          "elapsedMs": 1968
+        },
+        "observationRecovery": {
+          "previousGeneration": 1,
+          "recoveredGeneration": 2,
+          "activityRevision": 2,
+          "confirmedExecutionRevision": 4,
+          "snapshots": 1,
+          "sameSseConnection": true,
+          "browserStoreApplied": true
+        }
+      },
+      {
+        "scenario": "stream_stop",
+        "observedCharacters": 123,
+        "observedPrefixSha256": "0f08a6bfdd701a78ea831b9aad5acfb98a7b31616c4686994d34c9747a097cc5",
+        "noPgStreamingBodies": true,
+        "preservedNativePartial": true,
+        "oneRun": true
+      },
+      {
+        "scenario": "stream_both_crash",
+        "observedCharacters": 141,
+        "observedPrefixSha256": "c756e2586bcac280fb5afedd008e04ca72e4b5d51808601de63c5c569e24a1ac",
+        "noPgStreamingBodies": true,
+        "preservedNativePartial": true,
+        "oneRun": true,
+        "crash": {
+          "worker": {
+            "exitCode": 137,
+            "restartCount": 3,
+            "signal": "SIGKILL",
+            "elapsedMs": 13147
+          },
+          "controlPlane": {
+            "exitCode": 137,
+            "restartCount": 1
+          }
+        }
+      }
+    ]
+  },
+  "preservation": {
+    "afterRelease": {
+      "preserved": true,
+      "originalFiles": 393,
+      "originalMachines": 2,
+      "failures": []
+    },
+    "final": {
+      "preserved": true,
+      "originalFiles": 393,
+      "originalMachines": 2,
+      "failures": []
+    }
+  },
+  "health": {
+    "at": "2026-11-17T19:14:23.148Z",
+    "runningPods": 37,
+    "ready": 37,
+    "completedJobs": 1
+  }
+}

@@ -1,24 +1,34 @@
 # Maintained backlog
 
-## Projector consumption and memory — in progress
+## Projector consumption and memory — delivered
 
-- [ ] [#47](https://github.com/cookerpapa/pi-managed-agents/issues/47): replace
+- [x] [#47](https://github.com/cookerpapa/pi-managed-agents/issues/47): replace
   per-record native pause with bounded prefetch and ordered handlers; coalesce
   progress commits while preserving effect admission and EOF/recovery evidence.
-  ADR-0331 records the implementation contract. Complete this slice before #46.
+  ADR-0331 records the implemented ordering, EOF and failure contract.
 
-- [ ] [#46](https://github.com/cookerpapa/pi-managed-agents/issues/46): measure and
+- [x] [#46](https://github.com/cookerpapa/pi-managed-agents/issues/46): measure and
   bound identity caches with coherent eviction and coalesced PG reloads; a cache
   miss never grants permission. Remove cache-wide invalidation only with equivalent
   closure/rebalance guarantees.
-- [ ] Audit stable-message and post-checkpoint cleanup of pending live documents,
-  presentation tails and recovery metadata. Any active-state eviction must first
-  preserve reconstruction from PG plus the protected Kafka suffix, without losing
-  visible partial text or replaying Tools. Record a changed storage/replay policy
-  in an ADR before implementation.
-- [ ] Measure actual memory, cache hits/misses, reloads and cleanup latency under
-  serial owned workloads. This memory review is separate from the post-model
-  throughput bottleneck below; no causal link has been established.
+- [x] Audit and correct stable-message/post-checkpoint cleanup, empty display
+  retention and sealed-history replay. ADR-0332 retains uncheckpointed text and
+  original reply protection; active progress is not subject to ordinary LRU.
+- [x] Measure actual cache memory, hot reads, PG reloads and live cleanup under
+  serial owned workloads, followed by native partial-output recovery acceptance.
+
+[Delivery](reports/projector-prefetch-memory-delivery-20261118.md): native receive
+amplification falls from approximately 32x to 1.03x in the bounded reproduction.
+Three 64-concurrency samples measured 8.29/18.48/8.64 completed Runs/s; all admitted
+work completed. Cache metadata is bounded and pending state cleared at settlement.
+
+- [ ] Profile remaining work inside the timed projection stage before changing
+  transaction/storage boundaries. Sustained high offered load still completed
+  about 9–10 Runs/s; the consumer repair does not resolve that system-wide limit.
+- [ ] If the initial live fault admission anomaly recurs, use the newly retained
+  per-operation evidence to identify its cause. Only three of four expected
+  Worker claims were observed in the first group; its exact pre-admission failure
+  is unconfirmed. The complete rerun passed with unchanged criteria.
 
 ## Worker publication and model charge attribution — delivered
 

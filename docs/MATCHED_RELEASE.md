@@ -5,11 +5,16 @@ serving roles and physical maintenance separately under
 [ADR-0320](adr/0320-release-plans-and-artifact-reuse.md). Preparation does not change
 the serving catalog. All builds and native/live checks on the WSL host run serially.
 
-The current verified record is `projector-admission-20261117-r1`, schema 226, catalog v2, Session
+The current verified record is `prefetch-cache-20261118-r1`, schema 226, catalog v2, Session
 topic v22, reply topic v4, resource capsule 4, provider contract 1, Guest executor
 1, fixed Tool payload 7, Android executor 2 and public terminal 2. Core, Tool-host
 and Web artifacts retain their own source revisions. The
-[latest delivery](reports/projector-admission-delivery-20261117.md) records shared
+[latest delivery](reports/projector-prefetch-memory-delivery-20261118.md) records
+bounded Projector prefetch, coalesced progress confirmation, coherent identity
+caches and safe live-state cleanup. Three artifacts were built and eleven reused;
+native compute/storage were preserved. Serial live recovery and load checks retain
+the remaining sustained-throughput limit and the first live admission anomaly.
+The [preceding delivery](reports/projector-admission-delivery-20261117.md) records shared
 Worker producers, Projector admission, exact input confirmation and model charge
 eligibility. Six artifacts were built and eight reused; native compute and storage
 were preserved. Serial live recovery and load tests retain the unresolved

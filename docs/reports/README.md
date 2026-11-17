@@ -1,5 +1,10 @@
 # Delivery and research evidence
 
+- [Projector consumption and memory](projector-prefetch-memory-delivery-20261118.md):
+  #46/#47, bounded prefetch, coherent identity caches, measured cleanup and serial
+  recovery/load acceptance. Receive amplification is repaired; sustained capacity
+  remains limited. Retains the first live admission anomaly and full rerun evidence.
+
 - [Projector consumption diagnosis](projector-consumption-diagnosis-20261117.md):
   per-record pause purges native prefetch; isolated controls reproduce repeated
   reads and idle delivery gaps, with actual Run correlation and restored runtime

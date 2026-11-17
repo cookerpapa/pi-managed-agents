@@ -1,5 +1,16 @@
 # Implementation roadmap
 
+## Projector consumption and memory — delivered
+
+Issues #46/#47 are [deployed and measured](reports/projector-prefetch-memory-delivery-20261118.md)
+under ADR-0331/0332. Bounded prefetch replaces per-record native pause; required
+effect commits remain confirmed. Coherent identity caches reload PG on misses,
+while native live state retains its durable coverage and recovery boundaries.
+Reader amplification is repaired, real-PG/RF3/native recovery passes and original
+assets are preserved. Cold 64-concurrency throughput is 8.29/18.48/8.64 Runs/s;
+sustained higher offered rates still encounter a roughly 9–10-Run/s limit.
+The report retains the first live admission anomaly and successful full rerun.
+
 ## Worker publication and customer accounting — delivered
 
 Issues #43, #44 and #45 are [published and verified](reports/projector-admission-delivery-20261117.md)
@@ -15,8 +26,8 @@ The [subsequent consumer diagnosis](reports/projector-consumption-diagnosis-2026
 confirms repeated prefetch caused by pausing each partition for every record,
 with measured delivery gaps and serialized progress-commit waits. Isolated
 controls and two observed production-path repetitions passed with cleanup and
-configuration restoration. A bounded consumption repair needs review of ordering,
-EOF/replay and effect-commit semantics; it has not been implemented or deployed.
+configuration restoration. The deployed repair above preserves ordering,
+EOF/replay and effect-commit semantics, with measured memory and live recovery checks.
 
 ## Runtime throughput baseline — delivered
 

@@ -1,6 +1,9 @@
 # ADR-0332: Projector identity-cache and live-state lifetimes
 
-Status: accepted for implementation on 2026-11-17 (#46).
+Status: implemented and deployed on 2026-11-18 (#46).
+
+[Delivery and measurements](../reports/projector-prefetch-memory-delivery-20261118.md)
+record cache memory, real-PG reload, live cleanup and partial-output recovery.
 
 ## Authority and cache
 

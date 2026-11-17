@@ -1,6 +1,9 @@
 # ADR-0331: Bounded partition prefetch and coalesced progress
 
-Status: accepted for implementation on 2026-11-17 (#47).
+Status: implemented and deployed on 2026-11-18 (#47).
+
+[Delivery and measurements](../reports/projector-prefetch-memory-delivery-20261118.md)
+record the deployed reader, serial recovery acceptance and remaining throughput limits.
 
 ## Evidence and adoption
 

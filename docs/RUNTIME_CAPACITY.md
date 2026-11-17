@@ -10,6 +10,13 @@ repeats the workloads after shared Worker producers and Projector admission.
 It separates sub-millisecond writer preparation from remaining downstream
 settlement latency; rejected offered arrivals are distinguished from accepted work.
 
+The [November 18 repair](reports/projector-prefetch-memory-delivery-20261118.md)
+delivers bounded prefetch and identity caches, with actual reader counters,
+memory/cleanup observations and native recovery. The 64-concurrency repetitions
+improve some burst/tail measurements, but the sustained roughly 9–10-Run/s ceiling
+remains. Fault reports now preserve failed operation/admission evidence before
+cleanup removes their owned Runs.
+
 The [consumer diagnosis](reports/projector-consumption-diagnosis-20261117.md)
 then isolates native pause/refetch amplification and observes actual delivery gaps.
 Its bounded reproduction uses an owned RF3 Topic without models or PG handlers:

@@ -26,7 +26,7 @@ restarting platform services; users select them on the resource page. Existing
 Android devices can be registered for an organization and bound to idle Sessions.
 There is no automatic provider fallback or emulator-provisioning UI. See the
 [backend contract](docs/RESOURCE_BACKENDS.md) and
-[current delivery evidence](docs/reports/http-mcp-delivery-20261115.md).
+[current delivery evidence](docs/reports/projector-prefetch-memory-delivery-20261118.md).
 
 > **Open to opportunities:** The maintainer is looking for engineering roles in
 > Agent Runtime, Harness or Managed Agents infrastructure, based in **Guangzhou,
@@ -282,6 +282,10 @@ individual delivery reports retain both successes and unresolved failures.
 The [publication and accounting delivery](docs/reports/projector-admission-delivery-20261117.md)
 verifies shared Worker producers, projected input confirmation and customer-usage
 eligibility. Writer startup is faster; high-concurrency settlement remains a measured limit.
+The [Projector consumption and memory delivery](docs/reports/projector-prefetch-memory-delivery-20261118.md)
+verifies bounded prefetch, coherent identity caches and partial-output recovery.
+Repeated native fetching is repaired; the report separates burst improvements
+from the remaining sustained-throughput limit.
 The [runtime and resource-accounting delivery](docs/reports/runtime-accounting-20261107.md)
 records real quota growth, receipt recovery, an 86-second management outage,
 native crash recovery and image preservation on the maintained single-host setup.
