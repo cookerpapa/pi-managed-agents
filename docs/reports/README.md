@@ -1,5 +1,9 @@
 # Delivery and research evidence
 
+- [Fencing and Kafka publication patterns](../research/kafka-fencing-patterns-20261117.md):
+  official Connect/Streams source, Outbox and checkpoint comparisons; existing
+  authorization checks have precedent, while producer granularity remains a
+  measured design choice. Research only, with no runtime change.
 - [Terminal history query repair](terminal-history-query-repair-20261117.md): direct
   root metadata, bounded child selection, published before/after measurements,
   child/history/recovery acceptance and the separate Kafka-client follow-up.

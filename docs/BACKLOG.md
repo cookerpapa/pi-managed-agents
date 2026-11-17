@@ -73,6 +73,11 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
 - [ ] Evaluate Kafka client initialization/background scheduling without weakening
   Session producer fencing. Investigate the allocator abort seen in the injected
   diagnostic repetition; its recovery tails are not ordinary latency evidence.
+- [x] Compare established fencing/publication patterns against the current
+  constraints. The [source-backed survey](research/kafka-fencing-patterns-20261117.md)
+  finds an explicit Connect pre/init/post-check precedent and distinguishes
+  Streams group fencing, database Outbox and checkpoint-owned sinks. It does not
+  authorize restoring ingress, pooling Session writers or moving scheduling.
 - [ ] Remeasure publication/projection/settlement saturation after the bounded
   repairs. Terminal-query acceptance reduced the paired settlement p95 from
   24.98 s to 16.59/14.12 s, but substantial backlog and variability remain.
