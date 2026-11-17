@@ -1,5 +1,8 @@
 # Delivery and research evidence
 
+- [OpenMA streaming, retention and capacity evidence](../research/openma-streaming-retention-capacity-20261117.md):
+  actual Node/Cloudflare delta paths, retained stream buffers and the limits of
+  published stress/business-latency evidence. Source inspection only.
 - [Producer reuse and Raft assessment](../research/producer-reuse-and-raft-20261117.md):
   scoped Worker-query preference, Session/Worker/partition tradeoffs and the
   boundary between a replicated state machine and external Kafka publication.

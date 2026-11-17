@@ -182,6 +182,11 @@ everywhere or for lower database load. The reusable lesson is to enforce the
 business fence where an event can actually be accepted or rejected. Borrowing its
 SQL predicates wholesale would change our streaming/durability architecture.
 
+The [streaming/retention follow-up](openma-streaming-retention-capacity-20261117.md)
+distinguishes canonical SQL events from ephemeral Node deltas and Cloudflare's
+persisted stream buffer. Canonical-write fencing must not be generalized into a
+claim that every visible fragment is durable on every OpenMA deployment path.
+
 ## What Raft can solve
 
 [Raft](https://raft.github.io/) replicates an ordered sequence of commands so a

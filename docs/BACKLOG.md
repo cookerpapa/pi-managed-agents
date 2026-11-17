@@ -856,6 +856,10 @@ Evidence: `deploy/production/runtime/release-evidence/answer-copy-20261028/`.
 - [x] Record the owner's conversational-continuity rationale, including future
   spoken interruption and generated-versus-played boundaries. This constrains
   later log redesigns; it does not introduce or claim an implemented voice feature.
+- [x] Compare OpenMA's actual stream persistence, completion cleanup and public
+  capacity evidence. The [source review](research/openma-streaming-retention-capacity-20261117.md)
+  distinguishes ephemeral Node deltas from Cloudflare SQL buffers; it does not
+  supply a comparable sustained-capacity result or an automatic buffer-retention policy.
 
 [ADR-0283](adr/0283-interrupted-assistant-text-context.md) implements preserving
 cancelled visible text as assistant context with a short interruption marker.
