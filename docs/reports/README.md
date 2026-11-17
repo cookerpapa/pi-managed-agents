@@ -1,5 +1,10 @@
 # Delivery and research evidence
 
+- [Projector consumption diagnosis](projector-consumption-diagnosis-20261117.md):
+  per-record pause purges native prefetch; isolated controls reproduce repeated
+  reads and idle delivery gaps, with actual Run correlation and restored runtime
+  configuration. Includes a maintained reproduction command, not a deployed fix.
+
 - [Worker publication and model charge attribution](projector-admission-delivery-20261117.md):
   #43–45, shared producers, Projector admission, exact input confirmations,
   independent financial eligibility, deployed recovery and serial load comparison.

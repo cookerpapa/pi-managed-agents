@@ -11,6 +11,13 @@ with no real deductions. Writer preparation fell below one millisecond on averag
 but 64-concurrency throughput remains variable and the roughly 10-Run/s saturation
 question is unresolved. Investigate downstream queueing before another protocol change.
 
+The [subsequent consumer diagnosis](reports/projector-consumption-diagnosis-20261117.md)
+confirms repeated prefetch caused by pausing each partition for every record,
+with measured delivery gaps and serialized progress-commit waits. Isolated
+controls and two observed production-path repetitions passed with cleanup and
+configuration restoration. A bounded consumption repair needs review of ordering,
+EOF/replay and effect-commit semantics; it has not been implemented or deployed.
+
 ## Runtime throughput baseline — delivered
 
 Issue #42 is [implemented and measured](reports/runtime-capacity-20261115.md)

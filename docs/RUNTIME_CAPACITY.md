@@ -10,6 +10,18 @@ repeats the workloads after shared Worker producers and Projector admission.
 It separates sub-millisecond writer preparation from remaining downstream
 settlement latency; rejected offered arrivals are distinguished from accepted work.
 
+The [consumer diagnosis](reports/projector-consumption-diagnosis-20261117.md)
+then isolates native pause/refetch amplification and observes actual delivery gaps.
+Its bounded reproduction uses an owned RF3 Topic without models or PG handlers:
+
+```sh
+PI_CLOUD_READER_DIAGNOSTIC=1 node --import tsx \
+  scripts/run-projector-reader-diagnostic.mjs /private/reader-diagnostic.json
+```
+
+This is a consumer microbenchmark. Its buffered control does not implement the
+production EOF, recovery or effect-dispatch contract and is not a rollout option.
+
 The [November 16 repair measurements](reports/workload-release-throughput-20261116.md)
 compare identical pre/post workloads, document removed history timeouts and
 separate short-burst improvements from remaining sustained-rate/settlement limits.

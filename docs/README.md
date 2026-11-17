@@ -51,6 +51,10 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+- [Projector consumption diagnosis, November 17](reports/projector-consumption-diagnosis-20261117.md):
+  confirmed pause/refetch amplification, controlled experiments, Run-level
+  delivery timing and the remaining repair boundary.
+
 - [Workload build isolation and throughput, November 16](reports/workload-release-throughput-20261116.md):
   published query/build repairs, measured improvements and remaining saturation limits.
 

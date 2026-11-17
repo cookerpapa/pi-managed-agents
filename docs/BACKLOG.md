@@ -38,9 +38,15 @@ writer preparation averages 0.63–0.67 ms, but cold 64-concurrency throughput i
 4.57/5.93 Runs/s, with 8.50/s in the later capacity sequence. The previous release
 measured 6.29/9.04/s; no stable overall improvement is claimed. All admitted work
 completed, while high offered-rate workloads hit the driver's in-flight cap.
-- [ ] Locate the remaining post-model projection/acknowledgement/settlement queueing
-  before proposing an architectural change. Separate short 32-concurrency bursts
-  from sustainable throughput; preserve durable visible prefixes and effect admission.
+- [x] Locate the post-model delivery bottleneck through controlled RF3 experiments
+  and actual Run timing. The [consumer diagnosis](reports/projector-consumption-diagnosis-20261117.md)
+  confirms that per-record native pause discards prefetched data, causes repeated
+  fetches and creates delivery gaps; progress commits also serialize and queue.
+- [ ] Review a bounded prefetched-record scheduler and progress-commit strategy,
+  evaluating the pinned SDK's public API first. Preserve partition ordering,
+  processed EOF/replay evidence, generation fencing and confirmed Tool admission.
+  The diagnostic buffered control is not a production replacement. Measure actual
+  end-to-end improvements after a reviewed repair; no capacity gain is claimed yet.
 
 ## Runtime throughput baseline — delivered
 
