@@ -1,5 +1,20 @@
 # Maintained backlog
 
+## Projector cache and live-state memory — proposed
+
+- [ ] [#46](https://github.com/cookerpapa/pi-managed-agents/issues/46): measure and
+  bound identity caches with coherent eviction and coalesced PG reloads; a cache
+  miss never grants permission. Remove cache-wide invalidation only with equivalent
+  closure/rebalance guarantees.
+- [ ] Audit stable-message and post-checkpoint cleanup of pending live documents,
+  presentation tails and recovery metadata. Any active-state eviction must first
+  preserve reconstruction from PG plus the protected Kafka suffix, without losing
+  visible partial text or replaying Tools. Record a changed storage/replay policy
+  in an ADR before implementation.
+- [ ] Measure actual memory, cache hits/misses, reloads and cleanup latency under
+  serial owned workloads. This memory review is separate from the post-model
+  throughput bottleneck below; no causal link has been established.
+
 ## Worker publication and model charge attribution — delivered
 
 - [x] [#44](https://github.com/cookerpapa/pi-managed-agents/issues/44): derive exact
