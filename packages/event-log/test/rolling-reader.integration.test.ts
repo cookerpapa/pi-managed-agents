@@ -4,7 +4,7 @@ import { expect, it, vi } from "vitest";
 import { KafkaLogConsumer } from "../src/kafka-log-consumer.ts";
 const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS?.split(",");
 it.skipIf(!brokers)(
-  "resumes a partition paused by an in-flight handler across an overlapping group handoff",
+  "resumes a pressure-paused partition with buffered records across an overlapping group handoff",
   async () => {
     const topic = `rolling-reader-${randomUUID()}`;
     const kafka = new native.KafkaJS.Kafka({
@@ -64,6 +64,17 @@ it.skipIf(!brokers)(
       await vi.waitFor(() => expect(b.ownsPartition(1)).toBe(true), { timeout: 30000 });
       await send(1, "hold");
       await held.promise;
+      await producer.send({
+        topic,
+        messages: Array.from({ length: 300 }, (_, i) => ({
+          partition: 1,
+          key: "session",
+          value: JSON.stringify({ id: `queued-${i}` }),
+        })),
+      });
+      await vi.waitFor(() => expect(b.statistics().pausedPartitions).toBeGreaterThan(0), {
+        timeout: 10000,
+      });
       await a.close();
       await vi.waitFor(() => expect(b.ownsPartition(1)).toBe(false), { timeout: 15000 });
       release.resolve();
@@ -74,6 +85,9 @@ it.skipIf(!brokers)(
       await send(0, "after-gained");
       await vi.waitFor(() => expect(seen).toContain("after-retained"), { timeout: 10000 });
       await vi.waitFor(() => expect(seen).toContain("after-gained"), { timeout: 10000 });
+      expect(seen.filter((id) => id.startsWith("queued-"))).toEqual(
+        Array.from({ length: 300 }, (_, i) => `queued-${i}`),
+      );
     } finally {
       release.resolve();
       await Promise.allSettled(consumers.map((c) => c.close()));

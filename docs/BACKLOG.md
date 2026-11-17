@@ -1,6 +1,11 @@
 # Maintained backlog
 
-## Projector cache and live-state memory — proposed
+## Projector consumption and memory — in progress
+
+- [ ] [#47](https://github.com/cookerpapa/pi-managed-agents/issues/47): replace
+  per-record native pause with bounded prefetch and ordered handlers; coalesce
+  progress commits while preserving effect admission and EOF/recovery evidence.
+  ADR-0331 records the implementation contract. Complete this slice before #46.
 
 - [ ] [#46](https://github.com/cookerpapa/pi-managed-agents/issues/46): measure and
   bound identity caches with coherent eviction and coalesced PG reloads; a cache

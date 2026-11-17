@@ -1,4 +1,5 @@
 import kafkaNative from "@confluentinc/kafka-javascript";
+import { PartitionPrefetch, type PrefetchLimits } from "./partition-prefetch.ts";
 import type {
   KafkaJS as K,
   KafkaConsumer,
@@ -9,6 +10,13 @@ import type {
 
 type Assignment = { topic: string; partition: number; offset?: number };
 export type PartitionReaderOptions = {
+  prefetch?: PrefetchLimits;
+  /** Optional diagnostics only; observer failure cannot change delivery. */
+  onStatistics?(statistics: {
+    receivedRecords: number;
+    receivedMessageBytes: number;
+    fetchRequests: number;
+  }): void;
   brokers: readonly string[];
   clientId: string;
   groupId: string;
@@ -26,8 +34,8 @@ export type PartitionReaderOptions = {
   onPosition(partition: number, offset: bigint): void;
 };
 
-/** Pinned librdkafka's public native API exposes EOF, including transaction gaps.
- * One delivered record per partition is in flight; native pause owns buffering.
+/** Pinned public native API supplies EOF and group transaction fencing.
+ * Bounded prefetch retains data while each partition runs one handler.
  */
 export class KafkaPartitionReader {
   readonly #client: KafkaConsumer;
@@ -35,20 +43,35 @@ export class KafkaPartitionReader {
   readonly #assigned = new Set<number>();
   readonly #active = new Map<number, Promise<void>>();
   readonly #paused = new Set<number>();
+  readonly #nativePaused = new Set<number>();
+  readonly #seeking = new Map<number, { epoch: number; ready: boolean }>();
+  readonly #prefetch: PartitionPrefetch;
   readonly #epochs = new Map<number, number>();
   readonly #eof = new Map<number, { offset: bigint; epoch: number }>();
   readonly #starts = new Map<number, number>();
   readonly #committed = new Map<number, bigint>();
   readonly #commitLocks = new Map<number, Promise<void>>();
   #generation = 0;
+  #failed: unknown;
   #closing = false;
   #disconnecting: Promise<void> | undefined;
   #connected = false;
   #polling = false;
   #pollGeneration = 0;
+  #pollEpochs = new Map<number, number>();
   #loop: Promise<void> | undefined;
   #handler: K.EachBatchHandler | undefined;
-  #commitTail = Promise.resolve();
+  readonly #pendingCommits = new Map<
+    number,
+    {
+      offset: K.TopicPartitionOffsetAndMetadata;
+      generation: number;
+      resolve(): void;
+      reject(error: unknown): void;
+    }
+  >();
+  #commitTimer: NodeJS.Timeout | undefined;
+  #commitFlush: Promise<void> | undefined;
   #commit:
     | {
         offsets: K.TopicPartitionOffsetAndMetadata[];
@@ -59,11 +82,13 @@ export class KafkaPartitionReader {
 
   constructor(options: PartitionReaderOptions) {
     this.#options = options;
+    this.#prefetch = new PartitionPrefetch(options.prefetch);
     this.#client = new kafkaNative.KafkaConsumer({
       "metadata.broker.list": options.brokers.join(","),
       "client.id": options.clientId,
       "group.id": options.groupId,
       "enable.auto.commit": false,
+      "statistics.interval.ms": options.onStatistics ? 1000 : 0,
       "enable.auto.offset.store": false,
       "enable.partition.eof": true,
       "isolation.level": "read_committed",
@@ -84,6 +109,9 @@ export class KafkaPartitionReader {
         this.#committed.clear();
         this.#eof.clear();
         this.#paused.clear();
+        this.#nativePaused.clear();
+        this.#seeking.clear();
+        this.#prefetch.clearQueued();
         const generation = this.#generation;
         void options
           .rebalance(error, assignments, {
@@ -99,6 +127,7 @@ export class KafkaPartitionReader {
                 this.#assigned.add(value.partition);
                 if (value.offset !== undefined) this.#starts.set(value.partition, value.offset);
               }
+              this.#updatePauses();
             },
             unassign: () => {
               this.#client.unassign();
@@ -108,6 +137,26 @@ export class KafkaPartitionReader {
       },
     });
     this.#client.setDefaultConsumeTimeout(25);
+    if (options.onStatistics)
+      this.#client.on("event.stats", (event: { message: string }) => {
+        try {
+          const value = JSON.parse(event.message) as {
+            rxmsgs: number;
+            rxmsg_bytes: number;
+            brokers: Record<string, { req?: { Fetch?: number } }>;
+          };
+          options.onStatistics!({
+            receivedRecords: value.rxmsgs,
+            receivedMessageBytes: value.rxmsg_bytes,
+            fetchRequests: Object.values(value.brokers).reduce(
+              (n, broker) => n + (broker.req?.Fetch ?? 0),
+              0,
+            ),
+          });
+        } catch {
+          /* Disposable evidence never changes consumption. */
+        }
+      });
     this.#client.on("event.error", (error) => {
       if (!this.#closing) this.#fail(error);
     });
@@ -116,6 +165,9 @@ export class KafkaPartitionReader {
         this.#closing ||
         !this.#polling ||
         this.#pollGeneration !== this.#generation ||
+        this.#pollEpochs.get(event.partition) !== this.#epoch(event.partition) ||
+        this.#seeking.has(event.partition) ||
+        this.#failed !== undefined ||
         !this.#assigned.has(event.partition) ||
         event.offset < 0
       )
@@ -133,6 +185,11 @@ export class KafkaPartitionReader {
         pending.reject(error);
         return;
       }
+      const failed = offsets.find((offset) => offset.error);
+      if (failed) {
+        pending.reject(failed.error);
+        return;
+      }
       if (
         pending.offsets.every((wanted) =>
           offsets.some(
@@ -148,6 +205,13 @@ export class KafkaPartitionReader {
   }
 
   #fail(error: unknown): void {
+    if (this.#failed !== undefined || this.#closing) return;
+    this.#failed = error ?? new Error("Kafka reader failed");
+    this.#generation++;
+    this.#prefetch.clearQueued();
+    for (const request of this.#pendingCommits.values()) request.reject(error);
+    this.#pendingCommits.clear();
+    this.#commit?.reject(error);
     this.#options.logger.error(error instanceof Error ? error.name : "KafkaReaderError");
   }
 
@@ -160,6 +224,10 @@ export class KafkaPartitionReader {
     if (
       this.#polling ||
       this.#active.has(partition) ||
+      this.#prefetch.queued(partition) ||
+      this.#seeking.has(partition) ||
+      this.#paused.has(partition) ||
+      this.#failed !== undefined ||
       !eof ||
       eof.epoch !== this.#epoch(partition) ||
       !this.#assigned.has(partition)
@@ -195,9 +263,16 @@ export class KafkaPartitionReader {
   }
 
   async #poll(): Promise<void> {
-    while (!this.#closing) {
+    while (!this.#closing && this.#failed === undefined) {
+      this.#finishSeeks();
       const generation = this.#generation;
       this.#pollGeneration = generation;
+      this.#pollEpochs = new Map(
+        [...this.#assigned]
+          .filter((partition) => !this.#seeking.has(partition))
+          .map((partition) => [partition, this.#epoch(partition)]),
+      );
+      const epochs = this.#pollEpochs;
       this.#polling = true;
       let messages: Message[];
       try {
@@ -207,10 +282,22 @@ export class KafkaPartitionReader {
       } finally {
         this.#polling = false;
       }
-      if (!this.#closing && generation === this.#generation) {
-        for (const message of messages) this.#deliver(message);
+      if (!this.#closing && this.#failed === undefined && generation === this.#generation) {
+        for (const message of messages) {
+          if (epochs.get(message.partition) !== this.#epoch(message.partition)) {
+            const offset = this.#starts.get(message.partition);
+            if (offset !== undefined && this.#assigned.has(message.partition))
+              this.seek({
+                topic: message.topic,
+                partition: message.partition,
+                offset: String(offset),
+              });
+            continue;
+          }
+          this.#enqueue(message);
+        }
         for (const partition of this.#eof.keys()) this.#advance(partition);
-      } else if (!this.#closing) {
+      } else if (!this.#closing && this.#failed === undefined) {
         // A poll can span assignment. No new-generation record has been delivered
         // by this single poller yet; rewind its new assignments rather than drop
         // a first record returned while the callback was installing them.
@@ -221,20 +308,40 @@ export class KafkaPartitionReader {
     }
   }
 
-  #deliver(message: Message): void {
-    const partition = message.partition,
-      generation = this.#generation,
-      epoch = this.#epoch(partition);
-    if (!this.#assigned.has(partition)) return;
-    // pause is synchronous: no second record of this partition is handed to us
-    // until its handler finishes or explicitly seeks/retries it.
-    if (this.#active.has(partition))
-      throw Object.assign(new Error("Kafka delivered a paused partition twice"), {
-        name: "KafkaPausedPartitionDeliveryError",
-      });
-    this.#client.pause([{ topic: message.topic, partition }]);
+  #enqueue(message: Message): void {
+    if (!this.#assigned.has(message.partition) || this.#failed !== undefined) return;
+    this.#prefetch.push(message, this.#generation, this.#epoch(message.partition));
+    this.#updatePauses();
+    this.#drain(message.partition);
+  }
+
+  #drain(partition: number): void {
+    if (
+      this.#closing ||
+      this.#failed !== undefined ||
+      !this.#assigned.has(partition) ||
+      this.#active.has(partition) ||
+      this.#paused.has(partition) ||
+      this.#seeking.has(partition)
+    )
+      return;
+    const buffered = this.#prefetch.take(partition);
+    if (!buffered) {
+      this.#advance(partition);
+      return;
+    }
+    const { message, generation, epoch } = buffered;
+    if (generation !== this.#generation || epoch !== this.#epoch(partition)) {
+      this.#prefetch.release(buffered);
+      this.#updatePauses();
+      this.#drain(partition);
+      return;
+    }
     const current = () =>
-      !this.#closing && generation === this.#generation && epoch === this.#epoch(partition);
+      !this.#closing &&
+      this.#failed === undefined &&
+      generation === this.#generation &&
+      epoch === this.#epoch(partition);
     const record: K.KafkaMessage = {
       key: typeof message.key === "string" ? Buffer.from(message.key) : (message.key ?? null),
       value: message.value,
@@ -275,13 +382,11 @@ export class KafkaPartitionReader {
       )
       .catch((error) => this.#fail(error))
       .finally(() => {
+        this.#prefetch.release(buffered);
         if (this.#active.get(partition) !== task) return;
         this.#active.delete(partition);
-        if (current()) {
-          this.#advance(partition);
-          if (!this.#paused.has(partition))
-            this.#client.resume([{ topic: message.topic, partition }]);
-        }
+        this.#updatePauses();
+        this.#drain(partition);
       });
     this.#active.set(partition, task);
   }
@@ -291,7 +396,7 @@ export class KafkaPartitionReader {
       topic.partitions.map((partition) => ({ topic: topic.topic, partition })),
     );
     for (const { partition } of partitions) this.#paused.add(partition);
-    this.#client.pause(partitions);
+    this.#updatePauses();
   }
 
   resume(topics: K.TopicPartitions[]): void {
@@ -299,57 +404,173 @@ export class KafkaPartitionReader {
       topic.partitions.map((partition) => ({ topic: topic.topic, partition })),
     );
     for (const { partition } of partitions) this.#paused.delete(partition);
-    this.#client.resume(partitions.filter(({ partition }) => !this.#active.has(partition)));
+    this.#updatePauses();
+    for (const { partition } of partitions) this.#drain(partition);
+  }
+
+  #updatePauses(): void {
+    if (this.#closing || this.#failed !== undefined) return;
+    for (const partition of this.#assigned) {
+      const paused =
+        this.#paused.has(partition) ||
+        this.#seeking.has(partition) ||
+        this.#prefetch.paused(partition);
+      if (paused === this.#nativePaused.has(partition)) continue;
+      const target = [{ topic: this.#options.topic, partition }];
+      if (paused) {
+        this.#client.pause(target);
+        this.#nativePaused.add(partition);
+      } else {
+        this.#client.resume(target);
+        this.#nativePaused.delete(partition);
+      }
+    }
+  }
+
+  statistics() {
+    return {
+      ...this.#prefetch.statistics(),
+      activePartitions: this.#active.size,
+      pausedPartitions: this.#nativePaused.size,
+      pendingOffsetCommits: this.#pendingCommits.size,
+    };
   }
 
   seek(position: K.TopicPartitionOffset): void {
     this.#epochs.set(position.partition, this.#epoch(position.partition) + 1);
+    const epoch = this.#epoch(position.partition),
+      generation = this.#generation;
+    this.#starts.set(position.partition, Number(position.offset));
+    const seeking = { epoch, ready: false };
+    this.#seeking.set(position.partition, seeking);
+    this.#prefetch.clearQueued(position.partition);
     this.#eof.delete(position.partition);
+    this.#updatePauses();
     this.#client.seek({ ...position, offset: Number(position.offset) }, 5000, (error) => {
-      if (error && !this.#closing) this.#fail(error);
+      if (
+        this.#closing ||
+        generation !== this.#generation ||
+        this.#seeking.get(position.partition) !== seeking
+      )
+        return;
+      if (error) {
+        this.#fail(error);
+        return;
+      }
+      seeking.ready = true;
+      // Do not resume in the middle of an old consume() call: it could return
+      // a new-position record under that poll's old epoch and skip it.
+      if (!this.#polling) this.#finishSeeks();
     });
+  }
+
+  #finishSeeks(): void {
+    const ready = [...this.#seeking]
+      .filter(([, seek]) => seek.ready)
+      .map(([partition]) => partition);
+    for (const partition of ready) this.#seeking.delete(partition);
+    if (!ready.length) return;
+    this.#updatePauses();
+    for (const partition of ready) this.#drain(partition);
   }
 
   commitOffset(position: K.TopicPartitionOffsetAndMetadata): Promise<void> {
     if (this.#closing) return Promise.reject(new Error("Kafka consumer is closing"));
+    if (this.#failed !== undefined) return Promise.reject(this.#failed);
     const offset = { ...position },
       generation = this.#generation;
-    // A partition waiting for its publication never reserves another partition
-    // or the shared native commit callback. Only actual callback receipts serialize.
-    return this.#withCommitLock(offset.partition, () => {
-      const pending = this.#commitTail.then(async () => {
+    // Join a batch only AFTER this partition's publication guard is available.
+    // A blocked partition never reserves the shared native callback.
+    return this.#withCommitLock(offset.partition, async () => {
+      if (
+        this.#closing ||
+        this.#failed !== undefined ||
+        generation !== this.#generation ||
+        !this.#assigned.has(offset.partition)
+      )
+        throw new Error("Kafka commit owner changed");
+      if (BigInt(offset.offset) <= (this.#committed.get(offset.partition) ?? -1n)) return;
+      await new Promise<void>((resolve, reject) => {
+        this.#pendingCommits.set(offset.partition, { offset, generation, resolve, reject });
+        this.#scheduleCommits();
+      });
+    });
+  }
+
+  #scheduleCommits(): void {
+    if (
+      this.#closing ||
+      this.#failed !== undefined ||
+      this.#commitTimer ||
+      this.#commitFlush ||
+      !this.#pendingCommits.size
+    )
+      return;
+    this.#commitTimer = setTimeout(() => {
+      this.#commitTimer = undefined;
+      this.#commitFlush = this.#flushCommits().finally(() => {
+        this.#commitFlush = undefined;
+        this.#scheduleCommits();
+      });
+      void this.#commitFlush.catch((error) => this.#fail(error));
+    }, 0);
+  }
+
+  async #flushCommits(): Promise<void> {
+    const requests = [...this.#pendingCommits.values()];
+    this.#pendingCommits.clear();
+    const valid = requests.filter((request) => {
+      if (
+        this.#closing ||
+        this.#failed !== undefined ||
+        request.generation !== this.#generation ||
+        !this.#assigned.has(request.offset.partition)
+      ) {
+        request.reject(new Error("Kafka commit owner changed"));
+        return false;
+      }
+      return true;
+    });
+    if (!valid.length) return;
+    try {
+      const offsets = valid.map((request) => request.offset);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () => finish(new Error("Kafka dispatch commit acknowledgement timed out")),
+          5000,
+        );
+        const finish = (error?: unknown) => {
+          clearTimeout(timer);
+          this.#commit = undefined;
+          if (error !== undefined) reject(error);
+          else resolve();
+        };
+        this.#commit = { offsets, resolve: () => finish(), reject: finish };
+        try {
+          this.#client.commit(
+            offsets.map((offset) => ({ ...offset, offset: Number(offset.offset) })),
+          );
+        } catch (error) {
+          finish(error);
+        }
+      });
+      for (const request of valid) {
         if (
           this.#closing ||
-          generation !== this.#generation ||
-          !this.#assigned.has(offset.partition)
-        )
-          throw new Error("Kafka commit owner changed");
-        if (BigInt(offset.offset) <= (this.#committed.get(offset.partition) ?? -1n)) return;
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
-            const error = new Error("Kafka dispatch commit acknowledgement timed out");
-            this.#fail(error);
-            finish(error);
-          }, 5000);
-          const finish = (error?: unknown) => {
-            clearTimeout(timer);
-            this.#commit = undefined;
-            if (error) reject(error);
-            else resolve();
-          };
-          this.#commit = { offsets: [offset], resolve: () => finish(), reject: finish };
-          try {
-            this.#client.commit([{ ...offset, offset: Number(offset.offset) }]);
-          } catch (error) {
-            finish(error);
-          }
-        });
-        if (generation === this.#generation)
-          this.#committed.set(offset.partition, BigInt(offset.offset));
-      });
-      this.#commitTail = pending.catch(() => {});
-      return pending;
-    });
+          this.#failed !== undefined ||
+          request.generation !== this.#generation ||
+          !this.#assigned.has(request.offset.partition)
+        ) {
+          request.reject(new Error("Kafka commit owner changed"));
+          continue;
+        }
+        this.#committed.set(request.offset.partition, BigInt(request.offset.offset));
+        request.resolve();
+      }
+    } catch (error) {
+      for (const request of valid) request.reject(error);
+      if (valid.some((request) => request.generation === this.#generation)) this.#fail(error);
+    }
   }
 
   seedCommitted(offsets: ReadonlyMap<number, bigint>): void {
@@ -379,6 +600,7 @@ export class KafkaPartitionReader {
     send: () => Promise<void>,
   ): Promise<void> {
     if (this.#closing) throw new Error("Kafka consumer is closing");
+    if (this.#failed !== undefined) throw this.#failed;
     const generation = this.#generation;
     await this.#withCommitLock(partition, async () => {
       if (this.#closing || generation !== this.#generation || !this.#assigned.has(partition))
@@ -411,10 +633,16 @@ export class KafkaPartitionReader {
   async #disconnect(): Promise<void> {
     this.#closing = true;
     this.#generation++;
+    clearTimeout(this.#commitTimer);
+    this.#commitTimer = undefined;
+    this.#prefetch.clearQueued();
+    for (const request of this.#pendingCommits.values())
+      request.reject(new Error("Kafka consumer stopped before commit"));
+    this.#pendingCommits.clear();
     this.#commit?.reject(new Error("Kafka consumer stopped during commit"));
     await this.#loop;
     await Promise.allSettled([...this.#active.values()]);
-    await this.#commitTail;
+    await this.#commitFlush;
     // Session seal writers are external to KafkaLogConsumer's partition writer
     // set. Every group transaction borrows this native client through these
     // locks, so join them before disposal even during consumer-only restart.

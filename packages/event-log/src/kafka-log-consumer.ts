@@ -43,7 +43,7 @@ export type KafkaLogConsumerOptions<T> = {
   ): Promise<void>;
 };
 
-/** librdkafka owns bounded buffering, assignments and partition flow control.
+/** Bounded native/adapter prefetch preserves partition-ordered delivery.
  * A failed record pauses/seeks ONLY its partition and returns the batch worker. */
 export class KafkaLogConsumer<T> {
   readonly #options: KafkaLogConsumerOptions<T>;
@@ -58,7 +58,6 @@ export class KafkaLogConsumer<T> {
   #failure: unknown;
   readonly #processedOffsets = new Map<number, bigint>();
   readonly #committedOffsets = new Map<number, bigint>();
-  readonly #lastCommitAt = new Map<number, number>();
   readonly #initialTargets = new Map<number, bigint>();
   readonly #retries = new Map<number, { since: number; count: number; timer: NodeJS.Timeout }>();
   readonly #inflight = new Set<Promise<void>>();
@@ -377,7 +376,12 @@ export class KafkaLogConsumer<T> {
       });
       const progressing = new Map<number, Promise<void>>();
       const progressTimer = setInterval(() => {
-        if (!this.#ready || retired || this.#closing || this.#options.commitMessages === false)
+        if (
+          !this.#ready ||
+          retired ||
+          this.#closing ||
+          (this.#options.commitMessages === false && !this.#options.orderedEffects)
+        )
           return;
         const epoch = this.#epoch;
         for (const partition of this.#assigned) {
@@ -449,7 +453,6 @@ export class KafkaLogConsumer<T> {
     if (epoch !== this.#epoch || this.#closing) return;
     if (offset > (this.#committedOffsets.get(partition) ?? -1n))
       this.#committedOffsets.set(partition, offset);
-    this.#lastCommitAt.set(partition, performance.now());
   }
 
   async #batch(
@@ -493,7 +496,6 @@ export class KafkaLogConsumer<T> {
                 });
                 if (epoch !== this.#epoch || payload.isStale() || this.#closing) return false;
                 this.#committedOffsets.set(batch.partition, next);
-                this.#lastCommitAt.set(batch.partition, performance.now());
                 return true;
               }
             : undefined,
@@ -532,30 +534,23 @@ export class KafkaLogConsumer<T> {
         break;
       }
     }
-    if (
-      (this.#options.orderedEffects || this.#options.commitMessages !== false) &&
-      epoch === this.#epoch &&
-      !payload.isStale() &&
-      !this.#closing
-    ) {
-      const next = this.#processedOffsets.get(batch.partition);
-      if (
-        next !== undefined &&
-        next > (this.#committedOffsets.get(batch.partition) ?? -1n) &&
-        performance.now() - (this.#lastCommitAt.get(batch.partition) ?? -Infinity) >= 1000
-      ) {
-        await consumer.commitOffset({
-          topic: batch.topic,
-          partition: batch.partition,
-          offset: next.toString(),
-        });
-        if (epoch === this.#epoch && !payload.isStale()) {
-          if (next > (this.#committedOffsets.get(batch.partition) ?? -1n))
-            this.#committedOffsets.set(batch.partition, next);
-          this.#lastCommitAt.set(batch.partition, performance.now());
-        }
+    // Ordinary progress is checkpointed by progressTimer. A successful handler
+    // need not wait for that periodic RPC before its next ordered record.
+  }
+
+  statistics() {
+    return (
+      this.#reader?.statistics() ?? {
+        records: 0,
+        estimatedBytes: 0,
+        queuedRecords: 0,
+        peakRecords: 0,
+        peakEstimatedBytes: 0,
+        activePartitions: 0,
+        pausedPartitions: 0,
+        pendingOffsetCommits: 0,
       }
-    }
+    );
   }
 
   checkHealth(): void {

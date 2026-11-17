@@ -54,6 +54,7 @@ async function maintained(waitMs) {
   groups.push(groupId);
   let seen = 0,
     first = 0;
+  let nativeStatistics;
   const counts = new Map(),
     done = Promise.withResolvers();
   const started = performance.now(),
@@ -64,6 +65,9 @@ async function maintained(waitMs) {
     groupId,
     topic,
     logger,
+    onStatistics: (value) => {
+      nativeStatistics = value;
+    },
     onPosition() {},
     rebalance: async (error, assignments, functions) => {
       if (error.code === native.CODES.ERRORS.ERR__ASSIGN_PARTITIONS)
@@ -95,7 +99,15 @@ async function maintained(waitMs) {
         timer = setTimeout(() => reject(Error("reader timeout " + seen)), 120000);
       }),
     ]);
-    return { kind: "maintained", waitMs, ...stats(seen, started, first, cpu) };
+    const measurement = stats(seen, started, first, cpu);
+    await delay(1100); // Capture a final native counter sample outside the timed interval.
+    return {
+      kind: "maintained",
+      waitMs,
+      ...measurement,
+      nativeStatistics,
+      buffer: reader.statistics(),
+    };
   } finally {
     clearTimeout(timer);
     await reader.disconnect();

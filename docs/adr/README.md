@@ -1,16 +1,21 @@
 # Current architecture decisions
 
+[ADR-0331](0331-bounded-partition-prefetch.md) records bounded prefetch,
+per-partition serial delivery and coalesced progress commits (#47), in progress.
+[ADR-0332](0332-projector-memory-lifetimes.md) records coherent bounded identity
+caches and safe live-state cleanup/measurement (#46), in progress.
+
 [ADR-0330](0330-model-charge-eligibility.md) separates actual model usage from
 customer charge eligibility using native settlement and writer closure facts (#45).
-Valid user Stop with complete usage remains chargeable; implementation is in progress.
+Valid user Stop with complete usage remains chargeable; deployed on November 17.
 
 [ADR-0329](0329-worker-producer-and-projector-admission.md) selects one idempotent
 Session-log producer per Worker and Projector-side admission (#43). Implementation
-is in progress; the matched cutover requires ADR-0328 input confirmations.
+was deployed on November 17 with ADR-0328 input confirmations.
 
 [ADR-0328](0328-projected-native-input-confirmation.md) requires exact native input
 confirmation after Projector persistence (#44), before enabling shared Worker
-producers and Projector-side fencing (#43). Implementation is in progress.
+producers and Projector-side fencing (#43). Deployed on November 17.
 
 [ADR-0327](0327-workload-build-inputs.md) makes generated dependency inputs and
 Worker source imports follow their workload, preserving real artifact provenance.
