@@ -361,6 +361,11 @@ No automatic fork-identity instruction is added to model context.
 See [ADR-0287](adr/0287-single-path-shared-forks.md) and
 [ADR-0288](adr/0288-peer-forks-and-independent-deletion.md).
 
+User-facing partial wording is conversation state: an interruption must not erase
+what the user's next correction refers to. The
+[streaming rationale](STREAM_DURABILITY.md#why-partial-assistant-output-is-durable)
+also records this requirement for future spoken interaction, including the
+distinction between generated and actually played content.
 Cancelled visible assistant wording is retained through Pi's public context-only
 edits, with an interruption marker. The original aborted Entry and usage remain;
 reasoning, unfinished Tool structures and provider replay signatures are not

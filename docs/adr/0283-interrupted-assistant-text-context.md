@@ -8,6 +8,22 @@ The owner approved the native ContextEdit approach, including its one extra text
 copy per cancelled response. A reference-only custom context resolver was discussed
 and rejected in favor of native recovery/compaction behavior.
 
+## Product rationale clarified on 2026-11-17
+
+An interrupted answer can already have changed the user's understanding. When
+the user corrects something the assistant just said, that partial wording must
+remain available to the next model request so both participants refer to the same
+exchange. A response-completion boundary is not the beginning of its conversational
+meaning.
+
+The owner emphasized future spoken Personal Agents: a user can interrupt speech
+while it is being delivered, without waiting for a complete message. This is a
+reason to retain partial output and its interruption state across any future
+log-publication redesign. A voice adapter will also need to distinguish generated
+content from the prefix actually played; recording that requirement does not
+claim voice support or expand this ADR's implemented text-only scope. See the
+[streaming rationale](../STREAM_DURABILITY.md#why-partial-assistant-output-is-durable).
+
 ## Intended behavior
 
 After stopping a response, a user can refer to the words already produced and

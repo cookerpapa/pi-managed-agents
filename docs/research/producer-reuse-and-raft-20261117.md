@@ -6,6 +6,11 @@ PG claims, renewals or cold-context reads. No source, protocol, dependency or li
 configuration changed. Current authorization checks remain until a replacement
 handoff contract is designed and verified.
 
+Subsequent owner clarification: an extra log-publication hop is acceptable, but
+stale publication-service instances must be fenced. Do not introduce a separate
+Raft service; evaluate Kafka's existing ownership/transaction mechanisms. KRaft
+metadata replication is not itself a business-grant validation API.
+
 This follows the [fencing-pattern survey](kafka-fencing-patterns-20261117.md).
 Its Connect precedent remains valid; the new placement preference changes which
 design candidates deserve evaluation, not the need to establish write authority.
@@ -92,6 +97,91 @@ single-group boundary and needs its own decision. Co-locating admission with
 projection also creates an availability dependency which the current direct path
 avoids. Producer reuse must be compared against that dependency and extra hop.
 
+### Fencing the publication service itself
+
+Moving the fixed transactional ID from Session to partition is insufficient on
+its own: a delayed old service initializer can still fence its replacement.
+The current control publisher uses a fixed partition ID plus a group transaction
+guard. The proposed Worker-log path must separately address both stale commits
+and that availability interference.
+
+The stronger candidate is a producer identity specific to the publication-owner
+incarnation, combined with Kafka consumer-group fencing. Kafka Streams provides
+the relevant combination: its
+[producer identity includes process/thread identity](https://github.com/apache/kafka/blob/4.1.0/streams/src/main/java/org/apache/kafka/streams/processor/internals/ActiveTaskCreator.java#L111),
+and its [transaction commit supplies consumer-group metadata](https://github.com/apache/kafka/blob/4.1.0/streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamsProducer.java#L249).
+Different producer IDs alone do not fence each other; the group-bound transaction
+is essential. A late initializer then does not deliberately take over the new
+instance's producer identity, while its obsolete group membership cannot authorize
+a new transaction through the guard.
+
+For example, A's partition assignment belongs to group generation 20; B takes
+over in generation 21. A cannot turn a generation-20 request into valid generation-21
+work just by reconnecting or creating a producer. Local request/assignment handles
+must also be invalidated on revocation and never silently upgraded after rejoin.
+Group-member validation does not replace the application's partition and Session
+grant checks.
+
+Already admitted transactions need a handoff barrier. A transaction whose group
+check succeeded before revocation may complete afterward; the successor must
+settle or wait out the prior transaction boundary and restore its accepted prefix
+before becoming ready. It is inaccurate to promise that every old in-flight
+commit instantly becomes impossible at a rebalance.
+[KIP-447](https://cwiki.apache.org/confluence/spaces/KAFKA/pages/103093950/KIP-447+Producer+scalability+for+exactly+once+semantics)
+discusses this stable-offset/pending-transaction boundary.
+
+Publication must not advance the Projector's effect-dispatch position merely to
+pass the group check. The existing implementation submits its already confirmed
+position under a commit lock. Real-broker tests must validate this usage, including
+the client metadata captured during rebalance, successor startup, delayed producer
+initialization and an ACK lost after commit. Current mocked reader/publication
+tests establish local lifetime guards, not this proposed end-to-end protocol.
+
+The required guarantee concerns accepted committed history. Aborted or uncommitted
+bytes may reach brokers; downstream readers must use committed visibility. This
+is broker transaction admission, not retrospective business-epoch filtering by
+the Projector.
+
+### OpenMA comparison
+
+Inspected `openma-ai/open-managed-agents` at commit
+`c60476ecf1c88afc9cd1ee2cf0ce11d5165c7322`, including its managed Node and Cloudflare
+execution paths. This was source inspection, not a deployment or fault audit.
+
+OpenMA has the same general stale-execution problem. Its
+[execution authority ADR](https://github.com/openma-ai/open-managed-agents/blob/c60476ecf1c88afc9cd1ee2cf0ce11d5165c7322/docs/adr/0006-session-execution-authority.md)
+uses a durable execution row with attempt, owner, generation and renewable expiry.
+Its [execution host](https://github.com/openma-ai/open-managed-agents/blob/c60476ecf1c88afc9cd1ee2cf0ce11d5165c7322/packages/session-runtime/src/execution-host.ts)
+aborts on renewal loss and performs a final renewal before settlement. Recovery
+does not claim exactly-once arbitrary external effects.
+
+The managed Node publication path uses
+[conditional SQL projection](https://github.com/openma-ai/open-managed-agents/blob/c60476ecf1c88afc9cd1ee2cf0ce11d5165c7322/packages/managed-agents-adapters-sql/src/session-runtime-projection-sql-persistence.ts#L274):
+event inserts and Session updates carry predicates over the expected revision,
+execution state, attempt, owner, generation and lease expiry. The implementation
+uses a revision guard and checked batches to reject/roll back rejected publication;
+an obsolete execution returns `execution_fence_lost`. Thus the SQL acceptance
+boundary can examine the business identity directly. It is not Kafka producer
+initialization under another name.
+
+The Cloudflare path hosts the Session in a Durable Object, but still uses the
+execution authority: its
+[local history wrapper](https://github.com/openma-ai/open-managed-agents/blob/c60476ecf1c88afc9cd1ee2cf0ce11d5165c7322/apps/agent/src/runtime/session-do.ts#L3801)
+checks the current execution/attempt/generation and expiry before append, while
+managed projection receives the fence explicitly. The
+[shared lease reader](https://github.com/openma-ai/open-managed-agents/blob/c60476ecf1c88afc9cd1ee2cf0ce11d5165c7322/packages/session-runtime-sql/src/execution-lease.ts)
+reads the authoritative SQL execution row. Durable Objects do not justify
+describing all these checks as unnecessary, and D1/local-DO persistence still has
+its own cross-boundary work.
+
+The inspected built-in Session paths use SQL/DO event storage rather than the
+PiCloud Kafka-first log. They therefore do not have the particular PG-grant to
+Kafka-producer-epoch handoff. OpenMA also consults execution authority at several
+side-effect/publication ports; it is not evidence for removing lease checks
+everywhere or for lower database load. The reusable lesson is to enforce the
+business fence where an event can actually be accepted or rejected. Borrowing its
+SQL predicates wholesale would change our streaming/durability architecture.
+
 ## What Raft can solve
 
 [Raft](https://raft.github.io/) replicates an ordered sequence of commands so a
@@ -132,6 +222,13 @@ write against a PG-issued business token. Kafka's own
 it does not expose a user-defined Session-grant state machine.
 
 ## Recommendation and decision gates
+
+The owner also reaffirmed that interrupted user-facing output is part of shared
+conversation history, especially when a future voice client lets the user interrupt
+speech and correct it. Preserve the
+[partial-output durability requirement](../STREAM_DURABILITY.md#why-partial-assistant-output-is-durable)
+in every candidate. A lower initialization cost is not a reason to persist only
+completed responses or treat spoken/displayed prefixes as disposable progress.
 
 Prioritize a bounded partition-publication prototype and compare it with the
 smaller authorization-port change. Do not add a Raft/etcd deployment just to move

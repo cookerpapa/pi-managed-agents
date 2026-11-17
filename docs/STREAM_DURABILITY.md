@@ -12,6 +12,36 @@ by [ADR-0244](adr/0244-kafka-backed-native-live-state.md),
 [ADR-0247](adr/0247-session-work-and-tool-dispatch.md) and
 [ADR-0256](adr/0256-session-publication-and-completion-boundaries.md).
 
+## Why partial assistant output is durable
+
+Owner rationale clarified on 2026-11-17: user-facing output becomes part of the
+interaction before the response finishes. A user may interrupt an assistant
+mid-sentence and correct what it just said. If that prefix disappears from the
+next model context, the user and the Agent no longer share the same conversation:
+the Agent cannot reliably understand what the correction refers to.
+
+This matters especially for a future voice-based Personal Agent. Speech is heard
+progressively, and a spoken interruption can arrive before any complete response
+exists. Retaining the interrupted prefix supports conversational continuity, not
+only debugging or crash recovery. Preserve its wording, speaker, position and
+interruption state; do not pretend that the unfinished answer completed normally.
+The existing text behavior is defined by
+[ADR-0283](adr/0283-interrupted-assistant-text-context.md).
+
+Log transport, producer reuse and admission changes must preserve recoverable
+user-facing prefixes. They must not reduce assistant text to a lossy preview or
+wait for a final message before retaining it. This requirement does not promote
+unfinished Tool arguments or private replay structures into conversation text.
+
+Future audio integration must distinguish generated, durably recorded, delivered
+and actually played content. Model generation or network delivery alone does not
+prove what the user heard. Preserve the available evidence and the interruption
+boundary; do not present an unplayed generated tail as shared spoken history.
+Missing playback evidence remains unknown. Client playback reports may describe
+consumption, but cannot authorize execution, release a lease or establish a
+successful log commit. No audio storage format, playback protocol or voice feature
+is implemented by this rationale update.
+
 ## Persistence boundaries
 
 Native `Storage.commit()` prepares one exact sequence/batch and publishes through

@@ -82,7 +82,10 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   remove Worker-side write-authorization queries only. The
   [assessment](research/producer-reuse-and-raft-20261117.md) compares an authorization
   port with partition-owned log admission. A standalone consensus service does
-  not make PG grant checks and external Kafka writes atomic.
+  not make PG grant checks and external Kafka writes atomic. The owner accepts
+  an extra publication hop and rules out a separate Raft service. Follow-up source
+  review covers stale ingress-instance fencing and OpenMA's SQL/DO publication
+  guards; neither constitutes a verified replacement protocol.
 - [ ] Agree and verify a replacement write-admission protocol before removing the
   deployed checks or pooling producers across Sessions. Claims, renewal and cold
   context reads are outside the current placement request; no Raft adoption is planned.
@@ -849,6 +852,10 @@ claiming to have repaired that intermittent fixture-loading issue.
 Evidence: `deploy/production/runtime/release-evidence/answer-copy-20261028/`.
 
 ## Interrupted assistant text in model context — completed
+
+- [x] Record the owner's conversational-continuity rationale, including future
+  spoken interruption and generated-versus-played boundaries. This constrains
+  later log redesigns; it does not introduce or claim an implemented voice feature.
 
 [ADR-0283](adr/0283-interrupted-assistant-text-context.md) implements preserving
 cancelled visible text as assistant context with a short interruption marker.
