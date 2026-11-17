@@ -43,6 +43,8 @@ npm run browser:presentation:check
 The ordinary test suite covers queue claims, Session ordering, leases/fences,
 Pi Durable Storage, event ordering, cancellation, Tool ambiguity, Volume lifecycle
 and tenant isolation without spending model tokens.
+Root test discovery excludes `.cache` source copies used by build and benchmark
+experiments; those copies are not additional maintained test suites.
 
 Control-plane integration tests and the fault gate use real PostgreSQL for queue
 locking and cancellation. Their npm entry points reuse an explicit isolated
