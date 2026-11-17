@@ -1,4 +1,4 @@
-import { ExecutionStreamBoundary } from "./execution-stream-boundary.ts";
+import { ExecutionStreamBoundary, type BoundaryCacheLimits } from "./execution-stream-boundary.ts";
 import { settleHistoryTurn, settleChildHistory } from "./presentation-settlement.ts";
 import { transitionLockedRun } from "./run-state.ts";
 import { PostgresDurableCommitProjector } from "./postgres-durable-commit-projector.ts";
@@ -47,9 +47,10 @@ export class ExecutionStreamProjector {
   constructor(
     database: Kysely<Database>,
     readonly modelAccounting?: ModelAccountingPort,
+    boundaryLimits?: BoundaryCacheLimits,
   ) {
     this.#database = database;
-    this.#boundary = new ExecutionStreamBoundary(database);
+    this.#boundary = new ExecutionStreamBoundary(database, boundaryLimits);
     this.#durable = new PostgresDurableCommitProjector(database, undefined, modelAccounting);
   }
 
