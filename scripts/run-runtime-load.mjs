@@ -733,7 +733,8 @@ async function faultStage(kind, tools) {
     }));
   const operations = owned.map((session, i) => executeWork(session, plans[i], { views: 2 }));
   let stoppedRuntime = false,
-    evidence = {};
+    evidence = {},
+    stageError;
   const unrelated = async () =>
     assert.equal(
       (
@@ -933,6 +934,15 @@ async function faultStage(kind, tools) {
     console.log(
       JSON.stringify({ stage: kind, passed: true, evidence, resources: entry.resources }),
     );
+  } catch (error) {
+    stageError = error;
+    report.faultFailure = {
+      kind,
+      error: String(error.message).slice(0, 600),
+      before,
+      after: await fixture.mcpState().catch(() => null),
+    };
+    throw error;
   } finally {
     if (stoppedRuntime) {
       kubectl(["scale", "deployment/pi-cloud-session-runtime", "--replicas=1"]);
@@ -944,7 +954,17 @@ async function faultStage(kind, tools) {
       ]);
     }
     await fixture.releaseTools("PMA_CLEANUP").catch(() => {});
-    await Promise.allSettled(operations);
+    const outcomes = await Promise.allSettled(operations);
+    // Keep admission/submission evidence before cleanup removes the owned Runs.
+    // Otherwise a missing fourth request looks like four missing Tool replies.
+    if (stageError) {
+      report.faultFailure.outcomes = outcomes.map((outcome) =>
+        outcome.status === "fulfilled"
+          ? outcome.value
+          : { error: String(outcome.reason?.message ?? outcome.reason).slice(0, 600) },
+      );
+      await save();
+    }
     clearInterval(metrics.timer);
     await metrics.pending;
   }
