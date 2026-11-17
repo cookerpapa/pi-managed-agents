@@ -11,7 +11,7 @@ contain no content/identities and do not represent exact heap/RSS ownership.
 ## Active-turn runtime status
 
 The browser's continuous status uses Runner lifecycle observations and shows
-last actual activity separately from last Worker → ingress → Kafka → Projector path
+last actual activity separately from last Worker → Kafka → Projector path
 confirmation. It remains visible after commentary and between Tool calls.
 Worker phase snapshots are lossy HTTP/SSE observations; dropped frames cannot
 affect execution. Actual Tool log updates also refresh browser activity.

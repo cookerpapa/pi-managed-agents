@@ -158,7 +158,7 @@ export class RuntimeLoadMetrics {
             });
             if (!r.ok) throw new Error("metrics HTTP " + r.status);
             const metrics = parseMetricText(await r.text()).filter((m) =>
-              /^(process_cpu_seconds_total|process_resident_memory_bytes|process_start_time_seconds|nodejs_eventloop_lag_p99_seconds)$|^pi_cloud_(active_|model_permits_|kafka_producer_pending|kafka_producer_rejected|tool_transport_rejected)|^pi_cloud_(session_projection|session_mutation_wait|run_claim|run_preparation).*_(sum|count)$/.test(
+              /^(process_cpu_seconds_total|process_resident_memory_bytes|process_start_time_seconds|nodejs_eventloop_lag_p99_seconds)$|^pi_cloud_(active_|model_permits_|kafka_producer_pending|kafka_producer_rejected|tool_transport_rejected|projector_memory_|projector_cache_|operational_sample_timestamp_seconds)|^pi_cloud_(session_projection|session_mutation_wait|run_claim|run_preparation).*_(sum|count)$/.test(
                 m.name,
               ),
             );
@@ -216,6 +216,22 @@ export class RuntimeLoadMetrics {
   summary() {
     const s = this.samples;
     if (!s.length) return { samples: 0 };
+    const memory = { peakInstanceEstimatedBytes: {}, peakInstanceEntries: {}, observations: 0 };
+    for (const sample of s)
+      for (const process of sample.processes ?? [])
+        for (const metric of process.metrics ?? []) {
+          const component = /component="([^"]+)"/.exec(metric.labels)?.[1];
+          if (!component) continue;
+          const values =
+            metric.name === "pi_cloud_projector_memory_estimated_bytes"
+              ? memory.peakInstanceEstimatedBytes
+              : metric.name === "pi_cloud_projector_memory_entries"
+                ? memory.peakInstanceEntries
+                : undefined;
+          if (!values) continue;
+          values[component] = Math.max(values[component] ?? 0, metric.value);
+          memory.observations++;
+        }
     return {
       samples: s.length,
       peakActiveRootRuns: Math.max(...s.map((s) => s.pg.running)),
@@ -232,6 +248,7 @@ export class RuntimeLoadMetrics {
       scrapeMs: s.map((s) => s.finishedAt - s.at),
       headroomStopped: this.abort.signal.aborted,
       collectionErrors: this.errors,
+      ...(memory.observations ? { projectorMemory: memory } : {}),
     };
   }
 }
