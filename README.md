@@ -131,7 +131,7 @@ and execution files are prepared in the current Tool Sandbox only when used.
 Web / other clients -> Session API -> PostgreSQL (Run queue/control) -> Pi Worker
 Pi Worker <-> Worker-local Model Gateway <-> CLIProxyAPI <-> Model
 
-Pi Worker -> Session Kafka producer -> Kafka -> Session Projector
+Pi Worker -> shared Worker producer -> Kafka -> Session Projector
                                                +-> PostgreSQL (native state/history)
                                                +-> Session API -> clients (SSE)
                                                +-> Ordinary Tool host (HTTP)
