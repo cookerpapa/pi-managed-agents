@@ -1,22 +1,31 @@
 # Maintained backlog
 
-## Worker publication and model charge attribution — in progress
+## Worker publication and model charge attribution — delivered
 
-- [ ] [#44](https://github.com/cookerpapa/pi-managed-agents/issues/44): derive exact
+- [x] [#44](https://github.com/cookerpapa/pi-managed-agents/issues/44): derive exact
   input/mutation confirmations after PG projection; notify through existing
   Session HTTP/SSE and use durable receipts only for retry/recovery fallback.
-- [ ] [#43](https://github.com/cookerpapa/pi-managed-agents/issues/43): share one
+- [x] [#43](https://github.com/cookerpapa/pi-managed-agents/issues/43): share one
   Session-log producer per Worker; centralize valid-epoch/prefix admission before
   every Projector effect, preserve local shutdown and restore accepted history.
-- [ ] [#45](https://github.com/cookerpapa/pi-managed-agents/issues/45): distinguish
+- [x] [#45](https://github.com/cookerpapa/pi-managed-agents/issues/45): distinguish
   actual provider usage from customer eligibility using request/execution identity
   and durable settlement evidence. Unknown quantities are not estimated charges;
   user Stop with valid execution and complete usage remains chargeable, as
   confirmed by the owner. No real payment collection is enabled.
-- [ ] Complete serial source/PG/Kafka/browser/failure checks, matched deployment,
+- [x] Complete serial source/PG/Kafka/browser/failure checks, matched deployment,
   original-asset preservation and post-release cold/burst/sustained-load tests.
   Compare initialization, commit, projection, settlement and history tails with
   the November 16–17 evidence; retain unresolved allocator-failure diagnostics.
+
+[Delivery and measurements](reports/projector-admission-delivery-20261117.md):
+writer preparation averages 0.63–0.67 ms, but cold 64-concurrency throughput is
+4.57/5.93 Runs/s, with 8.50/s in the later capacity sequence. The previous release
+measured 6.29/9.04/s; no stable overall improvement is claimed. All admitted work
+completed, while high offered-rate workloads hit the driver's in-flight cap.
+- [ ] Locate the remaining post-model projection/acknowledgement/settlement queueing
+  before proposing an architectural change. Separate short 32-concurrency bursts
+  from sustainable throughput; preserve durable visible prefixes and effect admission.
 
 ## Runtime throughput baseline — delivered
 
@@ -88,9 +97,11 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   records 47 source tests, preserved original assets and before/after throughput
   of 4.92 versus 6.29/9.04 Runs/s. All three text cases completed 192 Runs;
   the query improvement does not establish a stable new capacity ceiling.
-- [ ] Evaluate shared Worker producer scheduling under the ADR-0329 Projector
-  admission boundary. Investigate the allocator abort seen in the injected
-  diagnostic repetition; its recovery tails are not ordinary latency evidence.
+- [x] Evaluate shared Worker producer scheduling under the ADR-0329 Projector
+  admission boundary through serial deployed bursts, sustained load and recovery.
+- [ ] Investigate the allocator abort seen in the earlier injected diagnostic
+  repetition. It did not recur in this delivery, but changing producer lifetime
+  does not establish its root cause; diagnostic recovery tails are not normal latency.
 - [x] Compare established fencing/publication patterns against the current
   constraints. The [source-backed survey](research/kafka-fencing-patterns-20261117.md)
   finds an explicit Connect pre/init/post-check precedent and distinguishes

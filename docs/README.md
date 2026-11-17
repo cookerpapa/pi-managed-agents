@@ -71,7 +71,8 @@ Git preserves their implementation history.
 The remaining product/contributor guides are [Web direction](WEB_UI_DIRECTION.md),
 [release policy](RELEASE_PROCESS.md) and [collaboration discipline](VIBE_CODING_PLAYBOOK.md).
 
-Latest delivery and validation: [HTTP MCP tools](reports/http-mcp-delivery-20261115.md).
+Latest delivery and validation: [Worker publication, input confirmation and model accounting](reports/projector-admission-delivery-20261117.md).
+Previous delivery: [HTTP MCP tools](reports/http-mcp-delivery-20261115.md).
 Previous delivery: [Shared clients, local execution and service minutes](reports/client-service-delivery-20261114.md).
 Previous delivery: [Decoupling, resource backends and scoped releases](reports/decoupling-delivery-20261113.md).
 Previous validation: [Integrated BoxLite / Android acceptance](reports/alternate-runtimes-20261112.md).

@@ -1,6 +1,6 @@
 # ADR-0329: Shared Worker producer and Projector admission
 
-Status: accepted for implementation on 2026-11-17; not yet deployed (#43).
+Status: deployed on 2026-11-17 as `projector-admission-20261117-r1` (#43).
 Supersedes ADR-0247's per-Session Kafka producer identity and initialization
 authorization, preserving PG ownership, native continuation and effect boundaries.
 

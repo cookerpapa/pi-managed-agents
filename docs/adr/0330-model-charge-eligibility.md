@@ -1,6 +1,6 @@
 # ADR-0330: Model charge eligibility and platform recovery costs
 
-Status: accepted for implementation on 2026-11-17; not yet deployed (#45).
+Status: deployed on 2026-11-17 as `projector-admission-20261117-r1` (#45).
 Extends ADR-0297/0298 accounting without enabling payment collection.
 
 ## Policy

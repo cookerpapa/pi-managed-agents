@@ -5,6 +5,11 @@ Pi/Worker/CLIProxyAPI/Kafka/Projector/PG/SSE path with a deterministic provider.
 It measures this deployment's response to declared workloads, not model quality,
 inference speed or a fleet-scale service guarantee.
 
+The [November 17 publication delivery](reports/projector-admission-delivery-20261117.md)
+repeats the workloads after shared Worker producers and Projector admission.
+It separates sub-millisecond writer preparation from remaining downstream
+settlement latency; rejected offered arrivals are distinguished from accepted work.
+
 The [November 16 repair measurements](reports/workload-release-throughput-20261116.md)
 compare identical pre/post workloads, document removed history timeouts and
 separate short-burst improvements from remaining sustained-rate/settlement limits.

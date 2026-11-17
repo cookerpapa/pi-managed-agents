@@ -1,0 +1,4809 @@
+{
+  "format": "pma.projector-admission-delivery.v1",
+  "generatedAt": "2026-11-17T12:28:17.193Z",
+  "release": {
+    "version": "projector-admission-20261117-r1",
+    "revision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+    "schema": 226,
+    "topic": "pi-cloud.execution-log.v22",
+    "maintenance": {
+      "storage": false,
+      "native": false,
+      "reasons": [],
+      "physical": false,
+      "schemaChanged": true
+    },
+    "artifacts": [
+      {
+        "name": "control-plane",
+        "action": "build",
+        "reference": "pi-cloud/control-plane:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "supervisor-host",
+        "action": "build",
+        "reference": "pi-cloud/supervisor-host:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "workspace-volume-gateway",
+        "action": "build",
+        "reference": "pi-cloud/workspace-volume-gateway:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "web-ui",
+        "action": "build",
+        "reference": "pi-cloud/web-ui:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "provider-egress-relay",
+        "action": "reuse",
+        "reference": "pi-cloud/provider-egress-relay:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "ssh-gateway",
+        "action": "build",
+        "reference": "pi-cloud/ssh-gateway:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "cli-proxy-api",
+        "action": "build",
+        "reference": "pi-cloud/cli-proxy-api:projector-admission-20261117-r1",
+        "sourceRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78"
+      },
+      {
+        "name": "cube-api-authorizer",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-api-authorizer:decoupled-backends-20261113-r2",
+        "sourceRevision": "7360b956f3da4738ade424d4648ce25c9a93178b"
+      },
+      {
+        "name": "cube-egress-gateway",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-egress-gateway:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cube-api",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-api:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cube-master",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-master:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cube-templatecenter",
+        "action": "reuse",
+        "reference": "pi-cloud/cube-templatecenter:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cubelet",
+        "action": "reuse",
+        "reference": "pi-cloud/cubelet:alternate-runtime-20261112-final",
+        "sourceRevision": "3136fa75ed0a831fc419042c19636a07c81080fc"
+      },
+      {
+        "name": "cubesandbox-tool",
+        "action": "reuse",
+        "reference": "localhost:5000/pi-cloud/cubesandbox-tool:f9afddbf062af3c0dd7fb713dcf7d55dc7e43e12",
+        "sourceRevision": "500533bbd8dfeb8aee310af3bae44fe05f2a5fc1"
+      }
+    ]
+  },
+  "sourceVerification": {
+    "faultInvariants": 444,
+    "fullFaultRun": {
+      "revision": "f4c4113996432349f5aa67b6369cd50fc09ac65f",
+      "successful": 443,
+      "caseCount": 444
+    },
+    "correctedManifestRerun": {
+      "revision": "471250098c37b656a874ee645186430d4a8a835b",
+      "successful": 1,
+      "caseCount": 1
+    },
+    "transportAssertions": 11,
+    "releaseHelperAssertions": 346,
+    "guestAdmissionAssertions": 11,
+    "workspaceSuite": "Complete run plus successful targeted reruns of corrected expectations and isolated fixtures",
+    "imageEvidence": "14 artifacts passed with cached vulnerability databases and the existing exact stock-Cube exception"
+  },
+  "preservation": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  },
+  "nativeInputAcceptance": {
+    "accepted": true,
+    "cleanupConfirmed": true,
+    "model": "gpt-6-luna",
+    "scriptSha256": "dc9d255ed35ca06da846394d682f4989013ad4b9a1f240407e2b034c5a71044a",
+    "cases": [
+      {
+        "scenario": "consume",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "stop",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "recover",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true,
+        "observationRecovery": {
+          "previousGeneration": 1,
+          "recoveredGeneration": 2,
+          "activityRevision": 2,
+          "confirmedExecutionRevision": 4,
+          "snapshots": 1,
+          "sameSseConnection": true,
+          "browserStoreApplied": true
+        }
+      },
+      {
+        "scenario": "stream_stop",
+        "oneRun": true,
+        "observedCharacters": 181,
+        "noPgStreamingBodies": true,
+        "preservedNativePartial": true
+      },
+      {
+        "scenario": "stream_both_crash",
+        "oneRun": true,
+        "observedCharacters": 132,
+        "noPgStreamingBodies": true,
+        "preservedNativePartial": true
+      }
+    ]
+  },
+  "phaseAnalysis": {
+    "cold64-r1": {
+      "provider_to_harness": {
+        "n": 192,
+        "mean": 131.49,
+        "p50": 24.6,
+        "p95": 492.09,
+        "max": 559.39
+      },
+      "harness_to_settlement": {
+        "n": 192,
+        "mean": 9814.57,
+        "p50": 4392.86,
+        "p95": 32361.88,
+        "max": 34856.57
+      },
+      "writer_prepare": {
+        "n": 192,
+        "mean": 0.67,
+        "p50": 0.63,
+        "p95": 1.12,
+        "max": 2.47
+      },
+      "pi_session_open": {
+        "n": 192,
+        "mean": 30.67,
+        "p50": 16.15,
+        "p95": 86.66,
+        "max": 176.46
+      },
+      "world_state_prepare": {
+        "n": 192,
+        "mean": 28.47,
+        "p50": 22.17,
+        "p95": 62.33,
+        "max": 103.94
+      }
+    },
+    "cold64-r2": {
+      "provider_to_harness": {
+        "n": 192,
+        "mean": 117.19,
+        "p50": 36.52,
+        "p95": 370.01,
+        "max": 471.05
+      },
+      "harness_to_settlement": {
+        "n": 192,
+        "mean": 7873.62,
+        "p50": 5950.47,
+        "p95": 18469.38,
+        "max": 23126.15
+      },
+      "writer_prepare": {
+        "n": 192,
+        "mean": 0.63,
+        "p50": 0.6,
+        "p95": 1,
+        "max": 1.29
+      },
+      "pi_session_open": {
+        "n": 192,
+        "mean": 28.52,
+        "p50": 16.82,
+        "p95": 81.57,
+        "max": 124.89
+      },
+      "world_state_prepare": {
+        "n": 192,
+        "mean": 25.67,
+        "p50": 22.83,
+        "p95": 51.01,
+        "max": 83.83
+      }
+    }
+  },
+  "hardware": {
+    "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+    "logicalCpus": 32,
+    "memoryBytes": 25195307008,
+    "platform": "linux",
+    "architecture": "x64",
+    "node": "v24.12.0"
+  },
+  "load": [
+    {
+      "mode": "smoke",
+      "at": "2026-11-17T11:39:47.513Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 8,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 8,
+        "eligibility": {
+          "billable": 8,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 8,
+          "p50_ms": 644.515,
+          "p95_ms": 819.81455,
+          "p99_ms": 837.36131
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "text-smoke",
+            "kind": "text",
+            "concurrency": 1,
+            "count": 2,
+            "firstByteMs": 100,
+            "chunkMs": 20
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 2,
+            "accepted": 2,
+            "completed": 2,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1789.3763360000012,
+            "successfulRunsPerSecond": 1.1177078626572374,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 2,
+              "p50": 26,
+              "p95": 59,
+              "p99": 59,
+              "max": 59
+            },
+            "firstDurableTextMs": {
+              "count": 2,
+              "p50": 487,
+              "p95": 665,
+              "p99": 665,
+              "max": 665
+            },
+            "settlementMs": {
+              "count": 2,
+              "p50": 659,
+              "p95": 824,
+              "p99": 824,
+              "max": 824
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 2,
+            "beforeProviderMs": {
+              "count": 2,
+              "p50": 170,
+              "p95": 348,
+              "p99": 348,
+              "max": 348
+            },
+            "providerMs": {
+              "count": 2,
+              "p50": 264,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "afterProviderMs": {
+              "count": 2,
+              "p50": 209,
+              "p95": 225,
+              "p99": 225,
+              "max": 225
+            }
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10632.13671875,
+            "maximumSwapUsedMiB": 540.32421875,
+            "walBytes": 488975,
+            "transactions": 137,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 1,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 26
+          },
+          "provider": {
+            "requests": 2,
+            "completed": 2,
+            "errors": 0,
+            "websocketRequests": 2,
+            "httpRequests": 0
+          },
+          "stageTimings": {},
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-smoke",
+            "kind": "mcp",
+            "concurrency": 1,
+            "count": 2,
+            "firstByteMs": 50,
+            "rounds": 2
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 2,
+            "accepted": 2,
+            "completed": 2,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 3008.1433019999968,
+            "successfulRunsPerSecond": 0.6648619428038147,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 2,
+              "p50": 23,
+              "p95": 23,
+              "p99": 23,
+              "max": 23
+            },
+            "firstDurableTextMs": {
+              "count": 2,
+              "p50": 487,
+              "p95": 535,
+              "p99": 535,
+              "max": 535
+            },
+            "settlementMs": {
+              "count": 2,
+              "p50": 1402,
+              "p95": 1456,
+              "p99": 1456,
+              "max": 1456
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10589.09375,
+            "maximumSwapUsedMiB": 540.32421875,
+            "walBytes": 700290,
+            "transactions": 222,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 12,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 12,
+            "lastKafkaObservationAgeMs": 27
+          },
+          "provider": {
+            "requests": 6,
+            "completed": 6,
+            "errors": 0,
+            "websocketRequests": 6,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 68,
+              "meanMs": 20.97286825000051
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "custom",
+      "at": "2026-11-17T11:42:13.477Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "eligibility": {
+          "billable": 192,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 643.381,
+          "p95_ms": 1072.25385,
+          "p99_ms": 1244.74566
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-r1",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 41971.120903999996,
+            "successfulRunsPerSecond": 4.57457403720904,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 41,
+              "p95": 131,
+              "p99": 273,
+              "max": 301
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 4603,
+              "p95": 32501,
+              "p99": 36641,
+              "max": 37123
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 5744,
+              "p95": 32664,
+              "p99": 37117,
+              "max": 37214
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 283,
+              "p95": 2205,
+              "p99": 2450,
+              "max": 2474
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 7,
+              "p95": 16,
+              "p99": 23,
+              "max": 25
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 4734,
+              "p95": 32394,
+              "p99": 35272,
+              "max": 35376
+            }
+          },
+          "resources": {
+            "samples": 22,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 19,
+            "minimumAvailableMiB": 10317.640625,
+            "maximumSwapUsedMiB": 545.57421875,
+            "walBytes": 29516085,
+            "transactions": 15227,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 965,
+            "kafkaSamples": 8,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 29
+          },
+          "provider": {
+            "requests": 192,
+            "completed": 192,
+            "errors": 0,
+            "websocketRequests": 192,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1648,
+              "meanMs": 14.018843785801343
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 0.6726041770822727
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2416,
+              "meanMs": 91.95074740024819
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "custom",
+      "at": "2026-11-17T11:44:26.555Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 192,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 192,
+        "eligibility": {
+          "billable": 192,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 192,
+          "p50_ms": 611.027,
+          "p95_ms": 1067.86995,
+          "p99_ms": 1174.20666
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-64-r2",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "chunkMs": 0,
+            "outputBytes": 4096,
+            "paddingBytes": 0,
+            "rounds": 3,
+            "views": 1,
+            "slowReaderMs": 0,
+            "readHistory": false
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 32371.176318000013,
+            "successfulRunsPerSecond": 5.931202441143243,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 39,
+              "p95": 101,
+              "p99": 1307,
+              "max": 1314
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 6492,
+              "p95": 18600,
+              "p99": 22033,
+              "max": 23271
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 7194,
+              "p95": 18674,
+              "p99": 22099,
+              "max": 23343
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 308,
+              "p95": 2580,
+              "p99": 2837,
+              "max": 2847
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 6,
+              "p95": 15,
+              "p99": 21,
+              "max": 22
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 6203,
+              "p95": 18493,
+              "p99": 21948,
+              "max": 23138
+            }
+          },
+          "resources": {
+            "samples": 18,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 36,
+            "minimumAvailableMiB": 10447.3671875,
+            "maximumSwapUsedMiB": 545.07421875,
+            "walBytes": 28155565,
+            "transactions": 13949,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1010,
+            "kafkaSamples": 7,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 20,
+            "lastKafkaObservationAgeMs": 27
+          },
+          "provider": {
+            "requests": 192,
+            "completed": 192,
+            "errors": 0,
+            "websocketRequests": 192,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1637,
+              "meanMs": 12.476272384239905
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 0.6324184531243496
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2405,
+              "meanMs": 82.78047726694312
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "matrix",
+      "at": "2026-11-17T11:48:36.392Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 1375,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 1376,
+        "eligibility": {
+          "billable": 1374,
+          "platform": 2,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 1376,
+          "p50_ms": 761.3085,
+          "p95_ms": 1253.6785,
+          "p99_ms": 2747.13025
+        }
+      },
+      "history": {
+        "seedRuns": 12,
+        "seedOutputBytes": 196608,
+        "outcomes": {
+          "warmContinuation": true,
+          "expiredContextFallback": true,
+          "nativeCompaction": true
+        },
+        "timings": {
+          "warm": {
+            "settlementMs": 429,
+            "firstTextMs": 372,
+            "historyMs": 276.02132299996447
+          },
+          "cold": {
+            "settlementMs": 357,
+            "firstTextMs": 293,
+            "historyMs": 147.75376099999994
+          },
+          "after": {
+            "settlementMs": 331,
+            "firstTextMs": 269,
+            "historyMs": 57.915526999975555
+          }
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "fast-text-1",
+            "kind": "text",
+            "concurrency": 1,
+            "count": 8,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 3633.2164300000004,
+            "successfulRunsPerSecond": 2.201905709206539,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 13,
+              "p95": 24,
+              "p99": 24,
+              "max": 24
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 354,
+              "p95": 378,
+              "p99": 378,
+              "max": 378
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 401,
+              "p95": 431,
+              "p99": 431,
+              "max": 431
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 8,
+            "beforeProviderMs": {
+              "count": 8,
+              "p50": 99,
+              "p95": 125,
+              "p99": 125,
+              "max": 125
+            },
+            "providerMs": {
+              "count": 8,
+              "p50": 3,
+              "p95": 5,
+              "p99": 5,
+              "max": 5
+            },
+            "afterProviderMs": {
+              "count": 8,
+              "p50": 277,
+              "p95": 321,
+              "p99": 321,
+              "max": 321
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11146.140625,
+            "maximumSwapUsedMiB": 543.57421875,
+            "walBytes": 904673,
+            "transactions": 527,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 21,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 21,
+            "lastKafkaObservationAgeMs": 22
+          },
+          "provider": {
+            "requests": 8,
+            "completed": 8,
+            "errors": 0,
+            "websocketRequests": 8,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 64,
+              "meanMs": 4.6273380312578105
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 0.30455687499489176
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 96,
+              "meanMs": 13.318378760427407
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-4",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1654.9378350000043,
+            "successfulRunsPerSecond": 7.251027649627678,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 15,
+              "p95": 28,
+              "p99": 28,
+              "max": 28
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 403,
+              "p95": 425,
+              "p99": 425,
+              "max": 425
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 457,
+              "p95": 481,
+              "p99": 481,
+              "max": 481
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 12,
+            "beforeProviderMs": {
+              "count": 12,
+              "p50": 126,
+              "p95": 154,
+              "p99": 154,
+              "max": 154
+            },
+            "providerMs": {
+              "count": 12,
+              "p50": 3,
+              "p95": 4,
+              "p99": 4,
+              "max": 4
+            },
+            "afterProviderMs": {
+              "count": 12,
+              "p50": 327,
+              "p95": 374,
+              "p99": 374,
+              "max": 374
+            }
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11108.34375,
+            "maximumSwapUsedMiB": 543.57421875,
+            "walBytes": 2005026,
+            "transactions": 644,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 64,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 64,
+            "lastKafkaObservationAgeMs": 22
+          },
+          "provider": {
+            "requests": 12,
+            "completed": 12,
+            "errors": 0,
+            "websocketRequests": 12,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 96,
+              "meanMs": 5.438535614583036
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 12,
+              "meanMs": 0.2596615833463147
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 144,
+              "meanMs": 18.038400527779903
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-8",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2081.250736000002,
+            "successfulRunsPerSecond": 11.531527453595567,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 20,
+              "p95": 108,
+              "p99": 116,
+              "max": 116
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 434,
+              "p95": 622,
+              "p99": 765,
+              "max": 765
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 495,
+              "p95": 677,
+              "p99": 848,
+              "max": 848
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 24,
+            "beforeProviderMs": {
+              "count": 24,
+              "p50": 156,
+              "p95": 315,
+              "p99": 316,
+              "max": 316
+            },
+            "providerMs": {
+              "count": 24,
+              "p50": 3,
+              "p95": 4,
+              "p99": 4,
+              "max": 4
+            },
+            "afterProviderMs": {
+              "count": 24,
+              "p50": 329,
+              "p95": 412,
+              "p99": 667,
+              "max": 667
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10968.19140625,
+            "maximumSwapUsedMiB": 543.57421875,
+            "walBytes": 2990042,
+            "transactions": 1206,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 4,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 4,
+            "lastKafkaObservationAgeMs": 21
+          },
+          "provider": {
+            "requests": 24,
+            "completed": 24,
+            "errors": 0,
+            "websocketRequests": 24,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 192,
+              "meanMs": 6.1048697291577465
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 24,
+              "meanMs": 0.2935154999916742
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 288,
+              "meanMs": 23.440136631943886
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-16",
+            "kind": "text",
+            "concurrency": 16,
+            "count": 48,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 16,
+            "offered": 48,
+            "accepted": 48,
+            "completed": 48,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 3045.629350000003,
+            "successfulRunsPerSecond": 15.76028941276126,
+            "maximumInFlight": 16,
+            "acknowledgementMs": {
+              "count": 48,
+              "p50": 28,
+              "p95": 189,
+              "p99": 194,
+              "max": 194
+            },
+            "firstDurableTextMs": {
+              "count": 48,
+              "p50": 618,
+              "p95": 1226,
+              "p99": 1369,
+              "max": 1369
+            },
+            "settlementMs": {
+              "count": 48,
+              "p50": 697,
+              "p95": 1299,
+              "p99": 1461,
+              "max": 1461
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 48,
+            "beforeProviderMs": {
+              "count": 48,
+              "p50": 189,
+              "p95": 515,
+              "p99": 552,
+              "max": 552
+            },
+            "providerMs": {
+              "count": 48,
+              "p50": 3,
+              "p95": 4,
+              "p99": 4,
+              "max": 4
+            },
+            "afterProviderMs": {
+              "count": 48,
+              "p50": 466,
+              "p95": 906,
+              "p99": 970,
+              "max": 970
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 15,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10667.9921875,
+            "maximumSwapUsedMiB": 543.57421875,
+            "walBytes": 6611380,
+            "transactions": 2475,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 21
+          },
+          "provider": {
+            "requests": 48,
+            "completed": 48,
+            "errors": 0,
+            "websocketRequests": 48,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 384,
+              "meanMs": 6.323853093748379
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 48,
+              "meanMs": 0.2864651875133864
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 576,
+              "meanMs": 31.450574715281025
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-32",
+            "kind": "text",
+            "concurrency": 32,
+            "count": 96,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 32,
+            "offered": 96,
+            "accepted": 96,
+            "completed": 96,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 5243.6563069999975,
+            "successfulRunsPerSecond": 18.307836055510577,
+            "maximumInFlight": 32,
+            "acknowledgementMs": {
+              "count": 96,
+              "p50": 25,
+              "p95": 148,
+              "p99": 319,
+              "max": 319
+            },
+            "firstDurableTextMs": {
+              "count": 96,
+              "p50": 1015,
+              "p95": 2778,
+              "p99": 3085,
+              "max": 3085
+            },
+            "settlementMs": {
+              "count": 96,
+              "p50": 1151,
+              "p95": 2921,
+              "p99": 3193,
+              "max": 3193
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 96,
+            "beforeProviderMs": {
+              "count": 96,
+              "p50": 233,
+              "p95": 858,
+              "p99": 980,
+              "max": 980
+            },
+            "providerMs": {
+              "count": 96,
+              "p50": 3,
+              "p95": 3,
+              "p99": 5,
+              "max": 5
+            },
+            "afterProviderMs": {
+              "count": 96,
+              "p50": 802,
+              "p95": 2244,
+              "p99": 2819,
+              "max": 2819
+            }
+          },
+          "resources": {
+            "samples": 4,
+            "peakActiveRootRuns": 30,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 10452.59375,
+            "maximumSwapUsedMiB": 543.82421875,
+            "walBytes": 13985713,
+            "transactions": 5887,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 35,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 35,
+            "lastKafkaObservationAgeMs": 22
+          },
+          "provider": {
+            "requests": 96,
+            "completed": 96,
+            "errors": 0,
+            "websocketRequests": 96,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 785,
+              "meanMs": 6.007462363056891
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 96,
+              "meanMs": 0.273584562494457
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 1169,
+              "meanMs": 43.42268679469436
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "paced-text",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 1000,
+            "chunkMs": 100,
+            "chunkBytes": 64,
+            "outputBytes": 1024
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 8994.513888000001,
+            "successfulRunsPerSecond": 2.668293172799423,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 18,
+              "p95": 44,
+              "p99": 50,
+              "max": 50
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 1239,
+              "p95": 1363,
+              "p99": 1368,
+              "max": 1368
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 2885,
+              "p95": 3002,
+              "p99": 3086,
+              "max": 3086
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 24,
+            "beforeProviderMs": {
+              "count": 24,
+              "p50": 125,
+              "p95": 247,
+              "p99": 253,
+              "max": 253
+            },
+            "providerMs": {
+              "count": 24,
+              "p50": 2605,
+              "p95": 2609,
+              "p99": 2610,
+              "max": 2610
+            },
+            "afterProviderMs": {
+              "count": 24,
+              "p50": 125,
+              "p95": 181,
+              "p99": 238,
+              "max": 238
+            }
+          },
+          "resources": {
+            "samples": 6,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10452.43359375,
+            "maximumSwapUsedMiB": 545.57421875,
+            "walBytes": 5009393,
+            "transactions": 2246,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 45,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 31
+          },
+          "provider": {
+            "requests": 24,
+            "completed": 24,
+            "errors": 0,
+            "websocketRequests": 24,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 440,
+              "meanMs": 5.811128043181822
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 24,
+              "meanMs": 0.2515888750009842
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 536,
+              "meanMs": 14.507038690301478
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-tools",
+            "kind": "mcp",
+            "concurrency": 8,
+            "count": 24,
+            "firstByteMs": 100,
+            "rounds": 3
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 24,
+            "accepted": 24,
+            "completed": 24,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 9016.66923,
+            "successfulRunsPerSecond": 2.661736766404594,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 24,
+              "p50": 32,
+              "p95": 163,
+              "p99": 184,
+              "max": 184
+            },
+            "firstDurableTextMs": {
+              "count": 24,
+              "p50": 703,
+              "p95": 1084,
+              "p99": 1124,
+              "max": 1124
+            },
+            "settlementMs": {
+              "count": 24,
+              "p50": 2325,
+              "p95": 3746,
+              "p99": 4084,
+              "max": 4084
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 6,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10527.453125,
+            "maximumSwapUsedMiB": 545.57421875,
+            "walBytes": 11885400,
+            "transactions": 2761,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 71,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 27
+          },
+          "provider": {
+            "requests": 96,
+            "completed": 96,
+            "errors": 0,
+            "websocketRequests": 96,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 841,
+              "meanMs": 7.262372879905142
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 24,
+              "meanMs": 0.5354098333239833
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 1081,
+              "meanMs": 34.30769358279702
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "continuous-tool-loops",
+            "kind": "mcp",
+            "concurrency": 8,
+            "count": 8,
+            "firstByteMs": 100,
+            "rounds": 32,
+            "outputBytes": 1024
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 37766.61496899999,
+            "successfulRunsPerSecond": 0.21182729790760038,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 30,
+              "p95": 224,
+              "p99": 224,
+              "max": 224
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 699,
+              "p95": 1600,
+              "p99": 1600,
+              "max": 1600
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 14689,
+              "p95": 37712,
+              "p99": 37712,
+              "max": 37712
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 20,
+            "peakActiveRootRuns": 8,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10488.1875,
+            "maximumSwapUsedMiB": 546.82421875,
+            "walBytes": 23834429,
+            "transactions": 5075,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 77,
+            "kafkaSamples": 8,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 29
+          },
+          "provider": {
+            "requests": 264,
+            "completed": 264,
+            "errors": 0,
+            "websocketRequests": 264,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 2368,
+              "meanMs": 5.824092729306996
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 0.3653129999875021
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2912,
+              "meanMs": 21.51811134203305
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "guest-tools",
+            "kind": "guest",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "rounds": 3,
+            "toolDelayMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 19454.495064000017,
+            "successfulRunsPerSecond": 0.41121601838969185,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 39,
+              "p95": 89,
+              "p99": 89,
+              "max": 89
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 574,
+              "p95": 906,
+              "p99": 906,
+              "max": 906
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 5508,
+              "p95": 14046,
+              "p99": 14046,
+              "max": 14046
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 11,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10280.70703125,
+            "maximumSwapUsedMiB": 552.57421875,
+            "walBytes": 4331426,
+            "transactions": 1505,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 7,
+            "kafkaSamples": 5,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 1,
+            "lastKafkaObservationAgeMs": 26
+          },
+          "provider": {
+            "requests": 32,
+            "completed": 32,
+            "errors": 0,
+            "websocketRequests": 32,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 296,
+              "meanMs": 5.376513097974678
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 0.3750311250041716
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 376,
+              "meanMs": 21.678827502655697
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "context-64k",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "paddingBytes": 65536,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2035.0928569999814,
+            "successfulRunsPerSecond": 5.896536837974912,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 26,
+              "p95": 48,
+              "p99": 48,
+              "max": 48
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 495,
+              "p95": 526,
+              "p99": 526,
+              "max": 526
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 557,
+              "p95": 625,
+              "p99": 625,
+              "max": 625
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 12,
+            "beforeProviderMs": {
+              "count": 12,
+              "p50": 182,
+              "p95": 231,
+              "p99": 231,
+              "max": 231
+            },
+            "providerMs": {
+              "count": 12,
+              "p50": 102,
+              "p95": 104,
+              "p99": 104,
+              "max": 104
+            },
+            "afterProviderMs": {
+              "count": 12,
+              "p50": 274,
+              "p95": 312,
+              "p99": 312,
+              "max": 312
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10211.66796875,
+            "maximumSwapUsedMiB": 552.57421875,
+            "walBytes": 1549685,
+            "transactions": 639,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 4,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 4,
+            "lastObservedKafkaLag": 2,
+            "lastKafkaObservationAgeMs": 35
+          },
+          "provider": {
+            "requests": 12,
+            "completed": 12,
+            "errors": 0,
+            "websocketRequests": 12,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 96,
+              "meanMs": 6.707878166658077
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 12,
+              "meanMs": 0.38002550001450114
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 144,
+              "meanMs": 24.691893972220196
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "child-conversations",
+            "kind": "children",
+            "concurrency": 2,
+            "count": 6,
+            "children": 4,
+            "firstByteMs": 300,
+            "outputBytes": 512
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 2,
+            "offered": 6,
+            "accepted": 6,
+            "completed": 6,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 10515.311696000019,
+            "successfulRunsPerSecond": 0.5705964952310805,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 6,
+              "p50": 16,
+              "p95": 22,
+              "p99": 22,
+              "max": 22
+            },
+            "firstDurableTextMs": {
+              "count": 6,
+              "p50": 478,
+              "p95": 632,
+              "p99": 632,
+              "max": 632
+            },
+            "settlementMs": {
+              "count": 6,
+              "p50": 2827,
+              "p95": 4799,
+              "p99": 4799,
+              "max": 4799
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 7,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10230.28125,
+            "maximumSwapUsedMiB": 552.82421875,
+            "walBytes": 4859684,
+            "transactions": 1373,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 25,
+            "kafkaSamples": 3,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 25,
+            "lastKafkaObservationAgeMs": 26
+          },
+          "provider": {
+            "requests": 36,
+            "completed": 36,
+            "errors": 0,
+            "websocketRequests": 36,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 330,
+              "meanMs": 5.336208839392132
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 6,
+              "meanMs": 0.3507341666651546
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 462,
+              "meanMs": 18.23589778354948
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "sse-fanout-history",
+            "kind": "text",
+            "concurrency": 8,
+            "count": 16,
+            "views": 3,
+            "slowReaderMs": 80,
+            "readHistory": true,
+            "firstByteMs": 100,
+            "chunkMs": 30
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 8,
+            "offered": 16,
+            "accepted": 16,
+            "completed": 16,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 4412.0224909999815,
+            "successfulRunsPerSecond": 3.6264547682243595,
+            "maximumInFlight": 8,
+            "acknowledgementMs": {
+              "count": 16,
+              "p50": 41,
+              "p95": 496,
+              "p99": 496,
+              "max": 496
+            },
+            "firstDurableTextMs": {
+              "count": 16,
+              "p50": 846,
+              "p95": 1539,
+              "p99": 1539,
+              "max": 1539
+            },
+            "settlementMs": {
+              "count": 16,
+              "p50": 1029,
+              "p95": 2221,
+              "p99": 2221,
+              "max": 2221
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 16,
+            "beforeProviderMs": {
+              "count": 16,
+              "p50": 195,
+              "p95": 715,
+              "p99": 715,
+              "max": 715
+            },
+            "providerMs": {
+              "count": 16,
+              "p50": 345,
+              "p95": 349,
+              "p99": 349,
+              "max": 349
+            },
+            "afterProviderMs": {
+              "count": 16,
+              "p50": 478,
+              "p95": 1697,
+              "p99": 1697,
+              "max": 1697
+            }
+          },
+          "resources": {
+            "samples": 4,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9997.43359375,
+            "maximumSwapUsedMiB": 553.57421875,
+            "walBytes": 2210441,
+            "transactions": 1190,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 27
+          },
+          "provider": {
+            "requests": 16,
+            "completed": 16,
+            "errors": 0,
+            "websocketRequests": 16,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 160,
+              "meanMs": 7.674585000002221
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 16,
+              "meanMs": 0.5045176875064488
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 224,
+              "meanMs": 50.52188762054044
+            }
+          },
+          "historyPages": {
+            "count": 16,
+            "latencyMs": {
+              "count": 16,
+              "p50": 574.3805850000062,
+              "p95": 958.4084260000091,
+              "p99": 958.4084260000091,
+              "max": 958.4084260000091
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-images",
+            "kind": "mcp",
+            "concurrency": 4,
+            "count": 8,
+            "rounds": 1,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 3020.036683000013,
+            "successfulRunsPerSecond": 2.6489744462484612,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 25,
+              "p95": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 473,
+              "p95": 522,
+              "p99": 522,
+              "max": 522
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 1247,
+              "p95": 1812,
+              "p99": 1812,
+              "max": 1812
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9962.04296875,
+            "maximumSwapUsedMiB": 553.57421875,
+            "walBytes": 1695396,
+            "transactions": 699,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 18,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 18,
+            "lastKafkaObservationAgeMs": 27
+          },
+          "provider": {
+            "requests": 16,
+            "completed": 16,
+            "errors": 0,
+            "websocketRequests": 16,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 136,
+              "meanMs": 7.409861647057389
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 0.40007187498850016
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 184,
+              "meanMs": 26.693211347829603
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-1",
+            "kind": "text",
+            "arrivalRate": 1,
+            "concurrency": 32,
+            "count": 45,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 45,
+            "accepted": 45,
+            "completed": 45,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 44506.895550999994,
+            "successfulRunsPerSecond": 1.0110792820504626,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 45,
+              "p50": 13,
+              "p95": 16,
+              "p99": 22,
+              "max": 22
+            },
+            "firstDurableTextMs": {
+              "count": 45,
+              "p50": 436,
+              "p95": 457,
+              "p99": 472,
+              "max": 472
+            },
+            "settlementMs": {
+              "count": 45,
+              "p50": 481,
+              "p95": 519,
+              "p99": 566,
+              "max": 566
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 45,
+            "beforeProviderMs": {
+              "count": 45,
+              "p50": 95,
+              "p95": 112,
+              "p99": 122,
+              "max": 122
+            },
+            "providerMs": {
+              "count": 45,
+              "p50": 301,
+              "p95": 302,
+              "p99": 302,
+              "max": 302
+            },
+            "afterProviderMs": {
+              "count": 45,
+              "p50": 84,
+              "p95": 115,
+              "p99": 170,
+              "max": 170
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9969.73046875,
+            "maximumSwapUsedMiB": 553.82421875,
+            "walBytes": 7862681,
+            "transactions": 3573,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 7,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 7,
+            "lastKafkaObservationAgeMs": 22
+          },
+          "provider": {
+            "requests": 45,
+            "completed": 45,
+            "errors": 0,
+            "websocketRequests": 45,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 360,
+              "meanMs": 4.738446949998634
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 45,
+              "meanMs": 0.26259422222307693
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 540,
+              "meanMs": 12.437085805556467
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-2",
+            "kind": "text",
+            "arrivalRate": 2,
+            "concurrency": 32,
+            "count": 90,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 90,
+            "accepted": 90,
+            "completed": 90,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 45046.523495,
+            "successfulRunsPerSecond": 1.9979344246174662,
+            "maximumInFlight": 2,
+            "acknowledgementMs": {
+              "count": 90,
+              "p50": 15,
+              "p95": 20,
+              "p99": 25,
+              "max": 25
+            },
+            "firstDurableTextMs": {
+              "count": 90,
+              "p50": 462,
+              "p95": 501,
+              "p99": 608,
+              "max": 608
+            },
+            "settlementMs": {
+              "count": 90,
+              "p50": 523,
+              "p95": 581,
+              "p99": 687,
+              "max": 687
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 90,
+            "beforeProviderMs": {
+              "count": 90,
+              "p50": 116,
+              "p95": 139,
+              "p99": 164,
+              "max": 164
+            },
+            "providerMs": {
+              "count": 90,
+              "p50": 301,
+              "p95": 302,
+              "p99": 303,
+              "max": 303
+            },
+            "afterProviderMs": {
+              "count": 90,
+              "p50": 110,
+              "p95": 141,
+              "p99": 247,
+              "max": 247
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10098.234375,
+            "maximumSwapUsedMiB": 553.82421875,
+            "walBytes": 13454427,
+            "transactions": 6253,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 39,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 26
+          },
+          "provider": {
+            "requests": 90,
+            "completed": 90,
+            "errors": 0,
+            "websocketRequests": 90,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 720,
+              "meanMs": 5.160828913891525
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 90,
+              "meanMs": 0.31116146666592925
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 1080,
+              "meanMs": 17.127065692594524
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-4",
+            "kind": "text",
+            "arrivalRate": 4,
+            "concurrency": 32,
+            "count": 180,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 180,
+            "accepted": 180,
+            "completed": 180,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 45524.21232999995,
+            "successfulRunsPerSecond": 3.9539399099362784,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 180,
+              "p50": 15,
+              "p95": 20,
+              "p99": 27,
+              "max": 86
+            },
+            "firstDurableTextMs": {
+              "count": 180,
+              "p50": 467,
+              "p95": 537,
+              "p99": 631,
+              "max": 720
+            },
+            "settlementMs": {
+              "count": 180,
+              "p50": 527,
+              "p95": 616,
+              "p99": 724,
+              "max": 806
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 180,
+            "beforeProviderMs": {
+              "count": 180,
+              "p50": 114,
+              "p95": 144,
+              "p99": 191,
+              "max": 200
+            },
+            "providerMs": {
+              "count": 180,
+              "p50": 301,
+              "p95": 303,
+              "p99": 303,
+              "max": 304
+            },
+            "afterProviderMs": {
+              "count": 180,
+              "p50": 112,
+              "p95": 167,
+              "p99": 297,
+              "max": 384
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10023.02734375,
+            "maximumSwapUsedMiB": 553.82421875,
+            "walBytes": 37504619,
+            "transactions": 12441,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 72,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 16,
+            "lastKafkaObservationAgeMs": 26
+          },
+          "provider": {
+            "requests": 180,
+            "completed": 180,
+            "errors": 0,
+            "websocketRequests": 180,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1440,
+              "meanMs": 5.239146432639578
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 180,
+              "meanMs": 0.31365660000139745
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2160,
+              "meanMs": 18.30142902037016
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-8",
+            "kind": "text",
+            "arrivalRate": 8,
+            "concurrency": 32,
+            "count": 360,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 32,
+            "offered": 360,
+            "accepted": 360,
+            "completed": 360,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 45544.77239399997,
+            "successfulRunsPerSecond": 7.904310002599247,
+            "maximumInFlight": 19,
+            "acknowledgementMs": {
+              "count": 360,
+              "p50": 15,
+              "p95": 38,
+              "p99": 47,
+              "max": 170
+            },
+            "firstDurableTextMs": {
+              "count": 360,
+              "p50": 545,
+              "p95": 1598,
+              "p99": 2699,
+              "max": 2907
+            },
+            "settlementMs": {
+              "count": 360,
+              "p50": 610,
+              "p95": 1721,
+              "p99": 2934,
+              "max": 3082
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 360,
+            "beforeProviderMs": {
+              "count": 360,
+              "p50": 109,
+              "p95": 249,
+              "p99": 325,
+              "max": 358
+            },
+            "providerMs": {
+              "count": 360,
+              "p50": 302,
+              "p95": 305,
+              "p99": 306,
+              "max": 306
+            },
+            "afterProviderMs": {
+              "count": 360,
+              "p50": 174,
+              "p95": 1196,
+              "p99": 2426,
+              "max": 2529
+            }
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 15,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 9747.3046875,
+            "maximumSwapUsedMiB": 555.32421875,
+            "walBytes": 64473014,
+            "transactions": 23682,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 151,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 28
+          },
+          "provider": {
+            "requests": 360,
+            "completed": 360,
+            "errors": 0,
+            "websocketRequests": 360,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 2880,
+              "meanMs": 6.1734521763894294
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 360,
+              "meanMs": 0.37997018889226447
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 4320,
+              "meanMs": 35.11061638009246
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "capacity",
+      "at": "2026-11-17T11:58:56.679Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 923,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 923,
+        "eligibility": {
+          "billable": 923,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 923,
+          "p50_ms": 897.571,
+          "p95_ms": 10435.3273,
+          "p99_ms": 10965.55594
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "context-64k",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 12,
+            "paddingBytes": 65536,
+            "firstByteMs": 100
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 12,
+            "accepted": 12,
+            "completed": 12,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2044.400539000002,
+            "successfulRunsPerSecond": 5.869691271882407,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 12,
+              "p50": 18,
+              "p95": 116,
+              "p99": 116,
+              "max": 116
+            },
+            "firstDurableTextMs": {
+              "count": 12,
+              "p50": 415,
+              "p95": 753,
+              "p99": 753,
+              "max": 753
+            },
+            "settlementMs": {
+              "count": 12,
+              "p50": 488,
+              "p95": 797,
+              "p99": 797,
+              "max": 797
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 12,
+            "beforeProviderMs": {
+              "count": 12,
+              "p50": 127,
+              "p95": 227,
+              "p99": 227,
+              "max": 227
+            },
+            "providerMs": {
+              "count": 12,
+              "p50": 102,
+              "p95": 104,
+              "p99": 104,
+              "max": 104
+            },
+            "afterProviderMs": {
+              "count": 12,
+              "p50": 224,
+              "p95": 570,
+              "p99": 570,
+              "max": 570
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10571.10546875,
+            "maximumSwapUsedMiB": 552.07421875,
+            "walBytes": 1741356,
+            "transactions": 520,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 63,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 63,
+            "lastKafkaObservationAgeMs": 21
+          },
+          "provider": {
+            "requests": 12,
+            "completed": 12,
+            "errors": 0,
+            "websocketRequests": 12,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 96,
+              "meanMs": 5.925684677092831
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 12,
+              "meanMs": 0.3509186666536453
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 144,
+              "meanMs": 19.934009041678436
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "fast-text-64",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 192,
+            "firstByteMs": 0,
+            "outputBytes": 4096
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 192,
+            "accepted": 192,
+            "completed": 192,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 22595.850379000003,
+            "successfulRunsPerSecond": 8.497135393427806,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 192,
+              "p50": 24,
+              "p95": 55,
+              "p99": 123,
+              "max": 1269
+            },
+            "firstDurableTextMs": {
+              "count": 192,
+              "p50": 2218,
+              "p95": 16699,
+              "p99": 18915,
+              "max": 20156
+            },
+            "settlementMs": {
+              "count": 192,
+              "p50": 2436,
+              "p95": 16762,
+              "p99": 19185,
+              "max": 20305
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 192,
+            "beforeProviderMs": {
+              "count": 192,
+              "p50": 284,
+              "p95": 812,
+              "p99": 907,
+              "max": 2033
+            },
+            "providerMs": {
+              "count": 192,
+              "p50": 3,
+              "p95": 7,
+              "p99": 10,
+              "max": 11
+            },
+            "afterProviderMs": {
+              "count": 192,
+              "p50": 2039,
+              "p95": 16631,
+              "p99": 18300,
+              "max": 18389
+            }
+          },
+          "resources": {
+            "samples": 13,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 2,
+            "minimumAvailableMiB": 10061.453125,
+            "maximumSwapUsedMiB": 552.07421875,
+            "walBytes": 28415638,
+            "transactions": 13384,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 892,
+            "kafkaSamples": 5,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 36,
+            "lastKafkaObservationAgeMs": 26
+          },
+          "provider": {
+            "requests": 192,
+            "completed": 192,
+            "errors": 0,
+            "websocketRequests": 192,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 1610,
+              "meanMs": 6.965923086336028
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 192,
+              "meanMs": 0.3436263124979933
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 2378,
+              "meanMs": 51.07488416484756
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "waiting-model-64",
+            "kind": "text",
+            "concurrency": 64,
+            "count": 64,
+            "firstByteMs": 10000,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 64,
+            "offered": 64,
+            "accepted": 64,
+            "completed": 64,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 13382.716163999998,
+            "successfulRunsPerSecond": 4.7822877819199645,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 64,
+              "p50": 380,
+              "p95": 518,
+              "p99": 708,
+              "max": 708
+            },
+            "firstDurableTextMs": {
+              "count": 64,
+              "p50": 11855,
+              "p95": 12586,
+              "p99": 12628,
+              "max": 12628
+            },
+            "settlementMs": {
+              "count": 64,
+              "p50": 11982,
+              "p95": 12663,
+              "p99": 12827,
+              "max": 12827
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 64,
+            "beforeProviderMs": {
+              "count": 64,
+              "p50": 1735,
+              "p95": 2507,
+              "p99": 2544,
+              "max": 2544
+            },
+            "providerMs": {
+              "count": 64,
+              "p50": 10002,
+              "p95": 10004,
+              "p99": 10006,
+              "max": 10006
+            },
+            "afterProviderMs": {
+              "count": 64,
+              "p50": 178,
+              "p95": 288,
+              "p99": 371,
+              "max": 371
+            }
+          },
+          "resources": {
+            "samples": 8,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 21,
+            "minimumAvailableMiB": 9965.54296875,
+            "maximumSwapUsedMiB": 551.82421875,
+            "walBytes": 11506545,
+            "transactions": 4963,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 78,
+            "kafkaSamples": 4,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 52,
+            "lastKafkaObservationAgeMs": 29
+          },
+          "provider": {
+            "requests": 64,
+            "completed": 64,
+            "errors": 0,
+            "websocketRequests": 64,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 512,
+              "meanMs": 13.970304332029421
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 64,
+              "meanMs": 0.7655252499935176
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 768,
+              "meanMs": 85.63061868229187
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-16",
+            "kind": "text",
+            "concurrency": 64,
+            "arrivalRate": 16,
+            "count": 480,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 64,
+            "offered": 480,
+            "accepted": 332,
+            "completed": 332,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 148,
+            "elapsedMs": 34834.79240200001,
+            "successfulRunsPerSecond": 9.530701264662584,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 332,
+              "p50": 28,
+              "p95": 42,
+              "p99": 63,
+              "max": 198
+            },
+            "firstDurableTextMs": {
+              "count": 332,
+              "p50": 2973,
+              "p95": 16966,
+              "p99": 22670,
+              "max": 23459
+            },
+            "settlementMs": {
+              "count": 332,
+              "p50": 3218,
+              "p95": 17097,
+              "p99": 22900,
+              "max": 23748
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 332,
+            "beforeProviderMs": {
+              "count": 332,
+              "p50": 215,
+              "p95": 323,
+              "p99": 378,
+              "max": 522
+            },
+            "providerMs": {
+              "count": 332,
+              "p50": 303,
+              "p95": 306,
+              "p99": 307,
+              "max": 309
+            },
+            "afterProviderMs": {
+              "count": 332,
+              "p50": 2629,
+              "p95": 16581,
+              "p99": 22379,
+              "max": 23196
+            }
+          },
+          "resources": {
+            "samples": 19,
+            "peakActiveRootRuns": 63,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 9977.203125,
+            "maximumSwapUsedMiB": 552.07421875,
+            "walBytes": 47475807,
+            "transactions": 23868,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1111,
+            "kafkaSamples": 7,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 31
+          },
+          "provider": {
+            "requests": 332,
+            "completed": 332,
+            "errors": 0,
+            "websocketRequests": 332,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 2656,
+              "meanMs": 8.456324293295248
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 332,
+              "meanMs": 0.49812637349444827
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 3984,
+              "meanMs": 85.49132525953813
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "arrival-32",
+            "kind": "text",
+            "concurrency": 64,
+            "arrivalRate": 32,
+            "count": 960,
+            "firstByteMs": 300,
+            "outputBytes": 2048
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 64,
+            "offered": 960,
+            "accepted": 323,
+            "completed": 323,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 637,
+            "elapsedMs": 39282.82026499999,
+            "successfulRunsPerSecond": 8.222423894747315,
+            "maximumInFlight": 64,
+            "acknowledgementMs": {
+              "count": 323,
+              "p50": 25,
+              "p95": 62,
+              "p99": 100,
+              "max": 311
+            },
+            "firstDurableTextMs": {
+              "count": 323,
+              "p50": 3154,
+              "p95": 22355,
+              "p99": 25737,
+              "max": 27284
+            },
+            "settlementMs": {
+              "count": 323,
+              "p50": 3449,
+              "p95": 22410,
+              "p99": 26479,
+              "max": 28239
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 323,
+            "beforeProviderMs": {
+              "count": 323,
+              "p50": 197,
+              "p95": 855,
+              "p99": 1032,
+              "max": 1065
+            },
+            "providerMs": {
+              "count": 323,
+              "p50": 302,
+              "p95": 305,
+              "p99": 306,
+              "max": 308
+            },
+            "afterProviderMs": {
+              "count": 323,
+              "p50": 2840,
+              "p95": 21932,
+              "p99": 25874,
+              "max": 27147
+            }
+          },
+          "resources": {
+            "samples": 21,
+            "peakActiveRootRuns": 64,
+            "peakQueuedRuns": 7,
+            "minimumAvailableMiB": 9709.88671875,
+            "maximumSwapUsedMiB": 556.57421875,
+            "walBytes": 46072128,
+            "transactions": 23700,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 1102,
+            "kafkaSamples": 8,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 95,
+            "lastKafkaObservationAgeMs": 32
+          },
+          "provider": {
+            "requests": 323,
+            "completed": 323,
+            "errors": 0,
+            "websocketRequests": 323,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 2598,
+              "meanMs": 8.375817650115874
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 323,
+              "meanMs": 0.4295153653223183
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 3890,
+              "meanMs": 63.34760775501228
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "faults",
+      "at": "2026-11-17T12:04:40.266Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 58,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 58,
+        "eligibility": {
+          "billable": 42,
+          "platform": 16,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 58,
+          "p50_ms": 844.2945,
+          "p95_ms": 10155.5014,
+          "p99_ms": 10350.49949
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "once-rate-limit",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "fault": "rate_limit_once"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 0,
+            "failed": 8,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1686.8734990000012,
+            "successfulRunsPerSecond": 0,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 38,
+              "p95": 117,
+              "p99": 117,
+              "max": 117
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 677,
+              "p95": 791,
+              "p99": 791,
+              "max": 791
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "terminalFailure": 8,
+            "subsequentUserRequestsCompleted": 8,
+            "automaticReplayClaimed": false
+          },
+          "recovery": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 2563.4894129999957,
+            "successfulRunsPerSecond": 3.120746260714131,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 22,
+              "p95": 32,
+              "p99": 32,
+              "max": 32
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 31,
+              "p95": 59,
+              "p99": 59,
+              "max": 59
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 596,
+              "p95": 725,
+              "p99": 725,
+              "max": 725
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 678,
+              "p95": 862,
+              "p99": 862,
+              "max": 862
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.0005010000022593886,
+              "p95": 0.0011420000009820797,
+              "p99": 0.0011420000009820797,
+              "max": 0.0011420000009820797
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10807.95703125,
+            "maximumSwapUsedMiB": 556.07421875,
+            "walBytes": 1149388,
+            "transactions": 354,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 9,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 9,
+            "lastKafkaObservationAgeMs": 28
+          },
+          "provider": {
+            "requests": 8,
+            "completed": 0,
+            "errors": 8,
+            "websocketRequests": 8,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 64,
+              "meanMs": 7.972051250013434
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 0.5009458750137169
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 96,
+              "meanMs": 33.93550622916782
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "once-disconnect",
+            "kind": "text",
+            "concurrency": 4,
+            "count": 8,
+            "firstByteMs": 100,
+            "fault": "disconnect_once"
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 0,
+            "failed": 8,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1236.1020080000017,
+            "successfulRunsPerSecond": 0,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 21,
+              "p95": 31,
+              "p99": 31,
+              "max": 31
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 447,
+              "p95": 486,
+              "p99": 486,
+              "max": 486
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 506,
+              "p95": 542,
+              "p99": 542,
+              "max": 542
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "terminalFailure": 8,
+            "subsequentUserRequestsCompleted": 8,
+            "automaticReplayClaimed": false
+          },
+          "recovery": {
+            "mode": "closed",
+            "concurrency": 4,
+            "offered": 8,
+            "accepted": 8,
+            "completed": 8,
+            "failed": 0,
+            "historyFailures": 0,
+            "historyErrors": [],
+            "dropped": 0,
+            "elapsedMs": 2280.0276650000014,
+            "successfulRunsPerSecond": 3.5087293557027937,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 8,
+              "p50": 22,
+              "p95": 127,
+              "p99": 127,
+              "max": 127
+            },
+            "queueMs": {
+              "count": 8,
+              "p50": 30,
+              "p95": 100,
+              "p99": 100,
+              "max": 100
+            },
+            "firstDurableTextMs": {
+              "count": 8,
+              "p50": 462,
+              "p95": 590,
+              "p99": 590,
+              "max": 590
+            },
+            "settlementMs": {
+              "count": 8,
+              "p50": 510,
+              "p95": 684,
+              "p99": 684,
+              "max": 684
+            },
+            "generatorDelayMs": {
+              "count": 8,
+              "p50": 0.00042100000428035855,
+              "p95": 0.0006310000026132911,
+              "p99": 0.0006310000026132911,
+              "max": 0.0006310000026132911
+            },
+            "sseReconnects": 0,
+            "errors": []
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10793.7734375,
+            "maximumSwapUsedMiB": 556.07421875,
+            "walBytes": 1220092,
+            "transactions": 631,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 2,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 2,
+            "lastKafkaObservationAgeMs": 28
+          },
+          "provider": {
+            "requests": 8,
+            "completed": 0,
+            "errors": 8,
+            "websocketRequests": 8,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 64,
+              "meanMs": 6.932611328120952
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 8,
+              "meanMs": 0.3765829999756512
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 96,
+              "meanMs": 23.342073302070315
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "worker-handoff",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 25853.553105,
+            "successfulRunsPerSecond": 0.15471761207268692,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 23,
+              "p95": 35,
+              "p99": 35,
+              "max": 35
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 418,
+              "p95": 434,
+              "p99": 434,
+              "max": 434
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 21417,
+              "p95": 24701,
+              "p99": 24701,
+              "max": 24701
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "sameRun": true,
+            "writerChanged": true,
+            "physicalCalls": 4
+          },
+          "resources": {
+            "samples": 14,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10727.42578125,
+            "maximumSwapUsedMiB": 556.07421875,
+            "walBytes": 1661788,
+            "transactions": 11622,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 7,
+            "kafkaSamples": 6,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 31
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 74,
+              "meanMs": 6.359663324333092
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 6,
+              "meanMs": 0.3193713333457804
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 100,
+              "meanMs": 19.91792249001037
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "projector-restart",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 43874.152090999996,
+            "successfulRunsPerSecond": 0.09116985307667128,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 23,
+              "p95": 111,
+              "p99": 111,
+              "max": 111
+            },
+            "firstDurableTextMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 42166,
+              "p95": 42200,
+              "p99": 42200,
+              "max": 42200
+            },
+            "sseReconnects": 131
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "writersPreserved": true,
+            "sseReconnects": 131
+          },
+          "resources": {
+            "samples": 24,
+            "peakActiveRootRuns": 4,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10739.55859375,
+            "maximumSwapUsedMiB": 555.57421875,
+            "walBytes": 1562987,
+            "transactions": 31932,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 230,
+            "kafkaSamples": 9,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 23
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 149,
+              "meanMs": 6.163101906043212
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 3,
+              "meanMs": 0.30100233332874815
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "stop-under-load",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 2,
+            "failed": 2,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2061.1235569999844,
+            "successfulRunsPerSecond": 0.9703445449486049,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 51,
+              "p95": 53,
+              "p99": 53,
+              "max": 53
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 419,
+              "p95": 503,
+              "p99": 503,
+              "max": 503
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 1124,
+              "p95": 1530,
+              "p99": 1530,
+              "max": 1530
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "cancelled": 2,
+            "lateReplyIgnored": true
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10645.7109375,
+            "maximumSwapUsedMiB": 555.57421875,
+            "walBytes": 529906,
+            "transactions": 319,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 5,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 5,
+            "lastKafkaObservationAgeMs": 22
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 62,
+              "meanMs": 5.487960129021799
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 4,
+              "meanMs": 0.19584724999729963
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 82,
+              "meanMs": 18.809370304878165
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "lost-tool-reply",
+            "kind": "fault"
+          },
+          "summary": {
+            "mode": "fault",
+            "concurrency": 4,
+            "offered": 4,
+            "accepted": 4,
+            "completed": 4,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1402.3079869999783,
+            "successfulRunsPerSecond": 2.8524404318322274,
+            "maximumInFlight": 4,
+            "acknowledgementMs": {
+              "count": 4,
+              "p50": 21,
+              "p95": 56,
+              "p99": 56,
+              "max": 56
+            },
+            "firstDurableTextMs": {
+              "count": 4,
+              "p50": 414,
+              "p95": 445,
+              "p99": 445,
+              "max": 445
+            },
+            "settlementMs": {
+              "count": 4,
+              "p50": 821,
+              "p95": 864,
+              "p99": 864,
+              "max": 864
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "expectedOutcomesPassed": true,
+          "evidence": {
+            "physicalWrites": 4
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 10548.0859375,
+            "maximumSwapUsedMiB": 555.57421875,
+            "walBytes": 616641,
+            "transactions": 197,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 2,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 2,
+            "lastKafkaObservationAgeMs": 21
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 51,
+              "meanMs": 5.4348703921755925
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 3,
+              "meanMs": 0.2287283332552681
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 92,
+              "meanMs": 15.93966295652121
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "at": "2026-11-17T12:12:37.062Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 8,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 8,
+        "eligibility": {
+          "billable": 8,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 8,
+          "p50_ms": 704.5855,
+          "p95_ms": 1126.09995,
+          "p99_ms": 1176.20959
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "text-smoke",
+            "kind": "text",
+            "concurrency": 1,
+            "count": 2,
+            "firstByteMs": 100,
+            "chunkMs": 20
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 2,
+            "accepted": 2,
+            "completed": 2,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 1312.9833389999985,
+            "successfulRunsPerSecond": 1.523248574900616,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 2,
+              "p50": 17,
+              "p95": 28,
+              "p99": 28,
+              "max": 28
+            },
+            "firstDurableTextMs": {
+              "count": 2,
+              "p50": 379,
+              "p95": 453,
+              "p99": 453,
+              "max": 453
+            },
+            "settlementMs": {
+              "count": 2,
+              "p50": 498,
+              "p95": 603,
+              "p99": 603,
+              "max": 603
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 2,
+            "beforeProviderMs": {
+              "count": 2,
+              "p50": 143,
+              "p95": 166,
+              "p99": 166,
+              "max": 166
+            },
+            "providerMs": {
+              "count": 2,
+              "p50": 263,
+              "p95": 265,
+              "p99": 265,
+              "max": 265
+            },
+            "afterProviderMs": {
+              "count": 2,
+              "p50": 90,
+              "p95": 174,
+              "p99": 174,
+              "max": 174
+            }
+          },
+          "resources": {
+            "samples": 2,
+            "peakActiveRootRuns": 0,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11246.94921875,
+            "maximumSwapUsedMiB": 553.82421875,
+            "walBytes": 265286,
+            "transactions": 130,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 0,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 0,
+            "lastKafkaObservationAgeMs": 24
+          },
+          "provider": {
+            "requests": 2,
+            "completed": 2,
+            "errors": 0,
+            "websocketRequests": 0,
+            "httpRequests": 2
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 18,
+              "meanMs": 5.358573999999662
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 2,
+              "meanMs": 0.5536964999628254
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 26,
+              "meanMs": 20.468595269229027
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "profile": {
+            "name": "mcp-smoke",
+            "kind": "mcp",
+            "concurrency": 1,
+            "count": 2,
+            "firstByteMs": 50,
+            "rounds": 2
+          },
+          "summary": {
+            "mode": "closed",
+            "concurrency": 1,
+            "offered": 2,
+            "accepted": 2,
+            "completed": 2,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 2243.351177999997,
+            "successfulRunsPerSecond": 0.8915233689729529,
+            "maximumInFlight": 1,
+            "acknowledgementMs": {
+              "count": 2,
+              "p50": 11,
+              "p95": 15,
+              "p99": 15,
+              "max": 15
+            },
+            "firstDurableTextMs": {
+              "count": 2,
+              "p50": 341,
+              "p95": 353,
+              "p99": 353,
+              "max": 353
+            },
+            "settlementMs": {
+              "count": 2,
+              "p50": 1071,
+              "p95": 1075,
+              "p99": 1075,
+              "max": 1075
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 3,
+            "peakActiveRootRuns": 1,
+            "peakQueuedRuns": 0,
+            "minimumAvailableMiB": 11234.0234375,
+            "maximumSwapUsedMiB": 553.82421875,
+            "walBytes": 1621181,
+            "transactions": 251,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 10,
+            "kafkaSamples": 2,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 10,
+            "lastKafkaObservationAgeMs": 21
+          },
+          "provider": {
+            "requests": 6,
+            "completed": 6,
+            "errors": 0,
+            "websocketRequests": 0,
+            "httpRequests": 6
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 52,
+              "meanMs": 4.884590711535287
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 2,
+              "meanMs": 0.3121000000392087
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 68,
+              "meanMs": 13.758687647057418
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "soak",
+      "at": "2026-11-17T12:15:26.491Z",
+      "driverRevision": "692c1992635c80d86627f5f94eddd01b0b17aa78",
+      "dirty": false,
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "realProviderRequests": false,
+      "metering": {
+        "calls": 960,
+        "foreign_models": 0,
+        "charged": 0,
+        "usage_receipts": 960,
+        "eligibility": {
+          "billable": 960,
+          "platform": 0,
+          "pending": 0
+        },
+        "deliveryLatency": {
+          "events": 960,
+          "p50_ms": 739.174,
+          "p95_ms": 1351.57045,
+          "p99_ms": 1376.61203
+        }
+      },
+      "stages": [
+        {
+          "profile": {
+            "name": "bounded-soak",
+            "kind": "mcp",
+            "concurrency": 8,
+            "count": 240,
+            "arrivalRate": 1,
+            "firstByteMs": 200,
+            "chunkMs": 20,
+            "rounds": 3
+          },
+          "summary": {
+            "mode": "arrival",
+            "concurrency": 8,
+            "offered": 240,
+            "accepted": 240,
+            "completed": 240,
+            "failed": 0,
+            "historyFailures": 0,
+            "dropped": 0,
+            "elapsedMs": 240964.31436199998,
+            "successfulRunsPerSecond": 0.9959981030197222,
+            "maximumInFlight": 3,
+            "acknowledgementMs": {
+              "count": 240,
+              "p50": 16,
+              "p95": 25,
+              "p99": 30,
+              "max": 32
+            },
+            "firstDurableTextMs": {
+              "count": 240,
+              "p50": 386,
+              "p95": 455,
+              "p99": 563,
+              "max": 620
+            },
+            "settlementMs": {
+              "count": 240,
+              "p50": 1939,
+              "p95": 2206,
+              "p99": 2387,
+              "max": 2915
+            },
+            "sseReconnects": 0
+          },
+          "singleRequestPhases": {
+            "samples": 0,
+            "beforeProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "providerMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            },
+            "afterProviderMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          },
+          "resources": {
+            "samples": 122,
+            "peakActiveRootRuns": 2,
+            "peakQueuedRuns": 1,
+            "minimumAvailableMiB": 10454.95703125,
+            "maximumSwapUsedMiB": 552.32421875,
+            "walBytes": 111481263,
+            "transactions": 29164,
+            "maximumLockWaiters": 0,
+            "maximumObservedKafkaLag": 33,
+            "kafkaSamples": 42,
+            "headroomStopped": false,
+            "collectionErrors": [],
+            "firstKafkaLag": 0,
+            "lastObservedKafkaLag": 1,
+            "lastKafkaObservationAgeMs": 28
+          },
+          "provider": {
+            "requests": 960,
+            "completed": 960,
+            "errors": 0,
+            "websocketRequests": 960,
+            "httpRequests": 0
+          },
+          "stageTimings": {
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_session_mutation_wait_seconds{service=\"pi-cloud-trusted-runner\",stage=\"kafka_publish\"}": {
+              "count": 4428,
+              "meanMs": 5.1593441967025555
+            },
+            "pi-cloud-pi-worker-primary-v1:pi_cloud_run_preparation_seconds{service=\"pi-cloud-trusted-runner\",stage=\"writer_prepare\",outcome=\"completed\"}": {
+              "count": 123,
+              "meanMs": 0.30276991056497904
+            },
+            "pi-cloud-session-runtime:pi_cloud_session_projection_seconds{service=\"pi-cloud-session-runtime\",stage=\"projection\",outcome=\"ok\"}": {
+              "count": 11040,
+              "meanMs": 14.691971342300926
+            }
+          },
+          "historyPages": {
+            "count": 0,
+            "latencyMs": {
+              "count": 0,
+              "p50": null,
+              "p95": null,
+              "p99": null,
+              "max": null
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "processObservations": [
+    {
+      "at": "2026-11-17T11:22:57.851Z",
+      "label": "old-idle",
+      "workers": [
+        {
+          "threads": 42,
+          "rssKiB": 448632,
+          "openFiles": 87
+        },
+        {
+          "threads": 43,
+          "rssKiB": 289276,
+          "openFiles": 94
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:39:49.498Z",
+      "label": "new-idle",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 311100,
+          "openFiles": 99
+        },
+        {
+          "threads": 47,
+          "rssKiB": 308912,
+          "openFiles": 101
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:43:00.766Z",
+      "label": "cold64-r1",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 409404,
+          "openFiles": 114
+        },
+        {
+          "threads": 47,
+          "rssKiB": 394856,
+          "openFiles": 117
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:43:06.764Z",
+      "label": "cold64-r1",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 414524,
+          "openFiles": 110
+        },
+        {
+          "threads": 47,
+          "rssKiB": 397928,
+          "openFiles": 112
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:43:10.793Z",
+      "label": "cold64-r1",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 414780,
+          "openFiles": 108
+        },
+        {
+          "threads": 47,
+          "rssKiB": 398184,
+          "openFiles": 111
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:43:14.593Z",
+      "label": "cold64-r1",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 419644,
+          "openFiles": 107
+        },
+        {
+          "threads": 47,
+          "rssKiB": 397928,
+          "openFiles": 110
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:43:18.250Z",
+      "label": "cold64-r1",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 419644,
+          "openFiles": 107
+        },
+        {
+          "threads": 47,
+          "rssKiB": 398184,
+          "openFiles": 110
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T11:43:22.054Z",
+      "label": "cold64-r1",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 419644,
+          "openFiles": 107
+        },
+        {
+          "threads": 47,
+          "rssKiB": 402280,
+          "openFiles": 110
+        }
+      ]
+    },
+    {
+      "at": "2026-11-17T12:22:40.249Z",
+      "label": "final-idle",
+      "workers": [
+        {
+          "threads": 47,
+          "rssKiB": 277876,
+          "openFiles": 99
+        },
+        {
+          "threads": 47,
+          "rssKiB": 298592,
+          "openFiles": 99
+        }
+      ]
+    }
+  ]
+}

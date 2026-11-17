@@ -1,5 +1,10 @@
 # Delivery and research evidence
 
+- [Worker publication and model charge attribution](projector-admission-delivery-20261117.md):
+  #43–45, shared producers, Projector admission, exact input confirmations,
+  independent financial eligibility, deployed recovery and serial load comparison.
+  Initialization is repaired; overall high-concurrency throughput remains limited.
+
 - [OpenMA streaming, retention and capacity evidence](../research/openma-streaming-retention-capacity-20261117.md):
   actual Node/Cloudflare delta paths, retained stream buffers and the limits of
   published stress/business-latency evidence. Source inspection only.

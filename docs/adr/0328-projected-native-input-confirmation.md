@@ -1,6 +1,6 @@
 # ADR-0328: Projected native input confirmation
 
-Status: accepted for implementation on 2026-11-17; not yet deployed.
+Status: deployed on 2026-11-17 as `projector-admission-20261117-r1`.
 Implements #44 and is a prerequisite for the #43 publication cutover.
 
 ## Decision

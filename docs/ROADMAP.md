@@ -1,14 +1,15 @@
 # Implementation roadmap
 
-## Worker publication and customer accounting — in progress
+## Worker publication and customer accounting — delivered
 
-The owner authorized #43, #44 and #45 on 2026-11-17. First implement exact native
-input confirmations (ADR-0328), then one long-lived producer per Worker with
-Projector-side Session admission. Retain direct renewal, local expiry, valid
-partial output and original Tool-reply recovery. Model accounting separately
-attributes platform failure/recovery waste without real deductions. Complete a
-matched publication and serial simulated-provider pressure/failure comparison
-against the existing #42 baseline before claiming delivery.
+Issues #43, #44 and #45 are [published and verified](reports/projector-admission-delivery-20261117.md)
+under ADR-0328–0330. Workers reuse one producer; Projector admits Session effects;
+human input success follows exact PG projection. Direct renewal, local expiry,
+valid partial output and original Tool replies retain their recovery contracts.
+Independent model accounting separates customer eligibility from platform costs,
+with no real deductions. Writer preparation fell below one millisecond on average,
+but 64-concurrency throughput remains variable and the roughly 10-Run/s saturation
+question is unresolved. Investigate downstream queueing before another protocol change.
 
 ## Runtime throughput baseline — delivered
 

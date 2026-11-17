@@ -279,6 +279,9 @@ The repository contains native SDK contract tests, PostgreSQL/Kafka integration
 checks, browser layout tests, deterministic fault scenarios and opt-in live
 model/Cube acceptance. [Evaluation](docs/EVALUATION.md) describes their scope;
 individual delivery reports retain both successes and unresolved failures.
+The [publication and accounting delivery](docs/reports/projector-admission-delivery-20261117.md)
+verifies shared Worker producers, projected input confirmation and customer-usage
+eligibility. Writer startup is faster; high-concurrency settlement remains a measured limit.
 The [runtime and resource-accounting delivery](docs/reports/runtime-accounting-20261107.md)
 records real quota growth, receipt recovery, an 86-second management outage,
 native crash recovery and image preservation on the maintained single-host setup.
