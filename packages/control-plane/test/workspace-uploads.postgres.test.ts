@@ -525,7 +525,11 @@ describe.skipIf(!external).sequential("Workspace uploads and durable user attach
       ).rejects.toMatchObject({ code: "input_delivery_unavailable" });
       expect(await pendingPins()).toBe(1);
       ack.resolve();
-      await expect(request).rejects.toMatchObject({ code: "input_delivery_unavailable" });
+      await expect(request).resolves.toMatchObject({
+        kind: "input",
+        state: "accepted",
+        replayed: true,
+      });
       holdAck = false;
       const queue = new QueuedInputService({
         database: db,
@@ -540,16 +544,16 @@ describe.skipIf(!external).sequential("Workspace uploads and durable user attach
           text: "Inspect edited",
           uploadIds: [edited.id],
         }),
-      ).rejects.toMatchObject({ code: "input_delivery_unavailable" });
+      ).resolves.toMatchObject({ replayed: true });
       snapshot = await queue.list(tenant.tenantId, s.sessionId);
       expect(snapshot.items[0]!.uploads).toEqual([edited]);
       await queue.mutate(tenant.tenantId, s.sessionId, inputId, "withdraw-after-acceptance", {
         action: "cancel",
         revision: snapshot.revision,
       });
-      // A fresh maintenance instance can confirm receipts even though the
-      // current input payload has been withdrawn. It never resends an input.
-      expect(await pendingPins()).toBe(2);
+      // Immediate receipt reconciliation has settled both pins despite lost
+      // Worker replies. Maintenance remains idempotent after withdrawal.
+      expect(await pendingPins()).toBe(0);
       await reconcile();
       expect(await pendingPins()).toBe(0);
       for (const image of [original, edited]) {

@@ -1,6 +1,7 @@
 import { modelTransportKey, MODEL_PURPOSE_HEADER } from "@pi-cloud/protocol";
 import { MODEL_EVENT_IDLE_MS, MODEL_RETRY_COUNT } from "./durable/model-wait-policy.ts";
 import { DurableTextPresentation } from "./durable/text-presentation.ts";
+import { DurableModelAccounting } from "./durable/model-accounting.ts";
 import {
   prepareNativeSettlementFollowUp,
   type PiSettlementGatePolicy,
@@ -432,6 +433,8 @@ export class PiCloudTurnRunner {
         options.openSession(command, readLifetime.signal),
       );
       const owner = handle;
+      const accounting = new DurableModelAccounting(command);
+      owner.prepareModelEvidence((commit) => accounting.prepare(commit));
       text = new DurableTextPresentation({
         conversationId: p.piSession.conversationId,
       });
@@ -754,11 +757,21 @@ export class PiCloudTurnRunner {
                   task?.state.status === "pending" ||
                   task?.state.status === "running" ||
                   task?.state.status === "waiting"
-                    ? (task.state.checkpoint as { attempt?: number })
+                    ? (task.state.checkpoint as { attempt?: number; phase?: string })
                     : undefined;
                 if (sequence === undefined || !checkpoint)
                   throw new Error("Model task has no committed checkpoint");
                 details.samplingAttempt = checkpoint.attempt ?? 1;
+                const modelAccounting = accounting.request({
+                  taskId: native.taskId,
+                  phase: checkpoint.phase ?? "request",
+                  provider: model.provider,
+                  model: model.id,
+                  purpose: native.purpose,
+                  ...(typeof request.options.fetch === "function"
+                    ? { fetch: request.options.fetch as typeof fetch }
+                    : {}),
+                });
                 const scoped = {
                   sampling: new DurableSampling(),
                   identity: undefined as ModelSamplingIdentity | undefined,
@@ -808,6 +821,7 @@ export class PiCloudTurnRunner {
                       : {}),
                     options: {
                       ...request.options,
+                      fetch: modelAccounting.fetch,
                       ...(config.transport ? { transport: config.transport } : {}),
                       apiKey: config.apiKey,
                       ...(model.api === "openai-codex-responses" ? { sessionId: cacheKey } : {}),
@@ -844,6 +858,7 @@ export class PiCloudTurnRunner {
                       });
                     },
                     onOutcome: (sample) => {
+                      modelAccounting.finish(sample.outcome);
                       options.metrics?.modelDuration.observe(
                         { provider: model.provider, model: model.id, outcome: sample.outcome },
                         sample.durationMs / 1000,

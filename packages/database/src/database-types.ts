@@ -1141,6 +1141,23 @@ export interface Database {
     valuation: JsonValue;
     received_at: GeneratedTimestamp;
   };
+  model_execution_writers: {
+    writer_id: string;
+    tenant_id: string;
+    pi_session_id: string;
+    run_id: string;
+    fencing_token: Int8;
+    topic: string;
+    partition: number;
+    close_offset: Int8;
+    fingerprint: string;
+    closed_at: GeneratedTimestamp;
+  };
+  model_billing_events: Database["model_metering_events"] & {
+    billing_valuation: JsonValue;
+    customer_eligibility: "billable" | "platform" | "pending";
+    eligibility_reason: string;
+  };
   session_schedules: SessionScheduleTable;
   session_uploads: SessionUploadTable;
   workspace_file_transfers: WorkspaceFileTransferTable;

@@ -1,4 +1,5 @@
 import { runtimeModelCatalog } from "./runtime-model-catalog.ts";
+import { ModelExecutionAccounting } from "@pi-cloud/accounting";
 import { SessionPublicationService } from "./session-publication-service.ts";
 import { SubagentController } from "./subagent-controller.ts";
 import { PlatformRuntimeSettingsService } from "./platform-runtime-settings.ts";
@@ -340,6 +341,7 @@ export async function startSessionRuntime(): Promise<void> {
     }, 2000);
     executorCleanupTimer.unref();
     agentEvents = new SessionProjector({
+      modelAccounting: new ModelExecutionAccounting(),
       publicationToken: config.supervisorManagementToken,
       projectionGate: quiescence,
       database: projectionDatabase,

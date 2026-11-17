@@ -258,6 +258,9 @@ export class DurableSessionPublisher {
             scope,
             commit,
             origins: publication.origins,
+            ...(publication.modelEvidence?.length
+              ? { modelEvidence: publication.modelEvidence }
+              : {}),
             ...(publication.inputQueueSessions?.length
               ? { inputQueueSessions: publication.inputQueueSessions }
               : {}),

@@ -252,6 +252,13 @@ async function cleanup() {
       database,
     );
   report.metering = billing[0];
+  const { rows: eligibility } = await sql`select
+    count(*) filter(where e.customer_eligibility='billable')::int as billable,
+    count(*) filter(where e.customer_eligibility='platform')::int as platform,
+    count(*) filter(where e.customer_eligibility='pending')::int as pending
+    from model_billing_events e join model_invocations i on i.id=e.invocation_id
+    where i.tenant_id=${tenant.tenantId}::uuid and e.kind='usage'`.execute(database);
+  report.metering.eligibility = eligibility[0];
   const { rows: delivery } = await sql`select count(*)::int as events,
     percentile_cont(0.50) within group(order by extract(epoch from(e.received_at-e.occurred_at))*1000) as p50_ms,
     percentile_cont(0.95) within group(order by extract(epoch from(e.received_at-e.occurred_at))*1000) as p95_ms,
@@ -261,6 +268,14 @@ async function cleanup() {
   report.metering.deliveryLatency = delivery[0];
   assert.equal(billing[0].foreign_models, 0);
   assert.equal(billing[0].charged, 0);
+  if (mode === "smoke" || mode === "http") {
+    assert.equal(
+      eligibility[0].billable,
+      billing[0].usage_receipts,
+      "Every successful smoke request needs exact accepted native model evidence",
+    );
+    assert.equal(eligibility[0].platform + eligibility[0].pending, 0);
+  }
   const blobs = new S3AttachmentBlobStore({
     endpoint: `http://${serviceAddress("session-images")}:8333`,
     region: "us-east-1",

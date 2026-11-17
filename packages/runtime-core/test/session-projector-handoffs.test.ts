@@ -152,7 +152,7 @@ function deferred<T>() {
 }
 
 describe("Unified Projector handoff boundaries (transport/PG simulated)", () => {
-  it("routes Session activity without native PG projection or a Tool dispatch receipt", async () => {
+  it("admits Session activity through the epoch view without native projection or a Tool dispatch receipt", async () => {
     const consume = vi.fn(),
       commit = vi.fn(async () => true);
     projector.options.sessionActivity = { consume, reset: vi.fn() };
@@ -168,10 +168,13 @@ describe("Unified Projector handoff boundaries (transport/PG simulated)", () => 
     await f.handler!(record, () => true, commit);
     expect(consume).toHaveBeenCalledOnce();
     expect(f.project).not.toHaveBeenCalled();
-    expect(f.applies).not.toHaveBeenCalled();
+    expect(f.applies).toHaveBeenCalledWith(record);
     expect(commit).not.toHaveBeenCalled();
     expect(route).not.toHaveBeenCalled();
     await f.handler!(record, () => false, commit);
+    expect(consume).toHaveBeenCalledOnce();
+    f.applies.mockResolvedValue(false);
+    await f.handler!({ ...record, offset: 13n }, () => true, commit);
     expect(consume).toHaveBeenCalledOnce();
   });
   it("holds a replacement record before PG projection or dispatch acknowledgement", async () => {

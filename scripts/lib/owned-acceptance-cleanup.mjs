@@ -123,6 +123,7 @@ export async function purgeOwnedAcceptanceTenant(
       "resource_metering_resources",
       "resource_rate_versions",
       "model_invocations",
+      "model_execution_writers",
       "model_rate_versions",
       "mcp_connections",
       "run_skill_catalogs",

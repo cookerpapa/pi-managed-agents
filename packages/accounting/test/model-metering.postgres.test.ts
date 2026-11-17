@@ -37,7 +37,6 @@ const definition: Omit<ModelRateInput, "effectiveAt"> = {
   model: "gpt-6-luna",
   serviceTier: "default",
   currency: "USD",
-  includeFailed: false,
   perMillion: { input: "1.25", cacheRead: "0.125", cacheWrite: "2.5", output: "5", reasoning: "5" },
 };
 
@@ -147,8 +146,8 @@ it("deduplicates reordered/lost-ack deliveries, survives chat deletion, and fixe
     expect(page.items[0]!.state).toBe("confirmed");
     const prices = page.items[0]!.usage.map((e) => e.valuation.customer);
     expect(prices).toEqual([
-      { state: "priced", rateId: first.id, currency: "USD", amountPico: "230000000" },
-      { state: "waived", rateId: second.id, currency: "USD", amountPico: "0" },
+      { state: "unconfirmed", reason: "execution_not_confirmed" },
+      { state: "unconfirmed", reason: "execution_not_confirmed" },
     ]);
     expect(formatModelAmount("230000000")).toBe("0.000230000000");
     expect(page.items[0]!.usage[0]!.valuation.upstream_estimate.state).toBe("unpriced");
@@ -188,7 +187,23 @@ it("deduplicates reordered/lost-ack deliveries, survives chat deletion, and fixe
       .select("valuation")
       .where("id", "=", modelMeteringEventId(events[2]!))
       .executeTakeFirstOrThrow();
-    expect(row.valuation!.customer).toEqual(prices[0]);
+    expect(row.valuation!.customer).toEqual({
+      state: "priced",
+      rateId: first.id,
+      currency: "USD",
+      amountPico: "230000000",
+    });
+    const secondQuote = await db
+      .selectFrom("model_metering_events")
+      .select("valuation")
+      .where("id", "=", modelMeteringEventId(events[4]!))
+      .executeTakeFirstOrThrow();
+    expect(secondQuote.valuation!.customer).toEqual({
+      state: "priced",
+      rateId: second.id,
+      currency: "USD",
+      amountPico: "305000000",
+    });
   } finally {
     await server.close();
     await db.destroy();

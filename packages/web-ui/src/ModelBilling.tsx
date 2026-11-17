@@ -87,7 +87,9 @@ export function ModelBilling({
       : p.state === "unconfirmed"
         ? say("未确认", "Unconfirmed")
         : p.state === "unpriced"
-          ? say("未定价", "Unpriced")
+          ? p.reason === "platform_cost"
+            ? say("平台承担", "Platform cost")
+            : say("未定价", "Unpriced")
           : p.state === "waived"
             ? say("已免计", "Waived")
             : "amountPico" in p
@@ -158,9 +160,10 @@ export function ModelBilling({
               {[
                 say("时间", "Time"),
                 say("模型 / 用途", "Model / purpose"),
-                say("输入", "Input"),
+                say("实际输入", "Actual input"),
                 say("缓存读 / 写", "Cache read / write"),
                 say("输出 / 推理", "Output / reasoning"),
+                say("计费用量", "Billable tokens"),
                 say("模拟金额", "Quoted cost"),
                 say("上游估算", "Upstream estimate"),
               ].map((label) => (
@@ -199,6 +202,13 @@ export function ModelBilling({
                         {u.usage.tokens.output.toLocaleString()} /{" "}
                         {u.usage.tokens.reasoning.toLocaleString()}
                       </td>
+                      <td>
+                        {u.eligibility.state === "billable"
+                          ? u.usage.tokens.total.toLocaleString()
+                          : u.eligibility.state === "platform"
+                            ? say("0 · 平台承担", "0 · Platform cost")
+                            : say("待确认", "Pending")}
+                      </td>
                       <td>{price(u.valuation.customer)}</td>
                       <td>{price(u.valuation.upstream_estimate)}</td>
                     </tr>
@@ -207,7 +217,7 @@ export function ModelBilling({
                     <tr key={item.context.invocationId}>
                       <td>{new Date(item.context.requestedAt).toLocaleString(language)}</td>
                       <td>{item.context.model}</td>
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         {item.state === "pending"
                           ? say("等待用量回执", "Awaiting usage receipt")
                           : say("用量未确认", "Usage unconfirmed")}

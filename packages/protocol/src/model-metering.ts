@@ -27,10 +27,49 @@ export const ModelMeteringContextSchema = Type.Object(
       Type.Literal("image"),
     ]),
     operationId: Type.Optional(Name),
+    execution: Type.Optional(
+      Type.Object(
+        {
+          writerId: UuidSchema,
+          fencingToken: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+          taskId: Type.Optional(Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })),
+        },
+        closed,
+      ),
+    ),
   },
   closed,
 );
 export type ModelMeteringContext = Static<typeof ModelMeteringContextSchema>;
+export function parseModelMeteringContext(value: unknown): ModelMeteringContext {
+  if (
+    !Value.Check(ModelMeteringContextSchema, value) ||
+    !Number.isFinite(Date.parse(value.requestedAt))
+  )
+    throw new TypeError("Invalid model metering context");
+  return value;
+}
+export const ModelExecutionEvidenceSchema = Type.Object(
+  {
+    context: ModelMeteringContextSchema,
+    outcome: Type.Union([
+      Type.Literal("completed"),
+      Type.Literal("cancelled"),
+      Type.Literal("failed"),
+      Type.Literal("superseded"),
+    ]),
+  },
+  closed,
+);
+export type ModelExecutionEvidence = Static<typeof ModelExecutionEvidenceSchema>;
+export function parseModelExecutionEvidence(value: unknown): ModelExecutionEvidence {
+  if (!Value.Check(ModelExecutionEvidenceSchema, value))
+    throw new TypeError("Invalid model execution evidence");
+  parseModelMeteringContext(value.context);
+  if (!value.context.execution?.taskId || value.context.purpose === "image")
+    throw new TypeError("Model settlement requires native execution identity");
+  return value;
+}
 export const MeteredTokensSchema = Type.Object(
   {
     input: Count,

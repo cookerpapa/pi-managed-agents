@@ -7,8 +7,11 @@ usage and simulated amounts in its Models tab. Compute and Storage use separate
 
 ## Flow and authority
 
-Worker Model Gateway and the image Tool caller attach a new invocation UUID and
-bounded tenant/Session/Conversation/Run/purpose metadata to each HTTP request.
+The trusted Models HTTP adapter assigns a new invocation UUID and bounded
+tenant/Session/Conversation/Run/purpose metadata to each actual request. The
+Worker Model Gateway checks it against the active grant. Ordinary model context
+also carries writer/fence/native-task identity; the image Tool caller retains
+its separately attributed, currently unpriced media path.
 This attribution is independent of the reusable model transport key. The provider
 removes the private header before forwarding model work. Its v8 execution UUIDs
 distinguish fallback/retry attempts within one invocation.
@@ -31,6 +34,23 @@ PG owns `model_invocations`, immutable `model_metering_events`, and
 `model_rate_versions`. These have no cascading relationship to chat/native history.
 Deleting a chat, Compaction and Fork do not erase or copy actual consumption.
 The only cleanup exception is the explicitly owned acceptance-fixture purger.
+
+Under [ADR-0330](adr/0330-model-charge-eligibility.md), model-task settlement
+evidence accompanies the same native Kafka commit as Pi's state transition.
+Projector inserts an immutable `execution` accounting event only when that batch
+is accepted. One `model_execution_writers` closure fact retains each writer's
+ordered cutoff independently of Session deletion. Neither fact grants execution.
+The independent accounting view `model_billing_events` joins these exact identities
+to raw usage and source completion. It does not poll Worker leases or give CPA a
+live fencing cache. Either source may arrive first; missing evidence remains pending.
+
+Customer eligibility is separate from actual usage. Completed work and valid
+native user cancellation are chargeable with complete usage. Failed/superseded
+work, a closed writer without accepted settlement, and ambiguous multi-attempt
+provider attribution are platform cost. A valid pre-seal settlement remains
+eligible when its usage arrives after replacement. No token count is split using
+a seal timestamp. The statement shows actual quantities separately from billable
+tokens and masks customer amounts without changing raw receipts or tariff quotes.
 
 ## Missing observations and limits
 
@@ -57,8 +77,8 @@ The only cleanup exception is the explicitly owned acceptance-fixture purger.
 ## Prices
 
 The platform operator creates immutable rate versions for an account, model and
-service tier. Rates have a future effective time, currency, explicit failed-attempt
-policy and decimal prices **per million tokens**. `customer` is a simulated customer
+service tier. Rates have a future effective time, currency and decimal prices
+**per million tokens**. `customer` is a simulated customer
 quote; `upstream_estimate` is a separate optional estimate. Neither is copied from
 the other or inferred from a subscription. No real rates are seeded automatically.
 
@@ -72,8 +92,9 @@ start time. Later rate changes and duplicate receipt delivery do not rewrite it.
 Image generation, hosted search and other unsupported media dimensions remain
 unpriced even when token counts are available. Ordinary vision tokens can be
 counted when the provider supplies canonical quantities. Incomplete quantities
-remain unconfirmed. `includeFailed: false` explicitly waives reported failed
-attempts; it does not suppress their usage facts.
+remain unconfirmed. `includeFailed` is accepted only for `upstream_estimate` rates.
+Customer failure/Stop handling follows native execution eligibility, not the
+provider's failure flag: a valid user Stop with complete usage remains chargeable.
 
 ## API
 
@@ -99,7 +120,6 @@ or Run to exist.
   "serviceTier": "default",
   "effectiveAt": "2099-01-01T00:00:00.000Z",
   "currency": "USD",
-  "includeFailed": false,
   "perMillion": {
     "input": "1.25",
     "cacheRead": "0.125",
@@ -113,9 +133,9 @@ or Run to exist.
 This is a fixture, not a published model tariff. Match the model/tier actually
 reported by the provider. Backdated new changes are rejected. An identical retry, including after its
 effective time, returns the existing version; conflicting reuse is rejected. There is no edit/delete
-route for a historical rate or receipt. The current failed-attempt rule uses provider-reported failure, not a claim that
-every platform-caused retry is automatically free. Payments, wallets, BYOK collection and
-Sandbox billing require separate business decisions before enabling collection.
+route for a historical rate or receipt. Ordinary generation and compaction use
+the same eligibility boundary. Unsupported media/search pricing, payments,
+wallets and BYOK collection require separate business decisions before collection.
 
 ## Publication
 

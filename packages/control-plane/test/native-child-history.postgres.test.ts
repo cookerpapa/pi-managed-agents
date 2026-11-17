@@ -129,7 +129,7 @@ it("forks native child history and preserves parent-owned deletion boundaries wi
       },
       { topic: "child-history", partition: 0, offset: 0n },
     );
-    expect(replay).toEqual({ events: [], covers: [] });
+    expect(replay).toEqual({ events: [], covers: [], admitted: false });
     expect(
       (
         await sql`select 1 from pi_durable_commits where tenant_id=${f.scope.tenantId}::uuid and session_id=${f.scope.piSessionId}`.execute(

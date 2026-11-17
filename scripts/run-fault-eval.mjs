@@ -68,6 +68,8 @@ async function executeGroup(cases) {
           "--outputFile",
           resultFile,
           "--maxWorkers=1",
+          "--no-file-parallelism",
+          "--exclude=**/.cache/**",
           "--testTimeout=30000",
           "--hookTimeout=60000",
         ],

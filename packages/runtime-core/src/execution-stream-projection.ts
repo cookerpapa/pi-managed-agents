@@ -22,6 +22,7 @@ import type { KafkaAcceptedFactRecord } from "./kafka-accepted-fact-consumer.ts"
 import { recordFactProjection, type FactPosition } from "./accepted-fact-recovery.ts";
 import { ExecutionPrefix } from "./execution-prefix.ts";
 import { projectionTransaction } from "./projection-transaction.ts";
+import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
 export type ExecutionProjectionResult = {
   admitted?: boolean;
@@ -166,10 +167,13 @@ export class ExecutionStreamProjector {
   readonly #durable: PostgresDurableCommitProjector;
   readonly #prefixes = new Map<string, ExecutionPrefix>();
 
-  constructor(database: Kysely<Database>) {
+  constructor(
+    database: Kysely<Database>,
+    readonly modelAccounting?: ModelAccountingPort,
+  ) {
     this.#database = database;
     this.#boundary = new ExecutionStreamBoundary(database);
-    this.#durable = new PostgresDurableCommitProjector(database);
+    this.#durable = new PostgresDurableCommitProjector(database, undefined, modelAccounting);
   }
 
   reset(): void {
@@ -464,7 +468,10 @@ export class ExecutionStreamProjector {
       );
       if (result) {
         rootClosed = position.offset;
-        if (retire) writerClosed = position.offset;
+        if (retire) {
+          writerClosed = position.offset;
+          await this.modelAccounting?.closeWriter(tx, fact.scope, position);
+        }
       }
       if (!current()) throw new Error("Work completion Projector owner changed");
       return result;
@@ -537,6 +544,7 @@ export class ExecutionStreamProjector {
             .where("tenant_id", "=", fact.scope.tenantId)
             .where("lease_id", "=", fact.scope.writerId)
             .execute();
+          await this.modelAccounting?.closeWriter(transaction, fact.scope, position);
           await releaseIdleSessionLease(transaction, fact.scope.writerId, now);
         }
         await recordFactProjection(transaction, position);
@@ -552,7 +560,7 @@ export class ExecutionStreamProjector {
         adopt = await this.#durable.checkpointLiveIn(transaction, fact.scope, current);
         await this.#handoffViews(transaction, fact.scope);
       }
-      if (writer.writer_seal_offset === null)
+      if (writer.writer_seal_offset === null) {
         await transaction
           .updateTable("session_leases")
           .set({
@@ -561,6 +569,8 @@ export class ExecutionStreamProjector {
           })
           .where("lease_id", "=", fact.scope.writerId)
           .execute();
+        await this.modelAccounting?.closeWriter(transaction, fact.scope, position);
+      }
       {
         // The ordered Kafka fence is the ownership proof. An unreachable old
         // Worker need not acknowledge its local callback cleanup; this says

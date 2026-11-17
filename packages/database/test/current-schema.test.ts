@@ -23,9 +23,9 @@ describe("current PiCloud schema", () => {
       const firstMigrationPass = await sql<{ name: string }>`
         select name from kysely_migration order by name
       `.execute(database);
-      expect(firstMigrationPass.rows).toHaveLength(225);
+      expect(firstMigrationPass.rows).toHaveLength(226);
       expect(firstMigrationPass.rows[0]?.name).toBe("001_initial_control_plane");
-      expect(firstMigrationPass.rows.at(-1)?.name).toBe("225_http_mcp_connections");
+      expect(firstMigrationPass.rows.at(-1)?.name).toBe("226_model_charge_evidence");
       const storageColumns = await sql<{
         column_name: string;
       }>`select column_name from information_schema.columns where table_name='workspaces'`.execute(
@@ -83,6 +83,12 @@ describe("current PiCloud schema", () => {
         database,
       );
       expect(scopes.rows[0]?.table_type).toBe("VIEW");
+      const billing = await sql<{
+        table_type: string;
+      }>`select table_type from information_schema.tables where table_name='model_billing_events'`.execute(
+        database,
+      );
+      expect(billing.rows[0]?.table_type).toBe("VIEW");
       await runMigrations(database, "up");
 
       const tables = await sql<{ table_name: string }>`
@@ -118,6 +124,7 @@ describe("current PiCloud schema", () => {
       ])
         expect(names.has(retired)).toBe(false);
       for (const required of [
+        "model_execution_writers",
         "workers",
         "worker_retirements",
         "runs",

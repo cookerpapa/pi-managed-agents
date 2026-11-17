@@ -14,8 +14,8 @@ import { UsageBilling } from "/src/UsageBilling.tsx";
 import { I18nProvider } from "/src/i18n.tsx";
 import "/src/product.css";
 const context={invocationId:"fixture",requestedAt:"2026-11-06T08:00:00.000Z",model:"gpt-6-luna",purpose:"agent"};
-const usage={model:"gpt-6-luna",failed:false,tokens:{input:60,cacheRead:40,cacheWrite:0,output:20,reasoning:10}};
-const row={context,state:"unconfirmed",missingAttempts:1,interrupted:true,usage:[{executionId:"a",occurredAt:context.requestedAt,usage,valuation:{customer:{state:"priced",currency:"USD",amountPico:"230000000"},upstream_estimate:{state:"unpriced"}}}]};
+const usage={model:"gpt-6-luna",failed:false,tokens:{input:60,cacheRead:40,cacheWrite:0,output:20,reasoning:10,total:130}};
+const row={context,state:"unconfirmed",missingAttempts:1,interrupted:true,usage:[{executionId:"a",occurredAt:context.requestedAt,usage,eligibility:{state:"billable",reason:"accepted_execution"},valuation:{customer:{state:"priced",currency:"USD",amountPico:"230000000"},upstream_estimate:{state:"unpriced"}}},{executionId:"b",occurredAt:context.requestedAt,usage,eligibility:{state:"platform",reason:"writer_closed_without_settlement"},valuation:{customer:{state:"unpriced",reason:"platform_cost"},upstream_estimate:{state:"unpriced"}}}]};
 window.queries=[];
 const api={async modelBilling(q){queries.push(q.toString());return q.has("beforeId")?{items:[{context:{...context,invocationId:"next",model:"next-page-model"},state:"pending",missingAttempts:0,interrupted:false,usage:[]}],next:null}:{items:[row],next:{time:context.requestedAt,id:"00000000-0000-4000-8000-000000000001"}}},async modelBillingSummary(){return {collectionEnabled:false,categories:[{kind:"customer",state:"priced",currency:"USD",amountPico:"230000000",count:"1"},{kind:"customer",state:"unpriced",currency:null,amountPico:null,count:"1"}]}}};
 api.resourceBilling=async(q)=>{queries.push('resource:'+q.toString());return {items:[{resource:{kind:q.get('resourceKind'),resourceId:'owned-compute-resource',workspaceId:'owned-workspace'},firstAt:context.requestedAt,lastAt:context.requestedAt,confirmedMilliseconds:'3600000',unconfirmedMilliseconds:'30000',quantity:q.get('resourceKind')==='compute'?{kind:'compute',cpuMillis:2000,memoryBytes:4294967296}:{kind:'workspace',capacityBytes:34359738368},charges:[{kind:'customer',state:'priced',currency:'CNY',amountPico:'450000000000',count:'1'},{kind:'customer',state:'unconfirmed',currency:null,amountPico:null,count:'1'}]}],next:null}};
@@ -59,6 +59,8 @@ try {
     assert.match(text, /未扣款|No collection/);
     assert.match(text, /部分用量未确认|Some usage is unconfirmed/);
     assert.match(text, /未定价|Unpriced/);
+    assert.match(text, /计费用量|Billable tokens/);
+    assert.match(text, /0 · 平台承担|0 · Platform cost/);
     assert.equal(
       await page.evaluate("document.querySelector('td:nth-child(3)').textContent"),
       "60",

@@ -1,5 +1,9 @@
 # Current architecture decisions
 
+[ADR-0330](0330-model-charge-eligibility.md) separates actual model usage from
+customer charge eligibility using native settlement and writer closure facts (#45).
+Valid user Stop with complete usage remains chargeable; implementation is in progress.
+
 [ADR-0329](0329-worker-producer-and-projector-admission.md) selects one idempotent
 Session-log producer per Worker and Projector-side admission (#43). Implementation
 is in progress; the matched cutover requires ADR-0328 input confirmations.

@@ -9,22 +9,24 @@ import {
 
 const name = Type.String({ minLength: 1, maxLength: 256 });
 const price = Type.String({ pattern: "^(0|[1-9][0-9]{0,8})(\\.[0-9]{1,6})?$" });
-export const ModelRateInputSchema = Type.Object(
-  {
-    kind: Type.Union([Type.Literal("customer"), Type.Literal("upstream_estimate")]),
-    provider: name,
-    model: name,
-    serviceTier: name,
-    effectiveAt: Type.String({ maxLength: 30 }),
-    currency: Type.String({ pattern: "^[A-Z]{3}$" }),
-    includeFailed: Type.Boolean(),
-    perMillion: Type.Object(
-      { input: price, cacheRead: price, cacheWrite: price, output: price, reasoning: price },
-      { additionalProperties: false },
-    ),
-  },
-  { additionalProperties: false },
-);
+const rateFields = {
+  provider: name,
+  model: name,
+  serviceTier: name,
+  effectiveAt: Type.String({ maxLength: 30 }),
+  currency: Type.String({ pattern: "^[A-Z]{3}$" }),
+  perMillion: Type.Object(
+    { input: price, cacheRead: price, cacheWrite: price, output: price, reasoning: price },
+    { additionalProperties: false },
+  ),
+};
+export const ModelRateInputSchema = Type.Union([
+  Type.Object({ kind: Type.Literal("customer"), ...rateFields }, { additionalProperties: false }),
+  Type.Object(
+    { kind: Type.Literal("upstream_estimate"), ...rateFields, includeFailed: Type.Boolean() },
+    { additionalProperties: false },
+  ),
+]);
 export type ModelRateInput = Static<typeof ModelRateInputSchema>;
 export type ModelRate = ModelRateInput & { id: string };
 export type ModelPrice =
@@ -73,6 +75,14 @@ export const ModelBillingPageSchema = Type.Object({
           occurredAt: UtcTimestampSchema,
           usage: ModelUsageFactSchema,
           valuation: Type.Object({ customer: PriceSchema, upstream_estimate: PriceSchema }),
+          eligibility: Type.Object({
+            state: Type.Union([
+              Type.Literal("billable"),
+              Type.Literal("platform"),
+              Type.Literal("pending"),
+            ]),
+            reason: Type.String(),
+          }),
         }),
       ),
     }),

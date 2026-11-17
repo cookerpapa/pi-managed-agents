@@ -1,3 +1,4 @@
+import { ensureModelInvocation } from "./model-invocations.ts";
 import { priceModelUsage } from "./model-pricing.ts";
 import { parseModelRateInput, type ModelRate, type ModelValuation } from "@pi-cloud/protocol";
 import { randomUUID } from "node:crypto";
@@ -28,29 +29,7 @@ export class ModelMeteringService {
         if (identities.has(c.invocationId) && identities.get(c.invocationId) !== contextHash)
           throw new MeteringConflict("Model invocation identity changed");
         if (!identities.has(c.invocationId)) {
-          await tx
-            .insertInto("model_invocations")
-            .values({
-              id: c.invocationId,
-              tenant_id: c.tenantId,
-              session_id: c.sessionId,
-              run_id: c.runId,
-              requested_at: c.requestedAt,
-              provider: c.provider,
-              model: c.model,
-              purpose: c.purpose,
-              context: c,
-              context_hash: contextHash,
-            })
-            .onConflict((oc) => oc.column("id").doNothing())
-            .execute();
-          const identity = await tx
-            .selectFrom("model_invocations")
-            .select("context_hash")
-            .where("id", "=", c.invocationId)
-            .executeTakeFirstOrThrow();
-          if (identity.context_hash !== contextHash)
-            throw new MeteringConflict("Model invocation identity changed");
+          await ensureModelInvocation(tx, c);
           identities.set(c.invocationId, contextHash);
         }
         let valuation: ModelValuation | null = null;
@@ -183,15 +162,18 @@ export class ModelMeteringService {
       count: string;
       amountPico: string | null;
     }>`
-      select p.key as kind, p.value->>'state' as state, p.value->>'currency' as currency,
-        count(*)::text as count, sum((p.value->>'amountPico')::numeric)::text as "amountPico"
-      from model_invocations i join model_metering_events e on e.invocation_id=i.id
-      cross join lateral jsonb_each(e.valuation) p
-      where i.tenant_id=${tenantId}::uuid and i.requested_at>=${options.from}::timestamptz and i.requested_at<${options.to}::timestamptz
+      select p.key as kind,
+        case when p.key='customer' and e.customer_eligibility='platform' then 'waived' else p.value->>'state' end as state,
+        p.value->>'currency' as currency,
+        count(*)::text as count,
+        sum(case when p.key='customer' and e.customer_eligibility='platform' then 0::numeric else (p.value->>'amountPico')::numeric end)::text as "amountPico"
+      from model_invocations i join model_billing_events e on e.invocation_id=i.id
+      cross join lateral jsonb_each(e.billing_valuation) p
+      where e.kind='usage' and i.tenant_id=${tenantId}::uuid and i.requested_at>=${options.from}::timestamptz and i.requested_at<${options.to}::timestamptz
         ${options.sessionId ? sql`and i.session_id=${options.sessionId}::uuid` : sql``}
         ${options.model ? sql`and i.model=${options.model}` : sql``}
-      group by p.key,p.value->>'state',p.value->>'currency'
-      order by p.key,p.value->>'state',p.value->>'currency'
+      group by p.key,state,p.value->>'currency'
+      order by p.key,state,p.value->>'currency'
     `.execute(this.database);
     return { collectionEnabled: false as const, categories: result.rows };
   }
@@ -233,8 +215,14 @@ export class ModelMeteringService {
     rows.length = Math.min(rows.length, options.limit);
     const facts = rows.length
       ? await this.database
-          .selectFrom("model_metering_events")
-          .select(["invocation_id", "payload", "valuation"])
+          .selectFrom("model_billing_events")
+          .select([
+            "invocation_id",
+            "payload",
+            "billing_valuation",
+            "customer_eligibility",
+            "eligibility_reason",
+          ])
           .where(
             "invocation_id",
             "in",
@@ -244,12 +232,19 @@ export class ModelMeteringService {
           .orderBy("id")
           .execute()
       : [];
-    const groups = new Map<string, (ModelMeteringEvent & { valuation?: ModelValuation })[]>();
+    const groups = new Map<
+      string,
+      (ModelMeteringEvent & {
+        valuation?: ModelValuation;
+        eligibility: { state: "billable" | "platform" | "pending"; reason: string };
+      })[]
+    >();
     for (const fact of facts) {
       const group = groups.get(fact.invocation_id) ?? [];
       group.push({
         ...(fact.payload as ModelMeteringEvent),
-        ...(fact.valuation ? { valuation: fact.valuation as ModelValuation } : {}),
+        ...(fact.billing_valuation ? { valuation: fact.billing_valuation as ModelValuation } : {}),
+        eligibility: { state: fact.customer_eligibility, reason: fact.eligibility_reason },
       });
       groups.set(fact.invocation_id, group);
     }

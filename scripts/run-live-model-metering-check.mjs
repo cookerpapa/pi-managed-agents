@@ -131,7 +131,6 @@ try {
       serviceTier,
       effectiveAt: effective,
       currency: "USD",
-      includeFailed: false,
       perMillion: { input: "1", cacheRead: "0.1", cacheWrite: "1", output: "5", reasoning: "5" },
     });
   }
@@ -220,7 +219,7 @@ try {
   }, "Durable receipt delivery");
   const receipts = await db
     .selectFrom("model_metering_events")
-    .select("payload")
+    .select(["payload", "valuation"])
     .where("invocation_id", "=", context.invocationId)
     .execute();
   report.observedUsage = page.items[0].usage.map((e) => ({
@@ -234,8 +233,15 @@ try {
   }));
   assert(page.items[0].usage.length > 0);
   assert(
-    page.items[0].usage.some((u) => u.valuation.customer.state === "priced"),
-    "Fixture rate did not produce a priced receipt",
+    receipts.some((r) => r.valuation?.customer?.state === "priced"),
+    "Fixture rate did not produce a raw tariff quote",
+  );
+  // This source-delivery probe intentionally bypasses a native Session. Its
+  // exact usage is retained but cannot establish customer charge eligibility.
+  assert(
+    page.items[0].usage.every(
+      (u) => u.eligibility.state === "pending" && u.valuation.customer.state === "unconfirmed",
+    ),
   );
   for (let repeat = 0; repeat < 2; repeat++) {
     const ack = await fetch(

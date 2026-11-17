@@ -88,8 +88,8 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   records 47 source tests, preserved original assets and before/after throughput
   of 4.92 versus 6.29/9.04 Runs/s. All three text cases completed 192 Runs;
   the query improvement does not establish a stable new capacity ceiling.
-- [ ] Evaluate Kafka client initialization/background scheduling without weakening
-  Session producer fencing. Investigate the allocator abort seen in the injected
+- [ ] Evaluate shared Worker producer scheduling under the ADR-0329 Projector
+  admission boundary. Investigate the allocator abort seen in the injected
   diagnostic repetition; its recovery tails are not ordinary latency evidence.
 - [x] Compare established fencing/publication patterns against the current
   constraints. The [source-backed survey](research/kafka-fencing-patterns-20261117.md)
@@ -112,9 +112,10 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   Kafka ACK would no longer prove input admission; exact input/mutation receipt
   confirmation and all pre-effect filters need a new verified contract. No
   producer, lease, deployment or upstream model behavior changed.
-- [ ] Agree and verify a replacement write-admission protocol before removing the
-  deployed checks or pooling producers across Sessions. Claims, renewal and cold
-  context reads are outside the current placement request; no Raft adoption is planned.
+- [x] Agree the replacement boundary: ADR-0328/0329 require projected input
+  confirmation and one shared Worker producer with Projector-side fencing.
+  Implementation, publication and pressure verification are tracked in #43/#44
+  above. Claims, renewal and cold context reads remain; no Raft adoption is planned.
 - [ ] Remeasure publication/projection/settlement saturation after the bounded
   repairs. Terminal-query acceptance reduced the paired settlement p95 from
   24.98 s to 16.59/14.12 s, but substantial backlog and variability remain.

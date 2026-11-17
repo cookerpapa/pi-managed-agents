@@ -166,6 +166,9 @@ cross-request continuation. Existing installations use the reviewed provider
 configuration conversion in the [component release procedure](docs/COMPONENT_RELEASE.md).
 [Model metering](docs/MODEL_BILLING.md) records request receipts separately from
 conversation history, with versioned prices and an informational Model costs page.
+Actual provider usage is distinct from billable usage: accepted model settlement
+and writer closure identify platform failure/recovery costs. Valid user Stop with
+complete usage remains chargeable; missing usage is unconfirmed, never estimated.
 The independent metering service settles platform service minutes from PG and
 separately receives persistent Workspace capacity receipts; [resource statements](docs/RESOURCE_BILLING.md) preserve
 unconfirmed gaps and exempt user-provided compute. Payment collection and production tariffs are not enabled.

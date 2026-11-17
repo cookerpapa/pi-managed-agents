@@ -1907,31 +1907,31 @@
       "invariant": "Native completion cannot bypass a requested writer closure or be undone by its late seal."
     },
     {
-      "id": "session-producer-post-init-grant",
-      "workspace": "@pi-cloud/event-log",
-      "file": "test/kafka-session-writer.test.ts",
-      "test": "checks PG both before and after producer initialization and never adopts a stale grant",
-      "invariant": "A producer cannot adopt a grant revoked while initialization was in flight."
+      "id": "projector-rejected-commit-effects",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/session-projector-fencing.test.ts",
+      "test": "a rejected native commit cannot dispatch its cancellation or ordinary Tools",
+      "invariant": "Obsolete native candidates cannot dispatch cancellation, Tools or accepted state."
     },
     {
-      "id": "session-producer-unknown-commit",
+      "id": "worker-producer-uncertain-delivery",
       "workspace": "@pi-cloud/event-log",
-      "file": "test/kafka-session-writer.test.ts",
-      "test": "freezes the writer after an uncertain commit without retrying its batch or initializing again",
-      "invariant": "An uncertain native transaction freezes this producer instead of replaying or reinitializing."
+      "file": "test/kafka-worker-producer.test.ts",
+      "test": "an uncertain delivery fails all pending transport writes without replay or reinitialization",
+      "invariant": "Uncertain shared delivery fails the Worker transport without application replay or reinitialization."
     },
     {
-      "id": "session-producer-initialization-close",
+      "id": "worker-producer-startup-close",
       "workspace": "@pi-cloud/event-log",
-      "file": "test/kafka-session-writer.test.ts",
-      "test": "closing during initialization waits for disposal and never admits queued writes",
-      "invariant": "Shutdown disposes an initializing producer before it can publish."
+      "file": "test/kafka-worker-producer.test.ts",
+      "test": "closing during startup disposes the transport before any Session can publish",
+      "invariant": "Shutdown joins startup disposal and cannot admit queued Session publication."
     },
     {
       "id": "session-producer-waiting-recovery",
       "workspace": "@pi-cloud/control-plane",
       "file": "test/atomic-worker-admission.postgres.test.ts",
-      "test": "recovers a Kafka-fenced producer while its Agent is waiting without a new native commit",
+      "test": "recovers known publication failure while its Agent is waiting without a new native commit",
       "invariant": "Existing Worker heartbeat checks recover a failed producer even while its model has no new commit."
     },
     {
@@ -3060,6 +3060,55 @@
       "file": "test/sse.test.ts",
       "test": "uses the same authenticated client in Node and keeps another reader alive after disconnect",
       "invariant": "Closing one chat reader neither stops the agent nor another reader."
+    },
+    {
+      "id": "input-projected-receipt-required",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/queued-inputs.test.ts",
+      "test": "does not accept a Worker publication acknowledgement without a projected input receipt",
+      "invariant": "Kafka publication alone never acknowledges a human operation."
+    },
+    {
+      "id": "input-notification-owner-loss",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/input-confirmation-client.test.ts",
+      "test": "makes assignment loss unconfirmed without fabricating rejection or acceptance",
+      "invariant": "Lost projection notification requires durable reconciliation, not invented success."
+    },
+    {
+      "id": "input-notification-concurrent-identities",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/input-confirmation-client.test.ts",
+      "test": "keeps concurrent identities and fingerprints isolated",
+      "invariant": "Concurrent input operations cannot confirm one another."
+    },
+    {
+      "id": "model-charge-valid-user-stop",
+      "workspace": "@pi-cloud/accounting",
+      "file": "test/model-charge-eligibility.postgres.test.ts",
+      "test": "charges valid user Stop with complete usage even when the provider labels cancellation failed",
+      "invariant": "Complete usage of valid user-cancelled work retains its actual charge eligibility."
+    },
+    {
+      "id": "model-charge-old-and-new-writer",
+      "workspace": "@pi-cloud/accounting",
+      "file": "test/model-charge-eligibility.postgres.test.ts",
+      "test": "distinguishes a valid late old receipt, obsolete work and its replacement on the same Run",
+      "invariant": "Old arrival time is not old execution; invalid work is platform cost."
+    },
+    {
+      "id": "model-charge-missing-usage",
+      "workspace": "@pi-cloud/accounting",
+      "file": "test/model-charge-eligibility.postgres.test.ts",
+      "test": "missing usage remains unconfirmed and ambiguous provider retries do not become duplicate customer charges",
+      "invariant": "Incomplete usage and ambiguous retries never inflate customer charges."
+    },
+    {
+      "id": "model-charge-projection-boundary",
+      "workspace": "@pi-cloud/control-plane",
+      "file": "test/model-accounting-projection.postgres.test.ts",
+      "test": "co-commits financial evidence, retains valid late usage and ignores post-seal model settlement",
+      "invariant": "Financial eligibility is derived only from accepted native task settlement and ordered closure."
     }
   ]
 }

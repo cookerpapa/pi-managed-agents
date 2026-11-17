@@ -1,5 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ producers: [] as any[] }));
+const state = vi.hoisted(() => ({
+  producers: [] as any[],
+  connect: undefined as ((done: () => void) => void) | undefined,
+}));
 vi.mock("@confluentinc/kafka-javascript", () => ({
   default: {
     CODES: { ERRORS: { ERR__QUEUE_FULL: -184 } },
@@ -11,7 +14,7 @@ vi.mock("@confluentinc/kafka-javascript", () => ({
       on(name: string, callback: Function) {
         this.events.set(name, callback);
       }
-      connect = vi.fn((_options, done) => done());
+      connect = vi.fn((_options, done) => (state.connect ? state.connect(done) : done()));
       setPollInterval = vi.fn();
       produce = vi.fn();
       flush = vi.fn((_timeout, done) => done());
@@ -27,6 +30,7 @@ const owners: KafkaWorkerProducer[] = [];
 afterEach(async () => {
   await Promise.allSettled(owners.splice(0).map((p) => p.close()));
   state.producers.length = 0;
+  state.connect = undefined;
 });
 async function fixture() {
   const failed = vi.fn();
@@ -41,6 +45,33 @@ async function fixture() {
   return { producer, failed, native: state.producers[0]! };
 }
 const record = (sessionId = "one") => ({ factId: crypto.randomUUID(), sessionId, value: "{}" });
+
+it("closing during startup disposes the transport before any Session can publish", async () => {
+  let connected!: () => void;
+  state.connect = (done) => {
+    connected = done;
+  };
+  const producer = new KafkaWorkerProducer({
+    brokers: ["fixture"],
+    clientId: "boot",
+    topic: "log",
+  });
+  owners.push(producer);
+  const opening = producer.start();
+  const refused = expect(opening).rejects.toThrow("closed during startup");
+  let closed = false;
+  const closing = producer.close().then(() => {
+    closed = true;
+  });
+  await Promise.resolve();
+  expect(closed).toBe(false);
+  connected();
+  await refused;
+  await closing;
+  await expect(producer.append(0, record())).rejects.toBeDefined();
+  expect(state.producers[0].produce).not.toHaveBeenCalled();
+  expect(state.producers[0].disconnect).toHaveBeenCalledOnce();
+});
 
 it("connects once and multiplexes Sessions without a transactional Session identity", async () => {
   const f = await fixture();

@@ -535,7 +535,13 @@ Authenticated receipt batches commit to PG independently of native Session lease
 Projector and chat history. PG owns deduplicated usage, immutable rate versions and
 simulated amounts. Model/Tool retry authority stays with the existing runtime.
 Missing receipts remain unconfirmed; unsupported tariffs remain unpriced. Neither
-payments nor Sandbox billing is enabled; see [Model billing](MODEL_BILLING.md).
+real payments nor balance deductions are enabled; sandbox service/storage have
+their own informational accounting. Under [ADR-0330](adr/0330-model-charge-eligibility.md),
+accepted native model-task changes co-commit exact financial settlement evidence.
+The accounting view combines that evidence, provider receipts and persistent writer
+cutoffs to separate customer usage from platform waste. Valid user Stop with
+complete usage remains chargeable; unknown quantities are not estimated charges.
+The provider has no live fencing view. See [Model billing](MODEL_BILLING.md).
 
 Under [ADR-0289](adr/0289-provider-owned-model-continuation.md), HTTP/SSE carries the
 full effective context inside the cluster. The provider adapter reuses a compatible

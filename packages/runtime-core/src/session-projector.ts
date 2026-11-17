@@ -30,6 +30,7 @@ import type {
 } from "./kafka-accepted-fact-consumer.ts";
 import { ProjectionTiming } from "./projection-timing.ts";
 import { RunObservations } from "./run-observations.ts";
+import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
 const PREFIX = "pi-cloud-projector@";
 export class SessionProjector {
@@ -62,6 +63,7 @@ export class SessionProjector {
       notificationConnectionString: string;
       advertisedBaseUrl: string;
       publicationToken: string;
+      modelAccounting?: ModelAccountingPort;
       projectionGate?: { run<T>(operation: () => Promise<T>): Promise<T> };
       controlChanges?: {
         load(partitions: readonly number[], current: () => boolean): Promise<void>;
@@ -133,7 +135,7 @@ export class SessionProjector {
     this.observations = new RunObservations(this.eventHub);
     this.#observationSweep = setInterval(() => this.observations.sweep(), 60_000);
     this.#observationSweep.unref();
-    this.#projection = new ExecutionStreamProjector(options.database);
+    this.#projection = new ExecutionStreamProjector(options.database, options.modelAccounting);
     let currentControlAssignment: () => boolean = () => false;
     const groupId = "pi-cloud-session-projector-v2";
     this.#consumer = new KafkaLogConsumer({

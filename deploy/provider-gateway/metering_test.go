@@ -23,6 +23,25 @@ func testAttribution() attribution {
 	n := int64(3)
 	return attribution{Version: 1, InvocationID: uuid.NewString(), TenantID: uuid.NewString(), SessionID: uuid.NewString(), RunID: uuid.NewString(), RequestedAt: "2026-11-06T08:00:00.000Z", PiSessionID: "native-session", ConversationID: &n, Provider: "openai-codex", Model: "gpt-6-luna", Purpose: "agent"}
 }
+
+func TestExecutionAttributionSurvivesReceiptCapture(t *testing.T) {
+	a := testAttribution()
+	task := int64(42)
+	a.Execution = &executionIdentity{WriterID: uuid.NewString(), FencingToken: 7, TaskID: &task}
+	bytes, err := json.Marshal(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := parseAttribution(base64.RawURLEncoding.EncodeToString(bytes))
+	if err != nil || decoded.Execution == nil || *decoded.Execution.TaskID != task || decoded.Execution.WriterID != a.Execution.WriterID || decoded.Execution.FencingToken != 7 {
+		t.Fatal("execution attribution changed", err)
+	}
+	a.Execution.FencingToken = 0
+	bytes, _ = json.Marshal(a)
+	if _, err = parseAttribution(base64.RawURLEncoding.EncodeToString(bytes)); err == nil {
+		t.Fatal("invalid execution admitted")
+	}
+}
 func readEvents(t *testing.T, j *journal) []event {
 	t.Helper()
 	batch, err := j.batch()

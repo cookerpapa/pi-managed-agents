@@ -108,8 +108,8 @@ Native input integration tests use the real Pi Harness and PostgreSQL to cover
 lost acknowledgements, edits, ordering, promotion, tenant isolation and Stop
 restoration. The current matched deployment check is
 `PI_CLOUD_LIVE_NATIVE_INPUT_CHECK=1 node --import tsx scripts/run-live-native-input-check.mjs`.
-It requires schema 183 and matched images; it checks Luna/Cube native consumption
-and Stop with one Run per scenario. HTTP confirmation follows native persistence;
+It requires the current schema and matched images; it checks Luna/Cube native consumption
+and Stop with one Run per scenario. HTTP confirmation follows exact native PG projection;
 restoration waits for native abort settlement and ordered writer closure.
 
 ## Live-event durability
@@ -128,14 +128,14 @@ The production stream is:
 
 ```text
 Pi event / native Entry / Tool command
-    -> trusted Worker -> Session transactional producer -> Kafka transaction commit
+    -> trusted Worker -> shared Worker producer -> replicated Kafka acknowledgement
     -> one Session Projector group
          ├-> PostgreSQL Durable Storage
          ├-> live view -> snapshot-first SSE
          └-> owning Tool executor -> Cube
 ```
 
-Kafka RF3/transaction commit precedes visibility. Kafka retains a bounded
+Kafka RF3 acknowledgement and Projector admission precede visibility. Kafka retains a bounded
 log of Assistant text deltas, complete Tool/lifecycle Items and Pi mutations;
 PostgreSQL stores Pi-native complete messages once. The two checks separately
 measure Kafka publication ordering and PostgreSQL complete-message projection

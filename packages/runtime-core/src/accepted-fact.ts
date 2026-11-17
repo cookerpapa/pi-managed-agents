@@ -51,6 +51,7 @@ export type AcceptedDurableCommitFact = Readonly<{
   commit: DurableSessionCommit;
   origins: readonly DurableRecordOrigin[];
   inputQueueSessions?: readonly string[];
+  modelEvidence?: readonly import("@pi-cloud/protocol").ModelExecutionEvidence[];
   tools: readonly DurableToolDispatch[];
   cancellations: readonly import("@pi-cloud/protocol").AcceptedToolCancellation[];
   display: readonly Readonly<{

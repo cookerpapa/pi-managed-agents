@@ -6,6 +6,8 @@ import {
   DEFAULT_PROJECT_ENVIRONMENT_RECIPE_SHA256,
   DEFAULT_PROJECT_ENVIRONMENT_SPEC_SHA256,
   modelSamplingHeaders,
+  MODEL_METERING_HEADER,
+  type ModelMeteringContext,
   type ExecuteTurnCommandMessage,
 } from "@pi-cloud/protocol";
 import { zstdCompressSync } from "node:zlib";
@@ -104,6 +106,59 @@ function command(
 }
 
 const gateways: TenantModelGateway[] = [];
+
+it.each([false, true])(
+  "preserves exact native accounting identity and rejects an altered execution (changed=%s)",
+  async (changed) => {
+    const accepted = command(),
+      p = accepted.payload;
+    const execution = parseExecutionReference(p.executionReference);
+    const context: ModelMeteringContext = {
+      version: 1,
+      invocationId: crypto.randomUUID(),
+      requestedAt: new Date().toISOString(),
+      tenantId: p.tenantId,
+      sessionId: p.sessionId,
+      runId: p.runId,
+      piSessionId: p.piSession.id,
+      conversationId: p.piSession.conversationId,
+      provider: p.model.provider,
+      model: p.model.modelId,
+      purpose: "agent",
+      execution: {
+        writerId: execution.leaseId,
+        fencingToken: execution.fencingToken + (changed ? 1 : 0),
+        taskId: 10,
+      },
+    };
+    const upstream = vi.fn<typeof fetch>(async (_url, init) => {
+      expect(
+        JSON.parse(
+          Buffer.from(
+            new Headers(init?.headers).get(MODEL_METERING_HEADER)!,
+            "base64url",
+          ).toString(),
+        ),
+      ).toEqual(context);
+      return new Response("ok");
+    });
+    const gateway = createGateway(upstream);
+    await gateway.start();
+    const lease = gateway.issue(accepted);
+    const response = await fetch(`http://127.0.0.1:${gateway.listeningPort}/v1/responses`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${lease.runtime.capability}`,
+        ...samplingHeaders(),
+        [MODEL_METERING_HEADER]: Buffer.from(JSON.stringify(context)).toString("base64url"),
+      },
+      body: JSON.stringify({ model: p.model.modelId, stream: true, input: [] }),
+    });
+    await response.text();
+    expect(response.status).toBe(changed ? 400 : 200);
+    expect(upstream).toHaveBeenCalledTimes(changed ? 0 : 1);
+  },
+);
 
 async function localLease() {
   const accepted = command();

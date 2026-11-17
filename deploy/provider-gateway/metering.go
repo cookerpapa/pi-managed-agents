@@ -27,18 +27,24 @@ import (
 const Header = "X-Picloud-Metering"
 
 type attribution struct {
-	Version        int    `json:"version"`
-	InvocationID   string `json:"invocationId"`
-	TenantID       string `json:"tenantId"`
-	SessionID      string `json:"sessionId"`
-	RunID          string `json:"runId"`
-	RequestedAt    string `json:"requestedAt"`
-	PiSessionID    string `json:"piSessionId,omitempty"`
-	ConversationID *int64 `json:"conversationId,omitempty"`
-	Provider       string `json:"provider"`
-	Model          string `json:"model"`
-	Purpose        string `json:"purpose"`
-	OperationID    string `json:"operationId,omitempty"`
+	Version        int                `json:"version"`
+	InvocationID   string             `json:"invocationId"`
+	TenantID       string             `json:"tenantId"`
+	SessionID      string             `json:"sessionId"`
+	RunID          string             `json:"runId"`
+	RequestedAt    string             `json:"requestedAt"`
+	PiSessionID    string             `json:"piSessionId,omitempty"`
+	ConversationID *int64             `json:"conversationId,omitempty"`
+	Provider       string             `json:"provider"`
+	Model          string             `json:"model"`
+	Purpose        string             `json:"purpose"`
+	OperationID    string             `json:"operationId,omitempty"`
+	Execution      *executionIdentity `json:"execution,omitempty"`
+}
+type executionIdentity struct {
+	WriterID     string `json:"writerId"`
+	FencingToken int64  `json:"fencingToken"`
+	TaskID       *int64 `json:"taskId,omitempty"`
 }
 type tokens struct {
 	Input        int64 `json:"input"`
@@ -96,6 +102,15 @@ func parseAttribution(raw string) (attribution, error) {
 	}
 	if a.ConversationID != nil && (*a.ConversationID < 0 || *a.ConversationID > 9007199254740991) {
 		return a, errors.New("invalid conversation")
+	}
+	if a.Execution != nil {
+		if _, err = uuid.Parse(a.Execution.WriterID); err != nil {
+			return a, err
+		}
+		if a.Execution.FencingToken < 1 || a.Execution.FencingToken > 9007199254740991 ||
+			(a.Execution.TaskID != nil && (*a.Execution.TaskID < 1 || *a.Execution.TaskID > 9007199254740991)) {
+			return a, errors.New("invalid execution identity")
+		}
 	}
 	t, err := time.Parse(time.RFC3339Nano, a.RequestedAt)
 	if err != nil {

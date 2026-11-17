@@ -14,14 +14,16 @@ import type { AcceptedDurableCommitFact } from "./accepted-fact.ts";
 import { recordFactProjection, type FactPosition } from "./accepted-fact-recovery.ts";
 import { projectionTransaction, type ProjectionBudget } from "./projection-transaction.ts";
 import { captureNativePresentation, mayCaptureNativePresentation } from "./frozen-history.ts";
+import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
 function cloudMetadata(fact: AcceptedDurableCommitFact) {
   const controlTools = fact.tools.filter((tool) => tool.target === "control");
   const remoteTools = fact.tools.filter((tool) => tool.target !== "control" && tool.replyRecovery);
-  return controlTools.length || remoteTools.length
+  return controlTools.length || remoteTools.length || fact.modelEvidence?.length
     ? {
         ...(controlTools.length ? { controlTools } : {}),
         ...(remoteTools.length ? { remoteTools } : {}),
+        ...(fact.modelEvidence?.length ? { modelEvidence: fact.modelEvidence } : {}),
       }
     : undefined;
 }
@@ -31,6 +33,7 @@ export class PostgresDurableCommitProjector {
   constructor(
     readonly database: Kysely<Database>,
     readonly budget?: ProjectionBudget,
+    readonly modelAccounting?: ModelAccountingPort,
   ) {}
   #key(scope: AcceptedDurableCommitFact["scope"]): string {
     // All Conversations/anchors of one physical writer share this view. Old
@@ -176,6 +179,11 @@ export class PostgresDurableCommitProjector {
             : undefined,
         );
         admitted = true;
+        if (appended && fact.modelEvidence?.length) {
+          if (!this.modelAccounting)
+            throw new Error("Model accounting projection is not installed");
+          await this.modelAccounting.settle(tx, fact.scope, fact.modelEvidence, position);
+        }
         if (nativeConfirmations.length) {
           const conversations = await tx
             .selectFrom("sessions")

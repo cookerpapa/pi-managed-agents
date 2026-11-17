@@ -2,6 +2,8 @@ import { Agent, fetch as upstreamFetch } from "undici";
 import { resourceLimit, minimumResourceLimit } from "@pi-cloud/domain";
 import {
   MODEL_METERING_HEADER,
+  parseExecutionReference,
+  parseModelMeteringContext,
   type ModelMeteringContext,
   assertModelAdapter,
   parseModelRuntimeSnapshot,
@@ -830,7 +832,8 @@ export class TenantModelGateway {
       const purpose = request.headers[MODEL_PURPOSE_HEADER] ?? "agent";
       if (purpose !== "agent" && purpose !== "context_maintenance")
         throw new SafeGatewayHttpError(400, "invalid_model_purpose", "Model purpose is invalid");
-      const metering: ModelMeteringContext = {
+      const execution = parseExecutionReference(active.executionReference);
+      let metering: ModelMeteringContext = {
         version: 1,
         invocationId: randomUUID(),
         requestedAt: new Date().toISOString(),
@@ -842,7 +845,42 @@ export class TenantModelGateway {
         provider: active.provider,
         model: active.modelId,
         purpose,
+        execution: { writerId: execution.leaseId, fencingToken: execution.fencingToken },
       };
+      const suppliedMetering = request.headers[MODEL_METERING_HEADER];
+      if (suppliedMetering !== undefined) {
+        try {
+          if (typeof suppliedMetering !== "string" || suppliedMetering.length > 4096)
+            throw new Error();
+          const candidate = parseModelMeteringContext(
+            JSON.parse(Buffer.from(suppliedMetering, "base64url").toString()),
+          );
+          for (const key of [
+            "tenantId",
+            "sessionId",
+            "runId",
+            "piSessionId",
+            "conversationId",
+            "provider",
+            "model",
+            "purpose",
+          ] as const)
+            if (candidate[key] !== metering[key]) throw new Error();
+          if (
+            candidate.execution?.writerId !== execution.leaseId ||
+            candidate.execution.fencingToken !== execution.fencingToken ||
+            !candidate.execution.taskId
+          )
+            throw new Error();
+          metering = candidate;
+        } catch {
+          throw new SafeGatewayHttpError(
+            400,
+            "model_metering_context_mismatch",
+            "Model request accounting identity changed",
+          );
+        }
+      }
       headers.set(
         MODEL_METERING_HEADER,
         Buffer.from(JSON.stringify(metering)).toString("base64url"),

@@ -134,6 +134,7 @@ export function expandSessionLogEnvelope(input: unknown): SessionLogFact {
       "commit",
       "origins",
       "inputQueueSessions",
+      "modelEvidence",
       "tools",
       "cancellations",
       "display",

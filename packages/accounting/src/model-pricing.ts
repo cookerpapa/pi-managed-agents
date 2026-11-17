@@ -9,7 +9,7 @@ export function priceModelUsage(
   if (purpose === "image" || usage.unsupportedDimensions)
     return { state: "unpriced", reason: "unsupported_dimensions" };
   if (!rate) return { state: "unpriced", reason: "missing_rate" };
-  if (usage.failed && !rate.includeFailed)
+  if (usage.failed && rate.kind === "upstream_estimate" && !rate.includeFailed)
     return { state: "waived", rateId: rate.id, currency: rate.currency, amountPico: "0" };
   let amount = 0n;
   for (const key of ["input", "cacheRead", "cacheWrite", "output", "reasoning"] as const) {

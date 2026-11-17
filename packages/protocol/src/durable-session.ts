@@ -21,6 +21,7 @@ export type DurableCommitPublication = Readonly<{
   origins: readonly DurableRecordOrigin[];
   /** Native queue documents changed; a disposable view wake after projection. */
   inputQueueSessions?: readonly string[];
+  modelEvidence?: readonly import("./model-metering.ts").ModelExecutionEvidence[];
   tools: readonly Readonly<{ taskId: number; command: CandidateToolEffect }>[];
   cancellations: readonly CandidateToolCancellation[];
   display: readonly DurableDisplayPreparation[];

@@ -2239,7 +2239,7 @@ describe.skipIf(!endpoint)("atomic Worker admission", () => {
     expect((await f.state()).leases).toEqual([]);
     expect(f.runner).toHaveBeenCalledOnce();
   });
-  it("recovers a Kafka-fenced producer while its Agent is waiting without a new native commit", async () => {
+  it("recovers known publication failure while its Agent is waiting without a new native commit", async () => {
     let failure: Error | undefined;
     const f = await fixture(2, undefined, () => failure),
       entered = Promise.withResolvers<void>();
@@ -2253,7 +2253,7 @@ describe.skipIf(!endpoint)("atomic Worker admission", () => {
     const executing = f.executor().dispatchRun(f.accepted.runId);
     void executing.catch(entered.reject);
     await entered.promise;
-    failure = Error("producer epoch fenced during probe");
+    failure = Error("shared publication failed during probe");
     await expect(executing).resolves.toMatchObject({ status: "recovering" });
     expect((await f.state()).leases).toHaveLength(1);
     await f.project();

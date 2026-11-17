@@ -4,8 +4,32 @@ import { DevelopmentEnvironmentService } from "../../control-plane/src/developme
 import { randomUUID } from "node:crypto";
 import { expect, it, vi } from "vitest";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
+import { sql } from "kysely";
 import { ResourceBackendRegistry } from "../src/resource-backend-registry.ts";
 import type { ResourceBackendConfiguration } from "@pi-cloud/protocol";
+
+/** Registry reads intentionally inspect every backend; unrelated fixtures may
+ * contain catalog-only rows, so this contract needs its own database. */
+async function registryDatabase() {
+  const endpoint = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL!;
+  const admin = createDatabase({ connectionString: endpoint, maxConnections: 1 });
+  const name = `registry_${randomUUID().replaceAll("-", "")}`;
+  await sql`create database ${sql.id(name)}`.execute(admin);
+  const url = new URL(endpoint);
+  url.pathname = `/${name}`;
+  const database = createDatabase({ connectionString: url.toString(), maxConnections: 2 });
+  return {
+    database,
+    close: async () => {
+      await database.destroy();
+      try {
+        await sql`drop database ${sql.id(name)}`.execute(admin);
+      } finally {
+        await admin.destroy();
+      }
+    },
+  };
+}
 
 const configuration = (endpoint: string): ResourceBackendConfiguration => ({
   compute: { provider: "boxlite", url: endpoint, nodeId: "owned-node", token: "private-token" },
@@ -24,10 +48,8 @@ const configuration = (endpoint: string): ResourceBackendConfiguration => ({
 });
 
 it("updates display metadata with allocated intent while preserving template mutation guards", async () => {
-  const db = createDatabase({
-    connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL!,
-    maxConnections: 2,
-  });
+  const fixture = await registryDatabase(),
+    db = fixture.database;
   try {
     await runMigrations(db, "up");
     const registry = new ResourceBackendRegistry({
@@ -98,15 +120,13 @@ it("updates display metadata with allocated intent while preserving template mut
       ).rejects.toThrow("retained resources");
     }
   } finally {
-    await db.destroy();
+    await fixture.close();
   }
 });
 
 it("registers two native backends behind one existing management endpoint, encrypts credentials and rejects stale edits", async () => {
-  const db = createDatabase({
-    connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL!,
-    maxConnections: 2,
-  });
+  const fixture = await registryDatabase(),
+    db = fixture.database;
   try {
     await runMigrations(db, "up");
     const verify = vi.fn(async () => "owned-pool");
@@ -199,6 +219,6 @@ it("registers two native backends behind one existing management endpoint, encry
       "disabled",
     );
   } finally {
-    await db.destroy();
+    await fixture.close();
   }
 });
