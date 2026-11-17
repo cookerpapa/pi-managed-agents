@@ -1,5 +1,8 @@
 # Current architecture decisions
 
+[ADR-0333](0333-development-picomatch-review.md) records one exact development-only
+audit exception for an unpatched advisory, retaining raw findings and runtime gates.
+
 [ADR-0331](0331-bounded-partition-prefetch.md) records bounded prefetch,
 per-partition serial delivery and coalesced progress commits (#47), in progress.
 [ADR-0332](0332-projector-memory-lifetimes.md) records coherent bounded identity

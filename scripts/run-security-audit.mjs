@@ -1,6 +1,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { reviewDevelopmentAudit } from "./lib/development-audit-review.mjs";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -52,14 +54,21 @@ const remaining = Object.entries(auditReport.vulnerabilities).map(([name, findin
 }));
 
 const blockingSeverities = new Set(["high", "critical"]);
-const blocking = remaining.filter((vulnerability) =>
+const rawBlocking = remaining.filter((vulnerability) =>
   blockingSeverities.has(vulnerability.severity),
+);
+const { blocking, reviewed } = reviewDevelopmentAudit(
+  auditReport,
+  JSON.parse(readFileSync(join(repositoryRoot, "package-lock.json"), "utf8")),
 );
 
 console.log(
   JSON.stringify({
     securityAuditPassed: blocking.length === 0,
     auditLevel: "high",
+    unfilteredHighCriticalPackages: rawBlocking.length,
+    effectiveHighCriticalPackages: blocking.length,
+    reviewedDevelopmentPackages: reviewed,
     remainingVulnerabilities: remaining.map((vulnerability) => ({
       name: vulnerability.name,
       severity: vulnerability.severity,
@@ -73,7 +82,10 @@ if (blocking.length > 0) {
   process.exit(1);
 }
 
-if (auditResult.status !== 0) {
+if (
+  auditResult.status !== 0 &&
+  !(auditResult.status === 1 && reviewed.length > 0 && reviewed.length === rawBlocking.length)
+) {
   process.stderr.write(auditResult.stderr);
   process.exit(auditResult.status ?? 1);
 }

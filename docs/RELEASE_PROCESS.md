@@ -84,6 +84,11 @@ require explicit review; the gate is not a statement that the image has no
 lower-severity or unknown risk. Root `npm audit` remains a separate lockfile
 gate.
 
+[ADR-0333](adr/0333-development-picomatch-review.md) records an exact, reviewed
+development-only picomatch finding with no released fix. Root audit output keeps
+the raw findings and separates reviewed from effective blockers. This review
+does not apply to runtime images, other advisories or changed dependency paths.
+
 The local scanner receives read-only `docker image save` archives, not the
 Docker socket. Its root filesystem and capabilities are removed; only the
 database cache and evidence directory are writable. Network is enabled only for
