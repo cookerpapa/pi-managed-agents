@@ -52,6 +52,27 @@ export type NativeInputResult = {
   acceptedAt?: string;
 };
 
+/** Exact committed human operation, independent of queue membership or sequence. */
+export type NativeInputConfirmation = {
+  tenantId: string;
+  sessionId: string;
+  runId: string;
+  action: "submit" | "mutate";
+  operationId: string;
+  fingerprint: string;
+};
+
+export function nativeInputConfirmationKey(value: NativeInputConfirmation): string {
+  return JSON.stringify([
+    value.tenantId,
+    value.sessionId,
+    value.runId,
+    value.action,
+    value.operationId,
+    value.fingerprint,
+  ]);
+}
+
 export type NativeInputCommand = {
   tenantId: string;
   sessionId: string;
@@ -72,6 +93,17 @@ export const NativeInputIdSchema = Type.Union([
   Type.String({ pattern: "^input-[0-9a-f]{64}$" }),
 ]);
 const operationId = Type.Union([UuidSchema, Type.String({ pattern: "^edit-[0-9a-f]{64}$" })]);
+export const NativeInputConfirmationSchema = Type.Object(
+  {
+    tenantId: UuidSchema,
+    sessionId: UuidSchema,
+    runId: UuidSchema,
+    action: Type.Union([Type.Literal("submit"), Type.Literal("mutate")]),
+    operationId: Type.Union([NativeInputIdSchema, operationId]),
+    fingerprint: hash,
+  },
+  closed,
+);
 export const NativeInputAcceptedSchema = Type.Object(
   {
     kind: Type.Literal("input"),

@@ -519,6 +519,7 @@ export async function startSessionRuntime(): Promise<void> {
       database: conversationDatabase,
       stream: new SessionEventStream(activeAgentEvents.eventStore, activeAgentEvents.eventHub),
       token: config.supervisorManagementToken,
+      inputConfirmations: activeAgentEvents.eventHub,
     }).install(runtime.server);
     runtime.server.get("/health/live", async () => ({ status: "ok" }));
     runtime.server.get("/health/ready", async (_request, reply) => {

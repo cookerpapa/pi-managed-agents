@@ -1,8 +1,13 @@
-import { resolveDurableDisplay, type PiCloudEvent } from "@pi-cloud/protocol";
+import {
+  resolveDurableDisplay,
+  type PiCloudEvent,
+  type NativeInputConfirmation,
+} from "@pi-cloud/protocol";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import {
   DurablePostgresProjection,
+  collectInputConfirmations,
   type StoredDurableBatch,
 } from "@pi-cloud/pi-session-postgres/durable";
 import type { AcceptedDurableCommitFact } from "./accepted-fact.ts";
@@ -75,9 +80,14 @@ export class PostgresDurableCommitProjector {
     fact: AcceptedDurableCommitFact,
     position: FactPosition,
     current: () => boolean = () => true,
-  ): Promise<{ events: PiCloudEvent[]; covers: { sessionId: string; through: number }[] }> {
+  ): Promise<{
+    events: PiCloudEvent[];
+    covers: { sessionId: string; through: number }[];
+    inputConfirmations?: NativeInputConfirmation[];
+  }> {
     const events: PiCloudEvent[] = [],
       covers: { sessionId: string; through: number }[] = [];
+    const inputConfirmations: NativeInputConfirmation[] = [];
     const view = this.#view(fact.scope),
       state = view.liveState.fork();
     if (!current()) return { events, covers };
@@ -147,13 +157,36 @@ export class PostgresDurableCommitProjector {
             throw new Error("Native display has no admitted Conversation view");
         }
         const batch = fact.commit as unknown as StoredDurableBatch;
+        const nativeConfirmations: ReturnType<typeof collectInputConfirmations> = [];
         const appended = await view.applyIn(
           tx,
           batch,
           fact.origins,
           { state, position },
           cloudMetadata(fact),
+          fact.inputQueueSessions?.length
+            ? (rows, previous) =>
+                nativeConfirmations.push(...collectInputConfirmations(view.scope, rows, previous))
+            : undefined,
         );
+        if (nativeConfirmations.length) {
+          const conversations = await tx
+            .selectFrom("sessions")
+            .select(["id", "pi_conversation_id"])
+            .where("tenant_id", "=", fact.scope.tenantId)
+            .where("pi_session_id", "=", fact.scope.piSessionId)
+            .where("pi_conversation_id", "in", [
+              ...new Set(nativeConfirmations.map((c) => String(c.conversationId))),
+            ])
+            .execute();
+          const targets = new Map(conversations.map((c) => [Number(c.pi_conversation_id), c.id]));
+          for (const { conversationId, ...confirmation } of nativeConfirmations) {
+            const sessionId = targets.get(conversationId);
+            if (!sessionId || confirmation.runId !== fact.scope.runId)
+              throw new Error("Input confirmation has no admitted Conversation view");
+            inputConfirmations.push({ ...confirmation, sessionId });
+          }
+        }
         if (appended && mayCaptureNativePresentation(batch.writes))
           await captureNativePresentation(
             tx,
@@ -217,7 +250,7 @@ export class PostgresDurableCommitProjector {
       this.budget,
     );
     if (current() && this.#views.get(this.#key(fact.scope)) === view) view.liveState.adopt(state);
-    return { events, covers };
+    return { events, covers, ...(inputConfirmations.length ? { inputConfirmations } : {}) };
   }
   async replay(
     fact: AcceptedDurableCommitFact,

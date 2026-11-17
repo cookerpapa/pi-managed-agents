@@ -5,15 +5,13 @@ import {
   assertUserInputBudget,
   parseModelRuntimeSnapshot,
   parseUserUploads,
-  parseInputQueueResource,
   parseExecutionReference,
   type AcceptTurnRequest,
   type AcceptedConversationInputResource,
   type NativeInputAccepted,
   type NativeInputCommand,
   type NativeInputResult,
-  type NativeInputSnapshot,
-  type InputQueueResource,
+  type NativeInputConfirmation,
   type QueuedInputAction,
   type QueuedInputActionResult,
   type AcknowledgeReturnedInputs,
@@ -29,12 +27,13 @@ import {
   advanceLaneReadiness,
   receivingConversationRunId,
 } from "@pi-cloud/runtime-core/run-readiness";
-import { readInputQueue, pgInputRevision, queueViewVersion } from "./input-queue-snapshot.ts";
+import { readInputQueue, pgInputRevision } from "./input-queue-snapshot.ts";
 import { readReturnedInputs } from "./stopped-inputs.ts";
 import { bindInputUploads } from "./workspace-upload-service.ts";
 import type { ControlPlaneStore } from "./control-plane-store.ts";
 import { ControlPlaneStoreError } from "./control-plane-store-error.ts";
 import { settleUploadPins } from "./upload-input-pins.ts";
+import type { InputConfirmationPort, InputConfirmationWait } from "./input-confirmation-client.ts";
 
 export interface NativeInputBackend {
   humanInput(command: NativeInputCommand): Promise<NativeInputResult>;
@@ -87,7 +86,11 @@ type WithoutGrant<T> = T extends unknown ? Omit<T, "executionReference"> : never
 /** Native inputs have one durable owner. PG retains only initial execution work and controls. */
 export class QueuedInputService {
   constructor(
-    readonly options: { database: Kysely<Database>; backendFactory?: NativeInputBackendFactory },
+    readonly options: {
+      database: Kysely<Database>;
+      backendFactory?: NativeInputBackendFactory;
+      confirmations?: InputConfirmationPort;
+    },
   ) {}
 
   /** Read-only reconciliation for a browser that lost an acceptance response.
@@ -198,6 +201,19 @@ export class QueuedInputService {
     const workerId = target.worker_id,
       backendFactory = this.options.backendFactory;
     let attempted = false;
+    let wait: InputConfirmationWait | undefined;
+    let lookup: Promise<NativeInputResult | undefined> | undefined;
+    const expected: NativeInputConfirmation = {
+      tenantId: target.tenant_id,
+      sessionId: target.session_id,
+      runId: target.id,
+      action: command.action,
+      operationId:
+        command.action === "submit" ? command.input.inputId : command.mutation.operationId,
+      fingerprint:
+        command.action === "submit" ? command.input.fingerprint : command.mutation.fingerprint,
+    };
+    const reconcile = () => (lookup ??= this.#appliedInput(expected));
     try {
       if (!workerId || !backendFactory) unavailable();
       const grant = await new SessionLeaseCoordinator({
@@ -214,15 +230,24 @@ export class QueuedInputService {
       const backend = await backendFactory(workerId);
       if (parseExecutionReference(grant.executionReference).leaseId !== target.lease_id)
         unavailable();
+      wait = await this.options.confirmations?.open(expected);
       attempted = true;
       const result = await backend.humanInput({
         ...command,
         executionReference: grant.executionReference,
       } as NativeInputCommand);
       if (command.action === "submit" && !result.acceptedAt) unavailable();
+      if (!(wait && (await wait.result)) && !(await reconcile())) unavailable();
       if (pinId) await settleUploadPins(this.options.database, pinId, true);
       return result;
     } catch (error) {
+      if (attempted) {
+        const applied = await reconcile().catch(() => undefined);
+        if (applied) {
+          if (pinId) await settleUploadPins(this.options.database, pinId, true);
+          return applied;
+        }
+      }
       const code =
         typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
       if (
@@ -236,8 +261,49 @@ export class QueuedInputService {
         throw new NativeInputTargetClosed("Native input admission has closed");
       if (["input_conflict", "input_closed"].includes(code))
         conflict("The input changed or has already been consumed");
-      unavailable();
+      return unavailable();
+    } finally {
+      wait?.close();
     }
+  }
+
+  /** Recovery only: never use Inbox membership or another writer's sequence as proof. */
+  async #appliedInput(expected: NativeInputConfirmation): Promise<NativeInputResult | undefined> {
+    const db = this.options.database;
+    const session = await this.#session(db, expected.tenantId, expected.sessionId);
+    if (session.pi_conversation_id === null) return;
+    const scope = {
+      tenantId: expected.tenantId,
+      sessionId: session.pi_session_id,
+      conversationId: Number(session.pi_conversation_id),
+      runId: expected.runId,
+    };
+    const metadata = (await readHumanInputMetadataBatch(db, scope, [scope])).get(expected.runId);
+    const receipt =
+      expected.action === "submit"
+        ? metadata?.inputs[expected.operationId]
+        : metadata?.receipts[expected.operationId];
+    if (!receipt) return;
+    if (receipt.fingerprint !== expected.fingerprint)
+      throw new ControlPlaneStoreError("idempotency_conflict", "Input operation identity changed");
+    if (expected.action === "submit") {
+      const submitted = await readNativeHumanSubmission(db, scope, expected.operationId);
+      if (submitted?.runId !== expected.runId) return;
+    }
+    const stored = await readNativeHumanInputs(db, scope);
+    return {
+      replayed: true,
+      ...(expected.action === "submit"
+        ? { acceptedAt: metadata!.inputs[expected.operationId]!.acceptedAt }
+        : {}),
+      queue: {
+        runId: expected.runId,
+        revision: stored.revision,
+        nativeSequence: stored.nativeSequence,
+        items: stored.items.slice(0, 20),
+        hasMore: stored.items.length > 20,
+      },
+    };
   }
   async #changed(tenantId: string, sessionId: string): Promise<void> {
     // A view wake does not own acceptance. Native publication remains authoritative.
@@ -411,89 +477,6 @@ export class QueuedInputService {
     return readInputQueue(this.options.database, tenantId, sessionId, page);
   }
 
-  async #nativeView(
-    tenantId: string,
-    sessionId: string,
-    targetTurnId: string,
-    native: NativeInputSnapshot,
-  ): Promise<InputQueueResource> {
-    return this.options.database
-      .transaction()
-      .setIsolationLevel("repeatable read")
-      .execute(async (tx) => {
-        const session = await this.#session(tx, tenantId, sessionId);
-        const pending = await tx
-          .selectFrom("runs")
-          .select(["id", "turn_id", "mailbox_position", "row_version"])
-          .where("tenant_id", "=", tenantId)
-          .where("session_id", "=", sessionId)
-          .where("state", "=", "queued")
-          .where("operation_kind", "=", "chat")
-          .where("scheduled_origin", "is", null)
-          .where("lease_id", "is", null)
-          .where("started_at", "is", null)
-          .where("pruned_at", "is", null)
-          .orderBy("mailbox_position")
-          .execute();
-        const returned = await tx
-          .selectFrom("turn_control_requests")
-          .select("id")
-          .where("tenant_id", "=", tenantId)
-          .where("session_id", "=", sessionId)
-          .where("kind", "=", "cancel")
-          .where(sql<string>`payload->>'inputReturnPending'`, "=", "true")
-          .limit(1)
-          .executeTakeFirst();
-        const selected = native.hasMore ? [] : pending.slice(0, 20 - native.items.length);
-        const bodies = selected.length
-          ? await tx
-              .selectFrom("runs")
-              .select([
-                "id",
-                "turn_id",
-                "input_text",
-                "input_uploads",
-                "created_at",
-                "mailbox_position",
-              ])
-              .where("tenant_id", "=", tenantId)
-              .where(
-                "id",
-                "in",
-                selected.map((r) => r.id),
-              )
-              .orderBy("mailbox_position")
-              .execute()
-          : [];
-        const items = [
-          ...native.items.map(({ idempotencyKey: _key, ...item }) => ({
-            ...item,
-            runId: native.runId,
-          })),
-          ...bodies.map((r) => ({
-            inputId: r.turn_id,
-            runId: r.id,
-            text: r.input_text,
-            uploads: parseUserUploads(r.input_uploads),
-            acceptedAt: r.created_at.toISOString(),
-            mailboxPosition: 0,
-            runMailboxPosition: Number(r.mailbox_position),
-            status: "queued" as const,
-          })),
-        ].map((item, index) => ({ ...item, mailboxPosition: index + 1 }));
-        return parseInputQueueResource({
-          sessionId,
-          activeTurnId: session.state === "running" ? targetTurnId : null,
-          revision: `${native.revision}.${pgInputRevision(pending)}`,
-          viewVersion: queueViewVersion(native.nativeSequence, session.row_version),
-          hasReturnedInputs: returned !== undefined,
-          afterPosition: 0,
-          hasMore: native.hasMore || native.items.length + pending.length > 20,
-          items: items.slice(0, 20),
-        });
-      });
-  }
-
   async mutate(
     tenantId: string,
     sessionId: string,
@@ -595,7 +578,7 @@ export class QueuedInputService {
     );
     return {
       replayed: result.replayed,
-      queue: await this.#nativeView(tenantId, sessionId, target.turn_id, result.queue),
+      queue: await this.list(tenantId, sessionId),
     };
   }
 

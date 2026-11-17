@@ -49,6 +49,7 @@ import { WebAuthenticationService } from "./web-authentication.ts";
 import { PlatformRuntimeSettingsService } from "./platform-runtime-settings.ts";
 import { QueuedInputService } from "./queued-input-service.ts";
 import type { NativeInputBackendFactory } from "./queued-input-service.ts";
+import type { InputConfirmationPort } from "./input-confirmation-client.ts";
 import { ConversationTreeService } from "./conversation-tree-service.ts";
 import { DevelopmentEnvironmentService } from "./development-environment-service.ts";
 import { SshAccessTicketService } from "./ssh-access-ticket-service.ts";
@@ -78,6 +79,7 @@ export type ControlPlaneModuleOptions = Omit<
   platformRuntimeSettings?: PlatformRuntimeSettingsService;
   resourceBackends?: ResourceBackendService;
   nativeInputBackendFactory?: NativeInputBackendFactory;
+  inputConfirmations?: InputConfirmationPort;
   developmentEnvironmentService?: DevelopmentEnvironmentService;
   sshAccessTicketService?: SshAccessTicketService;
   sourceControlService?: SourceControlService;
@@ -258,6 +260,7 @@ export class ControlPlaneModule {
           provide: QueuedInputService,
           useValue: new QueuedInputService({
             database: options.database,
+            ...(options.inputConfirmations ? { confirmations: options.inputConfirmations } : {}),
             ...(options.nativeInputBackendFactory
               ? { backendFactory: options.nativeInputBackendFactory }
               : {}),

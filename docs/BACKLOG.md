@@ -1,5 +1,22 @@
 # Maintained backlog
 
+## Worker publication and model charge attribution — in progress
+
+- [ ] [#44](https://github.com/cookerpapa/pi-managed-agents/issues/44): derive exact
+  input/mutation confirmations after PG projection; notify through existing
+  Session HTTP/SSE and use durable receipts only for retry/recovery fallback.
+- [ ] [#43](https://github.com/cookerpapa/pi-managed-agents/issues/43): share one
+  Session-log producer per Worker; centralize valid-epoch/prefix admission before
+  every Projector effect, preserve local shutdown and restore accepted history.
+- [ ] [#45](https://github.com/cookerpapa/pi-managed-agents/issues/45): distinguish
+  actual provider usage from customer eligibility using request/execution identity
+  and durable settlement evidence. Unknown quantities are not estimated charges;
+  user Stop policy is being confirmed. No real payment collection is enabled.
+- [ ] Complete serial source/PG/Kafka/browser/failure checks, matched deployment,
+  original-asset preservation and post-release cold/burst/sustained-load tests.
+  Compare initialization, commit, projection, settlement and history tails with
+  the November 16–17 evidence; retain unresolved allocator-failure diagnostics.
+
 ## Runtime throughput baseline — delivered
 
 - [x] [#42](https://github.com/cookerpapa/pi-managed-agents/issues/42): update the

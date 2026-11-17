@@ -4,7 +4,11 @@ import { PostgresDurableCommitProjector } from "./postgres-durable-commit-projec
 import type { Database } from "@pi-cloud/database";
 import { recoverQuarantinedSession } from "./quarantined-session-recovery.ts";
 import { advanceLaneReadiness } from "./run-readiness.ts";
-import { parsePiCloudEvent, type PiCloudEvent } from "@pi-cloud/protocol";
+import {
+  parsePiCloudEvent,
+  type PiCloudEvent,
+  type NativeInputConfirmation,
+} from "@pi-cloud/protocol";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type {
   AcceptedExecutionSealFact,
@@ -19,6 +23,7 @@ import { ExecutionPrefix } from "./execution-prefix.ts";
 import { projectionTransaction } from "./projection-transaction.ts";
 
 export type ExecutionProjectionResult = {
+  inputConfirmations?: NativeInputConfirmation[];
   terminal?: PiCloudEvent;
   canonicalThroughSequence?: number;
   events?: PiCloudEvent[];
@@ -198,6 +203,9 @@ export class ExecutionStreamProjector {
       const projected = await this.#durable.project(fact, record, current);
       const sessions = new Set([...scopes.values()].map((scope) => scope.sessionId));
       const result = {
+        ...(projected.inputConfirmations
+          ? { inputConfirmations: projected.inputConfirmations }
+          : {}),
         events: projected.events.filter((event) => sessions.has(event.sessionId)),
         covers: projected.covers.filter((cover) => sessions.has(cover.sessionId)),
       };

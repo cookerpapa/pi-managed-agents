@@ -12,6 +12,7 @@ import type { ControlPlaneStoreOptions } from "./control-plane-store.ts";
 import type { SessionEventStreamOptions } from "@pi-cloud/runtime-core/session-event-stream";
 import type { SupervisorWebSocketGateway } from "./supervisor-websocket-gateway.ts";
 import type { NativeInputBackendFactory } from "./queued-input-service.ts";
+import type { InputConfirmationPort } from "./input-confirmation-client.ts";
 import type { SupervisorProvisioningGateway } from "./supervisor-boot-provisioner.ts";
 import type { ProductionHttpGateway } from "./production-http-gateway.ts";
 import type { PublicTenantRegistrationConfiguration } from "./public-tenant-registration.ts";
@@ -45,6 +46,7 @@ export type ControlPlaneApplicationOptions = Omit<
   defaultModelProfileId?: string;
   supervisorWebSocketGateway?: SupervisorWebSocketGateway;
   nativeInputBackendFactory?: NativeInputBackendFactory;
+  inputConfirmations?: InputConfirmationPort;
   supervisorProvisioningGateway?: SupervisorProvisioningGateway;
   productionHttpGateway?: ProductionHttpGateway;
   sessionEventStreamOptions?: SessionEventStreamOptions;

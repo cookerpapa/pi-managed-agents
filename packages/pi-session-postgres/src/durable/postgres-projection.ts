@@ -464,6 +464,10 @@ export class DurablePostgresProjection {
     origins: readonly DurableRecordOrigin[] = [],
     live?: NativeLiveProjection,
     cloudMetadata?: Readonly<Record<string, unknown>>,
+    onCurrentState?: (
+      rows: readonly CurrentStateRow[],
+      previous: readonly CurrentStateRow[],
+    ) => void,
   ): Promise<boolean> {
     validateImageReferencePayload(stored);
     // Only non-image record metadata is interpreted here. Model/image parts
@@ -594,6 +598,7 @@ export class DurablePostgresProjection {
       effective,
       this.#liveSources(head.inputs, live?.state),
     );
+    onCurrentState?.(current.rows, head.inputs);
     const pending = current.rows.filter(isPendingLiveRow);
     if (pending.length && !live)
       throw new Error("Native live progress requires an ordered Kafka position");

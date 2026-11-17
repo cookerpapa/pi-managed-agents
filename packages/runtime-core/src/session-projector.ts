@@ -278,6 +278,8 @@ export class SessionProjector {
             if (projected?.terminal)
               this.eventStore.accept(fact.scope.tenantId, projected.terminal);
             if (applicable) {
+              for (const confirmation of projected?.inputConfirmations ?? [])
+                this.eventHub.confirmInput(confirmation);
               for (const event of projected?.events ?? factEvents(fact))
                 this.eventStore.accept(fact.scope.tenantId, event);
               for (const cover of projected?.covers ?? [])

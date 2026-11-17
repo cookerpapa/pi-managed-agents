@@ -57,3 +57,4 @@ export {
   type HistoryDirectoryNode,
   type HistoryDirectoryStore,
 } from "./history-directory.ts";
+export { collectInputConfirmations } from "./input-confirmations.ts";

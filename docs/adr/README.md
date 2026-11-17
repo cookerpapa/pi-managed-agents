@@ -1,5 +1,9 @@
 # Current architecture decisions
 
+[ADR-0328](0328-projected-native-input-confirmation.md) requires exact native input
+confirmation after Projector persistence (#44), before enabling shared Worker
+producers and Projector-side fencing (#43). Implementation is in progress.
+
 [ADR-0327](0327-workload-build-inputs.md) makes generated dependency inputs and
 Worker source imports follow their workload, preserving real artifact provenance.
 

@@ -427,8 +427,10 @@ describe.sequential("native human inputs and cloud execution records", () => {
         closed = true;
         throw Error("lost reply after completion");
       });
-      await expect(f.accept("accepted once", "closed-reply", "steer")).rejects.toMatchObject({
-        code: "input_delivery_unavailable",
+      await expect(f.accept("accepted once", "closed-reply", "steer")).resolves.toMatchObject({
+        kind: "input",
+        state: "accepted",
+        replayed: true,
       });
       const replay = await f.accept("accepted once", "closed-reply", "steer");
       expect(replay).toMatchObject({ kind: "input", runId: a.root.runId, replayed: true });
@@ -532,6 +534,30 @@ describe.sequential("native human inputs and cloud execution records", () => {
       await a.close();
     }
   });
+  it("does not accept a Worker publication acknowledgement without a projected input receipt", async () => {
+    const f = await fixture(),
+      a = await f.start();
+    try {
+      f.deliver.mockImplementationOnce(async (command) => ({
+        acceptedAt: new Date().toISOString(),
+        replayed: false,
+        queue: {
+          runId: command.runId,
+          revision: "0".repeat(64),
+          nativeSequence: 999,
+          items: [],
+          hasMore: false,
+        },
+      }));
+      await expect(f.accept("not projected", "unconfirmed")).rejects.toMatchObject({
+        code: "input_delivery_unavailable",
+      });
+      expect((await f.list()).items).toEqual([]);
+    } finally {
+      await a.close();
+    }
+  });
+
   it("recovers a lost confirmation and edits/promotes the same native submission across API instances", async () => {
     const f = await fixture(),
       a = await f.start();
@@ -540,8 +566,10 @@ describe.sequential("native human inputs and cloud execution records", () => {
         await a.backend.humanInput(c);
         throw new Error("response lost");
       });
-      await expect(f.accept("original", "lost")).rejects.toMatchObject({
-        code: "input_delivery_unavailable",
+      await expect(f.accept("original", "lost")).resolves.toMatchObject({
+        kind: "input",
+        state: "accepted",
+        replayed: true,
       });
       const accepted = (await f.accept("original", "lost")) as NativeInputAccepted;
       const edit = { action: "edit" as const, text: "final", revision: (await f.list()).revision };

@@ -3,8 +3,13 @@ import type {
   ToolProgress,
   RunObservation,
   InputQueueResource,
+  NativeInputConfirmation,
 } from "@pi-cloud/protocol";
-import { ToolPreviewChannel, SESSION_STREAM_PART_CHARACTERS } from "@pi-cloud/protocol";
+import {
+  ToolPreviewChannel,
+  SESSION_STREAM_PART_CHARACTERS,
+  nativeInputConfirmationKey,
+} from "@pi-cloud/protocol";
 import { stringifyChunked } from "@discoveryjs/json-ext";
 
 export const SESSION_EVENT_PENDING_BYTES = 16 * 1024 * 1024;
@@ -247,6 +252,40 @@ export class SessionEventSubscription {
 
 export class SessionEventHub {
   readonly #subscriptions = new Map<string, Set<SessionEventSubscription>>();
+  readonly #inputWaiters = new Map<string, Set<(applied: boolean) => void>>();
+  #inputWaiterCount = 0;
+
+  watchInput(confirmation: NativeInputConfirmation): { result: Promise<boolean>; close(): void } {
+    if (this.#inputWaiterCount >= 4096) throw new Error("Input confirmation wait capacity reached");
+    const key = nativeInputConfirmationKey(confirmation);
+    let settle!: (value: boolean) => void;
+    const result = new Promise<boolean>((resolve) => {
+      settle = resolve;
+    });
+    const pending = this.#inputWaiters.get(key) ?? new Set<(applied: boolean) => void>();
+    const finish = (applied: boolean) => {
+      if (!pending.delete(finish)) return;
+      this.#inputWaiterCount--;
+      if (!pending.size && this.#inputWaiters.get(key) === pending) this.#inputWaiters.delete(key);
+      settle(applied);
+    };
+    pending.add(finish);
+    this.#inputWaiters.set(key, pending);
+    this.#inputWaiterCount++;
+    return { result, close: () => finish(false) };
+  }
+
+  confirmInput(confirmation: NativeInputConfirmation): void {
+    for (const finish of [
+      ...(this.#inputWaiters.get(nativeInputConfirmationKey(confirmation)) ?? []),
+    ])
+      finish(true);
+  }
+
+  #closeInputWaiters(): void {
+    for (const pending of [...this.#inputWaiters.values()])
+      for (const finish of [...pending]) finish(false);
+  }
 
   constructor(readonly maximumPendingBytes = SESSION_EVENT_PENDING_BYTES) {
     if (!Number.isSafeInteger(maximumPendingBytes) || maximumPendingBytes < 1)
@@ -316,12 +355,14 @@ export class SessionEventHub {
   }
 
   resyncAll(): void {
+    this.#closeInputWaiters();
     for (const current of this.#subscriptions.values()) {
       for (const subscription of [...current]) subscription.resync();
     }
   }
 
   onApplicationShutdown(): void {
+    this.#closeInputWaiters();
     const subscriptions = [...this.#subscriptions.values()].flatMap((current) => [...current]);
     for (const subscription of subscriptions) subscription.close();
     this.#subscriptions.clear();

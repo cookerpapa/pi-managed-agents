@@ -1,5 +1,15 @@
 # Implementation roadmap
 
+## Worker publication and customer accounting — in progress
+
+The owner authorized #43, #44 and #45 on 2026-11-17. First implement exact native
+input confirmations (ADR-0328), then one long-lived producer per Worker with
+Projector-side Session admission. Retain direct renewal, local expiry, valid
+partial output and original Tool-reply recovery. Model accounting separately
+attributes platform failure/recovery waste without real deductions. Complete a
+matched publication and serial simulated-provider pressure/failure comparison
+against the existing #42 baseline before claiming delivery.
+
 ## Runtime throughput baseline — delivered
 
 Issue #42 is [implemented and measured](reports/runtime-capacity-20261115.md)

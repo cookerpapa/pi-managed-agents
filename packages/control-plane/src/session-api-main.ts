@@ -191,6 +191,10 @@ export async function startSessionApi(): Promise<void> {
           allowInsecureHttp: config.allowInsecureInternalHttp,
         });
       },
+      inputConfirmations: new HttpInputConfirmations({
+        baseUrl: runtimeUrl,
+        token: config.supervisorManagementToken,
+      }),
       productionHttpGateway: new ProductionHttpGateway({
         authenticator: new PostgresTenantApiAuthenticator({ database }),
         publicRegistrationEnabled: config.publicRegistration.enabled,
@@ -264,3 +268,4 @@ if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href)
     process.stderr.write("PiCloud Session API startup failed\n");
     process.exitCode = 1;
   });
+import { HttpInputConfirmations } from "./input-confirmation-client.ts";

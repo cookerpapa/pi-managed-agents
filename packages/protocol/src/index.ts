@@ -678,6 +678,7 @@ export type {
   NativeInputResult,
   NativeInputCommand,
   NativeInputAccepted,
+  NativeInputConfirmation,
 } from "./native-inputs.ts";
 export {
   NATIVE_HUMAN_INPUT_DOCUMENT,
@@ -687,6 +688,8 @@ export {
   NativeInputSnapshotSchema,
   NativeInputAcceptedSchema,
   NativeInputIdSchema,
+  NativeInputConfirmationSchema,
+  nativeInputConfirmationKey,
 } from "./native-inputs.ts";
 export {
   parseDurableTextDescription,
