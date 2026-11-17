@@ -7,6 +7,11 @@ methods. The comparison uses official designs, implementation and documentation;
 it is not a survey of market share or a claim that another framework proves our
 protocol correct.
 
+The owner subsequently clarified a preference to remove only the Worker's
+write-authorization queries. The follow-up
+[producer-reuse and Raft assessment](producer-reuse-and-raft-20261117.md) records
+that scope and evaluates placement alternatives; no deployed check was removed.
+
 ## Main finding
 
 External task ownership plus Kafka producer fencing is an established combination.

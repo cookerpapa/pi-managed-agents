@@ -1,5 +1,8 @@
 # Delivery and research evidence
 
+- [Producer reuse and Raft assessment](../research/producer-reuse-and-raft-20261117.md):
+  scoped Worker-query preference, Session/Worker/partition tradeoffs and the
+  boundary between a replicated state machine and external Kafka publication.
 - [Fencing and Kafka publication patterns](../research/kafka-fencing-patterns-20261117.md):
   official Connect/Streams source, Outbox and checkpoint comparisons; existing
   authorization checks have precedent, while producer granularity remains a
