@@ -200,11 +200,14 @@ when needed. The resource owner keeps physical admission and recovery; file acce
 authority or extra network hop. See the [provider boundaries](docs/ARCHITECTURE.md#tools-and-cube).
 
 One physical Pi Session has one renewable execution lease, one writer and one
-Worker family slot. Its child Conversations share that ownership. Workers publish
-directly with a stable transactional Kafka producer identity; takeover checks PG
-authorization before and after initialization. There is no per-commit HTTP ingress.
+Worker family slot. Its child Conversations share that ownership. Each Worker
+publishes through one long-lived idempotent Kafka producer. Projector admits the
+authorized incarnation and ordered prefix before state, display or Tool effects;
+closure uses the existing group-owned control publisher. There is no log ingress.
 
-Kafka acknowledgement precedes adoption into Pi's committed memory state.
+Kafka acknowledgement precedes adoption into Pi's committed memory state and
+confirms transport durability. Human input success additionally waits for exact
+post-projection confirmation, with durable receipt lookup after lost notification.
 PostgreSQL retains semantic history and authoritative current Inbox/Submission
 values. Native live progress stays in Kafka with PG checkpoints at settlement or
 ordered handoff. Temporary tool-output previews and health observations use lossy

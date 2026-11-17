@@ -11,7 +11,8 @@
 - [ ] [#45](https://github.com/cookerpapa/pi-managed-agents/issues/45): distinguish
   actual provider usage from customer eligibility using request/execution identity
   and durable settlement evidence. Unknown quantities are not estimated charges;
-  user Stop policy is being confirmed. No real payment collection is enabled.
+  user Stop with valid execution and complete usage remains chargeable, as
+  confirmed by the owner. No real payment collection is enabled.
 - [ ] Complete serial source/PG/Kafka/browser/failure checks, matched deployment,
   original-asset preservation and post-release cold/burst/sustained-load tests.
   Compare initialization, commit, projection, settlement and history tails with

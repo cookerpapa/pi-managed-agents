@@ -51,7 +51,7 @@ type RuntimeBinding = {
   resourceUse?: SessionResourceUse;
   check?: { controller: AbortController; result: Promise<boolean> };
 };
-/** Worker-local ordering over its physical Session producer; no second lease renewer. */
+/** Per-Session ordering over the shared Worker transport; no second lease renewer. */
 export class WorkerExecutionLog implements ExecutionLogFactory, ActiveExecutionLogResolver {
   #probeTransport: WorkerExecutionProbeTransport | undefined;
   readonly #runtimeBindings = new Map<string, RuntimeBinding>();

@@ -5,7 +5,6 @@ import type { AddressInfo } from "node:net";
 import { Client } from "pg";
 import { sql } from "kysely";
 import { expect, it, vi } from "vitest";
-import type { KafkaSessionWriter } from "@pi-cloud/event-log";
 import { createDatabase } from "@pi-cloud/database";
 import { PublicationNotSentError } from "@pi-cloud/protocol";
 import { nativeSubagentFixture } from "./native-subagent-fixture.ts";
@@ -216,22 +215,14 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL)(
         return result;
       },
     });
-    const writer = vi.fn<PostgresPublicationControl["options"]["writer"]>(
-      (_owner, _fact, authorize: () => Promise<void>) =>
-        ({
-          start: async () => {
-            await authorize();
-            await authorize();
-          },
-          append: async (item: { factId: string }) => ({ factId: item.factId, durable: true }),
-          close: async () => {},
-        }) as unknown as KafkaSessionWriter,
+    const writer = vi.fn<PostgresPublicationControl["options"]["publish"]>(
+      async (_owner, item) => ({ factId: item.factId, durable: true }),
     );
     const control = new PostgresPublicationControl({
       database: db,
       current: (candidate) => candidate === owner,
       beforeSeal: async () => {},
-      writer,
+      publish: writer,
     });
     try {
       const seal = await request(f);
@@ -295,21 +286,10 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL)(
           phases.push("close-routing");
           await bindings.closeWriter(seal.scope, true);
         },
-        writer: (_owner, _fact, authorize) =>
-          ({
-            start: async () => {
-              await authorize();
-              phases.push("initialize");
-              await authorize();
-            },
-            append: async (item: { factId: string }) => {
-              phases.push("commit");
-              return { factId: item.factId, durable: true };
-            },
-            close: async () => {
-              phases.push("dispose");
-            },
-          }) as unknown as KafkaSessionWriter,
+        publish: async (_owner, item) => {
+          phases.push("commit");
+          return { factId: item.factId, durable: true };
+        },
       });
       const relay = new SessionOutboxRelay({
         database: f.database,
@@ -338,12 +318,12 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL)(
       }
       // The close transaction serializes late registration with lease-gate
       // mutation before closing binding rows. This is per retirement, not per Tool.
-      expect(queries).toHaveLength(9);
+      expect(queries).toHaveLength(8);
       const gate = queries.findIndex((q) => q.startsWith('update "session_leases"'));
       const bindingClose = queries.findIndex((q) => q.startsWith('update "sandbox_tool_bindings"'));
       expect(gate).toBeGreaterThanOrEqual(0);
       expect(bindingClose).toBeGreaterThan(gate);
-      expect(phases).toEqual(["close-routing", "initialize", "commit", "dispose"]);
+      expect(phases).toEqual(["close-routing", "commit"]);
       process.stdout.write(
         JSON.stringify({
           probe: "seal-sql",
@@ -361,7 +341,7 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL)(
 );
 
 it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["authority", "binding"] as const)(
-  "bounds locked %s work before Kafka initialization",
+  "bounds locked %s work before seal publication",
   async (stage) => {
     const f = await nativeSubagentFixture();
     const database = createDatabase({
@@ -372,8 +352,8 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["authority", "bi
     const entered = Promise.withResolvers<void>(),
       release = Promise.withResolvers<void>();
     const owner = { partition: 0, generation: Symbol("owner") };
-    const writer = vi.fn<PostgresPublicationControl["options"]["writer"]>(() => {
-      throw new Error("No producer may initialize before authority and binding closure");
+    const writer = vi.fn<PostgresPublicationControl["options"]["publish"]>(() => {
+      throw new Error("No seal may publish before authority and binding closure");
     });
     const publish = vi.fn(async () => {});
     const bindings = new PostgresSandboxBindings(
@@ -388,7 +368,7 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["authority", "bi
     const control = new PostgresPublicationControl({
       database,
       current: () => true,
-      writer,
+      publish: writer,
       beforeSeal: (seal) => bindings.closeWriter(seal.scope, true),
     });
     let blocker: Promise<void> | undefined;
@@ -428,44 +408,29 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["authority", "bi
 );
 
 it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL)(
-  "drains the old writer before a new ownership generation initializes",
+  "joins the old in-flight seal before retrying on a replacement group owner",
   async () => {
     const f = await nativeSubagentFixture();
     const old = { partition: 0, generation: Symbol("old") },
       next = { partition: 0, generation: Symbol("new") };
     let owner = old;
     const appendEntered = Promise.withResolvers<void>(),
-      appendRelease = Promise.withResolvers<void>(),
-      closeEntered = Promise.withResolvers<void>(),
-      closeRelease = Promise.withResolvers<void>();
-    const writer = vi.fn<PostgresPublicationControl["options"]["writer"]>(
-      (generation, _fact, authorize) =>
-        ({
-          start: async () => {
-            await authorize();
-            await authorize();
-          },
-          append: async (item: { factId: string }) => {
-            if (generation === old) {
-              appendEntered.resolve();
-              await appendRelease.promise;
-              throw new Error("Old publication failed");
-            }
-            return { factId: item.factId, durable: true };
-          },
-          close: async () => {
-            if (generation === old) {
-              closeEntered.resolve();
-              await closeRelease.promise;
-            }
-          },
-        }) as unknown as KafkaSessionWriter,
+      appendRelease = Promise.withResolvers<void>();
+    const writer = vi.fn<PostgresPublicationControl["options"]["publish"]>(
+      async (generation, item) => {
+        if (generation === old) {
+          appendEntered.resolve();
+          await appendRelease.promise;
+          throw new Error("Old publication failed");
+        }
+        return { factId: item.factId, durable: true };
+      },
     );
     const control = new PostgresPublicationControl({
       database: f.database,
       current: (value) => value === owner,
       beforeSeal: async () => {},
-      writer,
+      publish: writer,
     });
     let pending: Promise<unknown> | undefined, replacement: Promise<unknown> | undefined;
     try {
@@ -476,16 +441,13 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL)(
       owner = next;
       replacement = control.seal(next, seal);
       void replacement.catch(() => {});
-      appendRelease.resolve();
-      await closeEntered.promise;
       expect(writer).toHaveBeenCalledTimes(1);
-      closeRelease.resolve();
+      appendRelease.resolve();
       await expect(pending).rejects.toThrow("Old publication failed");
       await expect(replacement).resolves.toMatchObject({ factId: seal.factId, durable: true });
       expect(writer).toHaveBeenCalledTimes(2);
     } finally {
       appendRelease.resolve();
-      closeRelease.resolve();
       await Promise.allSettled([pending, replacement]);
       await control.close();
       await f.close();

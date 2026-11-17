@@ -26,6 +26,8 @@ try {
       "run",
       ...files,
       "--maxWorkers=1",
+      "--no-file-parallelism",
+      "--exclude=**/.cache/**",
       "--testTimeout=180000",
       "--hookTimeout=60000",
     ],

@@ -5,7 +5,7 @@ import {
 } from "@pi-cloud/protocol";
 import { DEFAULT_PRODUCER_CAPACITY, type ProducerCapacity } from "@pi-cloud/event-log";
 import type { PiCloudMetrics } from "@pi-cloud/observability";
-import type { AcceptedFactReceipt } from "./accepted-fact.ts";
+import type { AcceptedFactReceipt, AcceptedExecutionSealFact } from "./accepted-fact.ts";
 
 export type PublicationRecord = Readonly<{ factId: string; sessionId: string; value: string }>;
 export interface PartitionPublicationWriter {
@@ -25,7 +25,7 @@ export class PublicationIngressRejected extends PublicationNotSentError {
     this.name = "PublicationIngressRejected";
   }
 }
-/** Bounded, ordered control publication only. Workers own their Session producers. */
+/** Bounded ordered control/seal publication under the Projector group owner. */
 export class SessionPublicationIngress {
   readonly #partitions = new Map<number, Partition>();
   #pendingBytes = 0;
@@ -66,7 +66,13 @@ export class SessionPublicationIngress {
   control(owner: PublicationOwnership, fact: SessionControlChange): Promise<AcceptedFactReceipt> {
     return this.#enqueue(this.#owned(owner), fact);
   }
-  #enqueue(partition: Partition, fact: SessionControlChange): Promise<AcceptedFactReceipt> {
+  seal(owner: PublicationOwnership, fact: AcceptedExecutionSealFact): Promise<AcceptedFactReceipt> {
+    return this.#enqueue(this.#owned(owner), fact);
+  }
+  #enqueue(
+    partition: Partition,
+    fact: SessionControlChange | AcceptedExecutionSealFact,
+  ): Promise<AcceptedFactReceipt> {
     const record = {
       factId: fact.factId,
       sessionId: fact.scope.piSessionId,

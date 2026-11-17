@@ -434,9 +434,15 @@ export class PiWorkerRuntime {
     let executionLogs = this.#executionLogs;
     if (!executionLogs) {
       const bus = new DirectSessionKafkaBus({
-        database: this.#database!,
         ...this.#config.kafka,
         clientId: `pi-worker-${identity.bootId}`,
+        onFailure: () => {
+          this.#stopRequested = true;
+          this.#state = "failed";
+          this.#terminalFailureCode = "worker_publication_failed";
+          this.#runSupervisor?.retire();
+          this.#settleTerminal("connection_failed");
+        },
       });
       executionLogs = new WorkerExecutionLog(bus, this.#config.producerCapacity);
       this.#activeExecutionLogs = executionLogs;

@@ -35,7 +35,6 @@ it.skipIf(!postgres || !brokers)(
     const database = createDatabase({ connectionString: endpoint.toString(), maxConnections: 8 });
     const kafka = new Admin({ clientId: topic, bootstrapBrokers: brokers! });
     const bus = new DirectSessionKafkaBus({
-      database,
       brokers: brokers!,
       topic,
       clientId: topic,

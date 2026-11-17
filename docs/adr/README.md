@@ -1,5 +1,9 @@
 # Current architecture decisions
 
+[ADR-0329](0329-worker-producer-and-projector-admission.md) selects one idempotent
+Session-log producer per Worker and Projector-side admission (#43). Implementation
+is in progress; the matched cutover requires ADR-0328 input confirmations.
+
 [ADR-0328](0328-projected-native-input-confirmation.md) requires exact native input
 confirmation after Projector persistence (#44), before enabling shared Worker
 producers and Projector-side fencing (#43). Implementation is in progress.

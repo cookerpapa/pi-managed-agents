@@ -43,7 +43,6 @@ it.skipIf(!postgres || !brokers)(
     });
     let projector: SessionProjector | undefined;
     const bus = new DirectSessionKafkaBus({
-      database: f.database,
       brokers: brokers!,
       topic,
       clientId: topic,

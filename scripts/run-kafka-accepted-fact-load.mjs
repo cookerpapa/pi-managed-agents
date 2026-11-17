@@ -161,7 +161,7 @@ await kafkaEvaluation("docs/reports/kafka-accepted-fact-load-latest.json", async
       transactionalIdentity: "physical-session",
       recordAuthentication: "trusted-worker-grant",
       scope:
-        "Session producer init -> transactional Kafka ACK; excludes PG grants, projection, model and Cube",
+        "Shared Worker producer -> replicated Kafka delivery ACK; excludes PG grants, projection, model and Cube",
       cases,
     };
   } finally {

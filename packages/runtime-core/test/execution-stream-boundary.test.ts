@@ -20,6 +20,7 @@ it("does not turn interleaved closed execution replay into a metadata query per 
       reads++;
       return {
         lease_id: "writer",
+        fencing_token: "1",
         started_at: new Date(),
         output_sealed_at: new Date(),
         output_seal_offset: "10",

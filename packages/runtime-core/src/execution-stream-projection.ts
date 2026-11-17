@@ -14,6 +14,7 @@ import type {
   AcceptedExecutionSealFact,
   AcceptedWorkFinishedFact,
   AcceptedFact,
+  AcceptedFactScope,
 } from "./accepted-fact.ts";
 import { finishWorkIn } from "./work-finished-projection.ts";
 import { releaseIdleSessionLease } from "./session-lease-release.ts";
@@ -23,6 +24,7 @@ import { ExecutionPrefix } from "./execution-prefix.ts";
 import { projectionTransaction } from "./projection-transaction.ts";
 
 export type ExecutionProjectionResult = {
+  admitted?: boolean;
   inputConfirmations?: NativeInputConfirmation[];
   terminal?: PiCloudEvent;
   canonicalThroughSequence?: number;
@@ -62,16 +64,25 @@ export class ExecutionStreamBoundary {
     }
   }
 
-  observes(runId: string, writerId: string): boolean {
+  #identity(scope: AcceptedFactScope): string {
+    return JSON.stringify([
+      scope.tenantId,
+      scope.piSessionId,
+      scope.writerId,
+      scope.fencingToken,
+      scope.runId,
+    ]);
+  }
+
+  observes(scope: AcceptedFactScope): boolean {
+    const identity = this.#identity(scope);
     return (
-      this.#open.has(`${writerId}:${runId}`) &&
-      !this.#closed.has(`${writerId}:${runId}`) &&
-      !this.#writers.has(writerId)
+      this.#open.has(identity) && !this.#closed.has(identity) && !this.#writers.has(scope.writerId)
     );
   }
 
-  close(runId: string, writerId: string, offset: bigint): void {
-    runId = `${writerId}:${runId}`;
+  close(scope: AcceptedFactScope, offset: bigint): void {
+    const runId = this.#identity(scope);
     this.#open.delete(runId);
     const previous = this.#closed.get(runId);
     this.#closed.delete(runId);
@@ -84,7 +95,7 @@ export class ExecutionStreamBoundary {
 
   async isOpen(record: KafkaAcceptedFactRecord, canonical: boolean): Promise<boolean> {
     const { scope } = record.fact;
-    const identity = `${scope.writerId}:${scope.runId}`;
+    const identity = this.#identity(scope);
     const writerCutoff = this.#writers.get(scope.writerId);
     if (writerCutoff !== undefined && record.offset >= writerCutoff) return false;
     const cutoff = this.#closed.get(identity);
@@ -110,11 +121,13 @@ export class ExecutionStreamBoundary {
         "run.output_first_offset",
         "run.lease_id",
         "writer.writer_seal_offset",
+        "writer.fencing_token",
       ])
       .where("run.id", "=", scope.runId)
       .where("run.tenant_id", "=", scope.tenantId)
       .where("writer.pi_session_id", "=", scope.piSessionId)
       .executeTakeFirst();
+    if (run && Number(run.fencing_token) !== scope.fencingToken) return false;
     if (run && run.lease_id !== scope.writerId) {
       if (run.writer_seal_offset === null)
         throw new Error("Previous execution owner has no closure proof");
@@ -128,7 +141,7 @@ export class ExecutionStreamBoundary {
     }
     if (!run || run.output_sealed_at !== null) {
       const cutoff = run?.output_seal_offset == null ? -1n : BigInt(run.output_seal_offset);
-      this.close(scope.runId, scope.writerId, cutoff);
+      this.close(scope, cutoff);
       return !canonical && record.offset < cutoff;
     }
     if (canonical) {
@@ -183,7 +196,7 @@ export class ExecutionStreamProjector {
   }
 
   observes(record: KafkaAcceptedFactRecord): boolean {
-    return this.#boundary.observes(record.fact.scope.runId, record.fact.scope.writerId);
+    return this.#boundary.observes(record.fact.scope);
   }
 
   async project(
@@ -203,6 +216,7 @@ export class ExecutionStreamProjector {
       const projected = await this.#durable.project(fact, record, current);
       const sessions = new Set([...scopes.values()].map((scope) => scope.sessionId));
       const result = {
+        admitted: projected.admitted,
         ...(projected.inputConfirmations
           ? { inputConfirmations: projected.inputConfirmations }
           : {}),
@@ -227,7 +241,7 @@ export class ExecutionStreamProjector {
           `${fact.scope.writerId}:${fact.scope.runId}:${fact.scope.sessionId}`,
         );
         const terminal = await this.#seal(fact, record, prefix, current);
-        this.#boundary.close(fact.scope.runId, fact.scope.writerId, record.offset);
+        this.#boundary.close(fact.scope, record.offset);
         this.#closeWriter(fact.scope.writerId, record.offset);
         return terminal ? { terminal, canonicalThroughSequence: terminal.seq } : undefined;
       }
@@ -242,7 +256,7 @@ export class ExecutionStreamProjector {
     }
     if (fact.kind === "execution_seal") {
       const terminal = await this.#seal(fact, record, prefix, current);
-      this.#boundary.close(fact.scope.runId, fact.scope.writerId, record.offset);
+      this.#boundary.close(fact.scope, record.offset);
       this.#closeWriter(fact.scope.writerId, record.offset);
       return terminal ? { terminal, canonicalThroughSequence: terminal.seq } : undefined;
     } else {
@@ -458,7 +472,7 @@ export class ExecutionStreamProjector {
     adopt();
     if (!current()) return;
     if (rootClosed !== undefined) {
-      this.#boundary.close(fact.scope.runId, fact.scope.writerId, rootClosed);
+      this.#boundary.close(fact.scope, rootClosed);
       this.#prefixes.delete(key);
     }
     if (writerClosed !== undefined) this.#closeWriter(fact.scope.writerId, writerClosed);

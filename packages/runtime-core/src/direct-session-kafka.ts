@@ -1,8 +1,5 @@
-import { KafkaSessionWriter, ACCEPTED_FACT_TOPIC } from "@pi-cloud/event-log";
-import type { Database } from "@pi-cloud/database";
-import { sql, type Kysely } from "kysely";
+import { KafkaWorkerProducer, ACCEPTED_FACT_TOPIC } from "@pi-cloud/event-log";
 import { MAX_EXECUTION_FACT_BYTES, PublicationNotSentError } from "@pi-cloud/protocol";
-import { isDeepStrictEqual } from "node:util";
 import type {
   AcceptedFact,
   AcceptedFactBus,
@@ -34,131 +31,107 @@ export function assertSessionPublication(
   }
 }
 
-/** Root authority is checked at producer initialization. Every Conversation
- * then uses the same Session producer and local grant without per-record SQL. */
+/** Per-Session local ordering over one Worker transport. PG claims/renewal own
+ * execution; the Projector admits the durable candidate prefix. */
 export class DirectSessionKafkaBus implements AcceptedFactBus {
   readonly #writers = new Map<
     string,
-    { publication: ExecutionPublication; writer: KafkaSessionWriter; retired: boolean }
+    {
+      publication: ExecutionPublication;
+      retired: boolean;
+      signal?: AbortSignal;
+      tail: Promise<void>;
+    }
   >();
-  readonly #opening = new Map<string, Promise<void>>();
   readonly #topic: ExecutionLogTopic;
+  readonly #producer: KafkaWorkerProducer;
   #starting: Promise<void> | undefined;
   #closed = false;
   constructor(
     readonly options: {
-      database: Kysely<Database>;
       brokers: readonly string[];
       clientId: string;
       partitions: number;
       replicas: number;
       topic?: string;
+      onFailure?(error: unknown): void;
     },
   ) {
     this.#topic = new ExecutionLogTopic({ ...options, manageTopic: false });
+    this.#producer = new KafkaWorkerProducer({
+      ...options,
+      topic: options.topic ?? ACCEPTED_FACT_TOPIC,
+    });
   }
   #key(scope: Pick<AcceptedFactScope, "tenantId" | "piSessionId">): string {
     return JSON.stringify([scope.tenantId, scope.piSessionId]);
   }
-  async #authorize(publication: ExecutionPublication): Promise<void> {
-    const scope = publication.scope;
-    const row = await this.options.database
-      .selectFrom("runs as r")
-      .innerJoin("session_leases as l", "l.lease_id", "r.lease_id")
-      .select("r.output_publication")
-      .where("r.tenant_id", "=", scope.tenantId)
-      .where("r.id", "=", scope.runId)
-      .where("l.tenant_id", "=", scope.tenantId)
-      .where("l.pi_session_id", "=", scope.piSessionId)
-      .where("l.lease_id", "=", scope.writerId)
-      .where("l.fencing_token", "=", String(scope.fencingToken))
-      .where("l.released_at", "is", null)
-      .where("l.writer_failed_at", "is", null)
-      .where("l.writer_sealed_at", "is", null)
-      .where("l.valid_until", ">", sql<Date>`clock_timestamp()`)
-      .where("r.output_seal_id", "is", null)
-      .where("r.state", "in", ["running", "settling", "cancel_requested"])
-      .executeTakeFirst();
-    if (!row || !isDeepStrictEqual(row.output_publication, publication))
-      throw new PublicationNotSentError("Session producer grant is no longer current");
-  }
-  open(publication: ExecutionPublication, signal?: AbortSignal): Promise<void> {
-    const key = this.#key(publication.scope);
-    if (this.#opening.has(key))
-      return Promise.reject(new PublicationNotSentError("Session producer is already opening"));
-    const pending = this.#open(publication, signal).finally(() => {
-      if (this.#opening.get(key) === pending) this.#opening.delete(key);
-    });
-    this.#opening.set(key, pending);
-    return pending;
-  }
-  async #open(publication: ExecutionPublication, signal?: AbortSignal): Promise<void> {
+  async open(publication: ExecutionPublication, signal?: AbortSignal): Promise<void> {
     if (this.#closed) throw new PublicationNotSentError("Session publication is closed");
     signal?.throwIfAborted();
-    const key = this.#key(publication.scope),
-      prior = this.#writers.get(key);
-    if (prior)
-      throw new PublicationNotSentError(
-        "Retire the existing Session writer before opening another one",
-      );
+    const key = this.#key(publication.scope);
+    if (this.#writers.has(key))
+      throw new PublicationNotSentError("Retire the local Session before opening another owner");
+    if (publication.scope.leaseId !== publication.scope.writerId)
+      throw new PublicationNotSentError("Session writer identity changed");
     const entry = {
       publication: structuredClone(publication),
-      writer: undefined as unknown as KafkaSessionWriter,
       retired: false,
+      ...(signal ? { signal } : {}),
+      tail: Promise.resolve(),
     };
-    entry.writer = new KafkaSessionWriter({
-      brokers: this.options.brokers,
-      clientId: this.options.clientId,
-      topic: this.options.topic ?? ACCEPTED_FACT_TOPIC,
-      partition: kafkaProducerLane(publication.scope.piSessionId, this.options.partitions),
-      tenantId: publication.scope.tenantId,
-      sessionId: publication.scope.piSessionId,
-      current: () => !this.#closed && !entry.retired && !signal?.aborted,
-      authorize: async (phase) => {
-        signal?.throwIfAborted();
-        await this.#authorize(publication);
-        if (phase === "after_init") {
-          const current = this.#writers.get(key);
-          if (current && current !== prior)
-            throw new PublicationNotSentError("Session initialization was replaced locally");
-          if (this.#closed || signal?.aborted)
-            throw new PublicationNotSentError("Session initialization ended locally");
-          this.#writers.set(key, entry);
-        }
-      },
-    });
+    this.#writers.set(key, entry);
     try {
-      await entry.writer.start();
+      await this.#start();
+      this.#producer.assertHealthy();
+      signal?.throwIfAborted();
+      if (this.#closed || entry.retired || this.#writers.get(key) !== entry)
+        throw new PublicationNotSentError("Session owner retired while opening");
     } catch (error) {
       entry.retired = true;
-      await entry.writer.close();
       if (this.#writers.get(key) === entry) this.#writers.delete(key);
       throw error;
     }
   }
-  async append(fact: AcceptedFact) {
+  append(fact: AcceptedFact) {
     const entry = this.#writers.get(this.#key(fact.scope));
     const scope = entry?.publication.scope;
     if (
       !entry ||
       entry.retired ||
+      entry.signal?.aborted ||
       !scope ||
       scope.runId !== fact.scope.runId ||
       scope.writerId !== fact.scope.writerId ||
       scope.fencingToken !== fact.scope.fencingToken ||
       fact.kind === "execution_seal"
     )
-      throw new PublicationNotSentError("Session writer is unavailable for this record");
+      return Promise.reject(
+        new PublicationNotSentError("Session writer is unavailable for this record"),
+      );
     let value: string;
     try {
       assertSessionPublication(entry.publication, fact);
       value = encodeSessionLogFact(fact);
+      if (Buffer.byteLength(value) > MAX_EXECUTION_FACT_BYTES)
+        throw new Error("Session record exceeds its transport budget");
     } catch (cause) {
-      throw new PublicationNotSentError("Session record is invalid", { cause });
+      return Promise.reject(new PublicationNotSentError("Session record is invalid", { cause }));
     }
-    if (Buffer.byteLength(value) > MAX_EXECUTION_FACT_BYTES)
-      throw new PublicationNotSentError("Session record exceeds its transport budget");
-    return entry.writer.append({ factId: fact.factId, sessionId: fact.scope.piSessionId, value });
+    const pending = entry.tail.then(() => {
+      if (this.#closed || entry.retired || entry.signal?.aborted)
+        throw new PublicationNotSentError("Session writer retired before enqueue");
+      return this.#producer.append(kafkaProducerLane(scope.piSessionId, this.options.partitions), {
+        factId: fact.factId,
+        sessionId: scope.piSessionId,
+        value,
+      });
+    });
+    entry.tail = pending.then(
+      () => {},
+      () => {},
+    );
+    return pending;
   }
   async forget(scope: AcceptedFactScope): Promise<void> {
     const key = this.#key(scope),
@@ -171,16 +144,15 @@ export class DirectSessionKafkaBus implements AcceptedFactBus {
       return;
     entry.retired = true;
     this.#writers.delete(key);
-    await entry.writer.close();
+    await entry.tail;
   }
   publicationFailure(scope: AcceptedFactScope): unknown {
-    const entry = this.#writers.get(this.#key(scope));
-    return entry?.publication.scope.writerId === scope.writerId ? entry.writer.failure : undefined;
+    return this.publicationFailureSignal(scope)?.reason;
   }
   publicationFailureSignal(scope: AcceptedFactScope): AbortSignal | undefined {
     const entry = this.#writers.get(this.#key(scope));
     return entry?.publication.scope.writerId === scope.writerId
-      ? entry.writer.failureSignal
+      ? this.#producer.failureSignal
       : undefined;
   }
   async publicationAvailability() {
@@ -190,24 +162,26 @@ export class DirectSessionKafkaBus implements AcceptedFactBus {
       partitions: await this.#topic.availablePartitions(),
     };
   }
+  #start(): Promise<void> {
+    return (this.#starting ??= (async () => {
+      await this.#topic.start();
+      await this.#producer.start();
+    })());
+  }
   async checkHealth(): Promise<void> {
     if (this.#closed) throw new Error("Session publication is closed");
-    this.#starting ??= this.#topic.start().catch((error) => {
-      this.#starting = undefined;
-      throw error;
-    });
-    await this.#starting;
+    await this.#start();
     await this.#topic.checkHealth();
-    if (this.#closed) throw new Error("Session publication is closed");
+    this.#producer.assertHealthy();
   }
   async close(): Promise<void> {
     this.#closed = true;
-    await Promise.allSettled(this.#opening.values());
     const entries = [...this.#writers.values()];
     this.#writers.clear();
     for (const entry of entries) entry.retired = true;
-    await Promise.allSettled(entries.map((entry) => entry.writer.close()));
+    await Promise.allSettled(entries.map((entry) => entry.tail));
     await this.#starting?.catch(() => {});
+    await this.#producer.close();
     await this.#topic.close();
   }
 }

@@ -44,11 +44,12 @@ is implemented by this rationale update.
 
 ## Persistence boundaries
 
-Native `Storage.commit()` prepares one exact sequence/batch and publishes through
-one transactional producer per active physical Session. Main and child
-Conversations share that writer and lease. PG authorization runs before and
-after producer initialization, not once per token or native commit. Only a
-confirmed Kafka transaction permits the Worker to adopt that batch.
+Native `Storage.commit()` prepares one exact sequence/batch and publishes one
+record through the Worker's long-lived idempotent producer. Main and child
+Conversations share their logical writer and lease; different Sessions retain
+independent ordering over that transport. Kafka delivery confirmation permits
+local adoption. Projector admits the authorized incarnation and ordered prefix
+before canonical effects; user input success additionally needs ADR-0328 confirmation.
 
 Complete native messages, tasks and retained document history are materialized
 in PG. Inbox/input metadata and submissions retain authoritative current values.
@@ -76,8 +77,9 @@ history, renew a lease or authorize VM cleanup.
 A trusted no-send refusal becomes native `StorageRejected`, preserving the
 previous acknowledged state while rejecting the new draft. Pi decides the
 calling task's failure; this is not a retry promise or retained-result queue.
-An uncertain ACK, producer fence or failure adopting an acknowledged batch
-retires the writer through the existing ordered recovery path.
+An uncertain shared transport retires the Worker boot and its local families.
+Failure adopting an acknowledged batch retires the affected writer through
+ordered recovery. Application code never retries an uncertain native batch.
 
 ## Ordered projection and Tool effects
 
@@ -111,7 +113,7 @@ and wakeups may be delivered more than once; they do not grant a second effect.
 ## Completion and ownership handoff
 
 Native descendant-aware idle and child publication cleanup precede root writer
-drain. The Worker then commits `work_finished` through its Session producer.
+drain. The Worker then commits `work_finished` through its shared producer.
 Projector closes routing, validates the final native boundary and atomically
 records the logical outcome, terminal event, recovery progress and normal writer
 retirement. Session-locked readiness releases the next root work. There are no
@@ -124,8 +126,8 @@ Replay never invents another event ID/sequence or rewrites the winning outcome.
 A browser ACK does not control readiness or lease release.
 
 For unknown writes/owner loss, PG revokes the grant and records one Session seal
-request. The control publisher takes over the same Kafka transactional producer
-identity, rechecks its PG intent and commits under current group ownership.
+request. The existing partition control publisher rechecks its PG intent and
+commits the seal under current group ownership without taking over a Worker producer.
 Routing revocation precedes the successor boundary. A pending forced seal cannot
 be replaced by voluntary retirement merely because `work_finished` arrives.
 

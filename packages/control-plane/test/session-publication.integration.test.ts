@@ -20,7 +20,7 @@ const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS?.split(",");
 const postgres = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
 
 it.skipIf(!brokers || !postgres)(
-  "writes directly through control-plane replacement, fences old writers and resumes the same logical work",
+  "shares direct transports through Projector replacement and rejects stale effects after ordered closure",
   async () => {
     const f = await nativeSubagentFixture(),
       topic = `direct-session-${crypto.randomUUID()}`;
@@ -52,25 +52,10 @@ it.skipIf(!brokers || !postgres)(
     };
     const bus = new DirectSessionKafkaBus(options),
       successor = new DirectSessionKafkaBus(options);
-    const prechecked = Promise.withResolvers<void>(),
-      resumeLate = Promise.withResolvers<void>();
-    let holdOnce = true;
-    const lateDb = f.database.withPlugin({
-      transformQuery({ node }) {
-        return node;
-      },
-      async transformResult({ result }) {
-        if (holdOnce) {
-          holdOnce = false;
-          prechecked.resolve();
-          await resumeLate.promise;
-        }
-        return result;
-      },
-    });
-    const late = new DirectSessionKafkaBus({ ...options, database: lateDb });
+    const late = new DirectSessionKafkaBus(options);
     const third = new DirectSessionKafkaBus(options);
-    let lateOpening: Promise<void> | undefined, thirdExecution: Promise<unknown> | undefined;
+    let thirdExecution: Promise<unknown> | undefined;
+    const routed: string[] = [];
     let projector: SessionProjector | undefined;
     let quiescence = new ControlPlaneQuiescence("old", () => ({ active: 0, unsettled: 0 }));
     const create = () =>
@@ -82,7 +67,11 @@ it.skipIf(!brokers || !postgres)(
         retentionMs: 600000,
         publicationToken: "fixture-".repeat(8),
         advertisedBaseUrl: "http://127.0.0.1:9",
-        toolCommands: { consume: async () => {} },
+        toolCommands: {
+          consume: async (record) => {
+            if ("factId" in record.fact) routed.push(record.fact.factId);
+          },
+        },
         projectionGate: quiescence,
       });
     const permit = { scope: { ...f.scope, leaseId: f.scope.writerId, piConversationId: 1 } };
@@ -123,15 +112,13 @@ it.skipIf(!brokers || !postgres)(
       await bus.checkHealth();
       expect(await bus.publicationAvailability()).toEqual({ partitionCount: 1, partitions: [0] });
       await measured.run(true, () => bus.open(permit));
-      expect(queries).toHaveLength(2); // current PG grant before AND after native init
+      expect(queries).toHaveLength(0); // Worker writer opening no longer queries PG
       queries.length = 0;
       const oversized = fact(2);
       Object.assign(oversized.commit.writes[0]!.value as object, {
         data: { text: "x".repeat(MAX_EXECUTION_FACT_BYTES) },
       });
-      await expect(measured.run(true, () => bus.append(oversized))).rejects.toThrow(
-        "transport budget",
-      );
+      await expect(measured.run(true, () => bus.append(oversized))).rejects.toThrow("invalid");
       expect(bus.publicationFailure(f.scope)).toBeUndefined();
       await measured.run(true, () => bus.append(fact(2)));
       expect(queries).toEqual([]);
@@ -154,9 +141,6 @@ it.skipIf(!brokers || !postgres)(
       await vi.waitFor(async () => expect((await f.projection.head()).seq).toBe(3), {
         timeout: 30000,
       });
-      lateOpening = late.open(permit);
-      void lateOpening.catch(() => {});
-      await prechecked.promise;
       const sealId = crypto.randomUUID();
       await f.database.transaction().execute((tx) =>
         requestExecutionStreamSeal(tx, {
@@ -180,9 +164,9 @@ it.skipIf(!brokers || !postgres)(
       await vi.waitFor(async () => expect((await readRun()).state).toBe("queued"), {
         timeout: 30000,
       });
-      await expect(bus.append(fact(4))).rejects.toBeInstanceOf(Error);
-      await expect(bus.append(fact(4))).rejects.toBeInstanceOf(Error);
-      await expect(successor.open(permit)).rejects.toThrow("no longer current");
+      const stale = fact(4);
+      Object.assign(stale.commit.writes[0]!.value as object, { data: { text: "obsolete writer" } });
+      await expect(bus.append(stale)).resolves.toMatchObject({ durable: true });
       const worker = await createTestWorker(f.database);
       const entered = Promise.withResolvers<ExecutionPublication>();
       execution = worker
@@ -201,7 +185,7 @@ it.skipIf(!brokers || !postgres)(
       expect(next.scope.writerId).not.toBe(f.scope.writerId);
       expect(next.scope.fencingToken).toBe(2);
       await successor.open(next);
-      // Replayed closed evidence must NOT initialize another producer and fence the successor.
+      // Replayed closure is idempotent and cannot close the successor transport.
       await projector.publishSeal(seal);
       const { leaseId: _lease, piConversationId: _conv, ...scope } = next.scope;
       await successor.append(fact(4, scope));
@@ -214,11 +198,30 @@ it.skipIf(!brokers || !postgres)(
       await vi.waitFor(async () => expect((await f.projection.head()).seq).toBe(5), {
         timeout: 10000,
       });
-      // A delayed initializer passed its first PG check before closure. It fences
-      // the current producer, then MUST fail its fresh post-init check.
-      resumeLate.resolve();
-      await expect(lateOpening).rejects.toThrow("no longer current");
-      await expect(successor.append(fact(6, scope))).rejects.toBeInstanceOf(Error);
+      // A delayed obsolete Worker can initialize/publish, but cannot fence the
+      // successor or overwrite accepted native sequence positions.
+      await late.open(permit);
+      const lateFact = fact(6);
+      Object.assign(lateFact.commit.writes[0]!.value as object, {
+        data: { text: "late obsolete owner" },
+      });
+      await late.append(lateFact);
+      const staleFinish = {
+        kind: "work_finished" as const,
+        factId: crypto.randomUUID(),
+        scope: f.scope,
+        agentId: "root",
+        baseSequence: 0,
+        nativeSequence: 6,
+        terminal: { type: "turn.completed" as const, payload: { stopReason: "stop" } },
+        occurredAt: new Date().toISOString(),
+      };
+      await late.append(staleFinish);
+      await successor.append(fact(6, scope));
+      await vi.waitFor(async () => expect((await f.projection.head()).seq).toBe(6), {
+        timeout: 10000,
+      });
+      expect(routed).not.toContain(staleFinish.factId);
       await f.database.transaction().execute((tx) =>
         requestExecutionStreamSeal(tx, {
           tenantId: scope.tenantId,
@@ -251,8 +254,8 @@ it.skipIf(!brokers || !postgres)(
       expect(finalPermit.scope.fencingToken).toBe(3);
       await third.open(finalPermit);
       const { leaseId: _l3, piConversationId: _c3, ...scope3 } = finalPermit.scope;
-      await third.append(fact(6, scope3));
-      await vi.waitFor(async () => expect((await f.projection.head()).seq).toBe(6), {
+      await third.append(fact(7, scope3));
+      await vi.waitFor(async () => expect((await f.projection.head()).seq).toBe(7), {
         timeout: 10000,
       });
       expect(
@@ -265,8 +268,6 @@ it.skipIf(!brokers || !postgres)(
         ).rows[0]!.count,
       ).toBe("1");
     } finally {
-      resumeLate.resolve();
-      await lateOpening?.catch(() => {});
       finished.resolve();
       await Promise.allSettled([execution, thirdExecution]);
       await Promise.allSettled([bus.close(), successor.close(), late.close(), third.close()]);

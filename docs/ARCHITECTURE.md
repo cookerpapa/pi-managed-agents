@@ -25,7 +25,7 @@ also cover independent storage, dynamic registration and scoped publication.
 Browser -> Session API -> PG Run admission -> Pi Worker
 Pi Worker <-> local Model Gateway <-> CLIProxyAPI <-> model provider
 
-Pi Worker -> transactional Session producer -> Kafka -> Session Projector
+Pi Worker -> shared Worker producer -> Kafka -> Session Projector
                                                         +-> PG native state/history
                                                         +-> live view / browser SSE
                                                         +-> independent ordinary Tool host (HTTP)
@@ -48,7 +48,7 @@ Retained attachment originals -> private S3 objects; Kafka and PG carry referenc
    active native work and calls the model through its local Gateway. Pure chat
    does not activate a VM.
 4. Pi commits through the public Storage port. The Worker stamps one ordered
-   batch, publishes directly with its Session transactional producer and waits
+   batch, publishes directly with its shared Worker producer and waits
    for Kafka acknowledgement before Pi adopts the committed state.
 5. One Session Projector group materializes native state, updates live views and
    routes committed Tool intent. It confirms dispatch admission durably before
@@ -105,7 +105,11 @@ transcripts, image bytes or Workspace archives.
 
 Steer and follow-up belong to the current native Conversation. The API routes
 edits, cancellation, reordering and promotion to its current Worker. Pi's detached
-transaction commits the Inbox and input metadata before the request is acknowledged.
+transaction commits the Inbox and input metadata. Exact post-PG-projection
+confirmation then allows the API to acknowledge the human operation. Notifications
+use the existing Session HTTP/SSE server; lost notifications use native receipt
+lookup rather than normal-path PG polling. [ADR-0328](adr/0328-projected-native-input-confirmation.md)
+keeps ordinary streaming Storage commits free of projection round trips.
 An unreachable Worker leaves the message as a retryable draft. Consumption adds
 the actual user Entry in the same native transaction as queue removal.
 
@@ -128,12 +132,14 @@ See [ADR-0243](adr/0243-native-input-current-state.md) and
 
 ## Publication and execution log
 
-The physical Session ID determines the Kafka key/partition. One stable
-transactional producer identity fences replaced Session writers. PG authorization
-is checked before and after producer initialization, not on each ordinary commit.
-A delayed stale initializer fails its post-initialization check; an affected valid
-writer recovers only through ordered closure. An uncertain producer is never
-automatically reinitialized to retry arbitrary effects.
+The physical Session ID determines the Kafka key/partition. One long-lived
+idempotent producer per Worker boot transports complete native commit records.
+Projector admits the PG-issued Session identity and ordered pre-seal prefix before
+state, display or external effects. There is no dedicated writer-opening PG check
+or Session producer takeover. Shared transport uncertainty revokes local families
+and retires the Worker boot; uncertain records are never automatically resubmitted.
+Claims, direct renewal, local expiry and cold context reads retain their authority.
+See [ADR-0329](adr/0329-worker-producer-and-projector-admission.md).
 
 Control changes commit PG state plus immutable Outbox references and use the same
 Session partition. Binding close consumption acknowledges stopped dispatch in
@@ -220,9 +226,9 @@ An independent monotonic deadline and synchronous model-admission check prevent
 late timers or acknowledgements from extending an expired owner. Silent PG
 revocation is learned at the next renewal, normally twenty seconds; a stalled
 renewal cannot exceed the last confirmed lifetime, normally sixty seconds.
-Known Kafka publication failure immediately aborts the whole native family and
-its model transports. An unobserved broker fence is discovered by subsequent
-publication. ADR-0307 adds a bounded Session resource-use declaration about once
+Known uncertain Kafka transport failure immediately aborts the Worker's local
+families/model transports and retires that boot. Projector rejects obsolete
+incarnations independently. ADR-0307 adds a bounded Session resource-use declaration about once
 per minute through that same writer, including silent model waits. Execution
 uses its resource view without polling Worker ownership or PG leases. Full probes
 are on-demand and register the caller waiter before Kafka publication. Already accepted provider

@@ -1,6 +1,6 @@
 import type { Database } from "@pi-cloud/database";
 import type { Kysely } from "kysely";
-import { KafkaLogConsumer, KafkaSessionWriter } from "@pi-cloud/event-log";
+import { KafkaLogConsumer } from "@pi-cloud/event-log";
 import {
   ACCEPTED_FACT_TOPIC,
   kafkaProducerLane,
@@ -117,22 +117,7 @@ export class SessionProjector {
           this.#consumer.ownsPartition(partition),
         );
       },
-      writer: (owner, fact, authorize) => {
-        const current = () =>
-          this.publication.ownership(owner.partition) === owner &&
-          this.#consumer.ownsPartition(owner.partition);
-        return new KafkaSessionWriter({
-          brokers: options.brokers,
-          clientId: `${options.clientId}-seal`,
-          topic,
-          partition: owner.partition,
-          tenantId: fact.scope.tenantId,
-          sessionId: fact.scope.piSessionId,
-          current,
-          authorize,
-          transaction: this.#consumer.publicationTransaction(owner.partition, current),
-        });
-      },
+      publish: (owner, fact) => this.publication.seal(owner, fact),
     });
     this.#publicationClient = new HttpPublicationClient({
       baseUrl: options.advertisedBaseUrl,
@@ -214,6 +199,11 @@ export class SessionProjector {
           const raw = { ...decoded, fact: prepared.fact };
           if (raw.fact.kind === "session_activity") {
             if (current?.() === false) return;
+            if (
+              !(await this.#projection.accepts(raw as KafkaAcceptedFactRecord)) ||
+              current?.() === false
+            )
+              return;
             if (this.observations.isActive(raw.fact.scope))
               this.observations.record({ ...raw, fact: raw.fact }, true);
             options.sessionActivity?.consume(raw.fact, current ?? (() => true));
@@ -221,6 +211,11 @@ export class SessionProjector {
           }
           if (raw.fact.kind === "path_probe") {
             if (current?.() === false) return;
+            if (
+              !(await this.#projection.accepts(raw as KafkaAcceptedFactRecord)) ||
+              current?.() === false
+            )
+              return;
             if (this.observations.isActive(raw.fact.scope))
               this.observations.record({ ...raw, fact: raw.fact }, true);
             options.executionProbes?.consume?.(raw.fact, current ?? (() => true));
@@ -260,24 +255,28 @@ export class SessionProjector {
             const { fact } = record;
             // Normal work completion also retires this idle owner. Publish routing
             // revocation before opening the PG boundary to a successor writer.
-            if (fact.kind === "work_finished") await options.toolCommands.consume(record, current);
+            if (fact.kind === "work_finished") {
+              if (!(await this.#projection.accepts(record)) || current?.() === false) return;
+              await options.toolCommands.consume(record, current);
+            }
             if (fact.kind === "work_finished" || fact.kind === "execution_seal")
               options.runtimeRetention?.forget(fact.scope.writerId);
             const projected = await timing.measure("projection", () =>
               this.#projection.project(record, current ?? (() => true)),
             );
             if (current?.() === false) return;
-            if (fact.kind === "durable_commit")
-              for (const cancellation of fact.cancellations)
-                await options.toolCommands.consume({ ...record, fact: cancellation }, current);
             const applicable =
               fact.kind === "execution_seal" ||
               fact.kind === "work_finished" ||
-              (await timing.measure("boundary", () => this.#projection.accepts(record)));
+              (projected?.admitted !== false &&
+                (await timing.measure("boundary", () => this.#projection.accepts(record))));
             if (current?.() === false) return;
             if (projected?.terminal)
               this.eventStore.accept(fact.scope.tenantId, projected.terminal);
             if (applicable) {
+              if (fact.kind === "durable_commit")
+                for (const cancellation of fact.cancellations)
+                  await options.toolCommands.consume({ ...record, fact: cancellation }, current);
               for (const confirmation of projected?.inputConfirmations ?? [])
                 this.eventHub.confirmInput(confirmation);
               for (const event of projected?.events ?? factEvents(fact))

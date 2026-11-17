@@ -84,13 +84,15 @@ export class PostgresDurableCommitProjector {
     events: PiCloudEvent[];
     covers: { sessionId: string; through: number }[];
     inputConfirmations?: NativeInputConfirmation[];
+    admitted: boolean;
   }> {
     const events: PiCloudEvent[] = [],
       covers: { sessionId: string; through: number }[] = [];
     const inputConfirmations: NativeInputConfirmation[] = [];
+    let admitted = false;
     const view = this.#view(fact.scope),
       state = view.liveState.fork();
-    if (!current()) return { events, covers };
+    if (!current()) return { events, covers, admitted };
     await projectionTransaction(
       this.database,
       async (tx) => {
@@ -109,16 +111,20 @@ export class PostgresDurableCommitProjector {
           output_first_offset: string | null;
           output_display_seq: string;
           writer_seal_offset: string | null;
+          writer_fencing_token: string;
+          writer_pi_session_id: string;
         }>`with locked_run as materialized (
           select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text
           from runs where tenant_id=${fact.scope.tenantId}::uuid and id=${fact.scope.runId}::uuid
           for no key update
-        ) select r.*,l.writer_seal_offset from locked_run r join session_leases l
+        ) select r.*,l.writer_seal_offset,l.fencing_token as writer_fencing_token,l.pi_session_id as writer_pi_session_id from locked_run r join session_leases l
           on l.tenant_id=${fact.scope.tenantId}::uuid and l.lease_id=${fact.scope.writerId}::uuid
         for no key update of l`.execute(tx);
         if (
           !run ||
-          (run.writer_seal_offset !== null && position.offset > BigInt(run.writer_seal_offset))
+          Number(run.writer_fencing_token) !== fact.scope.fencingToken ||
+          run.writer_pi_session_id !== fact.scope.piSessionId ||
+          (run.writer_seal_offset !== null && position.offset >= BigInt(run.writer_seal_offset))
         )
           return;
         if (
@@ -169,6 +175,7 @@ export class PostgresDurableCommitProjector {
                 nativeConfirmations.push(...collectInputConfirmations(view.scope, rows, previous))
             : undefined,
         );
+        admitted = true;
         if (nativeConfirmations.length) {
           const conversations = await tx
             .selectFrom("sessions")
@@ -250,7 +257,12 @@ export class PostgresDurableCommitProjector {
       this.budget,
     );
     if (current() && this.#views.get(this.#key(fact.scope)) === view) view.liveState.adopt(state);
-    return { events, covers, ...(inputConfirmations.length ? { inputConfirmations } : {}) };
+    return {
+      events,
+      covers,
+      admitted,
+      ...(inputConfirmations.length ? { inputConfirmations } : {}),
+    };
   }
   async replay(
     fact: AcceptedDurableCommitFact,
@@ -267,14 +279,16 @@ export class PostgresDurableCommitProjector {
           writer_seal_offset: string | null;
           output_seal_offset: string | null;
           lease_id: string | null;
+          fencing_token: string;
         }>`
-        select l.writer_seal_offset,r.output_seal_offset,r.lease_id
+        select l.writer_seal_offset,r.output_seal_offset,r.lease_id,l.fencing_token
         from session_leases l left join runs r on r.id=${fact.scope.runId}::uuid and r.tenant_id=l.tenant_id
         where l.tenant_id=${fact.scope.tenantId}::uuid and l.lease_id=${fact.scope.writerId}::uuid
           and l.pi_session_id=${fact.scope.piSessionId}`.execute(tx);
         const accepted = proof.rows[0];
         if (
           !accepted ||
+          Number(accepted.fencing_token) !== fact.scope.fencingToken ||
           (accepted.writer_seal_offset !== null &&
             position.offset >= BigInt(accepted.writer_seal_offset)) ||
           (accepted.lease_id === fact.scope.writerId &&

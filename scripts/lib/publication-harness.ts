@@ -1,5 +1,5 @@
 import {
-  KafkaSessionWriter,
+  KafkaWorkerProducer,
   DEFAULT_PRODUCER_CAPACITY,
   type ProducerCapacity,
 } from "@pi-cloud/event-log";
@@ -12,10 +12,11 @@ import { PublicationIngressRejected } from "../../packages/runtime-core/src/sess
 import type { AcceptedFact } from "../../packages/runtime-core/src/accepted-fact.ts";
 
 /** Isolated transport measurements. Synthetic grants never authorize production
- * work; the production DirectSessionKafkaBus checks fresh PG ownership twice. */
+ * work; production grants are admitted by the single Session Projector. */
 export class PublicationHarness {
   readonly #topic: ExecutionLogTopic;
-  readonly #writers = new Map<string, { writer: KafkaSessionWriter; ready: Promise<void> }>();
+  readonly #producer: KafkaWorkerProducer;
+  readonly #tails = new Map<string, Promise<void>>();
   #closed = false;
   #bytes = 0;
   #facts = 0;
@@ -23,9 +24,11 @@ export class PublicationHarness {
     readonly options: ExecutionLogTopicOptions & { topic: string; capacity?: ProducerCapacity },
   ) {
     this.#topic = new ExecutionLogTopic(options);
+    this.#producer = new KafkaWorkerProducer(options);
   }
   async start(): Promise<void> {
     await this.#topic.start();
+    await this.#producer.start();
   }
   async append(fact: AcceptedFact) {
     if (this.#closed) throw new Error("Fixture is closed");
@@ -41,46 +44,39 @@ export class PublicationHarness {
     this.#facts++;
     try {
       const key = `${fact.scope.tenantId}:${fact.scope.piSessionId}`;
-      let entry = this.#writers.get(key);
-      if (!entry) {
-        const writer = new KafkaSessionWriter({
-          brokers: this.options.brokers,
-          clientId: this.options.clientId,
-          topic: this.options.topic,
-          partition: kafkaProducerLane(fact.scope.piSessionId, this.options.partitions),
-          tenantId: fact.scope.tenantId,
+      const pending = (this.#tails.get(key) ?? Promise.resolve()).then(() =>
+        this.#producer.append(kafkaProducerLane(fact.scope.piSessionId, this.options.partitions), {
+          factId: fact.factId,
           sessionId: fact.scope.piSessionId,
-          authorize: async () => {},
-          current: () => !this.#closed,
-        });
-        entry = { writer, ready: writer.start() };
-        this.#writers.set(key, entry);
+          value,
+        }),
+      );
+      const tail = pending.then(
+        () => {},
+        () => {},
+      );
+      this.#tails.set(key, tail);
+      try {
+        return await pending;
+      } finally {
+        if (this.#tails.get(key) === tail) this.#tails.delete(key);
       }
-      await entry.ready;
-      return await entry.writer.append({
-        factId: fact.factId,
-        sessionId: fact.scope.piSessionId,
-        value,
-      });
     } finally {
       this.#bytes -= bytes;
       this.#facts--;
     }
   }
   async retire(tenant: string, session: string): Promise<void> {
-    const key = `${tenant}:${session}`,
-      entry = this.#writers.get(key);
-    if (!entry) return;
-    this.#writers.delete(key);
-    await entry.writer.close();
+    await this.#tails.get(`${tenant}:${session}`);
   }
   statistics() {
     return { pendingBytes: this.#bytes, pendingFacts: this.#facts };
   }
   async close(): Promise<void> {
     this.#closed = true;
-    await Promise.allSettled([...this.#writers.values()].map((e) => e.writer.close()));
-    this.#writers.clear();
+    await Promise.allSettled(this.#tails.values());
+    await this.#producer.close();
+    this.#tails.clear();
     await this.#topic.close();
   }
 }

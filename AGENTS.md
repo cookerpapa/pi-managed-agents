@@ -99,19 +99,24 @@ protocol, record the decision under `docs/adr/` before implementation.
   their historical policy. Do not restore per-Step projection receipts or allocate sequence from
   a second active writer. Cold administrative mutations require Session quiescence.
   Bootstrap only the latest Compaction and active suffix, never lifetime JSONL.
-- Under ADR-0247 Workers publish directly with one stable transactional producer
-  identity per active physical Session. PG authorization is checked before and
-  after producer initialization, never per ordinary commit. Root Runs encompass
+- Under ADR-0329 Workers publish directly through one long-lived idempotent
+  Session-log producer per Worker boot. Projector admits PG-authorized Session
+  identities and ordered prefixes before every effect. Dedicated writer-opening
+  PG checks and per-Session Kafka identities are removed; claims, direct renewal
+  and local monotonic expiry remain. Root Runs encompass
   native child Conversations; children are not cloud queue rows or separate writers.
   Normal work_finished retires the idle owner after native family settlement.
-  Forced closure takes over the same Kafka identity, rechecks its PG intent and
-  commits under the current Projector group. A delayed stale initializer must
-  fail post-init authorization; affected valid writers recover through one ordered
-  Session closure. Never automatically reinitialize/retry an uncertain writer.
+  Forced closure rechecks its PG intent and uses the existing partition publication
+  queue under the current Projector group. Late obsolete candidates may enter
+  Kafka but cannot affect accepted state. Uncertain shared transport failure
+  retires the Worker boot; never automatically reinitialize/retry an uncertain writer.
   One Session Projector group owns native history, live views and Tool routing.
   Control changes retain the partition publication queue and group transaction
   guard; Worker open/append HTTP and ingress identity caches are removed.
   Do not add another channel lease, separate live/Tool consumer or per-Step receipt.
+  Under ADR-0328 human input/mutation success waits for exact post-PG-commit
+  confirmation over the existing Session HTTP/SSE service, with native receipt
+  lookup only on retry/recovery. Kafka acknowledgement alone is transport proof.
   Tool executors remain independently authorized external-effect endpoints;
   replaying a projection must never imply replaying arbitrary shell work.
   Projector confirms its monotonic Kafka dispatch commit before issuing a Tool

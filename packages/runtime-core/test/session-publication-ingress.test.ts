@@ -83,10 +83,37 @@ it("rejects queued controls and stale owners after assignment replacement", asyn
   expect(f.records).toHaveLength(2);
   await f.ingress.close();
 });
-it("has no Worker registration, data append or child seal authority", async () => {
-  const f = fixture();
-  for (const name of ["installRun", "append", "seal", "beginAdmission"])
-    expect(name in f.ingress).toBe(false);
-  await f.ingress.control(f.owner, change());
-  await f.ingress.close();
+it("orders an authorized seal after earlier control changes on the same Session", async () => {
+  const f = fixture(),
+    gate = Promise.withResolvers<void>(),
+    before = change();
+  f.gates.push(gate.promise);
+  const first = f.ingress.control(f.owner, before);
+  const seal = {
+    kind: "execution_seal" as const,
+    factId: randomUUID(),
+    occurredAt: new Date().toISOString(),
+    scope: {
+      ...before.scope,
+      sessionId: before.scope.piSessionId,
+      runId: randomUUID(),
+      turnId: randomUUID(),
+      writerId: randomUUID(),
+      fencingToken: 1,
+    },
+    agentId: "root",
+    baseSequence: 0,
+    recover: true as const,
+  };
+  const closing = f.ingress.seal(f.owner, seal);
+  try {
+    await vi.waitFor(() => expect(f.records).toHaveLength(1));
+    gate.resolve();
+    await Promise.all([first, closing]);
+    expect(f.records.map((r) => r.factId)).toEqual([before.factId, seal.factId]);
+    expect(JSON.parse(f.records[1]!.value).scope).toEqual(seal.scope);
+  } finally {
+    gate.resolve();
+    await f.ingress.close();
+  }
 });

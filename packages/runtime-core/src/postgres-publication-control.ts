@@ -6,28 +6,24 @@ import {
   PublicationIngressRejected,
   type PublicationOwnership,
 } from "./session-publication-ingress.ts";
-import type { KafkaSessionWriter } from "@pi-cloud/event-log";
-import { encodeSessionLogFact } from "./session-log-envelope.ts";
 
-/** Forced closure takes over the same Kafka identity only under a fresh PG
- * closure grant. Completed evidence never initializes another producer. */
+/** PG authorizes closure; the existing group-owned partition publisher orders
+ * its marker. Worker transports are not taken over or initialized here. */
 export class PostgresPublicationControl {
   readonly #pending = new Map<
     string,
     { owner: PublicationOwnership; promise: Promise<AcceptedFactReceipt> }
   >();
-  readonly #writers = new Set<KafkaSessionWriter>();
   #closed = false;
   constructor(
     readonly options: {
       database: Kysely<Database>;
       current(owner: PublicationOwnership): boolean;
       beforeSeal(fact: AcceptedExecutionSealFact): Promise<void>;
-      writer(
+      publish(
         owner: PublicationOwnership,
         fact: AcceptedExecutionSealFact,
-        authorize: () => Promise<void>,
-      ): KafkaSessionWriter;
+      ): Promise<AcceptedFactReceipt>;
     },
   ) {}
 
@@ -90,32 +86,13 @@ export class PostgresPublicationControl {
     if (this.#closed || !this.options.current(owner))
       throw new PublicationIngressRejected("not_owner");
     await this.options.beforeSeal(fact);
-    let closed = false;
-    const writer = this.options.writer(owner, fact, async () => {
-      if (this.#closed || !this.options.current(owner))
-        throw new PublicationIngressRejected("not_owner");
-      closed = (await this.#state(fact)) === "closed";
-      if (closed) throw new PublicationIngressRejected("scope");
-    });
-    this.#writers.add(writer);
-    try {
-      await writer.start();
-      return await writer.append({
-        factId: fact.factId,
-        sessionId: fact.scope.piSessionId,
-        value: encodeSessionLogFact(fact),
-      });
-    } catch (error) {
-      if (closed) return receipt;
-      throw error;
-    } finally {
-      await writer.close();
-      this.#writers.delete(writer);
-    }
+    if (this.#closed || !this.options.current(owner))
+      throw new PublicationIngressRejected("not_owner");
+    if ((await this.#state(fact)) === "closed") return receipt;
+    return this.options.publish(owner, fact);
   }
   async close(): Promise<void> {
     this.#closed = true;
-    await Promise.allSettled([...this.#writers].map((writer) => writer.close()));
     await Promise.allSettled([...this.#pending.values()].map(({ promise }) => promise));
   }
 }

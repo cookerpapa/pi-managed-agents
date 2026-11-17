@@ -131,14 +131,13 @@ or a whole-VM cleanup inference. Persistent Volume bytes outlive VM loss.
 
 ## Native publication
 
-Worker initializes one Kafka transactional producer with a stable ID derived
-from Topic, tenant and physical Session. It verifies its exact PG grant before
-and after initialization. Run/lease/Boot changes do not change that Kafka identity.
-A delayed stale initializer may disrupt a valid producer, but cannot publish
-business data after failing its fresh authorization check.
+Worker initializes one long-lived idempotent producer for its boot. Session
+grants and ordered seal cutoffs are admitted by Projector; another Worker's
+late initialization cannot take over this transport identity. Claims, direct
+PG renewal and local expiry retain the execution-ownership boundary (ADR-0329).
 
 Native `Storage.commit()` prepares the exact batch and sequence, externalizes
-images and publishes directly to Kafka in a short transaction. Kafka ACK precedes
+images and publishes directly to Kafka as one atomic record. Kafka ACK precedes
 local adoption. Native state, dispatch/cancellation descriptions and text
 presentation references travel together. No Worker append HTTP ingress or
 per-Step PG receipt remains. PG asynchronously materializes cold native storage;
@@ -230,6 +229,6 @@ closure and positive Agent exit evidence before returning to idle.
 | Native commit | One Session writer, Kafka transaction ACK, idempotent PG projection |
 | Tool dispatch | Confirm dispatch position first; ambiguous effects are not replayed |
 | Normal completion | Ordered `work_finished`, idempotent PG terminal and voluntary retirement |
-| Forced handoff | Revocation, native producer fencing, ordered seal, fresh PG grant |
+| Forced handoff | Revocation, ordered seal and Projector fencing, fresh PG grant |
 | Browser terminal | Persisted event identity; replay/reconnect can restore delivery |
 | Workspace bytes | Persistent Cube Volume, independent of a Run's completion |
