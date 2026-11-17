@@ -1,3 +1,4 @@
+import { ExecutionStreamBoundary } from "./execution-stream-boundary.ts";
 import { settleHistoryTurn, settleChildHistory } from "./presentation-settlement.ts";
 import { transitionLockedRun } from "./run-state.ts";
 import { PostgresDurableCommitProjector } from "./postgres-durable-commit-projector.ts";
@@ -14,7 +15,6 @@ import type {
   AcceptedExecutionSealFact,
   AcceptedWorkFinishedFact,
   AcceptedFact,
-  AcceptedFactScope,
 } from "./accepted-fact.ts";
 import { finishWorkIn } from "./work-finished-projection.ts";
 import { releaseIdleSessionLease } from "./session-lease-release.ts";
@@ -35,129 +35,6 @@ export type ExecutionProjectionResult = {
 
 export function factEvents(fact: AcceptedFact): readonly PiCloudEvent[] {
   return fact.kind === "agent_event" ? [fact.event] : [];
-}
-
-/** Durable closure is checked once per execution, not once per token. Closed
- * tombstones can be evicted: their authority is the Run row, not RAM. */
-export class ExecutionStreamBoundary {
-  readonly #database: Kysely<Database>;
-  readonly #open = new Set<string>();
-  readonly #closed = new Map<string, bigint>();
-  readonly #writers = new Map<string, bigint>();
-
-  constructor(database: Kysely<Database>) {
-    this.#database = database;
-  }
-
-  reset(): void {
-    this.#open.clear();
-    this.#closed.clear();
-    this.#writers.clear();
-  }
-
-  closeWriter(writerId: string, offset: bigint) {
-    const prior = this.#writers.get(writerId);
-    if (prior === undefined || offset < prior) this.#writers.set(writerId, offset);
-    // Open scopes must reload the durable group cutoff after eviction.
-    if (this.#writers.size > 65_536) {
-      this.#writers.delete(this.#writers.keys().next().value!);
-      this.#open.clear();
-    }
-  }
-
-  #identity(scope: AcceptedFactScope): string {
-    return JSON.stringify([
-      scope.tenantId,
-      scope.piSessionId,
-      scope.writerId,
-      scope.fencingToken,
-      scope.runId,
-    ]);
-  }
-
-  observes(scope: AcceptedFactScope): boolean {
-    const identity = this.#identity(scope);
-    return (
-      this.#open.has(identity) && !this.#closed.has(identity) && !this.#writers.has(scope.writerId)
-    );
-  }
-
-  close(scope: AcceptedFactScope, offset: bigint): void {
-    const runId = this.#identity(scope);
-    this.#open.delete(runId);
-    const previous = this.#closed.get(runId);
-    this.#closed.delete(runId);
-    this.#closed.set(runId, previous === undefined || offset < previous ? offset : previous);
-    if (this.#closed.size > 65_536) {
-      const oldest = this.#closed.keys().next().value!;
-      this.#closed.delete(oldest);
-    }
-  }
-
-  async isOpen(record: KafkaAcceptedFactRecord, canonical: boolean): Promise<boolean> {
-    const { scope } = record.fact;
-    const identity = this.#identity(scope);
-    const writerCutoff = this.#writers.get(scope.writerId);
-    if (writerCutoff !== undefined && record.offset >= writerCutoff) return false;
-    const cutoff = this.#closed.get(identity);
-    if (cutoff !== undefined) {
-      this.#closed.delete(identity);
-      this.#closed.set(identity, cutoff);
-      return !canonical && record.offset < cutoff;
-    }
-    if (this.#open.has(identity)) return true;
-    const run = await this.#database
-      .selectFrom("runs as run")
-      .innerJoin("session_leases as writer", (join) =>
-        join
-          .on("writer.lease_id", "=", scope.writerId)
-          .onRef("writer.tenant_id", "=", "run.tenant_id"),
-      )
-      .select([
-        "run.started_at",
-        "run.output_sealed_at",
-        "run.output_seal_offset",
-        "run.output_first_topic",
-        "run.output_first_partition",
-        "run.output_first_offset",
-        "run.lease_id",
-        "writer.writer_seal_offset",
-        "writer.fencing_token",
-      ])
-      .where("run.id", "=", scope.runId)
-      .where("run.tenant_id", "=", scope.tenantId)
-      .where("writer.pi_session_id", "=", scope.piSessionId)
-      .executeTakeFirst();
-    if (run && Number(run.fencing_token) !== scope.fencingToken) return false;
-    if (run && run.lease_id !== scope.writerId) {
-      if (run.writer_seal_offset === null)
-        throw new Error("Previous execution owner has no closure proof");
-      this.closeWriter(scope.writerId, BigInt(run.writer_seal_offset));
-      return false;
-    }
-    if (run?.writer_seal_offset != null) {
-      const offset = BigInt(run.writer_seal_offset);
-      this.closeWriter(scope.writerId, offset);
-      if (record.offset >= offset) return false;
-    }
-    if (!run || run.output_sealed_at !== null) {
-      const cutoff = run?.output_seal_offset == null ? -1n : BigInt(run.output_seal_offset);
-      this.close(scope, cutoff);
-      return !canonical && record.offset < cutoff;
-    }
-    if (canonical) {
-      if (run.output_first_offset !== null) {
-        if (
-          run.output_first_topic !== record.topic ||
-          run.output_first_partition !== record.partition ||
-          BigInt(run.output_first_offset) !== record.offset
-        )
-          throw new Error("Unsealed execution prefix is missing or changed Kafka partition");
-      }
-    }
-    this.#open.add(identity);
-    return true;
-  }
 }
 
 /** Rebuild volatile prefixes from the PG recovery floor, never a consumer-group offset. */
@@ -186,6 +63,9 @@ export class ExecutionStreamProjector {
     return {
       prefixes: this.#prefixes.size,
       pendingEventIds: [...this.#prefixes.values()].reduce((n, p) => n + p.pendingEventIds, 0),
+      prefixEstimatedBytes: [...this.#prefixes.values()].reduce((n, p) => n + p.estimatedBytes, 0),
+      identityCache: this.#boundary.statistics(),
+      nativeLive: this.#durable.statistics(),
     };
   }
 
@@ -213,7 +93,11 @@ export class ExecutionStreamProjector {
       const scopes = new Map(
         [fact.scope, ...fact.display.map((d) => d.scope)].map((scope) => [scope.sessionId, scope]),
       );
-      if (!(await this.#boundary.isOpen(record, true))) {
+      if (
+        !(await this.#boundary.isOpen(record, true, (sessionId) =>
+          this.#prefixes.has(`${fact.scope.writerId}:${fact.scope.runId}:${sessionId}`),
+        ))
+      ) {
         await this.#durable.replay(fact, record, current);
         return;
       }
@@ -227,6 +111,7 @@ export class ExecutionStreamProjector {
         events: projected.events.filter((event) => sessions.has(event.sessionId)),
         covers: projected.covers.filter((cover) => sessions.has(cover.sessionId)),
       };
+      if (!projected.admitted) return result;
       // The native anchor need not be the Conversation that produced text.
       for (const scope of scopes.values()) {
         const key = `${scope.writerId}:${scope.runId}:${scope.sessionId}`;
@@ -239,7 +124,11 @@ export class ExecutionStreamProjector {
       }
       return result;
     }
-    if (!(await this.#boundary.isOpen(record, true))) {
+    if (
+      !(await this.#boundary.isOpen(record, true, (sessionId) =>
+        this.#prefixes.has(`${fact.scope.writerId}:${fact.scope.runId}:${sessionId}`),
+      ))
+    ) {
       if (fact.kind === "execution_seal") {
         const prefix = this.#prefixes.get(
           `${fact.scope.writerId}:${fact.scope.runId}:${fact.scope.sessionId}`,

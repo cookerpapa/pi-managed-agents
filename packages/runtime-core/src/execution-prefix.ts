@@ -12,6 +12,9 @@ export class ExecutionPrefix {
   get pendingEventIds(): number {
     return this.#identities.size;
   }
+  get estimatedBytes(): number {
+    return [...this.#identities.values()].reduce((n, id) => n + 64 + id.length * 2, 0);
+  }
   accept(event: Pick<PiCloudEvent, "seq" | "eventId">): void {
     if (event.seq <= this.#covered) return;
     const previous = this.#identities.get(event.seq);

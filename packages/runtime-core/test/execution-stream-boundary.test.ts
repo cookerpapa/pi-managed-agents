@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import type { Database } from "@pi-cloud/database";
 import type { Kysely } from "kysely";
-import { ExecutionStreamBoundary } from "../src/execution-stream-projection.ts";
+import { ExecutionStreamBoundary } from "../src/execution-stream-boundary.ts";
 import type { AcceptedAgentEventFact } from "../src/accepted-fact.ts";
 
 it("does not turn interleaved closed execution replay into a metadata query per delta", async () => {

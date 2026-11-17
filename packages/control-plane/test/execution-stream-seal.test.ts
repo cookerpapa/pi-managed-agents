@@ -1,3 +1,4 @@
+import { ExecutionStreamBoundary } from "../../runtime-core/src/execution-stream-boundary.ts";
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { createDatabase, runMigrations, type Database } from "@pi-cloud/database";
@@ -7,10 +8,7 @@ import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { sql, type Kysely } from "kysely";
 import { ControlPlaneStore, createPrivateTenant } from "../src/index.ts";
 import { createTestWorker } from "./admit-test-execution.ts";
-import {
-  ExecutionStreamProjector,
-  ExecutionStreamBoundary,
-} from "../../runtime-core/src/execution-stream-projection.ts";
+import { ExecutionStreamProjector } from "../../runtime-core/src/execution-stream-projection.ts";
 import { PostgresDurableCommitProjector } from "../../runtime-core/src/postgres-durable-commit-projector.ts";
 import { SessionLiveView } from "../../runtime-core/src/session-live-view.ts";
 import { parseKafkaAcceptedFact } from "../../runtime-core/src/kafka-accepted-fact.ts";

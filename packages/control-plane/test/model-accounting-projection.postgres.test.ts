@@ -130,6 +130,12 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
       11n,
     );
     await project(fact(late, head.seq + 2), 12n);
+    expect(projector.statistics().nativeLive).toEqual({
+      views: 0,
+      pendingDocuments: 0,
+      estimatedBytes: 0,
+    });
+    expect(projector.statistics().prefixes).toBe(0);
     expect((await f.projection.head()).seq).toBe(head.seq + 1);
     expect(
       await f.database

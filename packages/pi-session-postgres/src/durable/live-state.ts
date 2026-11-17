@@ -7,6 +7,13 @@ export class NativeLiveState {
   through: number | undefined;
   readonly rows = new Map<number, CurrentStateRow>();
 
+  statistics() {
+    return {
+      documents: this.rows.size,
+      estimatedBytes: [...this.rows.values()].reduce((n, row) => n + 256 + row.body.length * 2, 0),
+    };
+  }
+
   fork(): NativeLiveState {
     const next = new NativeLiveState();
     next.through = this.through;

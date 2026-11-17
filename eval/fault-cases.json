@@ -3109,6 +3109,118 @@
       "file": "test/model-accounting-projection.postgres.test.ts",
       "test": "co-commits financial evidence, retains valid late usage and ignores post-seal model settlement",
       "invariant": "Financial eligibility is derived only from accepted native task settlement and ordered closure."
+    },
+    {
+      "id": "buffered-reader-ordered-eof",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "prefetches without per-record pause and holds EOF behind queued and active records",
+      "invariant": "Buffered records preserve per-partition order and cannot be skipped by EOF progress."
+    },
+    {
+      "id": "buffered-reader-pressure",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "pauses only a full partition and preserves other partition progress",
+      "invariant": "Bounded pressure in one partition preserves healthy neighbours."
+    },
+    {
+      "id": "buffered-reader-large-record",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "retains one oversized record without discarding it or admitting an unbounded batch",
+      "invariant": "A legitimate large record is retained with a bounded single-record overshoot."
+    },
+    {
+      "id": "buffered-reader-seek",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "drops queued old-epoch records on seek and resumes exactly at the requested record",
+      "invariant": "Seek invalidates queued old data without skipping the new first record."
+    },
+    {
+      "id": "buffered-reader-assignment",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "replays queued data in a new assignment without allowing an old completion to advance it",
+      "invariant": "Old completions cannot advance replacement-generation state."
+    },
+    {
+      "id": "buffered-offset-coverage",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "coalesces ready offsets and resolves no request on incomplete callback coverage",
+      "invariant": "Every batched offset waiter requires full durable acknowledgement coverage."
+    },
+    {
+      "id": "buffered-offset-disposal",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "rejects queued offset work on disposal without sending it",
+      "invariant": "Unsent offset requests cannot survive consumer disposal."
+    },
+    {
+      "id": "buffered-offset-stale-ack",
+      "workspace": "@pi-cloud/event-log",
+      "file": "test/reader-prefetch.test.ts",
+      "test": "does not adopt an old offset acknowledgement into a replacement assignment",
+      "invariant": "A stale callback cannot seed replacement committed progress."
+    },
+    {
+      "id": "projector-cache-eviction",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "evicts complete identities by recency and reloads the durable seal without clearing healthy entries",
+      "invariant": "Eviction preserves closure authority and does not invalidate unrelated cached identities."
+    },
+    {
+      "id": "projector-cache-budget",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "bounds estimated bytes and does not turn an uncached or failed lookup into permission",
+      "invariant": "Identity metadata is bounded; absent/unavailable authority never grants permission."
+    },
+    {
+      "id": "projector-cache-coalescing",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "coalesces simultaneous identity loads",
+      "invariant": "Concurrent exact-identity misses share one PG lookup."
+    },
+    {
+      "id": "projector-cache-close-race",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "rejects a delayed open snapshot when its writer closes during the read",
+      "invariant": "A delayed read cannot reopen a sealed writer."
+    },
+    {
+      "id": "projector-cache-reset-race",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "does not install a reset generation's late result or remove a successor lookup",
+      "invariant": "Reset invalidates pending old reads without disturbing the successor."
+    },
+    {
+      "id": "projector-cache-active-prefix",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "reloads active admission independently of an already reconstructed native prefix",
+      "invariant": "Eviction does not erase replay-prefix knowledge or bypass cold replay checks."
+    },
+    {
+      "id": "projector-cache-successor",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/execution-boundary-cache.test.ts",
+      "test": "an old closure neither closes a new writer nor permits a forged fence",
+      "invariant": "Closure targets one incarnation and never authorizes a mismatched fence."
+    },
+    {
+      "id": "projector-empty-view-budget",
+      "workspace": "@pi-cloud/runtime-core",
+      "file": "test/session-live-view.test.ts",
+      "test": "bounds empty holder metadata without evicting an unfinished answer",
+      "invariant": "Completed display metadata is bounded while pending visible text survives until covered."
     }
   ]
 }

@@ -22,6 +22,16 @@ PI_CLOUD_READER_DIAGNOSTIC=1 node --import tsx \
 This is a consumer microbenchmark. Its buffered control does not implement the
 production EOF, recovery or effect-dispatch contract and is not a rollout option.
 
+For isolated cache/live-view memory checks (mock PG authority, no service changes):
+
+```sh
+node --expose-gc --import tsx scripts/run-projector-memory-check.mjs /private/projector-memory.json
+```
+
+This records forced-GC heap deltas, estimated cache budgets, hot lookup counts and
+pending-text preservation across completed-holder eviction. It is not a total-RSS
+or concurrent-Agent capacity guarantee.
+
 The [November 16 repair measurements](reports/workload-release-throughput-20261116.md)
 compare identical pre/post workloads, document removed history timeouts and
 separate short-burst improvements from remaining sustained-rate/settlement limits.

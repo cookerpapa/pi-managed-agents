@@ -107,6 +107,29 @@ export class OperationalMetricsSampler {
       this.#metrics.kafkaLiveTailSessions.set(snapshot.liveTail.activeSessionTails);
       this.#metrics.kafkaLiveTailEvents.set(snapshot.liveTail.cachedEvents);
       this.#metrics.kafkaLiveTailBytes.set(snapshot.liveTail.cachedBytes);
+      const { identityCache, nativeLive } = snapshot.projection;
+      for (const [component, bytes] of Object.entries({
+        identity: identityCache.estimatedBytes,
+        native_live: nativeLive.estimatedBytes,
+        display_tail: snapshot.liveTail.cachedBytes,
+        empty_display: snapshot.liveTail.emptyEstimatedBytes,
+        event_ids: snapshot.projection.prefixEstimatedBytes,
+        prefetch: snapshot.prefetch.estimatedBytes,
+      }))
+        this.#metrics.projectorMemoryBytes.set({ component }, bytes);
+      for (const [component, entries] of Object.entries({
+        identity: identityCache.entries,
+        identity_loads: identityCache.pendingLoads,
+        native_views: nativeLive.views,
+        native_live: nativeLive.pendingDocuments,
+        display_tail: snapshot.liveTail.cachedEvents,
+        empty_display: snapshot.liveTail.emptyHolders,
+        event_ids: snapshot.projection.pendingEventIds,
+        prefetch: snapshot.prefetch.records,
+      }))
+        this.#metrics.projectorMemoryEntries.set({ component }, entries);
+      for (const operation of ["hits", "misses", "loads", "coalesced", "evictions"] as const)
+        this.#metrics.projectorCacheOperations.set({ operation }, identityCache[operation]);
       this.#metrics.operationalSampleTimestamp.set({ source: "kafka" }, Date.now() / 1_000);
     } catch (error: unknown) {
       this.#metrics.operationalSampleFailures.inc({ source: "kafka" });

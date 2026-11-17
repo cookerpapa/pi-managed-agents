@@ -147,6 +147,23 @@ the Outbox before management can perform physical retirement. PG admission gates
 also prevent late binding registration. Projector
 membership and the partition publication queue retain their transaction guards.
 
+Under [ADR-0331](adr/0331-bounded-partition-prefetch.md), the native consumer keeps
+bounded prefetched records while processing one record per partition at a time.
+It pauses transport for pressure, seek or explicit failure isolation, with
+hysteresis; ordinary successful records do not purge native prefetch. Processed
+EOF and confirmed dispatch remain separate from the fetched cursor. Periodic
+progress requests can share one native offset commit after acquiring their own
+partition publication guards; external effects still await confirmation.
+
+[ADR-0332](adr/0332-projector-memory-lifetimes.md) bounds coherent identity snapshots
+by recency and estimated bytes. Cache misses reload PG, and closure/reset cannot
+install a stale pending read. The default metadata estimate is capped at 32 MiB
+and 65,536 entries. Empty covered display holders retain at most 4,096 entries /
+4 MiB of estimated metadata and expire after inactivity. Pending native live
+documents and visible text retain their Kafka/checkpoint recovery lifetimes;
+they are measured separately and are not discarded under the identity LRU.
+These budgets are not a hard total-process RSS limit.
+
 Native sequence preserves batch/write identity and replay validation; Kafka
 positions describe transport order. Native Entry IDs can be reserved before commit
 and are not interchangeable with commit positions. All are allocated by their

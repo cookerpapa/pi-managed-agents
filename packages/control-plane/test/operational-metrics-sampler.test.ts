@@ -9,6 +9,35 @@ import { OperationalMetricsSampler } from "../src/operational-metrics-sampler.ts
 let pglite: PGlite;
 let socketServer: PGLiteSocketServer;
 let database: Kysely<Database>;
+const diagnosticState = {
+  projection: {
+    prefixes: 0,
+    pendingEventIds: 0,
+    prefixEstimatedBytes: 0,
+    identityCache: {
+      entries: 2,
+      estimatedBytes: 2048,
+      peakEstimatedBytes: 2048,
+      pendingLoads: 0,
+      hits: 42,
+      misses: 3,
+      loads: 3,
+      coalesced: 1,
+      evictions: 1,
+    },
+    nativeLive: { views: 1, pendingDocuments: 1, estimatedBytes: 4096 },
+  },
+  prefetch: {
+    records: 4,
+    estimatedBytes: 32768,
+    queuedRecords: 3,
+    peakRecords: 4,
+    peakEstimatedBytes: 32768,
+    activePartitions: 1,
+    pausedPartitions: 0,
+    pendingOffsetCommits: 0,
+  },
+};
 
 beforeAll(async () => {
   pglite = await PGlite.create();
@@ -77,7 +106,14 @@ describe("operational metrics sampler", () => {
       database: measured,
       events: {
         statistics: () => ({
-          liveTail: { activeSessionTails: 0, cachedEvents: 0, cachedBytes: 0 },
+          ...diagnosticState,
+          liveTail: {
+            activeSessionTails: 0,
+            cachedEvents: 0,
+            cachedBytes: 0,
+            emptyEstimatedBytes: 0,
+            emptyHolders: 0,
+          },
         }),
       } as never,
       metrics,
@@ -103,6 +139,7 @@ describe("operational metrics sampler", () => {
     const metrics = new PiCloudMetrics("control-plane-test");
     const errors: unknown[] = [];
     const snapshot = {
+      ...diagnosticState,
       liveTail: {
         activeSessionTails: 2,
         cachedEvents: 9,
@@ -110,8 +147,12 @@ describe("operational metrics sampler", () => {
         acceptedEvents: 410,
         duplicateEvents: 1,
         evictedEvents: 400,
+        activeTextTails: 1,
+        emptyHolders: 1,
+        emptyEstimatedBytes: 512,
+        evictedEmptyHolders: 3,
       },
-      projection: { prefixes: 2, pendingEventIds: 9 },
+      projection: { ...diagnosticState.projection, prefixes: 2, pendingEventIds: 9 },
     };
     const sampler = new OperationalMetricsSampler({
       database,
@@ -128,6 +169,18 @@ describe("operational metrics sampler", () => {
     expect(output).toContain('pi_cloud_kafka_live_tail_sessions{service="control-plane-test"} 2');
     expect(output).toContain('pi_cloud_kafka_live_tail_events{service="control-plane-test"} 9');
     expect(output).toContain('pi_cloud_kafka_live_tail_bytes{service="control-plane-test"} 8192');
+    expect(output).toContain(
+      'pi_cloud_projector_memory_estimated_bytes{component="identity",service="control-plane-test"} 2048',
+    );
+    expect(output).toContain(
+      'pi_cloud_projector_memory_estimated_bytes{component="native_live",service="control-plane-test"} 4096',
+    );
+    expect(output).toContain(
+      'pi_cloud_projector_memory_entries{component="prefetch",service="control-plane-test"} 4',
+    );
+    expect(output).toContain(
+      'pi_cloud_projector_cache_operations{operation="hits",service="control-plane-test"} 42',
+    );
     expect(output).toContain(
       'pi_cloud_terminal_event_outbox_pending{service="control-plane-test"} 0',
     );

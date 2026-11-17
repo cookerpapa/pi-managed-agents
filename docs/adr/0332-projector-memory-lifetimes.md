@@ -23,6 +23,13 @@ reload tradeoffs. Recovery-prefix knowledge is separate from evictible admission
 metadata: reloading an active identity cannot mistake an existing prefix for a
 cold missing prefix or bypass first-record recovery validation.
 
+The selected defaults are 32 MiB estimated metadata and 65,536 entries, whichever
+is reached first. A forced-GC Node 24.12 measurement with realistic UUID scopes
+plateaued at 28,976 cached identities and approximately 17 MiB extra heap as the
+observed identity count grew from 50,000 to 100,000. Hot re-reads made no PG calls.
+An empty display-holder cache is capped at 4,096 entries / 4 MiB estimated metadata,
+in addition to idle expiry; pending text is excluded from that eviction policy.
+
 ## Live state
 
 Preserve ADR-0244's Kafka suffix and PG settlement/handoff checkpoint ownership.

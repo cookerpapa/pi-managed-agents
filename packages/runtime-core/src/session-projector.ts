@@ -481,7 +481,11 @@ export class SessionProjector {
     await this.#topic.checkHealth();
   }
   statistics() {
-    return { liveTail: this.eventStore.statistics(), projection: this.#projection.statistics() };
+    return {
+      liveTail: this.eventStore.statistics(),
+      projection: this.#projection.statistics(),
+      prefetch: this.#consumer.statistics(),
+    };
   }
   close(): Promise<void> {
     this.#ready = false;

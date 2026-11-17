@@ -57,6 +57,14 @@ export class PostgresDurableCommitProjector {
   reset(): void {
     this.#views.clear();
   }
+  statistics() {
+    const live = [...this.#views.values()].map((view) => view.liveState.statistics());
+    return {
+      views: this.#views.size,
+      pendingDocuments: live.reduce((n, state) => n + state.documents, 0),
+      estimatedBytes: live.reduce((n, state) => n + state.estimatedBytes, 0),
+    };
+  }
   releaseSettled(scope: AcceptedDurableCommitFact["scope"]): void {
     const key = this.#key(scope);
     if (this.#views.get(key)?.liveState.rows.size === 0) this.#views.delete(key);
@@ -93,10 +101,8 @@ export class PostgresDurableCommitProjector {
       covers: { sessionId: string; through: number }[] = [];
     const inputConfirmations: NativeInputConfirmation[] = [];
     let admitted = false;
-    const view = this.#view(fact.scope),
-      state = view.liveState.fork();
     if (!current()) return { events, covers, admitted };
-    await projectionTransaction(
+    const prepared = await projectionTransaction(
       this.database,
       async (tx) => {
         // Every child view shares the root Run. Materialize its lock before
@@ -143,6 +149,9 @@ export class PostgresDurableCommitProjector {
             run.output_first_partition !== position.partition)
         )
           throw new Error("Native Run publication moved between Kafka streams");
+        if (!current()) throw new Error("Native projection owner changed before state loading");
+        const view = this.#view(fact.scope),
+          state = view.liveState.fork();
         const displayViews = fact.display.length
           ? await sql<{
               session_id: string;
@@ -261,10 +270,12 @@ export class PostgresDurableCommitProjector {
         }
         await recordFactProjection(tx, position);
         if (!current()) throw new Error("Native projection owner changed before commit");
+        return { view, state };
       },
       this.budget,
     );
-    if (current() && this.#views.get(this.#key(fact.scope)) === view) view.liveState.adopt(state);
+    if (prepared && current() && this.#views.get(this.#key(fact.scope)) === prepared.view)
+      prepared.view.liveState.adopt(prepared.state);
     return {
       events,
       covers,
@@ -278,9 +289,7 @@ export class PostgresDurableCommitProjector {
     current: () => boolean = () => true,
   ): Promise<void> {
     if (!current()) return;
-    const view = this.#view(fact.scope),
-      state = view.liveState.fork();
-    await projectionTransaction(
+    const prepared = await projectionTransaction(
       this.database,
       async (tx) => {
         const proof = await sql<{
@@ -304,6 +313,9 @@ export class PostgresDurableCommitProjector {
             position.offset >= BigInt(accepted.output_seal_offset))
         )
           return;
+        if (!current()) throw new Error("Native replay owner changed before state loading");
+        const view = this.#view(fact.scope),
+          state = view.liveState.fork();
         await view.replayLiveIn(
           tx,
           fact.commit as unknown as StoredDurableBatch,
@@ -312,16 +324,21 @@ export class PostgresDurableCommitProjector {
           cloudMetadata(fact),
         );
         if (!current()) throw new Error("Native replay owner changed before completion");
+        return { view, state };
       },
       this.budget,
     );
-    if (current() && this.#views.get(this.#key(fact.scope)) === view) view.liveState.adopt(state);
+    if (prepared && current() && this.#views.get(this.#key(fact.scope)) === prepared.view) {
+      prepared.view.liveState.adopt(prepared.state);
+      this.releaseSettled(fact.scope);
+    }
   }
   async checkpointLiveIn(
     tx: Transaction<Database>,
     scope: AcceptedDurableCommitFact["scope"],
     current: () => boolean,
   ): Promise<() => void> {
+    if (!current()) throw new Error("Native checkpoint owner changed before state loading");
     const view = this.#view(scope),
       state = view.liveState.fork();
     await view.checkpointLiveIn(tx, state);

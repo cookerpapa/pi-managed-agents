@@ -1,5 +1,13 @@
 # Monitoring and observability
 
+Projector memory is sampled separately for identity metadata, pending native live
+documents, display tails, empty display holders, uncovered event IDs and reader
+prefetch. `pi_cloud_projector_memory_estimated_bytes` and
+`pi_cloud_projector_memory_entries` use the bounded `component` label;
+`pi_cloud_projector_cache_operations` reports process-lifetime hit/miss/load,
+coalescing and eviction counts. These local observations create no PG queries,
+contain no content/identities and do not represent exact heap/RSS ownership.
+
 ## Active-turn runtime status
 
 The browser's continuous status uses Runner lifecycle observations and shows

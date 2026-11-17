@@ -1,13 +1,11 @@
+import { ExecutionStreamBoundary } from "../../runtime-core/src/execution-stream-boundary.ts";
 import { beforeAll, afterAll, expect, it } from "vitest";
 import { sql, type Kysely } from "kysely";
 import { createDatabase, runMigrations, type Database } from "@pi-cloud/database";
 import { ControlPlaneStore, createPrivateTenant } from "../src/index.ts";
 import { createTestWorker } from "./admit-test-execution.ts";
 import { TurnExecutionBackendError } from "../../runtime-core/src/run-executor.ts";
-import {
-  ExecutionStreamProjector,
-  ExecutionStreamBoundary,
-} from "../../runtime-core/src/execution-stream-projection.ts";
+import { ExecutionStreamProjector } from "../../runtime-core/src/execution-stream-projection.ts";
 import { parseKafkaAcceptedFact } from "../../runtime-core/src/kafka-accepted-fact.ts";
 import type {
   AcceptedDurableCommitFact,

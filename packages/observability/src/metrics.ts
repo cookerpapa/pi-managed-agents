@@ -43,6 +43,9 @@ export class PiCloudMetrics {
   readonly kafkaLiveTailSessions: Gauge;
   readonly kafkaLiveTailEvents: Gauge;
   readonly kafkaLiveTailBytes: Gauge;
+  readonly projectorMemoryBytes: Gauge<"component">;
+  readonly projectorMemoryEntries: Gauge<"component">;
+  readonly projectorCacheOperations: Gauge<"operation">;
   readonly operationalSampleTimestamp: Gauge<"source">;
   readonly operationalSampleFailures: Counter<"source">;
   readonly sandboxActive: Gauge<"provider">;
@@ -302,6 +305,24 @@ export class PiCloudMetrics {
     this.kafkaLiveTailBytes = new Gauge({
       name: "pi_cloud_kafka_live_tail_bytes",
       help: "Approximate bytes held by incomplete Projector Session tails",
+      registers: [this.registry],
+    });
+    this.projectorMemoryBytes = new Gauge({
+      name: "pi_cloud_projector_memory_estimated_bytes",
+      help: "Estimated retained Projector data by component; not process heap or RSS",
+      labelNames: ["component"],
+      registers: [this.registry],
+    });
+    this.projectorMemoryEntries = new Gauge({
+      name: "pi_cloud_projector_memory_entries",
+      help: "Current Projector cache, live-state and prefetch entries",
+      labelNames: ["component"],
+      registers: [this.registry],
+    });
+    this.projectorCacheOperations = new Gauge({
+      name: "pi_cloud_projector_cache_operations",
+      help: "Identity-cache operation counts since process start",
+      labelNames: ["operation"],
       registers: [this.registry],
     });
     this.operationalSampleTimestamp = new Gauge({
