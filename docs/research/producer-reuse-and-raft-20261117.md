@@ -11,6 +11,12 @@ stale publication-service instances must be fenced. Do not introduce a separate
 Raft service; evaluate Kafka's existing ownership/transaction mechanisms. KRaft
 metadata replication is not itself a business-grant validation API.
 
+Latest discussion: the owner proposes allowing obsolete Worker records into
+Kafka and rejecting their effects at the Projector instead. This relaxes the
+earlier pre-publication admission requirement. Evaluate this simpler candidate
+before adding an ingress; it is not implemented or an approval to remove the
+deployed producer checks. The existing lease/renewal placement remains unchanged.
+
 This follows the [fencing-pattern survey](kafka-fencing-patterns-20261117.md).
 Its Connect precedent remains valid; the new placement preference changes which
 design candidates deserve evaluation, not the need to establish write authority.
@@ -187,6 +193,112 @@ distinguishes canonical SQL events from ephemeral Node deltas and Cloudflare's
 persisted stream buffer. Canonical-write fencing must not be generalized into a
 claim that every visible fragment is durable on every OpenMA deployment path.
 
+## Projector admission, input durability and obsolete Worker shutdown
+
+The proposed boundary treats Kafka records as durable candidates. A single
+Projector admits the valid prefix into native state, live presentation and Tool
+dispatch. A PG-authorized seal closes an incarnation even without a successor;
+later records from that incarnation cannot change any business state. Earlier
+accepted text remains recoverable, including interrupted visible text. A view
+of the largest number seen in arbitrary messages is insufficient: admission
+needs the authorized identity, closed/open state and ordered cutoff. Reassignment
+must restore these facts before accepting effects or serving the live view.
+
+This resembles historical [ADR-0163](../adr/0163-direct-log-and-unified-projector.md),
+but current Durable submissions, Session-family ownership and original Tool-reply
+recovery require a new contract. Do not restore historical implementation paths.
+In particular, audit early cancellation, work-finished and activity branches of
+the [Projector](../../packages/runtime-core/src/session-projector.ts), not just its
+PG/text filter. Recovery must ignore rejected native sequences and live suffixes,
+while still accepting original replies to Tools admitted before handoff.
+
+### Existing steer/follow-up storage and the new acknowledgement risk
+
+The [human-input adapter](../../packages/sandbox-supervisor/src/durable/human-inputs.ts)
+uses native Conversation transactions and submissions. The
+[published Storage](../../packages/pi-session-postgres/src/durable/published-storage.ts)
+waits for Kafka publication before adopting committed local state. The API then
+returns the Worker's accepted result; ordinary acceptance does not separately
+wait for PG projection. An unconfirmed request remains a retryable browser draft.
+
+Under [ADR-0243](../adr/0243-native-input-current-state.md), Projector stores latest
+Inbox/input metadata and Submission values in `pi_durable_current`. Queue edits
+travel through Kafka but are not retained as permanent PG body revisions. Native
+consumption records the user Entry together with the queue/submission change.
+Ordered closure and projection let a replacement recover the current queue.
+These inputs belong to the active native Conversation, not additional cloud Runs.
+
+With Projector-side admission, a stale Worker could acknowledge a Kafka append
+which the Projector subsequently rejects. Therefore successful submit/edit/cancel/
+reorder responses must prove admission of their exact input or mutation identity,
+not just raw publication or a numeric sequence watermark. A successor can reuse
+native sequence positions for different accepted work. Reuse native input/receipt
+identities and the existing projection path; do not introduce a second input
+queue or per-stream-fragment projection acknowledgements. Lost confirmation
+remains unconfirmed and retries retain the same identity.
+
+### Existing shutdown behavior
+
+Source review confirms [ADR-0303](../adr/0303-direct-renewal-and-local-execution-authority.md):
+
+- The [coordinator](../../packages/runtime-core/src/session-lease-coordinator.ts)
+  renews physical-Session leases directly in PG, normally every 20 seconds for a
+  60-second grant. One rejected lease revokes its family; eligible locked rows
+  are deferred and retried within one second without extending local lifetime.
+- The [backend](../../packages/supervisor-host/src/agent-run-execution-backend.ts)
+  revokes local executions before awaiting quarantine on a fatal renewal error.
+  Its dedicated PG pool has bounded checkout. This error path can stop all
+  families on that Worker; it is different from one rejected lease.
+- The [local authority](../../packages/pi-session-postgres/src/postgres-session-lease-observer.ts)
+  expires its last confirmed monotonic deadline independently of renewal I/O.
+  Late responses cannot revive it. The
+  [model gateway](../../packages/supervisor-host/src/model-gateway.ts) checks that
+  same authority before upstream admission and cancels the family's active
+  transports on revocation. These active checks do not issue PG SELECTs.
+- Retryable management WebSocket disconnection preserves directly renewed work.
+  Terminal registration failure/local retirement revokes assignments. There is
+  no verified dedicated per-Session Projector-rejection push in this review;
+  do not describe a proposed fast revocation message as an existing guarantee.
+- Known Kafka producer failure currently supplies another immediate local abort.
+  Projector filtering would remove business-epoch rejection from that route.
+  Genuine transport uncertainty must still fail safely, with the affected scope
+  reconsidered if several Sessions share one producer.
+
+Retain direct renewal, expiry and local model admission as the initial stopping
+mechanism. A silently revoked PG grant is normally learned at the next renewal,
+not at every model call. A stalled call cannot extend the last confirmed grant;
+an event-loop stall delays timer execution, but a resumed model admission checks
+expiry synchronously. No strict real-time stop bound or immediate upstream cost
+cancellation follows from those local guarantees. Already accepted provider
+requests may still compute or bill after their transports are cancelled.
+
+If measurements justify faster stopping, use an exact-incarnation revocation
+hint on the existing management path. Delivery accelerates local shutdown;
+loss never weakens Projector admission or extends the lease. Do not add a new
+Kafka consumer/lease, CPA fencing store or independent watchdog service for it.
+Ownership loss remains distinct from user Stop: a replacement can restore
+pending original Tool waiters; stopping obsolete local work must not fabricate
+user cancellation or prove that a remote process died.
+
+### Bounded validation of existing behavior
+
+On 2026-11-17, 34 tests passed across `session-lease-observer`,
+`durable-human-inputs` and `reconnecting-supervisor-websocket-client`; four selected
+Model Gateway tests also passed. They cover persisted queue replay, edits,
+ownership rejection, management outage, expiry, late acknowledgements, admission
+after event-loop delay and cancellation of three active child model transports.
+Tests used local fixtures/fake providers, with no paid model or deployment change.
+An initial root test command also matched an incomplete `.cache` build-input
+copy and failed its TypeScript configuration; excluding that directory produced
+the clean 34-test result. No application fix was involved.
+
+This is evidence for the existing shutdown primitives, not acceptance of the new
+Projector-only admission protocol. Required new tests include a stale input ACK
+after seal, isolated old Worker that can still reach Kafka/provider, stopped PG
+renewals, a paused process resuming, seal replay/rebalance and original reply
+recovery. Preserve valid prefixes and prove zero rejected effects before comparing
+producer reuse or cold-start performance.
+
 ## What Raft can solve
 
 [Raft](https://raft.github.io/) replicates an ordered sequence of commands so a
@@ -235,10 +347,12 @@ speech and correct it. Preserve the
 in every candidate. A lower initialization cost is not a reason to persist only
 completed responses or treat spoken/displayed prefixes as disposable progress.
 
-Prioritize a bounded partition-publication prototype and compare it with the
-smaller authorization-port change. Do not add a Raft/etcd deployment just to move
-two Worker queries. If a new authoritative replicated log is later justified,
-evaluate established implementations before building an algorithm or broker fork.
+Under the latest relaxed admission preference, prioritize the Projector candidate
+and its input-confirmation/shutdown contract. The earlier partition-publication
+and authorization-port candidates remain alternatives if admission must occur
+before Kafka. Do not add a Raft/etcd deployment just to move two Worker queries.
+If a new authoritative replicated log is later justified, evaluate established
+implementations before building an algorithm or broker fork.
 
 Before implementation, record the exact authority/ACK/migration decision in an
 ADR. Required comparisons include:

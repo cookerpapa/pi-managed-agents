@@ -86,6 +86,14 @@ native recovery and separate PG/Kafka/10,000-plan admission measurements.
   an extra publication hop and rules out a separate Raft service. Follow-up source
   review covers stale ingress-instance fencing and OpenMA's SQL/DO publication
   guards; neither constitutes a verified replacement protocol.
+- [x] Review the owner's subsequent Projector-side fencing proposal, current
+  steer/follow-up durability and obsolete-Worker shutdown. The same
+  [assessment](research/producer-reuse-and-raft-20261117.md#projector-admission-input-durability-and-obsolete-worker-shutdown)
+  records Kafka-confirmed native inputs, PG current-state retention, existing
+  direct renewal/local expiry and 38 passing local tests. A candidate record's
+  Kafka ACK would no longer prove input admission; exact input/mutation receipt
+  confirmation and all pre-effect filters need a new verified contract. No
+  producer, lease, deployment or upstream model behavior changed.
 - [ ] Agree and verify a replacement write-admission protocol before removing the
   deployed checks or pooling producers across Sessions. Claims, renewal and cold
   context reads are outside the current placement request; no Raft adoption is planned.
