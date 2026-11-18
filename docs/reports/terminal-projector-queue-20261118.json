@@ -1,0 +1,671 @@
+{
+  "source": "c2787216e12afcfedd7c8b2dbc121649650d411a",
+  "historicalControlRevision": "ad0c7bc62204da400ac9e9bfa4aefef27967eaff",
+  "workload": {
+    "sessionsPerWave": 192,
+    "partitions": 32,
+    "projectors": 1,
+    "workers": 2,
+    "outputBytes": 4096,
+    "providerDelayMs": 0
+  },
+  "waves": {
+    "control-1": {
+      "pool": 12,
+      "wholeHandler": false,
+      "runsPerSecond": 6.67,
+      "queueMs": {
+        "mean": 7444.22,
+        "p50": 7713,
+        "p95": 13722,
+        "max": 14959
+      },
+      "peakOffsetLag": 1911,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 24.88,
+      "otherSessionsPercent": 62.79,
+      "waitPercent": {
+        "sqlCallback": 46.2,
+        "poolCheckout": 40.41,
+        "sqlAndPoolOverlap": 0.0,
+        "handlerOther": 1.06,
+        "outsideMeasuredHandler": 12.33
+      }
+    },
+    "candidate-1": {
+      "pool": 12,
+      "wholeHandler": false,
+      "runsPerSecond": 9.11,
+      "queueMs": {
+        "mean": 5111.97,
+        "p50": 4931,
+        "p95": 9706,
+        "max": 11082
+      },
+      "peakOffsetLag": 1493,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 26.9,
+      "otherSessionsPercent": 59.5,
+      "waitPercent": {
+        "sqlCallback": 41.69,
+        "poolCheckout": 43.75,
+        "sqlAndPoolOverlap": 0.0,
+        "handlerOther": 0.97,
+        "outsideMeasuredHandler": 13.6
+      }
+    },
+    "candidate-2": {
+      "pool": 12,
+      "wholeHandler": false,
+      "runsPerSecond": 15.0,
+      "queueMs": {
+        "mean": 1615.45,
+        "p50": 1615,
+        "p95": 3225,
+        "max": 3716
+      },
+      "peakOffsetLag": 846,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 31.86,
+      "otherSessionsPercent": 53.95,
+      "waitPercent": {
+        "sqlCallback": 47.61,
+        "poolCheckout": 37.05,
+        "sqlAndPoolOverlap": 0.0,
+        "handlerOther": 1.14,
+        "outsideMeasuredHandler": 14.19
+      }
+    },
+    "control-2": {
+      "pool": 12,
+      "wholeHandler": false,
+      "runsPerSecond": 7.2,
+      "queueMs": {
+        "mean": 6555.49,
+        "p50": 6725,
+        "p95": 10436,
+        "max": 12594
+      },
+      "peakOffsetLag": 1825,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 28.55,
+      "otherSessionsPercent": 58.45,
+      "waitPercent": {
+        "sqlCallback": 42.43,
+        "poolCheckout": 43.6,
+        "sqlAndPoolOverlap": 0.0,
+        "handlerOther": 0.97,
+        "outsideMeasuredHandler": 13.0
+      }
+    },
+    "candidate-final": {
+      "pool": 12,
+      "wholeHandler": false,
+      "runsPerSecond": 10.55,
+      "queueMs": {
+        "mean": 3480.17,
+        "p50": 3023,
+        "p95": 6454,
+        "max": 8381
+      },
+      "peakOffsetLag": 1343,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 31.57,
+      "otherSessionsPercent": 53.95,
+      "waitPercent": {
+        "sqlCallback": 41.96,
+        "poolCheckout": 42.61,
+        "sqlAndPoolOverlap": 0.0,
+        "handlerOther": 0.96,
+        "outsideMeasuredHandler": 14.48
+      }
+    },
+    "A12": {
+      "pool": 12,
+      "wholeHandler": true,
+      "runsPerSecond": 6.65,
+      "queueMs": {
+        "mean": 7147.27,
+        "p50": 7231,
+        "p95": 12942,
+        "max": 14885
+      },
+      "peakOffsetLag": 1698,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 28.89,
+      "otherSessionsPercent": 70.72,
+      "waitPercent": {
+        "sqlCallback": 48.86,
+        "poolCheckout": 49.3,
+        "sqlAndPoolOverlap": 0.1,
+        "handlerOther": 1.35,
+        "outsideMeasuredHandler": 0.39
+      },
+      "pg": {
+        "backends": 12,
+        "clientCalls": 20314,
+        "clientCallSeconds": 286.108,
+        "serverDurationSeconds": 64.493,
+        "durationMessages": 40504,
+        "uniquelyMatched": 24691,
+        "ambiguous": 15804,
+        "unmatched": 9,
+        "uniquelyMatchedServerSeconds": 61.659,
+        "nativeHeadMatchedSeconds": 15.168,
+        "commitMatchedSeconds": 14.113,
+        "activitySampleCounts": {
+          "samples": 262,
+          "nonIdleBackendObservations": {
+            "idle in transaction / Client / ClientRead": 1749,
+            "active": 458,
+            "active / Client / ClientRead": 113,
+            "idle in transaction": 99,
+            "active / IO / WalSync": 72,
+            "active / LWLock / WALWrite": 60,
+            "idle in transaction / LWLock / WALWrite": 9,
+            "idle in transaction / IO / WalSync": 6,
+            "active / LWLock / LockManager": 2,
+            "active / IO / DataFileExtend": 1,
+            "idle in transaction / IO / DataFileExtend": 1,
+            "active / IO / WalWrite": 1,
+            "idle in transaction / Lock / object": 1
+          }
+        }
+      },
+      "bootstrapAdjacent": {
+        "sessions": 192,
+        "adjacentWorldAndRun": 138,
+        "adjacentRootWorldRun": 105
+      }
+    },
+    "B32": {
+      "pool": 32,
+      "wholeHandler": true,
+      "runsPerSecond": 8.28,
+      "queueMs": {
+        "mean": 5598.18,
+        "p50": 5262,
+        "p95": 11243,
+        "max": 12015
+      },
+      "peakOffsetLag": 1515,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 29.02,
+      "otherSessionsPercent": 70.6,
+      "waitPercent": {
+        "sqlCallback": 97.69,
+        "poolCheckout": 0.72,
+        "sqlAndPoolOverlap": 0.0,
+        "handlerOther": 1.21,
+        "outsideMeasuredHandler": 0.38
+      },
+      "pg": {
+        "backends": 32,
+        "clientCalls": 20316,
+        "clientCallSeconds": 471.608,
+        "serverDurationSeconds": 74.435,
+        "durationMessages": 41216,
+        "uniquelyMatched": 24796,
+        "ambiguous": 16411,
+        "unmatched": 9,
+        "uniquelyMatchedServerSeconds": 71.398,
+        "nativeHeadMatchedSeconds": 14.486,
+        "commitMatchedSeconds": 13.84,
+        "activitySampleCounts": {
+          "samples": 209,
+          "nonIdleBackendObservations": {
+            "idle in transaction / Client / ClientRead": 3334,
+            "active": 515,
+            "active / Client / ClientRead": 124,
+            "idle in transaction": 107,
+            "active / IO / WalSync": 59,
+            "active / LWLock / WALWrite": 52,
+            "idle in transaction / LWLock / WALWrite": 13,
+            "idle in transaction / IO / WalSync": 5,
+            "active / Lock / transactionid": 4,
+            "active / IO / WalWrite": 1,
+            "active / LWLock / LockManager": 1,
+            "idle in transaction / LWLock / WALInsert": 1
+          }
+        }
+      },
+      "bootstrapAdjacent": {
+        "sessions": 192,
+        "adjacentWorldAndRun": 159,
+        "adjacentRootWorldRun": 148
+      }
+    },
+    "A12-repeat": {
+      "pool": 12,
+      "wholeHandler": true,
+      "runsPerSecond": 15.05,
+      "queueMs": {
+        "mean": 2865.35,
+        "p50": 2754,
+        "p95": 5299,
+        "max": 5945
+      },
+      "peakOffsetLag": 1651,
+      "endOffsetLag": 0,
+      "sameSessionPercent": 28.35,
+      "otherSessionsPercent": 71.11,
+      "waitPercent": {
+        "sqlCallback": 47.78,
+        "poolCheckout": 50.0,
+        "sqlAndPoolOverlap": 0.31,
+        "handlerOther": 1.37,
+        "outsideMeasuredHandler": 0.54
+      },
+      "pg": {
+        "backends": 12,
+        "clientCalls": 20300,
+        "clientCallSeconds": 104.954,
+        "serverDurationSeconds": 30.663,
+        "durationMessages": 40474,
+        "uniquelyMatched": 12513,
+        "ambiguous": 27952,
+        "unmatched": 9,
+        "uniquelyMatchedServerSeconds": 25.889,
+        "nativeHeadMatchedSeconds": 4.517,
+        "commitMatchedSeconds": 13.51,
+        "activitySampleCounts": {
+          "samples": 105,
+          "nonIdleBackendObservations": {
+            "idle in transaction / Client / ClientRead": 616,
+            "active": 141,
+            "active / LWLock / WALWrite": 78,
+            "active / IO / WalSync": 50,
+            "active / Client / ClientRead": 33,
+            "idle in transaction": 32,
+            "active / Lock / transactionid": 2,
+            "idle in transaction / IO / WalWrite": 1,
+            "active / Lock / object": 1,
+            "idle in transaction / LWLock / WALWrite": 1
+          }
+        }
+      },
+      "bootstrapAdjacent": {
+        "sessions": 192,
+        "adjacentWorldAndRun": 151,
+        "adjacentRootWorldRun": 109
+      }
+    }
+  },
+  "examples": {
+    "candidate-final": {
+      "waitMs": 3023,
+      "overlappingRecords": 67,
+      "ownRecords": 9,
+      "otherRecords": 58,
+      "otherSessions": 5,
+      "partitionSessions": 8
+    },
+    "A12": {
+      "waitMs": 7231,
+      "overlappingRecords": 33,
+      "ownRecords": 14,
+      "otherRecords": 19,
+      "otherSessions": 2,
+      "partitionSessions": 5
+    }
+  },
+  "wholeHandlerMix": {
+    "agent_event.model.sampling.completed": {
+      "records": 192,
+      "pgCalls": 192,
+      "transactionsCommitted": 0,
+      "queuePercent": 5.4
+    },
+    "agent_event.model.sampling.started": {
+      "records": 192,
+      "pgCalls": 0,
+      "transactionsCommitted": 0,
+      "queuePercent": 0.02
+    },
+    "agent_event.turn.started": {
+      "records": 192,
+      "pgCalls": 0,
+      "transactionsCommitted": 0,
+      "queuePercent": 0.02
+    },
+    "control_change.input_queue": {
+      "records": 565,
+      "pgCalls": 1759,
+      "transactionsCommitted": 567,
+      "queuePercent": 7.12
+    },
+    "conversation": {
+      "records": 192,
+      "pgCalls": 1536,
+      "transactionsCommitted": 192,
+      "queuePercent": 7.92
+    },
+    "document.change.withSql": {
+      "records": 192,
+      "pgCalls": 1536,
+      "transactionsCommitted": 192,
+      "queuePercent": 8.36
+    },
+    "document.change.withoutSql": {
+      "records": 312,
+      "pgCalls": 0,
+      "transactionsCommitted": 0,
+      "queuePercent": 0.08
+    },
+    "document.create": {
+      "records": 192,
+      "pgCalls": 1536,
+      "transactionsCommitted": 192,
+      "queuePercent": 7.96
+    },
+    "document.create+document.change": {
+      "records": 192,
+      "pgCalls": 1728,
+      "transactionsCommitted": 192,
+      "queuePercent": 8.79
+    },
+    "entry:pi.assistant": {
+      "records": 192,
+      "pgCalls": 2683,
+      "transactionsCommitted": 192,
+      "queuePercent": 11.85
+    },
+    "entry:pi.system": {
+      "records": 192,
+      "pgCalls": 1152,
+      "transactionsCommitted": 192,
+      "queuePercent": 7.77
+    },
+    "entry:pi.user": {
+      "records": 192,
+      "pgCalls": 2112,
+      "transactionsCommitted": 192,
+      "queuePercent": 9.43
+    },
+    "session_activity": {
+      "records": 192,
+      "pgCalls": 192,
+      "transactionsCommitted": 0,
+      "queuePercent": 4.07
+    },
+    "task:pi.generation": {
+      "records": 192,
+      "pgCalls": 1152,
+      "transactionsCommitted": 192,
+      "queuePercent": 7.43
+    },
+    "work_finished": {
+      "records": 192,
+      "pgCalls": 5760,
+      "transactionsCommitted": 384,
+      "queuePercent": 13.39
+    }
+  },
+  "documentsInFirstFullTrace": {
+    "conversation": {
+      "pi.live+pi.inbox+pi.usage+pi.agent": 192
+    },
+    "document.create": {
+      "pi-cloud.runtime_world_state": 192
+    },
+    "document.create+document.change": {
+      "pi-cloud.run+pi.agent": 192
+    },
+    "entry:pi.user": {
+      "pi.live": 192
+    },
+    "document.change.withSql": {
+      "pi.live": 192
+    },
+    "document.change.withoutSql": {
+      "pi.live": 312
+    },
+    "entry:pi.assistant": {
+      "pi.live+pi.usage": 192
+    }
+  },
+  "controlTimingInFirstFullTrace": {
+    "control_change.input_queue": {
+      "beforeOwnTerminal": 384,
+      "afterOwnTerminalDuringBurst": 181,
+      "outsideBurst": 203
+    },
+    "control_change.subagent_state": {
+      "outsideBurst": 192
+    }
+  },
+  "headLookup": [
+    {
+      "variant": "original",
+      "receipts": 8,
+      "otherReceipts": 8192,
+      "queryHash": "9e10563334b4ca2d",
+      "planningMs": {
+        "median": 0.612,
+        "p95": 0.729,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.204,
+        "p95": 0.303,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 1.86,
+        "p95": 2.463,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 2
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 8,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        }
+      ]
+    },
+    {
+      "variant": "bounded",
+      "receipts": 8,
+      "otherReceipts": 8192,
+      "queryHash": "cb6b46ada4d157af",
+      "planningMs": {
+        "median": 0.622,
+        "p95": 0.814,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.209,
+        "p95": 0.303,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 1.998,
+        "p95": 2.492,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 2
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Backward",
+          "rows": 1,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        }
+      ]
+    },
+    {
+      "variant": "original",
+      "receipts": 20000,
+      "otherReceipts": 8192,
+      "queryHash": "9e10563334b4ca2d",
+      "planningMs": {
+        "median": 0.642,
+        "p95": 0.84,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 4.033,
+        "p95": 4.396,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 5.453,
+        "p95": 6.686,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Seq Scan",
+          "rows": 20000,
+          "loops": 1,
+          "removedByFilter": 8192,
+          "localBlocks": 511
+        }
+      ]
+    },
+    {
+      "variant": "bounded",
+      "receipts": 20000,
+      "otherReceipts": 8192,
+      "queryHash": "cb6b46ada4d157af",
+      "planningMs": {
+        "median": 0.627,
+        "p95": 0.96,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.22,
+        "p95": 0.276,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 2.041,
+        "p95": 3.057,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Backward",
+          "rows": 1,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 4
+        }
+      ]
+    },
+    {
+      "variant": "original",
+      "receipts": 100000,
+      "otherReceipts": 8192,
+      "queryHash": "9e10563334b4ca2d",
+      "planningMs": {
+        "median": 0.703,
+        "p95": 1.081,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 20.916,
+        "p95": 23.978,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 19.17,
+        "p95": 23.03,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Seq Scan",
+          "rows": 100000,
+          "loops": 1,
+          "removedByFilter": 8192,
+          "localBlocks": 2050
+        }
+      ]
+    },
+    {
+      "variant": "bounded",
+      "receipts": 100000,
+      "otherReceipts": 8192,
+      "queryHash": "cb6b46ada4d157af",
+      "planningMs": {
+        "median": 0.745,
+        "p95": 1.081,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.228,
+        "p95": 0.324,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 2.193,
+        "p95": 2.652,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Backward",
+          "rows": 1,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 4
+        }
+      ]
+    }
+  ]
+}

@@ -107,3 +107,19 @@ Pass each private load `report.json` to the summary tool. It matches synthetic p
 python3 scripts/experiments/projector-sql-20261118/summarize-live-progress.py output.json \
   /private/baseline/load/report.json /private/candidate/load-1/report.json /private/candidate/load-2/report.json
 ```
+
+## Per-partition queue attribution
+
+Use `12 projection-candidate live-burst server-duration`, then the same command with 32 connections and a final repetition with 12. Use a fresh private output directory each time and finish each restoration before beginning the next. This mode instruments the entire decoded fact handler as well as its inner projection. Nested SQL spans belong to the scope where the query started. The scoped PG server log provides duration messages without statement parameters.
+
+```sh
+python3 scripts/experiments/projector-sql-20261118/analyze-server.py /private/pool12-a
+python3 scripts/experiments/projector-sql-20261118/terminal-queue.py /private/queues.json \
+  pool12-a=/private/pool12-a/load/report.json pool32=/private/pool32/load/report.json \
+  pool12-b=/private/pool12-b/load/report.json
+PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1 node --import tsx \
+  scripts/experiments/projector-sql-20261118/native-head-plan.mjs /private/head-plan.json
+python3 -B scripts/experiments/projector-sql-20261118/test_terminal_queue.py
+```
+
+Run the server analyzer on each directory with a duration log. The queue analyzer also accepts older inner-projection-only observations. It intersects each terminal wait with earlier handlers on the same partition, clips partially covered SQL and pool intervals, and records overlap separately. Its population is the 192 measured Sessions. The latest-receipt experiment generates the actual native SELECT and uses connection-local temporary copies of the four tables and their indexes. It rolls back the fixtures.

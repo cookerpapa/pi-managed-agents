@@ -148,7 +148,7 @@ export function installProjectorDatabaseProbe(pg, emit) {
     );
   };
   return {
-    async run(record, work) {
+    async run(record, work, event = "diag.sql.projection") {
       const context = { started: performance.now(), spans: [], truncated: 0, finished: false };
       const at = Date.now();
       let failed = false;
@@ -160,11 +160,11 @@ export function installProjectorDatabaseProbe(pg, emit) {
       } finally {
         context.finished = true;
         report({
-          event: "diag.sql.projection",
+          event,
           at,
           durationMs: performance.now() - context.started,
           kind: record.fact.kind,
-          runId: record.fact.scope.runId,
+          runId: record.fact.scope.runId ?? record.fact.runId,
           sessionId: record.fact.scope.piSessionId,
           partition: record.partition,
           offset: String(record.offset),
@@ -172,6 +172,15 @@ export function installProjectorDatabaseProbe(pg, emit) {
           writes: record.fact.commit?.writes?.map((w) =>
             [w.type, w.value?.kind].filter(Boolean).join(":"),
           ),
+          ...(event === "diag.sql.handler" && {
+            subtype: record.fact.event?.type ?? record.fact.entity,
+            documents: record.fact.commit?.writes?.flatMap((write) => {
+              if (write.type === "document.create") return [[write.record.id, write.record.kind]];
+              if (write.type === "document.change" || write.type === "document.retire")
+                return [[write.id]];
+              return [];
+            }),
+          }),
           failed,
           truncated: context.truncated,
           spans: context.spans,

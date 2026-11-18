@@ -114,3 +114,39 @@ it("cannot turn a successful operation into failure when the observation sink th
     probe.uninstall();
   }
 });
+
+it("attributes each query once across a whole handler and its native projection", async () => {
+  const pg = fixture();
+  const events = [];
+  const probe = installProjectorDatabaseProbe(pg, (event) => events.push(event));
+  const fact = {
+    ...record.fact,
+    commit: {
+      writes: [
+        { type: "document.create", record: { id: 4, kind: "pi.live" }, content: "private-body" },
+        { type: "document.change", id: 4, content: "private-delta" },
+      ],
+    },
+  };
+  try {
+    const pool = new pg.Pool();
+    await probe.run(
+      { ...record, fact },
+      async () => {
+        const client = await pool.connect();
+        await probe.run({ ...record, fact }, () => client.query("select 1", []));
+        await client.query("select 2", []);
+      },
+      "diag.sql.handler",
+    );
+    const outer = events.find((e) => e.event === "diag.sql.handler");
+    const inner = events.find((e) => e.event === "diag.sql.projection");
+    expect(outer.documents).toEqual([[4, "pi.live"], [4]]);
+    expect(outer.spans.map((s) => s.type)).toEqual(["acquire", "query"]);
+    expect(inner.spans.map((s) => s.type)).toEqual(["query"]);
+    expect(outer.spans[1].id).not.toBe(inner.spans[0].id);
+    expect(JSON.stringify(events)).not.toMatch(/private-body|private-delta/);
+  } finally {
+    probe.uninstall();
+  }
+});

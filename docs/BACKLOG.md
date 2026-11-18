@@ -1,5 +1,10 @@
 # Maintained backlog
 
+## Projection queue and native head lookup
+
+- [x] Attribute waiting on previous Sessions, SQL callbacks, pool checkouts and ordinary control records in the synchronized 192-Run workload. Compare 12, 32 and 12 projection connections. [Queue diagnosis](reports/terminal-projector-queue-20261118.md).
+- [ ] Apply the measured bounded latest-receipt query to stable projection and cold head reads. Validate replay and shared bases. Evaluate cold-start transaction coalescing independently for short Runs. [Issue #48](https://github.com/cookerpapa/pi-managed-agents/issues/48).
+
 ## Native usage and system context projection
 
 - [x] The [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) candidate retains current Conversation usage and excludes system Entries from the chat index. Native reconstruction, public usage, Forks, deletion, backup recovery and seven fault scenarios passed. The permanent rollout gate remains open given the measured terminal queue under burst load. [Decision](adr/0337-native-usage-and-chat-presentation.md). [Measurements](reports/native-usage-and-chat-history-20261118.md).

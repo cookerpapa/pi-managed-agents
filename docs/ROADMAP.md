@@ -6,6 +6,8 @@
 
 ## Ordered Session projection under load
 
+[Terminal queue attribution](reports/terminal-projector-queue-20261118.md) separates contention in short bursts from a native lookup whose cost grows with the Session's receipt history.
+
 [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) has a
 [measured source implementation](reports/ordered-projection-tail-20261118.md).
 It reduces synchronous PG calls within each native commit and measures one or

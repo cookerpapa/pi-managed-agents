@@ -38,9 +38,11 @@ const clean = process.argv.slice(4).includes("clean");
 const liveBurst = process.argv.slice(4).includes("live-burst");
 const tailLoad = process.argv.slice(4).includes("tail-load");
 const faultLoad = process.argv.slice(4).includes("fault-load");
+const serverDuration = process.argv.slice(4).includes("server-duration");
 assert(
-  !liveBurst || (!tailLoad && !faultLoad && poolSize === 12),
-  "Synchronized burst needs a single twelve-connection owner",
+  !liveBurst ||
+    (!tailLoad && !faultLoad && (poolSize === 12 || (poolSize === 32 && serverDuration))),
+  "Synchronized burst uses 12 connections or the instrumented 32-connection pool comparison",
 );
 const genericPlans = process.argv.slice(4).includes("generic-plans");
 assert(
@@ -56,7 +58,6 @@ const repetitions = Number(process.env.PI_CLOUD_PROJECTOR_DIAGNOSTIC_REPETITIONS
 assert(Number.isSafeInteger(repetitions) && repetitions >= 1 && repetitions <= 5);
 const cpuOnly = process.argv.slice(4).includes("cpu-only");
 const cpuProfile = cpuOnly || process.argv.slice(4).includes("cpu");
-const serverDuration = process.argv.slice(4).includes("server-duration");
 assert(
   process.argv
     .slice(4)
@@ -260,6 +261,25 @@ import {installProjectorDatabaseProbe} from './probe.mjs';
 const pg=createRequire('/app/package.json')('pg');
 const probe=installProjectorDatabaseProbe(pg,e=>process.stdout.write(JSON.stringify(e)+'\\n'));
 export const projectWithProbe=(record,work)=>probe.run(record,work);\n`;
+if (liveBurst && serverDuration) {
+  // The inner projection keeps its own async context. This outer context records
+  // only the additional SQL, including early-return control and activity facts.
+  data["entry.mjs"] +=
+    'export const timeHandler=(decoded,work)=>probe.run({...decoded,fact:decoded.fact.fact},work,"diag.sql.handler");\n';
+  const file = "session-projector.ts";
+  data[file] =
+    'import { timeHandler } from "/pma-diagnostic/entry.mjs";\n' +
+    replace(
+      data[file],
+      "handler: (decoded, current, commitBeforeEffect) =>\n        this.#throughGate(",
+      "handler: (decoded, current, commitBeforeEffect) =>\n        timeHandler(decoded, () => this.#throughGate(",
+    );
+  data[file] = replace(
+    data[file],
+    "timing.finish(record, failure);\n          }\n        }),",
+    "timing.finish(record, failure);\n          }\n        })),",
+  );
+}
 if (cpuProfile) {
   data["cpu.mjs"] = await readFile("scripts/lib/projector-cpu-probe.mjs", "utf8");
   data["entry.mjs"] = data["entry.mjs"].replace(

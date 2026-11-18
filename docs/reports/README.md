@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Projector terminal queue and native head lookup](terminal-projector-queue-20261118.md) traces earlier same-partition work, tests pool size and measures latest-receipt lookup as a Session grows.
+
 - [Native usage and chat history under load](native-usage-and-chat-history-20261118.md) measures current-value storage, per-message projection cost, the terminal queue and fixed-rate arrivals.
 
 - [Kafka-backed live progress and recovery](kafka-live-progress-20261118.md) records the #50 SQL count, visible-prefix recovery and synchronized short-Run comparisons.
