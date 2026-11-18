@@ -1,0 +1,2708 @@
+{
+  "format": "pma.projector-sql-diagnosis.v1",
+  "at": "2026-11-18T00:08:44.166967+00:00",
+  "baseline": {
+    "version": "prefetch-cache-20261118-r1",
+    "revision": "4ce1bddcf8507f281f33adeaf46a2f38c91a2fdc",
+    "schema": 226,
+    "topic": "pi-cloud.execution-log.v22"
+  },
+  "hardware": "24 GiB WSL, one Projector, two Workers, 32 Session partitions, PostgreSQL 17.6",
+  "observations": [
+    {
+      "name": "pool12-r1",
+      "poolSize": 12,
+      "candidateReader": false,
+      "cpuProfile": false,
+      "serverDuration": false,
+      "sourceHashes": {
+        "session-projector.ts": "f0cbed41d063fb5737a56063e09e88ec3b33d5a23f0541e4ef243f2f4b44bc96",
+        "session-runtime-main.ts": "3deb4b1aa567b4341e93cdc482aca9dcca543990e768cb3728e24a6b67681a03",
+        "probe.mjs": "1e6a2e6a7912d761a927b11b6496099630d678c7b77a3e9dc011544339475d54",
+        "entry.mjs": "608d712dc613449df472ff4dc1e61ed70867d9dae77b7c752b5b5be1a58afdf7"
+      },
+      "accepted": false,
+      "cleanupConfirmed": true,
+      "restored": true,
+      "realProviderRequests": false,
+      "summary": {
+        "mode": "closed",
+        "concurrency": 64,
+        "offered": 192,
+        "accepted": 168,
+        "completed": 168,
+        "failed": 24,
+        "historyFailures": 0,
+        "dropped": 0,
+        "elapsedMs": 34680.943685000006,
+        "successfulRunsPerSecond": 4.844158841982791,
+        "maximumInFlight": 64,
+        "acknowledgementMs": {
+          "count": 168,
+          "p50": 43,
+          "p95": 509,
+          "p99": 1725,
+          "max": 1736
+        },
+        "queueMs": {
+          "count": 168,
+          "p50": 75,
+          "p95": 2453,
+          "p99": 2716,
+          "max": 2767
+        },
+        "firstDurableTextMs": {
+          "count": 168,
+          "p50": 4930,
+          "p95": 10348,
+          "p99": 15481,
+          "max": 16117
+        },
+        "settlementMs": {
+          "count": 168,
+          "p50": 5507,
+          "p95": 10881,
+          "p99": 16400,
+          "max": 17020
+        },
+        "generatorDelayMs": {
+          "count": 192,
+          "p50": 0.000822000001790002,
+          "p95": 0.002174000008380972,
+          "p99": 0.0042280000052414834,
+          "max": 0.033462999999755993
+        },
+        "sseReconnects": 0
+      },
+      "records": 2126,
+      "recordKinds": {
+        "durable_commit": 1454,
+        "agent_event": 504,
+        "work_finished": 168
+      },
+      "truncated": 0,
+      "breakdown": {
+        "wall": {
+          "count": 2126,
+          "mean": 168.795,
+          "p50": 175.789,
+          "p95": 357.393,
+          "max": 558.893,
+          "total": 358858.87
+        },
+        "queryUnion": {
+          "count": 2126,
+          "mean": 108.398,
+          "p50": 99.062,
+          "p95": 261.057,
+          "max": 551.622,
+          "total": 230454.63
+        },
+        "poolUnion": {
+          "count": 2126,
+          "mean": 58.403,
+          "p50": 60.422,
+          "p95": 136.676,
+          "max": 240.262,
+          "total": 124165.24
+        },
+        "other": {
+          "count": 2126,
+          "mean": 1.994,
+          "p50": 1.757,
+          "p95": 4.878,
+          "max": 31.039,
+          "total": 4239.0
+        },
+        "queryCount": {
+          "count": 2126,
+          "mean": 12.608,
+          "p50": 12,
+          "p95": 31,
+          "max": 31,
+          "total": 26804
+        }
+      },
+      "acquisition": {
+        "count": 1790,
+        "mean": 69.366,
+        "p50": 69.732,
+        "p95": 139.712,
+        "max": 240.262,
+        "total": 124165.24
+      },
+      "sqlCalls": 26804,
+      "sqlCallsPerCompletedRun": 159.54761904761904,
+      "queryGroups": [
+        {
+          "id": "541d04611b72ea92",
+          "count": 504,
+          "meanMs": 37.529,
+          "p95Ms": 58.694,
+          "totalMs": 18914.71,
+          "sqlPrefix": "with affected(session_id,turn_id) as ( values ($1::uuid,$2::uuid) ), inserted as ( insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) select $3::uuid,a.session_id,$4,$5,a.turn_"
+        },
+        {
+          "id": "9505cacb7c710ed1",
+          "count": 1622,
+          "meanMs": 11.172,
+          "p95Ms": 19.744,
+          "totalMs": 18121.53,
+          "sqlPrefix": "commit"
+        },
+        {
+          "id": "e4420bc209123df9",
+          "count": 1286,
+          "meanMs": 13.115,
+          "p95Ms": 23.195,
+          "totalMs": 16866.42,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,'?'::json as pending_live from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c w"
+        },
+        {
+          "id": "e660dcbf8778da0f",
+          "count": 1008,
+          "meanMs": 10.333,
+          "p95Ms": 17.77,
+          "totalMs": 10415.84,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "78ff36fdce0cf66f",
+          "count": 1454,
+          "meanMs": 6.549,
+          "p95Ms": 13.659,
+          "totalMs": 9521.72,
+          "sqlPrefix": "insert into pi_durable_commits(tenant_id,session_id,seq,next_id,fingerprint,write_count,history_write_count,history_fingerprint,current_hashes,cloud_metadata) values($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)"
+        },
+        {
+          "id": "a0c1f9da03a78d70",
+          "count": 168,
+          "meanMs": 54.811,
+          "p95Ms": 129.349,
+          "totalMs": 9208.2,
+          "sqlPrefix": "with owner as materialized ( select id from runs where tenant_id=$1::uuid and id=$2::uuid and lease_id=$3::uuid and exists(select 1 from pi_durable_commits c where c.tenant_id=$4::uuid and c.session_id=$5 and c.seq=$6) for no key update ), admitted as material"
+        },
+        {
+          "id": "3ecfaf9ae1b76408",
+          "count": 1622,
+          "meanMs": 5.216,
+          "p95Ms": 11.16,
+          "totalMs": 8460.56,
+          "sqlPrefix": "insert into accepted_fact_projection_offsets(topic,partition,next_offset) values($1,$2,$3::bigint) on conflict(topic,partition) do update set next_offset=excluded.next_offset where accepted_fact_projection_offsets.next_offset<excluded.next_offset"
+        },
+        {
+          "id": "e6f07d43b5c21db0",
+          "count": 1622,
+          "meanMs": 5.085,
+          "p95Ms": 9.978,
+          "totalMs": 8247.15,
+          "sqlPrefix": "begin"
+        },
+        {
+          "id": "980fdf628c0260a7",
+          "count": 1622,
+          "meanMs": 5.064,
+          "p95Ms": 9.595,
+          "totalMs": 8214.18,
+          "sqlPrefix": "select set_config('?', $1, true), set_config('?', $2, true)"
+        },
+        {
+          "id": "f174b3c048296f5c",
+          "count": 672,
+          "meanMs": 12.101,
+          "p95Ms": 21.11,
+          "totalMs": 8131.72,
+          "sqlPrefix": "select id,fields from pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and id=any($3::bigint[])"
+        },
+        {
+          "id": "f0e2fbc33aac3274",
+          "count": 504,
+          "meanMs": 15.246,
+          "p95Ms": 57.014,
+          "totalMs": 7683.92,
+          "sqlPrefix": "select g.id as retained_id,ref.ordinal,g.cloud_origin->>'?' as turn_id,g.cloud_origin->>'?' as source_session_id, assistant.retained_record_id as assistant_record_id,g.record_id::text as id,g.body,g.record_kind as kind,r.fields,g.committed_at, case when g.reco"
+        },
+        {
+          "id": "6078b3c8362749ef",
+          "count": 1454,
+          "meanMs": 5.061,
+          "p95Ms": 9.92,
+          "totalMs": 7358.35,
+          "sqlPrefix": "with locked_run as materialized ( select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text from runs where tenant_id=$1::uuid and id=$2::uuid for no key update )"
+        },
+        {
+          "id": "1f49cbe4f0a7377d",
+          "count": 1454,
+          "meanMs": 4.946,
+          "p95Ms": 9.429,
+          "totalMs": 7191.41,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "b5281bddc2216ccf",
+          "count": 1454,
+          "meanMs": 4.902,
+          "p95Ms": 9.46,
+          "totalMs": 7127.13,
+          "sqlPrefix": "select fingerprint,current_hashes from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and seq=$3"
+        },
+        {
+          "id": "0eef000afb5eb14d",
+          "count": 336,
+          "meanMs": 16.193,
+          "p95Ms": 26.857,
+          "totalMs": 5440.95,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "0cbded18ab91e3b9",
+          "count": 446,
+          "meanMs": 11.579,
+          "p95Ms": 46.84,
+          "totalMs": 5164.08,
+          "sqlPrefix": "select session_id,turn_id,id,output_display_seq::text from conversation_turns where tenant_id=$1::uuid and id=$2::uuid and session_id=any($3::uuid[])"
+        },
+        {
+          "id": "fc334885a1a7f3d8",
+          "count": 336,
+          "meanMs": 14.984,
+          "p95Ms": 25.0,
+          "totalMs": 5034.75,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "543cc5d28a734079",
+          "count": 504,
+          "meanMs": 9.798,
+          "p95Ms": 16.792,
+          "totalMs": 4938.17,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "0c1e2cbd5b79dbf3",
+          "count": 168,
+          "meanMs": 28.941,
+          "p95Ms": 107.202,
+          "totalMs": 4862.0,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,coalesce(( select json_agg(row) from (select c.id::text,c.kind,c.seq::text,c.ordinal,c.body,c.delta_count, c.created_seq::text,c.retired_se"
+        },
+        {
+          "id": "db68fce26ee46972",
+          "count": 336,
+          "meanMs": 14.045,
+          "p95Ms": 22.699,
+          "totalMs": 4719.1,
+          "sqlPrefix": "delete from pi_durable_document_revisions d using pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and r.id=any($3::bigint[]) and r.fields->>'?'='?' and d.tenant_id=r.tenant_id and d.session_id=r.session_id and d.document_id=r.id"
+        },
+        {
+          "id": "21d88ea11ae44bd5",
+          "count": 504,
+          "meanMs": 8.681,
+          "p95Ms": 16.68,
+          "totalMs": 4375.25,
+          "sqlPrefix": "insert into pi_durable_current as existing (tenant_id,session_id,id,kind,seq,ordinal,body,delta_count,created_seq,retired_seq,cloud_origin,committed_at) values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb, (select committed_at from pi_durable_commits where"
+        },
+        {
+          "id": "a6ce81460b600f39",
+          "count": 504,
+          "meanMs": 7.58,
+          "p95Ms": 15.239,
+          "totalMs": 3820.25,
+          "sqlPrefix": "with bodies as ( insert into pi_history_bodies(tenant_id,body_kind,id,sha256,payload_text,payload_bytes) values ($1::uuid,'?',$2::uuid,$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=e"
+        },
+        {
+          "id": "f7ec4e498a540da1",
+          "count": 336,
+          "meanMs": 10.057,
+          "p95Ms": 20.411,
+          "totalMs": 3379.32,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "694982afe745f148",
+          "count": 336,
+          "meanMs": 7.555,
+          "p95Ms": 17.024,
+          "totalMs": 2538.57,
+          "sqlPrefix": "with coverage(session_id,turn_id,through) as (values ($1::uuid,$2::uuid,$3::bigint)), root as ( update runs r set output_display_seq=greatest(r.output_display_seq,c.through), output_display_native_seq=greatest(r.output_display_native_seq,$4) from coverage c wh"
+        },
+        {
+          "id": "789962e9a76686a3",
+          "count": 336,
+          "meanMs": 6.639,
+          "p95Ms": 14.288,
+          "totalMs": 2230.61,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "5818505c3889f36b",
+          "count": 168,
+          "meanMs": 11.731,
+          "p95Ms": 19.643,
+          "totalMs": 1970.74,
+          "sqlPrefix": "select c.*,r.id as indexed_id,r.kind as indexed_kind,r.fields as indexed_fields from pi_durable_current c left join pi_durable_records r using(tenant_id,session_id,id) where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and c.replay_offset is not null"
+        },
+        {
+          "id": "9d592a2b8cea16ea",
+          "count": 168,
+          "meanMs": 11.638,
+          "p95Ms": 20.424,
+          "totalMs": 1955.16,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "5a249ba565c309c5",
+          "count": 168,
+          "meanMs": 10.853,
+          "p95Ms": 26.627,
+          "totalMs": 1823.23,
+          "sqlPrefix": "with \"updated_run\" as (update \"runs\" set \"state\" = $1, \"row_version\" = row_version+1, \"updated_at\" = $2, \"settled_at\" = $3, \"stop_reason\" = $4 where \"tenant_id\" = $5 and \"id\" = $6 and \"row_version\" = $7 returning \"id\", \"row_version\"), \"recorded_transition\" as "
+        },
+        {
+          "id": "ff821a030963b8f1",
+          "count": 168,
+          "meanMs": 10.574,
+          "p95Ms": 20.745,
+          "totalMs": 1776.5,
+          "sqlPrefix": "select id::text,fields from pi_durable_records where tenant_id=$1::uuid and session_id=$2 and kind='?' and fields->>'?'=any($3::text[])"
+        },
+        {
+          "id": "d9b6f68018f6562f",
+          "count": 168,
+          "meanMs": 10.352,
+          "p95Ms": 24.126,
+          "totalMs": 1739.15,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "f3ed981d2a966df6",
+          "count": 168,
+          "meanMs": 10.02,
+          "p95Ms": 25.453,
+          "totalMs": 1683.36,
+          "sqlPrefix": "update \"runs\" set \"output_sealed_at\" = $1, \"output_seal_offset\" = $2, \"last_event_seq\" = $3, \"execution_released_at\" = $4, \"agent_exited_at\" = $5, \"recovery_requested_at\" = $6, \"output_first_topic\" = coalesce(output_first_topic,$7), \"output_first_partition\" = "
+        },
+        {
+          "id": "a3681047405dfd8a",
+          "count": 168,
+          "meanMs": 9.466,
+          "p95Ms": 18.138,
+          "totalMs": 1590.36,
+          "sqlPrefix": "update \"runs\" set \"output_first_topic\" = $1, \"output_first_partition\" = $2, \"output_first_offset\" = $3 where \"tenant_id\" = $4 and \"id\" = $5"
+        },
+        {
+          "id": "a8c971c9acc61c55",
+          "count": 168,
+          "meanMs": 9.277,
+          "p95Ms": 18.683,
+          "totalMs": 1558.59,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "4bae498c1f8b55c7",
+          "count": 168,
+          "meanMs": 9.114,
+          "p95Ms": 17.971,
+          "totalMs": 1531.17,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "41cf5e117dbfaebb",
+          "count": 168,
+          "meanMs": 7.181,
+          "p95Ms": 13.56,
+          "totalMs": 1206.45,
+          "sqlPrefix": "update \"sessions\" set \"state\" = $1, \"next_event_seq\" = $2, \"row_version\" = row_version+1, \"updated_at\" = $3, \"last_active_at\" = $4 where \"tenant_id\" = $5 and \"id\" = $6"
+        },
+        {
+          "id": "3b06db3d03f1ca68",
+          "count": 168,
+          "meanMs": 6.774,
+          "p95Ms": 14.757,
+          "totalMs": 1138.01,
+          "sqlPrefix": "update sessions s set next_event_seq=greatest(s.next_event_seq,views.through+1) from (values ($1::uuid,$2::bigint)) views(id,through) where s.tenant_id=$3::uuid and s.pi_session_id=$4 and s.id=views.id"
+        },
+        {
+          "id": "be37a5c2332b2267",
+          "count": 168,
+          "meanMs": 6.373,
+          "p95Ms": 17.622,
+          "totalMs": 1070.68,
+          "sqlPrefix": "select 1 from pi_history_views v cross join lateral pi_history_view_ranges(v.tenant_id,v.root_id,$1::bigint,$2::bigint) n join pi_history_blocks b on b.tenant_id=v.tenant_id and b.id=n.block_id where v.tenant_id=$3::uuid and v.session_id=$4::uuid and b.turn_id"
+        },
+        {
+          "id": "34be46362b3dcb07",
+          "count": 168,
+          "meanMs": 6.082,
+          "p95Ms": 13.143,
+          "totalMs": 1021.76,
+          "sqlPrefix": "insert into \"session_terminal_events\" (\"event_id\", \"tenant_id\", \"session_id\", \"turn_id\", \"agent_id\", \"run_id\", \"seq\", \"schema_version\", \"type\", \"payload\", \"occurred_at\", \"persisted_at\", \"interrupted_prefix\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11"
+        },
+        {
+          "id": "3342327b73a01f94",
+          "count": 168,
+          "meanMs": 5.896,
+          "p95Ms": 12.196,
+          "totalMs": 990.49,
+          "sqlPrefix": "insert into \"model_invocations\" (\"id\", \"tenant_id\", \"session_id\", \"run_id\", \"requested_at\", \"provider\", \"model\", \"purpose\", \"context\", \"context_hash\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "285800fa5a467320",
+          "count": 168,
+          "meanMs": 5.51,
+          "p95Ms": 10.583,
+          "totalMs": 925.73,
+          "sqlPrefix": "update runs candidate set ready_at=clock_timestamp() where candidate.tenant_id=$1::uuid and candidate.session_id=$2::uuid and candidate.state='?' and candidate.ready_at is null and exists(select 1 from sessions s where s.tenant_id=$3::uuid and s.id=$4::uuid an"
+        },
+        {
+          "id": "0a0b2ee33c85351a",
+          "count": 168,
+          "meanMs": 5.49,
+          "p95Ms": 12.272,
+          "totalMs": 922.28,
+          "sqlPrefix": "update \"turn_control_requests\" set \"state\" = $1, \"completed_at\" = $2, \"failure_code\" = $3 where \"tenant_id\" = $4 and \"target_run_id\" = $5 and \"kind\" = $6 and \"state\" in ($7, $8, $9)"
+        },
+        {
+          "id": "9bff3cb0a038ac4c",
+          "count": 168,
+          "meanMs": 5.304,
+          "p95Ms": 11.472,
+          "totalMs": 891.06,
+          "sqlPrefix": "select s.pi_session_id,r.id as run_id,r.mailbox_position::text as position,r.state,r.stop_reason,r.operation_kind, r.output_display_seq::text as coverage,r.output_display_native_seq::text as native_coverage,r.created_at, jsonb_build_object('?',r.input_text,'?'"
+        },
+        {
+          "id": "8aacc851b9a7820e",
+          "count": 168,
+          "meanMs": 5.234,
+          "p95Ms": 11.43,
+          "totalMs": 879.33,
+          "sqlPrefix": "update pi_durable_current c set replay_topic=$1, replay_partition=$2,replay_offset=$3::bigint,replay_seq=$4 where \"c\".\"tenant_id\"=$5::uuid and \"c\".\"session_id\"=$6 and id=$7::bigint and replay_seq is null and seq<$8 returning id"
+        },
+        {
+          "id": "3134d500dfc57c06",
+          "count": 168,
+          "meanMs": 4.837,
+          "p95Ms": 9.726,
+          "totalMs": 812.59,
+          "sqlPrefix": "select coalesce(max(seq),0)::text seq from ( select seq from pi_durable_commits where tenant_id=$1::uuid and session_id=$2 union all select through_seq from pi_durable_bases where tenant_id=$3::uuid and session_id=$4 ) positions"
+        },
+        {
+          "id": "81275917293fac34",
+          "count": 168,
+          "meanMs": 4.719,
+          "p95Ms": 9.984,
+          "totalMs": 792.71,
+          "sqlPrefix": "insert into \"model_metering_events\" (\"id\", \"invocation_id\", \"kind\", \"execution_id\", \"occurred_at\", \"payload\", \"payload_hash\", \"valuation\") values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "af913f5ec4b4fb43",
+          "count": 168,
+          "meanMs": 4.679,
+          "p95Ms": 9.274,
+          "totalMs": 786.02,
+          "sqlPrefix": "update \"session_leases\" set \"writer_sealed_at\" = $1, \"writer_seal_offset\" = $2, \"released_at\" = $3 where \"tenant_id\" = $4 and \"lease_id\" = $5"
+        },
+        {
+          "id": "12e7bcb3eeb0040c",
+          "count": 168,
+          "meanMs": 4.571,
+          "p95Ms": 9.666,
+          "totalMs": 767.94,
+          "sqlPrefix": "insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) values($1::uuid,$2::uuid,$3,$4,$5::uuid,$6::uuid,$7::bigint) on conflict(tenant_id,source_pi_session_id,turn_id) do update se"
+        },
+        {
+          "id": "7db28c8f50809936",
+          "count": 168,
+          "meanMs": 4.408,
+          "p95Ms": 9.253,
+          "totalMs": 740.51,
+          "sqlPrefix": "select \"lease_id\", \"fencing_token\", \"session_id\", \"turn_id\", \"output_sealed_at\", \"output_seal_offset\", \"state\", \"row_version\", \"output_first_topic\", \"output_first_partition\" from \"runs\" where \"tenant_id\" = $1 and \"id\" = $2 for no key update"
+        },
+        {
+          "id": "79a98ec3b603d85c",
+          "count": 168,
+          "meanMs": 4.405,
+          "p95Ms": 9.325,
+          "totalMs": 740.03,
+          "sqlPrefix": "insert into \"model_execution_writers\" (\"writer_id\", \"tenant_id\", \"pi_session_id\", \"run_id\", \"fencing_token\", \"topic\", \"partition\", \"close_offset\", \"fingerprint\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (\"writer_id\") do nothing returning \"writer"
+        },
+        {
+          "id": "20d81d67730722a9",
+          "count": 168,
+          "meanMs": 4.398,
+          "p95Ms": 8.589,
+          "totalMs": 738.85,
+          "sqlPrefix": "select h.seq,h.next_id,false as incomplete from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 union all select through_seq,next_id from pi_durab"
+        },
+        {
+          "id": "791ee1248d3978e1",
+          "count": 168,
+          "meanMs": 4.361,
+          "p95Ms": 9.297,
+          "totalMs": 732.7,
+          "sqlPrefix": "select \"writer_failed_at\", \"writer_seal_offset\", \"pi_session_id\", \"fencing_token\" from \"session_leases\" where \"tenant_id\" = $1 and \"lease_id\" = $2 for no key update"
+        },
+        {
+          "id": "15d62ac19791509e",
+          "count": 168,
+          "meanMs": 4.284,
+          "p95Ms": 8.403,
+          "totalMs": 719.74,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "5e6f0d72b594ccc3",
+          "count": 168,
+          "meanMs": 4.229,
+          "p95Ms": 9.905,
+          "totalMs": 710.47,
+          "sqlPrefix": "select \"context_hash\" from \"model_invocations\" where \"id\" = $1"
+        },
+        {
+          "id": "f1bda116cc866cb2",
+          "count": 168,
+          "meanMs": 4.196,
+          "p95Ms": 8.148,
+          "totalMs": 704.94,
+          "sqlPrefix": "insert into pi_history_bodies(tenant_id,id,body_kind,sha256,payload_text,payload_bytes) values($1::uuid,$2::uuid,'?',$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=excluded.payload_te"
+        },
+        {
+          "id": "5b70cf5051759432",
+          "count": 168,
+          "meanMs": 4.195,
+          "p95Ms": 8.381,
+          "totalMs": 704.8,
+          "sqlPrefix": "select \"session_kind\" from \"sessions\" where \"tenant_id\" = $1 and \"id\" = $2 and \"pruned_at\" is null"
+        },
+        {
+          "id": "7a853c531db1dd6c",
+          "count": 168,
+          "meanMs": 4.19,
+          "p95Ms": 8.022,
+          "totalMs": 703.97,
+          "sqlPrefix": "update pi_history_blocks set header_body_id=$1::uuid,fields=$2::jsonb where tenant_id=$3::uuid and id=$4::uuid"
+        },
+        {
+          "id": "60e8f2004870ee8c",
+          "count": 168,
+          "meanMs": 4.176,
+          "p95Ms": 9.769,
+          "totalMs": 701.57,
+          "sqlPrefix": "select position::text,header_body_id,fields from pi_history_blocks where tenant_id=$1::uuid and id=$2::uuid and header_body_id is not null for key share"
+        },
+        {
+          "id": "fcf2a69f48ac183c",
+          "count": 168,
+          "meanMs": 4.157,
+          "p95Ms": 8.024,
+          "totalMs": 698.35,
+          "sqlPrefix": "insert into pi_history_views(tenant_id,session_id,root_id) values($1::uuid,$2::uuid,$3::uuid) on conflict(tenant_id,session_id) do update set root_id=excluded.root_id"
+        },
+        {
+          "id": "d25b8b805c8ef8fa",
+          "count": 168,
+          "meanMs": 4.141,
+          "p95Ms": 8.982,
+          "totalMs": 695.7,
+          "sqlPrefix": "select \"child_session_id\" from \"subagent_conversations\" where \"tenant_id\" = $1 and \"root_run_id\" = $2"
+        },
+        {
+          "id": "0321f41e71d8f44c",
+          "count": 168,
+          "meanMs": 4.129,
+          "p95Ms": 8.316,
+          "totalMs": 693.75,
+          "sqlPrefix": "select root_id from pi_history_views where tenant_id=$1::uuid and session_id=$2::uuid for update"
+        },
+        {
+          "id": "0e1357834e1a2920",
+          "count": 168,
+          "meanMs": 4.117,
+          "p95Ms": 7.647,
+          "totalMs": 691.6,
+          "sqlPrefix": "insert into pi_history_view_nodes(tenant_id,id,left_id,right_id,block_id,header_body_id,header_fields,through_seq,through_ordinal,min_position,max_position,turn_count,height,node) values ($1::uuid,$2::uuid, $3::uuid,$4::uuid, $5::uuid,$6::uuid,$7::jsonb,$8::bi"
+        },
+        {
+          "id": "2267c789ece38b08",
+          "count": 168,
+          "meanMs": 4.038,
+          "p95Ms": 7.467,
+          "totalMs": 678.43,
+          "sqlPrefix": "with visible as ( select seq,ordinal from pi_history_frames where tenant_id=$1::uuid and block_id=$2::uuid ) select count(*)::text as n,(array_agg(seq order by seq desc,ordinal desc))[1]::text as seq, (array_agg(ordinal order by seq desc,ordinal desc))[1] as o"
+        }
+      ],
+      "sseSetupFailures": 24
+    },
+    {
+      "name": "pool32-r1",
+      "poolSize": 32,
+      "candidateReader": false,
+      "cpuProfile": false,
+      "serverDuration": false,
+      "sourceHashes": {
+        "session-projector.ts": "f0cbed41d063fb5737a56063e09e88ec3b33d5a23f0541e4ef243f2f4b44bc96",
+        "session-runtime-main.ts": "961a6323c2bfc4bfdaa276b039b0ac687d8ac10bb992bfadf63fc34be01d6766",
+        "probe.mjs": "1e6a2e6a7912d761a927b11b6496099630d678c7b77a3e9dc011544339475d54",
+        "entry.mjs": "608d712dc613449df472ff4dc1e61ed70867d9dae77b7c752b5b5be1a58afdf7"
+      },
+      "accepted": false,
+      "cleanupConfirmed": true,
+      "restored": true,
+      "realProviderRequests": false,
+      "summary": {
+        "mode": "closed",
+        "concurrency": 64,
+        "offered": 192,
+        "accepted": 0,
+        "completed": 0,
+        "failed": 192,
+        "historyFailures": 0,
+        "dropped": 0,
+        "elapsedMs": 45052.322703000005,
+        "successfulRunsPerSecond": 0,
+        "maximumInFlight": 64,
+        "acknowledgementMs": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "queueMs": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "firstDurableTextMs": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "settlementMs": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "generatorDelayMs": {
+          "count": 192,
+          "p50": 0.0002810000005410984,
+          "p95": 0.0005510000046342611,
+          "p99": 0.009688999998616055,
+          "max": 0.03362400000332855
+        },
+        "sseReconnects": 0
+      },
+      "records": 0,
+      "recordKinds": {},
+      "truncated": 0,
+      "breakdown": {
+        "wall": {
+          "count": 0
+        },
+        "queryUnion": {
+          "count": 0
+        },
+        "poolUnion": {
+          "count": 0
+        },
+        "other": {
+          "count": 0
+        },
+        "queryCount": {
+          "count": 0
+        }
+      },
+      "acquisition": {
+        "count": 0
+      },
+      "sqlCalls": 0,
+      "sqlCallsPerCompletedRun": null,
+      "queryGroups": [],
+      "sseSetupFailures": 192
+    },
+    {
+      "name": "fixed12-cpu",
+      "poolSize": 12,
+      "candidateReader": true,
+      "cpuProfile": true,
+      "serverDuration": false,
+      "sourceHashes": {
+        "session-projector.ts": "f0cbed41d063fb5737a56063e09e88ec3b33d5a23f0541e4ef243f2f4b44bc96",
+        "session-runtime-main.ts": "3deb4b1aa567b4341e93cdc482aca9dcca543990e768cb3728e24a6b67681a03",
+        "kafka-partition-reader.ts": "7913647852c9141ad93b536f708f752b1a6d1be994dc5f5257da3fd6ec837a35",
+        "probe.mjs": "1e6a2e6a7912d761a927b11b6496099630d678c7b77a3e9dc011544339475d54",
+        "entry.mjs": "4b17d74d38343ce233b32dd2c76ea218d8d727cc373ef37d72a232d4e6f775b5",
+        "cpu.mjs": "7e1482f70b487bb94fbe95d994ffdbfda42909596b68833061902ef140a337ae"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "restored": true,
+      "realProviderRequests": false,
+      "summary": {
+        "mode": "closed",
+        "concurrency": 64,
+        "offered": 192,
+        "accepted": 192,
+        "completed": 192,
+        "failed": 0,
+        "historyFailures": 0,
+        "dropped": 0,
+        "elapsedMs": 27432.335867,
+        "successfulRunsPerSecond": 6.999039415778234,
+        "maximumInFlight": 64,
+        "acknowledgementMs": {
+          "count": 192,
+          "p50": 45,
+          "p95": 587,
+          "p99": 1052,
+          "max": 1724
+        },
+        "queueMs": {
+          "count": 192,
+          "p50": 69,
+          "p95": 1853,
+          "p99": 2278,
+          "max": 2320
+        },
+        "firstDurableTextMs": {
+          "count": 192,
+          "p50": 6399,
+          "p95": 12737,
+          "p99": 16070,
+          "max": 16501
+        },
+        "settlementMs": {
+          "count": 192,
+          "p50": 6942,
+          "p95": 13631,
+          "p99": 16385,
+          "max": 17262
+        },
+        "generatorDelayMs": {
+          "count": 192,
+          "p50": 0.0009920000011334196,
+          "p95": 0.002765000012004748,
+          "p99": 0.021249999990686774,
+          "max": 0.03799200001230929
+        },
+        "sseReconnects": 0
+      },
+      "records": 2398,
+      "recordKinds": {
+        "durable_commit": 1630,
+        "agent_event": 576,
+        "work_finished": 192
+      },
+      "truncated": 0,
+      "breakdown": {
+        "wall": {
+          "count": 2398,
+          "mean": 198.387,
+          "p50": 197.447,
+          "p95": 435.457,
+          "max": 1231.787,
+          "total": 475732.9
+        },
+        "queryUnion": {
+          "count": 2398,
+          "mean": 116.045,
+          "p50": 104.724,
+          "p95": 285.132,
+          "max": 614.703,
+          "total": 278275.75
+        },
+        "poolUnion": {
+          "count": 2398,
+          "mean": 80.202,
+          "p50": 77.914,
+          "p95": 199.955,
+          "max": 611.684,
+          "total": 192325.14
+        },
+        "other": {
+          "count": 2398,
+          "mean": 2.14,
+          "p50": 1.777,
+          "p95": 5.448,
+          "max": 31.059,
+          "total": 5132.01
+        },
+        "queryCount": {
+          "count": 2398,
+          "mean": 12.642,
+          "p50": 12,
+          "p95": 31,
+          "max": 31,
+          "total": 30316
+        }
+      },
+      "acquisition": {
+        "count": 2014,
+        "mean": 95.494,
+        "p50": 92.723,
+        "p95": 209.751,
+        "max": 611.684,
+        "total": 192325.14
+      },
+      "sqlCalls": 30316,
+      "sqlCallsPerCompletedRun": 157.89583333333334,
+      "queryGroups": [
+        {
+          "id": "541d04611b72ea92",
+          "count": 576,
+          "meanMs": 38.903,
+          "p95Ms": 62.807,
+          "totalMs": 22408.33,
+          "sqlPrefix": "with affected(session_id,turn_id) as ( values ($1::uuid,$2::uuid) ), inserted as ( insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) select $3::uuid,a.session_id,$4,$5,a.turn_"
+        },
+        {
+          "id": "9505cacb7c710ed1",
+          "count": 1822,
+          "meanMs": 11.733,
+          "p95Ms": 21.004,
+          "totalMs": 21376.62,
+          "sqlPrefix": "commit"
+        },
+        {
+          "id": "e4420bc209123df9",
+          "count": 1438,
+          "meanMs": 13.64,
+          "p95Ms": 24.936,
+          "totalMs": 19614.04,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,'?'::json as pending_live from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c w"
+        },
+        {
+          "id": "e660dcbf8778da0f",
+          "count": 1152,
+          "meanMs": 11.143,
+          "p95Ms": 19.29,
+          "totalMs": 12837.16,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "78ff36fdce0cf66f",
+          "count": 1630,
+          "meanMs": 7.27,
+          "p95Ms": 15.214,
+          "totalMs": 11849.55,
+          "sqlPrefix": "insert into pi_durable_commits(tenant_id,session_id,seq,next_id,fingerprint,write_count,history_write_count,history_fingerprint,current_hashes,cloud_metadata) values($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)"
+        },
+        {
+          "id": "3ecfaf9ae1b76408",
+          "count": 1822,
+          "meanMs": 5.776,
+          "p95Ms": 12.46,
+          "totalMs": 10523.98,
+          "sqlPrefix": "insert into accepted_fact_projection_offsets(topic,partition,next_offset) values($1,$2,$3::bigint) on conflict(topic,partition) do update set next_offset=excluded.next_offset where accepted_fact_projection_offsets.next_offset<excluded.next_offset"
+        },
+        {
+          "id": "e6f07d43b5c21db0",
+          "count": 1822,
+          "meanMs": 5.726,
+          "p95Ms": 11.56,
+          "totalMs": 10432.31,
+          "sqlPrefix": "begin"
+        },
+        {
+          "id": "a0c1f9da03a78d70",
+          "count": 192,
+          "meanMs": 54.271,
+          "p95Ms": 152.08,
+          "totalMs": 10420.09,
+          "sqlPrefix": "with owner as materialized ( select id from runs where tenant_id=$1::uuid and id=$2::uuid and lease_id=$3::uuid and exists(select 1 from pi_durable_commits c where c.tenant_id=$4::uuid and c.session_id=$5 and c.seq=$6) for no key update ), admitted as material"
+        },
+        {
+          "id": "980fdf628c0260a7",
+          "count": 1822,
+          "meanMs": 5.556,
+          "p95Ms": 11.344,
+          "totalMs": 10123.81,
+          "sqlPrefix": "select set_config('?', $1, true), set_config('?', $2, true)"
+        },
+        {
+          "id": "f174b3c048296f5c",
+          "count": 768,
+          "meanMs": 12.896,
+          "p95Ms": 23.654,
+          "totalMs": 9904.11,
+          "sqlPrefix": "select id,fields from pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and id=any($3::bigint[])"
+        },
+        {
+          "id": "6078b3c8362749ef",
+          "count": 1630,
+          "meanMs": 5.492,
+          "p95Ms": 11.119,
+          "totalMs": 8952.28,
+          "sqlPrefix": "with locked_run as materialized ( select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text from runs where tenant_id=$1::uuid and id=$2::uuid for no key update )"
+        },
+        {
+          "id": "1f49cbe4f0a7377d",
+          "count": 1630,
+          "meanMs": 5.445,
+          "p95Ms": 10.92,
+          "totalMs": 8875.08,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "b5281bddc2216ccf",
+          "count": 1630,
+          "meanMs": 5.378,
+          "p95Ms": 10.717,
+          "totalMs": 8765.93,
+          "sqlPrefix": "select fingerprint,current_hashes from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and seq=$3"
+        },
+        {
+          "id": "f0e2fbc33aac3274",
+          "count": 576,
+          "meanMs": 14.662,
+          "p95Ms": 55.293,
+          "totalMs": 8445.19,
+          "sqlPrefix": "select g.id as retained_id,ref.ordinal,g.cloud_origin->>'?' as turn_id,g.cloud_origin->>'?' as source_session_id, assistant.retained_record_id as assistant_record_id,g.record_id::text as id,g.body,g.record_kind as kind,r.fields,g.committed_at, case when g.reco"
+        },
+        {
+          "id": "0eef000afb5eb14d",
+          "count": 384,
+          "meanMs": 16.69,
+          "p95Ms": 28.276,
+          "totalMs": 6409.0,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "fc334885a1a7f3d8",
+          "count": 384,
+          "meanMs": 15.822,
+          "p95Ms": 26.592,
+          "totalMs": 6075.68,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "db68fce26ee46972",
+          "count": 384,
+          "meanMs": 15.118,
+          "p95Ms": 26.38,
+          "totalMs": 5805.21,
+          "sqlPrefix": "delete from pi_durable_document_revisions d using pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and r.id=any($3::bigint[]) and r.fields->>'?'='?' and d.tenant_id=r.tenant_id and d.session_id=r.session_id and d.document_id=r.id"
+        },
+        {
+          "id": "543cc5d28a734079",
+          "count": 576,
+          "meanMs": 9.939,
+          "p95Ms": 17.322,
+          "totalMs": 5725.0,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "0c1e2cbd5b79dbf3",
+          "count": 192,
+          "meanMs": 29.433,
+          "p95Ms": 66.928,
+          "totalMs": 5651.21,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,coalesce(( select json_agg(row) from (select c.id::text,c.kind,c.seq::text,c.ordinal,c.body,c.delta_count, c.created_seq::text,c.retired_se"
+        },
+        {
+          "id": "0cbded18ab91e3b9",
+          "count": 478,
+          "meanMs": 11.32,
+          "p95Ms": 43.525,
+          "totalMs": 5411.18,
+          "sqlPrefix": "select session_id,turn_id,id,output_display_seq::text from conversation_turns where tenant_id=$1::uuid and id=$2::uuid and session_id=any($3::uuid[])"
+        },
+        {
+          "id": "21d88ea11ae44bd5",
+          "count": 576,
+          "meanMs": 9.282,
+          "p95Ms": 16.736,
+          "totalMs": 5346.23,
+          "sqlPrefix": "insert into pi_durable_current as existing (tenant_id,session_id,id,kind,seq,ordinal,body,delta_count,created_seq,retired_seq,cloud_origin,committed_at) values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb, (select committed_at from pi_durable_commits where"
+        },
+        {
+          "id": "a6ce81460b600f39",
+          "count": 576,
+          "meanMs": 8.344,
+          "p95Ms": 18.086,
+          "totalMs": 4806.29,
+          "sqlPrefix": "with bodies as ( insert into pi_history_bodies(tenant_id,body_kind,id,sha256,payload_text,payload_bytes) values ($1::uuid,'?',$2::uuid,$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=e"
+        },
+        {
+          "id": "f7ec4e498a540da1",
+          "count": 384,
+          "meanMs": 10.248,
+          "p95Ms": 21.66,
+          "totalMs": 3935.2,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "694982afe745f148",
+          "count": 384,
+          "meanMs": 7.83,
+          "p95Ms": 17.387,
+          "totalMs": 3006.6,
+          "sqlPrefix": "with coverage(session_id,turn_id,through) as (values ($1::uuid,$2::uuid,$3::bigint)), root as ( update runs r set output_display_seq=greatest(r.output_display_seq,c.through), output_display_native_seq=greatest(r.output_display_native_seq,$4) from coverage c wh"
+        },
+        {
+          "id": "789962e9a76686a3",
+          "count": 384,
+          "meanMs": 6.703,
+          "p95Ms": 13.908,
+          "totalMs": 2573.81,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "5818505c3889f36b",
+          "count": 192,
+          "meanMs": 13.023,
+          "p95Ms": 23.787,
+          "totalMs": 2500.47,
+          "sqlPrefix": "select c.*,r.id as indexed_id,r.kind as indexed_kind,r.fields as indexed_fields from pi_durable_current c left join pi_durable_records r using(tenant_id,session_id,id) where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and c.replay_offset is not null"
+        },
+        {
+          "id": "9d592a2b8cea16ea",
+          "count": 192,
+          "meanMs": 12.462,
+          "p95Ms": 22.238,
+          "totalMs": 2392.62,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "5a249ba565c309c5",
+          "count": 192,
+          "meanMs": 11.669,
+          "p95Ms": 30.23,
+          "totalMs": 2240.37,
+          "sqlPrefix": "with \"updated_run\" as (update \"runs\" set \"state\" = $1, \"row_version\" = row_version+1, \"updated_at\" = $2, \"settled_at\" = $3, \"stop_reason\" = $4 where \"tenant_id\" = $5 and \"id\" = $6 and \"row_version\" = $7 returning \"id\", \"row_version\"), \"recorded_transition\" as "
+        },
+        {
+          "id": "d9b6f68018f6562f",
+          "count": 192,
+          "meanMs": 10.708,
+          "p95Ms": 22.734,
+          "totalMs": 2055.86,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "4bae498c1f8b55c7",
+          "count": 192,
+          "meanMs": 10.584,
+          "p95Ms": 21.048,
+          "totalMs": 2032.21,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "f3ed981d2a966df6",
+          "count": 192,
+          "meanMs": 10.523,
+          "p95Ms": 24.983,
+          "totalMs": 2020.43,
+          "sqlPrefix": "update \"runs\" set \"output_sealed_at\" = $1, \"output_seal_offset\" = $2, \"last_event_seq\" = $3, \"execution_released_at\" = $4, \"agent_exited_at\" = $5, \"recovery_requested_at\" = $6, \"output_first_topic\" = coalesce(output_first_topic,$7), \"output_first_partition\" = "
+        },
+        {
+          "id": "ff821a030963b8f1",
+          "count": 192,
+          "meanMs": 10.251,
+          "p95Ms": 20.005,
+          "totalMs": 1968.13,
+          "sqlPrefix": "select id::text,fields from pi_durable_records where tenant_id=$1::uuid and session_id=$2 and kind='?' and fields->>'?'=any($3::text[])"
+        },
+        {
+          "id": "a3681047405dfd8a",
+          "count": 192,
+          "meanMs": 10.026,
+          "p95Ms": 20.533,
+          "totalMs": 1924.92,
+          "sqlPrefix": "update \"runs\" set \"output_first_topic\" = $1, \"output_first_partition\" = $2, \"output_first_offset\" = $3 where \"tenant_id\" = $4 and \"id\" = $5"
+        },
+        {
+          "id": "a8c971c9acc61c55",
+          "count": 192,
+          "meanMs": 9.633,
+          "p95Ms": 17.054,
+          "totalMs": 1849.61,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "41cf5e117dbfaebb",
+          "count": 192,
+          "meanMs": 7.83,
+          "p95Ms": 19.236,
+          "totalMs": 1503.42,
+          "sqlPrefix": "update \"sessions\" set \"state\" = $1, \"next_event_seq\" = $2, \"row_version\" = row_version+1, \"updated_at\" = $3, \"last_active_at\" = $4 where \"tenant_id\" = $5 and \"id\" = $6"
+        },
+        {
+          "id": "3b06db3d03f1ca68",
+          "count": 192,
+          "meanMs": 7.366,
+          "p95Ms": 16.037,
+          "totalMs": 1414.24,
+          "sqlPrefix": "update sessions s set next_event_seq=greatest(s.next_event_seq,views.through+1) from (values ($1::uuid,$2::bigint)) views(id,through) where s.tenant_id=$3::uuid and s.pi_session_id=$4 and s.id=views.id"
+        },
+        {
+          "id": "be37a5c2332b2267",
+          "count": 192,
+          "meanMs": 7.209,
+          "p95Ms": 18.74,
+          "totalMs": 1384.04,
+          "sqlPrefix": "select 1 from pi_history_views v cross join lateral pi_history_view_ranges(v.tenant_id,v.root_id,$1::bigint,$2::bigint) n join pi_history_blocks b on b.tenant_id=v.tenant_id and b.id=n.block_id where v.tenant_id=$3::uuid and v.session_id=$4::uuid and b.turn_id"
+        },
+        {
+          "id": "3342327b73a01f94",
+          "count": 192,
+          "meanMs": 7.119,
+          "p95Ms": 15.108,
+          "totalMs": 1366.9,
+          "sqlPrefix": "insert into \"model_invocations\" (\"id\", \"tenant_id\", \"session_id\", \"run_id\", \"requested_at\", \"provider\", \"model\", \"purpose\", \"context\", \"context_hash\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "34be46362b3dcb07",
+          "count": 192,
+          "meanMs": 6.773,
+          "p95Ms": 15.692,
+          "totalMs": 1300.33,
+          "sqlPrefix": "insert into \"session_terminal_events\" (\"event_id\", \"tenant_id\", \"session_id\", \"turn_id\", \"agent_id\", \"run_id\", \"seq\", \"schema_version\", \"type\", \"payload\", \"occurred_at\", \"persisted_at\", \"interrupted_prefix\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11"
+        },
+        {
+          "id": "285800fa5a467320",
+          "count": 192,
+          "meanMs": 6.306,
+          "p95Ms": 11.608,
+          "totalMs": 1210.71,
+          "sqlPrefix": "update runs candidate set ready_at=clock_timestamp() where candidate.tenant_id=$1::uuid and candidate.session_id=$2::uuid and candidate.state='?' and candidate.ready_at is null and exists(select 1 from sessions s where s.tenant_id=$3::uuid and s.id=$4::uuid an"
+        },
+        {
+          "id": "9bff3cb0a038ac4c",
+          "count": 192,
+          "meanMs": 5.75,
+          "p95Ms": 12.624,
+          "totalMs": 1104.02,
+          "sqlPrefix": "select s.pi_session_id,r.id as run_id,r.mailbox_position::text as position,r.state,r.stop_reason,r.operation_kind, r.output_display_seq::text as coverage,r.output_display_native_seq::text as native_coverage,r.created_at, jsonb_build_object('?',r.input_text,'?'"
+        },
+        {
+          "id": "0a0b2ee33c85351a",
+          "count": 192,
+          "meanMs": 5.687,
+          "p95Ms": 11.974,
+          "totalMs": 1091.87,
+          "sqlPrefix": "update \"turn_control_requests\" set \"state\" = $1, \"completed_at\" = $2, \"failure_code\" = $3 where \"tenant_id\" = $4 and \"target_run_id\" = $5 and \"kind\" = $6 and \"state\" in ($7, $8, $9)"
+        },
+        {
+          "id": "81275917293fac34",
+          "count": 192,
+          "meanMs": 5.615,
+          "p95Ms": 11.563,
+          "totalMs": 1078.05,
+          "sqlPrefix": "insert into \"model_metering_events\" (\"id\", \"invocation_id\", \"kind\", \"execution_id\", \"occurred_at\", \"payload\", \"payload_hash\", \"valuation\") values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "3134d500dfc57c06",
+          "count": 192,
+          "meanMs": 5.509,
+          "p95Ms": 12.093,
+          "totalMs": 1057.82,
+          "sqlPrefix": "select coalesce(max(seq),0)::text seq from ( select seq from pi_durable_commits where tenant_id=$1::uuid and session_id=$2 union all select through_seq from pi_durable_bases where tenant_id=$3::uuid and session_id=$4 ) positions"
+        },
+        {
+          "id": "8aacc851b9a7820e",
+          "count": 192,
+          "meanMs": 5.388,
+          "p95Ms": 11.168,
+          "totalMs": 1034.53,
+          "sqlPrefix": "update pi_durable_current c set replay_topic=$1, replay_partition=$2,replay_offset=$3::bigint,replay_seq=$4 where \"c\".\"tenant_id\"=$5::uuid and \"c\".\"session_id\"=$6 and id=$7::bigint and replay_seq is null and seq<$8 returning id"
+        },
+        {
+          "id": "7db28c8f50809936",
+          "count": 192,
+          "meanMs": 5.348,
+          "p95Ms": 11.168,
+          "totalMs": 1026.85,
+          "sqlPrefix": "select \"lease_id\", \"fencing_token\", \"session_id\", \"turn_id\", \"output_sealed_at\", \"output_seal_offset\", \"state\", \"row_version\", \"output_first_topic\", \"output_first_partition\" from \"runs\" where \"tenant_id\" = $1 and \"id\" = $2 for no key update"
+        },
+        {
+          "id": "af913f5ec4b4fb43",
+          "count": 192,
+          "meanMs": 5.255,
+          "p95Ms": 11.767,
+          "totalMs": 1009.01,
+          "sqlPrefix": "update \"session_leases\" set \"writer_sealed_at\" = $1, \"writer_seal_offset\" = $2, \"released_at\" = $3 where \"tenant_id\" = $4 and \"lease_id\" = $5"
+        },
+        {
+          "id": "791ee1248d3978e1",
+          "count": 192,
+          "meanMs": 5.172,
+          "p95Ms": 10.767,
+          "totalMs": 993.05,
+          "sqlPrefix": "select \"writer_failed_at\", \"writer_seal_offset\", \"pi_session_id\", \"fencing_token\" from \"session_leases\" where \"tenant_id\" = $1 and \"lease_id\" = $2 for no key update"
+        },
+        {
+          "id": "fcf2a69f48ac183c",
+          "count": 192,
+          "meanMs": 5.131,
+          "p95Ms": 10.932,
+          "totalMs": 985.17,
+          "sqlPrefix": "insert into pi_history_views(tenant_id,session_id,root_id) values($1::uuid,$2::uuid,$3::uuid) on conflict(tenant_id,session_id) do update set root_id=excluded.root_id"
+        },
+        {
+          "id": "79a98ec3b603d85c",
+          "count": 192,
+          "meanMs": 5.124,
+          "p95Ms": 10.13,
+          "totalMs": 983.71,
+          "sqlPrefix": "insert into \"model_execution_writers\" (\"writer_id\", \"tenant_id\", \"pi_session_id\", \"run_id\", \"fencing_token\", \"topic\", \"partition\", \"close_offset\", \"fingerprint\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (\"writer_id\") do nothing returning \"writer"
+        },
+        {
+          "id": "5e6f0d72b594ccc3",
+          "count": 192,
+          "meanMs": 5.123,
+          "p95Ms": 10.736,
+          "totalMs": 983.53,
+          "sqlPrefix": "select \"context_hash\" from \"model_invocations\" where \"id\" = $1"
+        },
+        {
+          "id": "20d81d67730722a9",
+          "count": 192,
+          "meanMs": 5.115,
+          "p95Ms": 9.832,
+          "totalMs": 982.04,
+          "sqlPrefix": "select h.seq,h.next_id,false as incomplete from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 union all select through_seq,next_id from pi_durab"
+        },
+        {
+          "id": "12e7bcb3eeb0040c",
+          "count": 192,
+          "meanMs": 5.113,
+          "p95Ms": 10.902,
+          "totalMs": 981.74,
+          "sqlPrefix": "insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) values($1::uuid,$2::uuid,$3,$4,$5::uuid,$6::uuid,$7::bigint) on conflict(tenant_id,source_pi_session_id,turn_id) do update se"
+        },
+        {
+          "id": "d25b8b805c8ef8fa",
+          "count": 192,
+          "meanMs": 5.095,
+          "p95Ms": 10.676,
+          "totalMs": 978.18,
+          "sqlPrefix": "select \"child_session_id\" from \"subagent_conversations\" where \"tenant_id\" = $1 and \"root_run_id\" = $2"
+        },
+        {
+          "id": "7a853c531db1dd6c",
+          "count": 192,
+          "meanMs": 5.089,
+          "p95Ms": 10.659,
+          "totalMs": 977.13,
+          "sqlPrefix": "update pi_history_blocks set header_body_id=$1::uuid,fields=$2::jsonb where tenant_id=$3::uuid and id=$4::uuid"
+        },
+        {
+          "id": "15d62ac19791509e",
+          "count": 192,
+          "meanMs": 5.055,
+          "p95Ms": 10.686,
+          "totalMs": 970.58,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "2267c789ece38b08",
+          "count": 192,
+          "meanMs": 5.049,
+          "p95Ms": 10.83,
+          "totalMs": 969.45,
+          "sqlPrefix": "with visible as ( select seq,ordinal from pi_history_frames where tenant_id=$1::uuid and block_id=$2::uuid ) select count(*)::text as n,(array_agg(seq order by seq desc,ordinal desc))[1]::text as seq, (array_agg(ordinal order by seq desc,ordinal desc))[1] as o"
+        },
+        {
+          "id": "0e1357834e1a2920",
+          "count": 192,
+          "meanMs": 5.039,
+          "p95Ms": 10.784,
+          "totalMs": 967.49,
+          "sqlPrefix": "insert into pi_history_view_nodes(tenant_id,id,left_id,right_id,block_id,header_body_id,header_fields,through_seq,through_ordinal,min_position,max_position,turn_count,height,node) values ($1::uuid,$2::uuid, $3::uuid,$4::uuid, $5::uuid,$6::uuid,$7::jsonb,$8::bi"
+        },
+        {
+          "id": "60e8f2004870ee8c",
+          "count": 192,
+          "meanMs": 4.989,
+          "p95Ms": 10.382,
+          "totalMs": 957.93,
+          "sqlPrefix": "select position::text,header_body_id,fields from pi_history_blocks where tenant_id=$1::uuid and id=$2::uuid and header_body_id is not null for key share"
+        },
+        {
+          "id": "f1bda116cc866cb2",
+          "count": 192,
+          "meanMs": 4.862,
+          "p95Ms": 10.288,
+          "totalMs": 933.48,
+          "sqlPrefix": "insert into pi_history_bodies(tenant_id,id,body_kind,sha256,payload_text,payload_bytes) values($1::uuid,$2::uuid,'?',$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=excluded.payload_te"
+        },
+        {
+          "id": "0321f41e71d8f44c",
+          "count": 192,
+          "meanMs": 4.738,
+          "p95Ms": 9.864,
+          "totalMs": 909.65,
+          "sqlPrefix": "select root_id from pi_history_views where tenant_id=$1::uuid and session_id=$2::uuid for update"
+        },
+        {
+          "id": "5b70cf5051759432",
+          "count": 192,
+          "meanMs": 4.491,
+          "p95Ms": 9.899,
+          "totalMs": 862.29,
+          "sqlPrefix": "select \"session_kind\" from \"sessions\" where \"tenant_id\" = $1 and \"id\" = $2 and \"pruned_at\" is null"
+        }
+      ],
+      "sseSetupFailures": 0
+    },
+    {
+      "name": "fixed32-cpu",
+      "poolSize": 32,
+      "candidateReader": true,
+      "cpuProfile": true,
+      "serverDuration": false,
+      "sourceHashes": {
+        "session-projector.ts": "f0cbed41d063fb5737a56063e09e88ec3b33d5a23f0541e4ef243f2f4b44bc96",
+        "session-runtime-main.ts": "961a6323c2bfc4bfdaa276b039b0ac687d8ac10bb992bfadf63fc34be01d6766",
+        "kafka-partition-reader.ts": "7913647852c9141ad93b536f708f752b1a6d1be994dc5f5257da3fd6ec837a35",
+        "probe.mjs": "1e6a2e6a7912d761a927b11b6496099630d678c7b77a3e9dc011544339475d54",
+        "entry.mjs": "4b17d74d38343ce233b32dd2c76ea218d8d727cc373ef37d72a232d4e6f775b5",
+        "cpu.mjs": "7e1482f70b487bb94fbe95d994ffdbfda42909596b68833061902ef140a337ae"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "restored": true,
+      "realProviderRequests": false,
+      "summary": {
+        "mode": "closed",
+        "concurrency": 64,
+        "offered": 192,
+        "accepted": 192,
+        "completed": 192,
+        "failed": 0,
+        "historyFailures": 0,
+        "dropped": 0,
+        "elapsedMs": 29584.494636999996,
+        "successfulRunsPerSecond": 6.489886082416775,
+        "maximumInFlight": 64,
+        "acknowledgementMs": {
+          "count": 192,
+          "p50": 48,
+          "p95": 111,
+          "p99": 307,
+          "max": 356
+        },
+        "queueMs": {
+          "count": 192,
+          "p50": 73,
+          "p95": 2329,
+          "p99": 2759,
+          "max": 2765
+        },
+        "firstDurableTextMs": {
+          "count": 192,
+          "p50": 7587,
+          "p95": 12600,
+          "p99": 15129,
+          "max": 17356
+        },
+        "settlementMs": {
+          "count": 192,
+          "p50": 8025,
+          "p95": 13311,
+          "p99": 17244,
+          "max": 17806
+        },
+        "generatorDelayMs": {
+          "count": 192,
+          "p50": 0.0009710000013001263,
+          "p95": 0.0022939999907976016,
+          "p99": 0.005850999994436279,
+          "max": 0.03245099999185186
+        },
+        "sseReconnects": 0
+      },
+      "records": 2424,
+      "recordKinds": {
+        "durable_commit": 1656,
+        "agent_event": 576,
+        "work_finished": 192
+      },
+      "truncated": 0,
+      "breakdown": {
+        "wall": {
+          "count": 2424,
+          "mean": 163.275,
+          "p50": 141.494,
+          "p95": 405.302,
+          "max": 778.66,
+          "total": 395777.95
+        },
+        "queryUnion": {
+          "count": 2424,
+          "mean": 160.94,
+          "p50": 139.687,
+          "p95": 400.27,
+          "max": 765.786,
+          "total": 390119.71
+        },
+        "poolUnion": {
+          "count": 2424,
+          "mean": 0.204,
+          "p50": 0.049,
+          "p95": 0.423,
+          "max": 159.146,
+          "total": 494.72
+        },
+        "other": {
+          "count": 2424,
+          "mean": 2.13,
+          "p50": 1.67,
+          "p95": 5.465,
+          "max": 39.554,
+          "total": 5163.52
+        },
+        "queryCount": {
+          "count": 2424,
+          "mean": 12.614,
+          "p50": 12,
+          "p95": 31,
+          "max": 31,
+          "total": 30576
+        }
+      },
+      "acquisition": {
+        "count": 2040,
+        "mean": 0.243,
+        "p50": 0.059,
+        "p95": 0.442,
+        "max": 159.146,
+        "total": 494.72
+      },
+      "sqlCalls": 30576,
+      "sqlCallsPerCompletedRun": 159.25,
+      "queryGroups": [
+        {
+          "id": "541d04611b72ea92",
+          "count": 576,
+          "meanMs": 46.698,
+          "p95Ms": 72.951,
+          "totalMs": 26898.09,
+          "sqlPrefix": "with affected(session_id,turn_id) as ( values ($1::uuid,$2::uuid) ), inserted as ( insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) select $3::uuid,a.session_id,$4,$5,a.turn_"
+        },
+        {
+          "id": "9505cacb7c710ed1",
+          "count": 1848,
+          "meanMs": 14.51,
+          "p95Ms": 27.285,
+          "totalMs": 26814.73,
+          "sqlPrefix": "commit"
+        },
+        {
+          "id": "e4420bc209123df9",
+          "count": 1464,
+          "meanMs": 17.611,
+          "p95Ms": 32.461,
+          "totalMs": 25782.54,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,'?'::json as pending_live from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c w"
+        },
+        {
+          "id": "e660dcbf8778da0f",
+          "count": 1152,
+          "meanMs": 15.034,
+          "p95Ms": 26.854,
+          "totalMs": 17319.01,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "78ff36fdce0cf66f",
+          "count": 1656,
+          "meanMs": 10.187,
+          "p95Ms": 21.248,
+          "totalMs": 16870.47,
+          "sqlPrefix": "insert into pi_durable_commits(tenant_id,session_id,seq,next_id,fingerprint,write_count,history_write_count,history_fingerprint,current_hashes,cloud_metadata) values($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)"
+        },
+        {
+          "id": "a0c1f9da03a78d70",
+          "count": 192,
+          "meanMs": 84.778,
+          "p95Ms": 153.148,
+          "totalMs": 16277.28,
+          "sqlPrefix": "with owner as materialized ( select id from runs where tenant_id=$1::uuid and id=$2::uuid and lease_id=$3::uuid and exists(select 1 from pi_durable_commits c where c.tenant_id=$4::uuid and c.session_id=$5 and c.seq=$6) for no key update ), admitted as material"
+        },
+        {
+          "id": "3ecfaf9ae1b76408",
+          "count": 1848,
+          "meanMs": 8.257,
+          "p95Ms": 16.64,
+          "totalMs": 15258.18,
+          "sqlPrefix": "insert into accepted_fact_projection_offsets(topic,partition,next_offset) values($1,$2,$3::bigint) on conflict(topic,partition) do update set next_offset=excluded.next_offset where accepted_fact_projection_offsets.next_offset<excluded.next_offset"
+        },
+        {
+          "id": "980fdf628c0260a7",
+          "count": 1848,
+          "meanMs": 8.097,
+          "p95Ms": 15.23,
+          "totalMs": 14963.04,
+          "sqlPrefix": "select set_config('?', $1, true), set_config('?', $2, true)"
+        },
+        {
+          "id": "e6f07d43b5c21db0",
+          "count": 1848,
+          "meanMs": 8.039,
+          "p95Ms": 15.516,
+          "totalMs": 14855.71,
+          "sqlPrefix": "begin"
+        },
+        {
+          "id": "f0e2fbc33aac3274",
+          "count": 576,
+          "meanMs": 23.629,
+          "p95Ms": 76.28,
+          "totalMs": 13610.05,
+          "sqlPrefix": "select g.id as retained_id,ref.ordinal,g.cloud_origin->>'?' as turn_id,g.cloud_origin->>'?' as source_session_id, assistant.retained_record_id as assistant_record_id,g.record_id::text as id,g.body,g.record_kind as kind,r.fields,g.committed_at, case when g.reco"
+        },
+        {
+          "id": "6078b3c8362749ef",
+          "count": 1656,
+          "meanMs": 8.161,
+          "p95Ms": 14.857,
+          "totalMs": 13515.08,
+          "sqlPrefix": "with locked_run as materialized ( select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text from runs where tenant_id=$1::uuid and id=$2::uuid for no key update )"
+        },
+        {
+          "id": "1f49cbe4f0a7377d",
+          "count": 1656,
+          "meanMs": 8.145,
+          "p95Ms": 15.699,
+          "totalMs": 13488.49,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "b5281bddc2216ccf",
+          "count": 1656,
+          "meanMs": 8.052,
+          "p95Ms": 14.737,
+          "totalMs": 13334.04,
+          "sqlPrefix": "select fingerprint,current_hashes from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and seq=$3"
+        },
+        {
+          "id": "f174b3c048296f5c",
+          "count": 768,
+          "meanMs": 16.356,
+          "p95Ms": 29.775,
+          "totalMs": 12561.61,
+          "sqlPrefix": "select id,fields from pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and id=any($3::bigint[])"
+        },
+        {
+          "id": "0cbded18ab91e3b9",
+          "count": 504,
+          "meanMs": 20.085,
+          "p95Ms": 64.817,
+          "totalMs": 10122.89,
+          "sqlPrefix": "select session_id,turn_id,id,output_display_seq::text from conversation_turns where tenant_id=$1::uuid and id=$2::uuid and session_id=any($3::uuid[])"
+        },
+        {
+          "id": "0eef000afb5eb14d",
+          "count": 384,
+          "meanMs": 22.13,
+          "p95Ms": 35.595,
+          "totalMs": 8497.9,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "21d88ea11ae44bd5",
+          "count": 576,
+          "meanMs": 13.876,
+          "p95Ms": 26.627,
+          "totalMs": 7992.4,
+          "sqlPrefix": "insert into pi_durable_current as existing (tenant_id,session_id,id,kind,seq,ordinal,body,delta_count,created_seq,retired_seq,cloud_origin,committed_at) values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb, (select committed_at from pi_durable_commits where"
+        },
+        {
+          "id": "fc334885a1a7f3d8",
+          "count": 384,
+          "meanMs": 20.331,
+          "p95Ms": 33.257,
+          "totalMs": 7807.2,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "543cc5d28a734079",
+          "count": 576,
+          "meanMs": 12.887,
+          "p95Ms": 23.525,
+          "totalMs": 7423.18,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "db68fce26ee46972",
+          "count": 384,
+          "meanMs": 19.167,
+          "p95Ms": 31.239,
+          "totalMs": 7360.11,
+          "sqlPrefix": "delete from pi_durable_document_revisions d using pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and r.id=any($3::bigint[]) and r.fields->>'?'='?' and d.tenant_id=r.tenant_id and d.session_id=r.session_id and d.document_id=r.id"
+        },
+        {
+          "id": "a6ce81460b600f39",
+          "count": 576,
+          "meanMs": 12.692,
+          "p95Ms": 24.75,
+          "totalMs": 7310.63,
+          "sqlPrefix": "with bodies as ( insert into pi_history_bodies(tenant_id,body_kind,id,sha256,payload_text,payload_bytes) values ($1::uuid,'?',$2::uuid,$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=e"
+        },
+        {
+          "id": "0c1e2cbd5b79dbf3",
+          "count": 192,
+          "meanMs": 37.599,
+          "p95Ms": 123.291,
+          "totalMs": 7219.07,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,coalesce(( select json_agg(row) from (select c.id::text,c.kind,c.seq::text,c.ordinal,c.body,c.delta_count, c.created_seq::text,c.retired_se"
+        },
+        {
+          "id": "f7ec4e498a540da1",
+          "count": 384,
+          "meanMs": 13.999,
+          "p95Ms": 28.298,
+          "totalMs": 5375.57,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "694982afe745f148",
+          "count": 384,
+          "meanMs": 11.792,
+          "p95Ms": 23.755,
+          "totalMs": 4527.98,
+          "sqlPrefix": "with coverage(session_id,turn_id,through) as (values ($1::uuid,$2::uuid,$3::bigint)), root as ( update runs r set output_display_seq=greatest(r.output_display_seq,c.through), output_display_native_seq=greatest(r.output_display_native_seq,$4) from coverage c wh"
+        },
+        {
+          "id": "789962e9a76686a3",
+          "count": 384,
+          "meanMs": 9.777,
+          "p95Ms": 18.959,
+          "totalMs": 3754.32,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "5818505c3889f36b",
+          "count": 192,
+          "meanMs": 17.914,
+          "p95Ms": 33.447,
+          "totalMs": 3439.43,
+          "sqlPrefix": "select c.*,r.id as indexed_id,r.kind as indexed_kind,r.fields as indexed_fields from pi_durable_current c left join pi_durable_records r using(tenant_id,session_id,id) where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and c.replay_offset is not null"
+        },
+        {
+          "id": "5a249ba565c309c5",
+          "count": 192,
+          "meanMs": 17.163,
+          "p95Ms": 46.928,
+          "totalMs": 3295.2,
+          "sqlPrefix": "with \"updated_run\" as (update \"runs\" set \"state\" = $1, \"row_version\" = row_version+1, \"updated_at\" = $2, \"settled_at\" = $3, \"stop_reason\" = $4 where \"tenant_id\" = $5 and \"id\" = $6 and \"row_version\" = $7 returning \"id\", \"row_version\"), \"recorded_transition\" as "
+        },
+        {
+          "id": "ff821a030963b8f1",
+          "count": 192,
+          "meanMs": 17.13,
+          "p95Ms": 32.749,
+          "totalMs": 3288.96,
+          "sqlPrefix": "select id::text,fields from pi_durable_records where tenant_id=$1::uuid and session_id=$2 and kind='?' and fields->>'?'=any($3::text[])"
+        },
+        {
+          "id": "9d592a2b8cea16ea",
+          "count": 192,
+          "meanMs": 16.737,
+          "p95Ms": 30.284,
+          "totalMs": 3213.47,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "d9b6f68018f6562f",
+          "count": 192,
+          "meanMs": 15.762,
+          "p95Ms": 33.298,
+          "totalMs": 3026.26,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "f3ed981d2a966df6",
+          "count": 192,
+          "meanMs": 15.267,
+          "p95Ms": 49.601,
+          "totalMs": 2931.18,
+          "sqlPrefix": "update \"runs\" set \"output_sealed_at\" = $1, \"output_seal_offset\" = $2, \"last_event_seq\" = $3, \"execution_released_at\" = $4, \"agent_exited_at\" = $5, \"recovery_requested_at\" = $6, \"output_first_topic\" = coalesce(output_first_topic,$7), \"output_first_partition\" = "
+        },
+        {
+          "id": "a3681047405dfd8a",
+          "count": 192,
+          "meanMs": 14.628,
+          "p95Ms": 26.784,
+          "totalMs": 2808.65,
+          "sqlPrefix": "update \"runs\" set \"output_first_topic\" = $1, \"output_first_partition\" = $2, \"output_first_offset\" = $3 where \"tenant_id\" = $4 and \"id\" = $5"
+        },
+        {
+          "id": "4bae498c1f8b55c7",
+          "count": 192,
+          "meanMs": 14.279,
+          "p95Ms": 26.988,
+          "totalMs": 2741.65,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "a8c971c9acc61c55",
+          "count": 192,
+          "meanMs": 12.754,
+          "p95Ms": 26.477,
+          "totalMs": 2448.8,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "41cf5e117dbfaebb",
+          "count": 192,
+          "meanMs": 10.685,
+          "p95Ms": 21.461,
+          "totalMs": 2051.44,
+          "sqlPrefix": "update \"sessions\" set \"state\" = $1, \"next_event_seq\" = $2, \"row_version\" = row_version+1, \"updated_at\" = $3, \"last_active_at\" = $4 where \"tenant_id\" = $5 and \"id\" = $6"
+        },
+        {
+          "id": "be37a5c2332b2267",
+          "count": 192,
+          "meanMs": 10.3,
+          "p95Ms": 30.985,
+          "totalMs": 1977.69,
+          "sqlPrefix": "select 1 from pi_history_views v cross join lateral pi_history_view_ranges(v.tenant_id,v.root_id,$1::bigint,$2::bigint) n join pi_history_blocks b on b.tenant_id=v.tenant_id and b.id=n.block_id where v.tenant_id=$3::uuid and v.session_id=$4::uuid and b.turn_id"
+        },
+        {
+          "id": "34be46362b3dcb07",
+          "count": 192,
+          "meanMs": 10.275,
+          "p95Ms": 23.566,
+          "totalMs": 1972.74,
+          "sqlPrefix": "insert into \"session_terminal_events\" (\"event_id\", \"tenant_id\", \"session_id\", \"turn_id\", \"agent_id\", \"run_id\", \"seq\", \"schema_version\", \"type\", \"payload\", \"occurred_at\", \"persisted_at\", \"interrupted_prefix\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11"
+        },
+        {
+          "id": "3b06db3d03f1ca68",
+          "count": 192,
+          "meanMs": 10.263,
+          "p95Ms": 21.55,
+          "totalMs": 1970.5,
+          "sqlPrefix": "update sessions s set next_event_seq=greatest(s.next_event_seq,views.through+1) from (values ($1::uuid,$2::bigint)) views(id,through) where s.tenant_id=$3::uuid and s.pi_session_id=$4 and s.id=views.id"
+        },
+        {
+          "id": "3342327b73a01f94",
+          "count": 192,
+          "meanMs": 9.777,
+          "p95Ms": 21.291,
+          "totalMs": 1877.1,
+          "sqlPrefix": "insert into \"model_invocations\" (\"id\", \"tenant_id\", \"session_id\", \"run_id\", \"requested_at\", \"provider\", \"model\", \"purpose\", \"context\", \"context_hash\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "0a0b2ee33c85351a",
+          "count": 192,
+          "meanMs": 8.898,
+          "p95Ms": 22.53,
+          "totalMs": 1708.46,
+          "sqlPrefix": "update \"turn_control_requests\" set \"state\" = $1, \"completed_at\" = $2, \"failure_code\" = $3 where \"tenant_id\" = $4 and \"target_run_id\" = $5 and \"kind\" = $6 and \"state\" in ($7, $8, $9)"
+        },
+        {
+          "id": "9bff3cb0a038ac4c",
+          "count": 192,
+          "meanMs": 8.565,
+          "p95Ms": 18.87,
+          "totalMs": 1644.57,
+          "sqlPrefix": "select s.pi_session_id,r.id as run_id,r.mailbox_position::text as position,r.state,r.stop_reason,r.operation_kind, r.output_display_seq::text as coverage,r.output_display_native_seq::text as native_coverage,r.created_at, jsonb_build_object('?',r.input_text,'?'"
+        },
+        {
+          "id": "3134d500dfc57c06",
+          "count": 192,
+          "meanMs": 8.506,
+          "p95Ms": 16.49,
+          "totalMs": 1633.12,
+          "sqlPrefix": "select coalesce(max(seq),0)::text seq from ( select seq from pi_durable_commits where tenant_id=$1::uuid and session_id=$2 union all select through_seq from pi_durable_bases where tenant_id=$3::uuid and session_id=$4 ) positions"
+        },
+        {
+          "id": "7db28c8f50809936",
+          "count": 192,
+          "meanMs": 8.432,
+          "p95Ms": 20.321,
+          "totalMs": 1619.03,
+          "sqlPrefix": "select \"lease_id\", \"fencing_token\", \"session_id\", \"turn_id\", \"output_sealed_at\", \"output_seal_offset\", \"state\", \"row_version\", \"output_first_topic\", \"output_first_partition\" from \"runs\" where \"tenant_id\" = $1 and \"id\" = $2 for no key update"
+        },
+        {
+          "id": "8aacc851b9a7820e",
+          "count": 192,
+          "meanMs": 8.078,
+          "p95Ms": 14.193,
+          "totalMs": 1551.01,
+          "sqlPrefix": "update pi_durable_current c set replay_topic=$1, replay_partition=$2,replay_offset=$3::bigint,replay_seq=$4 where \"c\".\"tenant_id\"=$5::uuid and \"c\".\"session_id\"=$6 and id=$7::bigint and replay_seq is null and seq<$8 returning id"
+        },
+        {
+          "id": "12e7bcb3eeb0040c",
+          "count": 192,
+          "meanMs": 7.901,
+          "p95Ms": 15.748,
+          "totalMs": 1516.93,
+          "sqlPrefix": "insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) values($1::uuid,$2::uuid,$3,$4,$5::uuid,$6::uuid,$7::bigint) on conflict(tenant_id,source_pi_session_id,turn_id) do update se"
+        },
+        {
+          "id": "af913f5ec4b4fb43",
+          "count": 192,
+          "meanMs": 7.899,
+          "p95Ms": 16.494,
+          "totalMs": 1516.65,
+          "sqlPrefix": "update \"session_leases\" set \"writer_sealed_at\" = $1, \"writer_seal_offset\" = $2, \"released_at\" = $3 where \"tenant_id\" = $4 and \"lease_id\" = $5"
+        },
+        {
+          "id": "81275917293fac34",
+          "count": 192,
+          "meanMs": 7.891,
+          "p95Ms": 19.663,
+          "totalMs": 1515.14,
+          "sqlPrefix": "insert into \"model_metering_events\" (\"id\", \"invocation_id\", \"kind\", \"execution_id\", \"occurred_at\", \"payload\", \"payload_hash\", \"valuation\") values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "285800fa5a467320",
+          "count": 192,
+          "meanMs": 7.814,
+          "p95Ms": 15.373,
+          "totalMs": 1500.37,
+          "sqlPrefix": "update runs candidate set ready_at=clock_timestamp() where candidate.tenant_id=$1::uuid and candidate.session_id=$2::uuid and candidate.state='?' and candidate.ready_at is null and exists(select 1 from sessions s where s.tenant_id=$3::uuid and s.id=$4::uuid an"
+        },
+        {
+          "id": "5e6f0d72b594ccc3",
+          "count": 192,
+          "meanMs": 7.757,
+          "p95Ms": 16.7,
+          "totalMs": 1489.27,
+          "sqlPrefix": "select \"context_hash\" from \"model_invocations\" where \"id\" = $1"
+        },
+        {
+          "id": "20d81d67730722a9",
+          "count": 192,
+          "meanMs": 7.748,
+          "p95Ms": 15.741,
+          "totalMs": 1487.63,
+          "sqlPrefix": "select h.seq,h.next_id,false as incomplete from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 union all select through_seq,next_id from pi_durab"
+        },
+        {
+          "id": "79a98ec3b603d85c",
+          "count": 192,
+          "meanMs": 7.717,
+          "p95Ms": 15.584,
+          "totalMs": 1481.66,
+          "sqlPrefix": "insert into \"model_execution_writers\" (\"writer_id\", \"tenant_id\", \"pi_session_id\", \"run_id\", \"fencing_token\", \"topic\", \"partition\", \"close_offset\", \"fingerprint\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (\"writer_id\") do nothing returning \"writer"
+        },
+        {
+          "id": "2267c789ece38b08",
+          "count": 192,
+          "meanMs": 7.717,
+          "p95Ms": 17.955,
+          "totalMs": 1481.59,
+          "sqlPrefix": "with visible as ( select seq,ordinal from pi_history_frames where tenant_id=$1::uuid and block_id=$2::uuid ) select count(*)::text as n,(array_agg(seq order by seq desc,ordinal desc))[1]::text as seq, (array_agg(ordinal order by seq desc,ordinal desc))[1] as o"
+        },
+        {
+          "id": "d25b8b805c8ef8fa",
+          "count": 192,
+          "meanMs": 7.575,
+          "p95Ms": 16.211,
+          "totalMs": 1454.49,
+          "sqlPrefix": "select \"child_session_id\" from \"subagent_conversations\" where \"tenant_id\" = $1 and \"root_run_id\" = $2"
+        },
+        {
+          "id": "15d62ac19791509e",
+          "count": 192,
+          "meanMs": 7.525,
+          "p95Ms": 15.897,
+          "totalMs": 1444.75,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "791ee1248d3978e1",
+          "count": 192,
+          "meanMs": 7.475,
+          "p95Ms": 14.507,
+          "totalMs": 1435.27,
+          "sqlPrefix": "select \"writer_failed_at\", \"writer_seal_offset\", \"pi_session_id\", \"fencing_token\" from \"session_leases\" where \"tenant_id\" = $1 and \"lease_id\" = $2 for no key update"
+        },
+        {
+          "id": "f1bda116cc866cb2",
+          "count": 192,
+          "meanMs": 7.459,
+          "p95Ms": 13.488,
+          "totalMs": 1432.12,
+          "sqlPrefix": "insert into pi_history_bodies(tenant_id,id,body_kind,sha256,payload_text,payload_bytes) values($1::uuid,$2::uuid,'?',$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=excluded.payload_te"
+        },
+        {
+          "id": "0e1357834e1a2920",
+          "count": 192,
+          "meanMs": 7.342,
+          "p95Ms": 14.495,
+          "totalMs": 1409.72,
+          "sqlPrefix": "insert into pi_history_view_nodes(tenant_id,id,left_id,right_id,block_id,header_body_id,header_fields,through_seq,through_ordinal,min_position,max_position,turn_count,height,node) values ($1::uuid,$2::uuid, $3::uuid,$4::uuid, $5::uuid,$6::uuid,$7::jsonb,$8::bi"
+        },
+        {
+          "id": "fcf2a69f48ac183c",
+          "count": 192,
+          "meanMs": 7.183,
+          "p95Ms": 13.563,
+          "totalMs": 1379.11,
+          "sqlPrefix": "insert into pi_history_views(tenant_id,session_id,root_id) values($1::uuid,$2::uuid,$3::uuid) on conflict(tenant_id,session_id) do update set root_id=excluded.root_id"
+        },
+        {
+          "id": "7a853c531db1dd6c",
+          "count": 192,
+          "meanMs": 7.143,
+          "p95Ms": 13.727,
+          "totalMs": 1371.53,
+          "sqlPrefix": "update pi_history_blocks set header_body_id=$1::uuid,fields=$2::jsonb where tenant_id=$3::uuid and id=$4::uuid"
+        },
+        {
+          "id": "60e8f2004870ee8c",
+          "count": 192,
+          "meanMs": 7.114,
+          "p95Ms": 13.22,
+          "totalMs": 1365.82,
+          "sqlPrefix": "select position::text,header_body_id,fields from pi_history_blocks where tenant_id=$1::uuid and id=$2::uuid and header_body_id is not null for key share"
+        },
+        {
+          "id": "5b70cf5051759432",
+          "count": 192,
+          "meanMs": 7.047,
+          "p95Ms": 12.78,
+          "totalMs": 1353.01,
+          "sqlPrefix": "select \"session_kind\" from \"sessions\" where \"tenant_id\" = $1 and \"id\" = $2 and \"pruned_at\" is null"
+        },
+        {
+          "id": "0321f41e71d8f44c",
+          "count": 192,
+          "meanMs": 7.009,
+          "p95Ms": 13.213,
+          "totalMs": 1345.8,
+          "sqlPrefix": "select root_id from pi_history_views where tenant_id=$1::uuid and session_id=$2::uuid for update"
+        }
+      ],
+      "sseSetupFailures": 0
+    },
+    {
+      "name": "fixed12-server",
+      "poolSize": 12,
+      "candidateReader": true,
+      "cpuProfile": false,
+      "serverDuration": true,
+      "sourceHashes": {
+        "session-projector.ts": "f0cbed41d063fb5737a56063e09e88ec3b33d5a23f0541e4ef243f2f4b44bc96",
+        "session-runtime-main.ts": "a4132948aa17a58d51746b3235481228c0cd307797496673fdad73211559dbcb",
+        "kafka-partition-reader.ts": "7913647852c9141ad93b536f708f752b1a6d1be994dc5f5257da3fd6ec837a35",
+        "probe.mjs": "1e6a2e6a7912d761a927b11b6496099630d678c7b77a3e9dc011544339475d54",
+        "entry.mjs": "07965e3cc4ceb1391040e138c1435c2a308582765e17ca2c22d7ae47f856255f"
+      },
+      "accepted": true,
+      "cleanupConfirmed": true,
+      "restored": true,
+      "realProviderRequests": false,
+      "summary": {
+        "mode": "closed",
+        "concurrency": 64,
+        "offered": 192,
+        "accepted": 192,
+        "completed": 192,
+        "failed": 0,
+        "historyFailures": 0,
+        "dropped": 0,
+        "elapsedMs": 26058.447105999992,
+        "successfulRunsPerSecond": 7.368052256490439,
+        "maximumInFlight": 64,
+        "acknowledgementMs": {
+          "count": 192,
+          "p50": 36,
+          "p95": 84,
+          "p99": 97,
+          "max": 117
+        },
+        "queueMs": {
+          "count": 192,
+          "p50": 79,
+          "p95": 347,
+          "p99": 395,
+          "max": 399
+        },
+        "firstDurableTextMs": {
+          "count": 192,
+          "p50": 4778,
+          "p95": 14579,
+          "p99": 16109,
+          "max": 17330
+        },
+        "settlementMs": {
+          "count": 192,
+          "p50": 5554,
+          "p95": 14748,
+          "p99": 16275,
+          "max": 17423
+        },
+        "generatorDelayMs": {
+          "count": 192,
+          "p50": 0.0007610000029671937,
+          "p95": 0.0024249999987659976,
+          "p99": 0.004157999996095896,
+          "max": 0.02201200000126846
+        },
+        "sseReconnects": 0
+      },
+      "records": 2345,
+      "recordKinds": {
+        "durable_commit": 1577,
+        "agent_event": 576,
+        "work_finished": 192
+      },
+      "truncated": 0,
+      "breakdown": {
+        "wall": {
+          "count": 2345,
+          "mean": 185.531,
+          "p50": 136.732,
+          "p95": 506.091,
+          "max": 754.032,
+          "total": 435069.42
+        },
+        "queryUnion": {
+          "count": 2345,
+          "mean": 111.059,
+          "p50": 84.367,
+          "p95": 320.116,
+          "max": 491.3,
+          "total": 260432.31
+        },
+        "poolUnion": {
+          "count": 2345,
+          "mean": 72.343,
+          "p50": 51.523,
+          "p95": 218.349,
+          "max": 493.283,
+          "total": 169645.07
+        },
+        "other": {
+          "count": 2345,
+          "mean": 2.129,
+          "p50": 1.683,
+          "p95": 6.403,
+          "max": 11.428,
+          "total": 4992.04
+        },
+        "queryCount": {
+          "count": 2345,
+          "mean": 12.702,
+          "p50": 12,
+          "p95": 31,
+          "max": 31,
+          "total": 29786
+        }
+      },
+      "acquisition": {
+        "count": 1961,
+        "mean": 86.509,
+        "p50": 64.091,
+        "p95": 226.326,
+        "max": 493.283,
+        "total": 169645.07
+      },
+      "sqlCalls": 29786,
+      "sqlCallsPerCompletedRun": 155.13541666666666,
+      "queryGroups": [
+        {
+          "id": "541d04611b72ea92",
+          "count": 576,
+          "meanMs": 38.323,
+          "p95Ms": 67.59,
+          "totalMs": 22073.8,
+          "sqlPrefix": "with affected(session_id,turn_id) as ( values ($1::uuid,$2::uuid) ), inserted as ( insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) select $3::uuid,a.session_id,$4,$5,a.turn_"
+        },
+        {
+          "id": "9505cacb7c710ed1",
+          "count": 1769,
+          "meanMs": 11.711,
+          "p95Ms": 23.371,
+          "totalMs": 20715.93,
+          "sqlPrefix": "commit"
+        },
+        {
+          "id": "e4420bc209123df9",
+          "count": 1385,
+          "meanMs": 13.064,
+          "p95Ms": 29.336,
+          "totalMs": 18093.97,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,'?'::json as pending_live from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c w"
+        },
+        {
+          "id": "e660dcbf8778da0f",
+          "count": 1152,
+          "meanMs": 11.391,
+          "p95Ms": 23.216,
+          "totalMs": 13122.96,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "78ff36fdce0cf66f",
+          "count": 1577,
+          "meanMs": 7.012,
+          "p95Ms": 16.952,
+          "totalMs": 11058.18,
+          "sqlPrefix": "insert into pi_durable_commits(tenant_id,session_id,seq,next_id,fingerprint,write_count,history_write_count,history_fingerprint,current_hashes,cloud_metadata) values($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)"
+        },
+        {
+          "id": "f174b3c048296f5c",
+          "count": 768,
+          "meanMs": 12.664,
+          "p95Ms": 26.084,
+          "totalMs": 9725.99,
+          "sqlPrefix": "select id,fields from pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and id=any($3::bigint[])"
+        },
+        {
+          "id": "3ecfaf9ae1b76408",
+          "count": 1769,
+          "meanMs": 5.453,
+          "p95Ms": 13.842,
+          "totalMs": 9645.89,
+          "sqlPrefix": "insert into accepted_fact_projection_offsets(topic,partition,next_offset) values($1,$2,$3::bigint) on conflict(topic,partition) do update set next_offset=excluded.next_offset where accepted_fact_projection_offsets.next_offset<excluded.next_offset"
+        },
+        {
+          "id": "e6f07d43b5c21db0",
+          "count": 1769,
+          "meanMs": 5.178,
+          "p95Ms": 12.861,
+          "totalMs": 9159.4,
+          "sqlPrefix": "begin"
+        },
+        {
+          "id": "980fdf628c0260a7",
+          "count": 1769,
+          "meanMs": 5.036,
+          "p95Ms": 11.825,
+          "totalMs": 8907.85,
+          "sqlPrefix": "select set_config('?', $1, true), set_config('?', $2, true)"
+        },
+        {
+          "id": "6078b3c8362749ef",
+          "count": 1577,
+          "meanMs": 5.06,
+          "p95Ms": 12.279,
+          "totalMs": 7980.02,
+          "sqlPrefix": "with locked_run as materialized ( select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text from runs where tenant_id=$1::uuid and id=$2::uuid for no key update )"
+        },
+        {
+          "id": "a0c1f9da03a78d70",
+          "count": 192,
+          "meanMs": 40.741,
+          "p95Ms": 139.658,
+          "totalMs": 7822.26,
+          "sqlPrefix": "with owner as materialized ( select id from runs where tenant_id=$1::uuid and id=$2::uuid and lease_id=$3::uuid and exists(select 1 from pi_durable_commits c where c.tenant_id=$4::uuid and c.session_id=$5 and c.seq=$6) for no key update ), admitted as material"
+        },
+        {
+          "id": "1f49cbe4f0a7377d",
+          "count": 1577,
+          "meanMs": 4.907,
+          "p95Ms": 11.637,
+          "totalMs": 7738.4,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "b5281bddc2216ccf",
+          "count": 1577,
+          "meanMs": 4.871,
+          "p95Ms": 11.455,
+          "totalMs": 7681.94,
+          "sqlPrefix": "select fingerprint,current_hashes from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and seq=$3"
+        },
+        {
+          "id": "f0e2fbc33aac3274",
+          "count": 576,
+          "meanMs": 12.358,
+          "p95Ms": 24.874,
+          "totalMs": 7118.39,
+          "sqlPrefix": "select g.id as retained_id,ref.ordinal,g.cloud_origin->>'?' as turn_id,g.cloud_origin->>'?' as source_session_id, assistant.retained_record_id as assistant_record_id,g.record_id::text as id,g.body,g.record_kind as kind,r.fields,g.committed_at, case when g.reco"
+        },
+        {
+          "id": "0eef000afb5eb14d",
+          "count": 384,
+          "meanMs": 16.223,
+          "p95Ms": 33.069,
+          "totalMs": 6229.48,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "fc334885a1a7f3d8",
+          "count": 384,
+          "meanMs": 15.993,
+          "p95Ms": 32.175,
+          "totalMs": 6141.33,
+          "sqlPrefix": "insert into pi_durable_document_revisions (tenant_id,session_id,document_id,seq,ordinal,kind,version,delta_count,checkpoint) select r.tenant_id,r.session_id,r.id,$1,v.ordinal,v.kind,v.version, case when v.kind='?' then 0 else previous.delta_count+1 end,null fr"
+        },
+        {
+          "id": "543cc5d28a734079",
+          "count": 576,
+          "meanMs": 10.136,
+          "p95Ms": 21.905,
+          "totalMs": 5838.3,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "db68fce26ee46972",
+          "count": 384,
+          "meanMs": 14.801,
+          "p95Ms": 29.518,
+          "totalMs": 5683.72,
+          "sqlPrefix": "delete from pi_durable_document_revisions d using pi_durable_records r where \"r\".\"tenant_id\"=$1::uuid and \"r\".\"session_id\"=$2 and r.id=any($3::bigint[]) and r.fields->>'?'='?' and d.tenant_id=r.tenant_id and d.session_id=r.session_id and d.document_id=r.id"
+        },
+        {
+          "id": "21d88ea11ae44bd5",
+          "count": 576,
+          "meanMs": 9.412,
+          "p95Ms": 21.133,
+          "totalMs": 5421.18,
+          "sqlPrefix": "insert into pi_durable_current as existing (tenant_id,session_id,id,kind,seq,ordinal,body,delta_count,created_seq,retired_seq,cloud_origin,committed_at) values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb, (select committed_at from pi_durable_commits where"
+        },
+        {
+          "id": "0c1e2cbd5b79dbf3",
+          "count": 192,
+          "meanMs": 23.915,
+          "p95Ms": 43.193,
+          "totalMs": 4591.74,
+          "sqlPrefix": "select coalesce(h.seq,0)::text as seq,coalesce(h.next_id,2)::text as next_id, coalesce(state.inputs,'?'::json) as inputs,coalesce(( select json_agg(row) from (select c.id::text,c.kind,c.seq::text,c.ordinal,c.body,c.delta_count, c.created_seq::text,c.retired_se"
+        },
+        {
+          "id": "a6ce81460b600f39",
+          "count": 576,
+          "meanMs": 7.524,
+          "p95Ms": 18.362,
+          "totalMs": 4333.95,
+          "sqlPrefix": "with bodies as ( insert into pi_history_bodies(tenant_id,body_kind,id,sha256,payload_text,payload_bytes) values ($1::uuid,'?',$2::uuid,$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=e"
+        },
+        {
+          "id": "f7ec4e498a540da1",
+          "count": 384,
+          "meanMs": 10.309,
+          "p95Ms": 22.342,
+          "totalMs": 3958.8,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "0cbded18ab91e3b9",
+          "count": 425,
+          "meanMs": 8.142,
+          "p95Ms": 19.505,
+          "totalMs": 3460.52,
+          "sqlPrefix": "select session_id,turn_id,id,output_display_seq::text from conversation_turns where tenant_id=$1::uuid and id=$2::uuid and session_id=any($3::uuid[])"
+        },
+        {
+          "id": "694982afe745f148",
+          "count": 384,
+          "meanMs": 7.281,
+          "p95Ms": 15.723,
+          "totalMs": 2795.94,
+          "sqlPrefix": "with coverage(session_id,turn_id,through) as (values ($1::uuid,$2::uuid,$3::bigint)), root as ( update runs r set output_display_seq=greatest(r.output_display_seq,c.through), output_display_native_seq=greatest(r.output_display_native_seq,$4) from coverage c wh"
+        },
+        {
+          "id": "5818505c3889f36b",
+          "count": 192,
+          "meanMs": 13.876,
+          "p95Ms": 27.788,
+          "totalMs": 2664.26,
+          "sqlPrefix": "select c.*,r.id as indexed_id,r.kind as indexed_kind,r.fields as indexed_fields from pi_durable_current c left join pi_durable_records r using(tenant_id,session_id,id) where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 and c.replay_offset is not null"
+        },
+        {
+          "id": "789962e9a76686a3",
+          "count": 384,
+          "meanMs": 6.582,
+          "p95Ms": 14.828,
+          "totalMs": 2527.45,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "9d592a2b8cea16ea",
+          "count": 192,
+          "meanMs": 11.53,
+          "p95Ms": 24.554,
+          "totalMs": 2213.68,
+          "sqlPrefix": "insert into pi_durable_owned_records as existing (tenant_id,session_id,id,kind,seq,ordinal,fields,created_seq,retired_seq,retained_record_id,body_fork) select $1::uuid,$2,v.*,p.retained_record_id,coalesce(p.clear_owner,false) from (values ($3::bigint,$4::text,"
+        },
+        {
+          "id": "5a249ba565c309c5",
+          "count": 192,
+          "meanMs": 11.316,
+          "p95Ms": 24.463,
+          "totalMs": 2172.73,
+          "sqlPrefix": "with \"updated_run\" as (update \"runs\" set \"state\" = $1, \"row_version\" = row_version+1, \"updated_at\" = $2, \"settled_at\" = $3, \"stop_reason\" = $4 where \"tenant_id\" = $5 and \"id\" = $6 and \"row_version\" = $7 returning \"id\", \"row_version\"), \"recorded_transition\" as "
+        },
+        {
+          "id": "4bae498c1f8b55c7",
+          "count": 192,
+          "meanMs": 10.538,
+          "p95Ms": 21.966,
+          "totalMs": 2023.24,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (insert into pi_history_bodies(tenant_id,id,sha256,payload_text,payload_bytes) values ($3::uuid,$4::uuid,$5,$6,$7) on conflict(tenant_id,body_"
+        },
+        {
+          "id": "f3ed981d2a966df6",
+          "count": 192,
+          "meanMs": 10.167,
+          "p95Ms": 20.392,
+          "totalMs": 1952.01,
+          "sqlPrefix": "update \"runs\" set \"output_sealed_at\" = $1, \"output_seal_offset\" = $2, \"last_event_seq\" = $3, \"execution_released_at\" = $4, \"agent_exited_at\" = $5, \"recovery_requested_at\" = $6, \"output_first_topic\" = coalesce(output_first_topic,$7), \"output_first_partition\" = "
+        },
+        {
+          "id": "d9b6f68018f6562f",
+          "count": 192,
+          "meanMs": 9.279,
+          "p95Ms": 21.479,
+          "totalMs": 1781.54,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "a3681047405dfd8a",
+          "count": 192,
+          "meanMs": 8.786,
+          "p95Ms": 19.394,
+          "totalMs": 1686.84,
+          "sqlPrefix": "update \"runs\" set \"output_first_topic\" = $1, \"output_first_partition\" = $2, \"output_first_offset\" = $3 where \"tenant_id\" = $4 and \"id\" = $5"
+        },
+        {
+          "id": "ff821a030963b8f1",
+          "count": 192,
+          "meanMs": 8.471,
+          "p95Ms": 19.871,
+          "totalMs": 1626.4,
+          "sqlPrefix": "select id::text,fields from pi_durable_records where tenant_id=$1::uuid and session_id=$2 and kind='?' and fields->>'?'=any($3::text[])"
+        },
+        {
+          "id": "41cf5e117dbfaebb",
+          "count": 192,
+          "meanMs": 8.396,
+          "p95Ms": 20.783,
+          "totalMs": 1611.95,
+          "sqlPrefix": "update \"sessions\" set \"state\" = $1, \"next_event_seq\" = $2, \"row_version\" = row_version+1, \"updated_at\" = $3, \"last_active_at\" = $4 where \"tenant_id\" = $5 and \"id\" = $6"
+        },
+        {
+          "id": "a8c971c9acc61c55",
+          "count": 192,
+          "meanMs": 8.21,
+          "p95Ms": 18.662,
+          "totalMs": 1576.3,
+          "sqlPrefix": "with stream as ( insert into pi_history_streams(tenant_id,id) values($1::uuid,$2) on conflict do nothing ), bodies as (select null::uuid as id,null::text as sha256 where false), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_i"
+        },
+        {
+          "id": "3b06db3d03f1ca68",
+          "count": 192,
+          "meanMs": 7.509,
+          "p95Ms": 16.395,
+          "totalMs": 1441.77,
+          "sqlPrefix": "update sessions s set next_event_seq=greatest(s.next_event_seq,views.through+1) from (values ($1::uuid,$2::bigint)) views(id,through) where s.tenant_id=$3::uuid and s.pi_session_id=$4 and s.id=views.id"
+        },
+        {
+          "id": "285800fa5a467320",
+          "count": 192,
+          "meanMs": 7.398,
+          "p95Ms": 17.698,
+          "totalMs": 1420.43,
+          "sqlPrefix": "update runs candidate set ready_at=clock_timestamp() where candidate.tenant_id=$1::uuid and candidate.session_id=$2::uuid and candidate.state='?' and candidate.ready_at is null and exists(select 1 from sessions s where s.tenant_id=$3::uuid and s.id=$4::uuid an"
+        },
+        {
+          "id": "3342327b73a01f94",
+          "count": 192,
+          "meanMs": 7.138,
+          "p95Ms": 16.949,
+          "totalMs": 1370.51,
+          "sqlPrefix": "insert into \"model_invocations\" (\"id\", \"tenant_id\", \"session_id\", \"run_id\", \"requested_at\", \"provider\", \"model\", \"purpose\", \"context\", \"context_hash\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "34be46362b3dcb07",
+          "count": 192,
+          "meanMs": 6.79,
+          "p95Ms": 16.295,
+          "totalMs": 1303.59,
+          "sqlPrefix": "insert into \"session_terminal_events\" (\"event_id\", \"tenant_id\", \"session_id\", \"turn_id\", \"agent_id\", \"run_id\", \"seq\", \"schema_version\", \"type\", \"payload\", \"occurred_at\", \"persisted_at\", \"interrupted_prefix\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11"
+        },
+        {
+          "id": "be37a5c2332b2267",
+          "count": 192,
+          "meanMs": 6.574,
+          "p95Ms": 15.462,
+          "totalMs": 1262.26,
+          "sqlPrefix": "select 1 from pi_history_views v cross join lateral pi_history_view_ranges(v.tenant_id,v.root_id,$1::bigint,$2::bigint) n join pi_history_blocks b on b.tenant_id=v.tenant_id and b.id=n.block_id where v.tenant_id=$3::uuid and v.session_id=$4::uuid and b.turn_id"
+        },
+        {
+          "id": "0a0b2ee33c85351a",
+          "count": 192,
+          "meanMs": 6.112,
+          "p95Ms": 14.057,
+          "totalMs": 1173.56,
+          "sqlPrefix": "update \"turn_control_requests\" set \"state\" = $1, \"completed_at\" = $2, \"failure_code\" = $3 where \"tenant_id\" = $4 and \"target_run_id\" = $5 and \"kind\" = $6 and \"state\" in ($7, $8, $9)"
+        },
+        {
+          "id": "9bff3cb0a038ac4c",
+          "count": 192,
+          "meanMs": 6.111,
+          "p95Ms": 13.163,
+          "totalMs": 1173.38,
+          "sqlPrefix": "select s.pi_session_id,r.id as run_id,r.mailbox_position::text as position,r.state,r.stop_reason,r.operation_kind, r.output_display_seq::text as coverage,r.output_display_native_seq::text as native_coverage,r.created_at, jsonb_build_object('?',r.input_text,'?'"
+        },
+        {
+          "id": "3134d500dfc57c06",
+          "count": 192,
+          "meanMs": 5.966,
+          "p95Ms": 14.31,
+          "totalMs": 1145.44,
+          "sqlPrefix": "select coalesce(max(seq),0)::text seq from ( select seq from pi_durable_commits where tenant_id=$1::uuid and session_id=$2 union all select through_seq from pi_durable_bases where tenant_id=$3::uuid and session_id=$4 ) positions"
+        },
+        {
+          "id": "81275917293fac34",
+          "count": 192,
+          "meanMs": 5.746,
+          "p95Ms": 12.102,
+          "totalMs": 1103.23,
+          "sqlPrefix": "insert into \"model_metering_events\" (\"id\", \"invocation_id\", \"kind\", \"execution_id\", \"occurred_at\", \"payload\", \"payload_hash\", \"valuation\") values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (\"id\") do nothing returning \"id\""
+        },
+        {
+          "id": "af913f5ec4b4fb43",
+          "count": 192,
+          "meanMs": 5.594,
+          "p95Ms": 12.959,
+          "totalMs": 1074.09,
+          "sqlPrefix": "update \"session_leases\" set \"writer_sealed_at\" = $1, \"writer_seal_offset\" = $2, \"released_at\" = $3 where \"tenant_id\" = $4 and \"lease_id\" = $5"
+        },
+        {
+          "id": "7a853c531db1dd6c",
+          "count": 192,
+          "meanMs": 5.571,
+          "p95Ms": 12.378,
+          "totalMs": 1069.63,
+          "sqlPrefix": "update pi_history_blocks set header_body_id=$1::uuid,fields=$2::jsonb where tenant_id=$3::uuid and id=$4::uuid"
+        },
+        {
+          "id": "8aacc851b9a7820e",
+          "count": 192,
+          "meanMs": 5.405,
+          "p95Ms": 12.596,
+          "totalMs": 1037.85,
+          "sqlPrefix": "update pi_durable_current c set replay_topic=$1, replay_partition=$2,replay_offset=$3::bigint,replay_seq=$4 where \"c\".\"tenant_id\"=$5::uuid and \"c\".\"session_id\"=$6 and id=$7::bigint and replay_seq is null and seq<$8 returning id"
+        },
+        {
+          "id": "12e7bcb3eeb0040c",
+          "count": 192,
+          "meanMs": 5.395,
+          "p95Ms": 11.82,
+          "totalMs": 1035.83,
+          "sqlPrefix": "insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position) values($1::uuid,$2::uuid,$3,$4,$5::uuid,$6::uuid,$7::bigint) on conflict(tenant_id,source_pi_session_id,turn_id) do update se"
+        },
+        {
+          "id": "0e1357834e1a2920",
+          "count": 192,
+          "meanMs": 5.381,
+          "p95Ms": 12.172,
+          "totalMs": 1033.07,
+          "sqlPrefix": "insert into pi_history_view_nodes(tenant_id,id,left_id,right_id,block_id,header_body_id,header_fields,through_seq,through_ordinal,min_position,max_position,turn_count,height,node) values ($1::uuid,$2::uuid, $3::uuid,$4::uuid, $5::uuid,$6::uuid,$7::jsonb,$8::bi"
+        },
+        {
+          "id": "20d81d67730722a9",
+          "count": 192,
+          "meanMs": 5.285,
+          "p95Ms": 11.718,
+          "totalMs": 1014.8,
+          "sqlPrefix": "select h.seq,h.next_id,false as incomplete from (select 1) seed left join lateral ( select seq,next_id from ( select seq,next_id from pi_durable_commits c where \"c\".\"tenant_id\"=$1::uuid and \"c\".\"session_id\"=$2 union all select through_seq,next_id from pi_durab"
+        },
+        {
+          "id": "79a98ec3b603d85c",
+          "count": 192,
+          "meanMs": 5.251,
+          "p95Ms": 11.646,
+          "totalMs": 1008.21,
+          "sqlPrefix": "insert into \"model_execution_writers\" (\"writer_id\", \"tenant_id\", \"pi_session_id\", \"run_id\", \"fencing_token\", \"topic\", \"partition\", \"close_offset\", \"fingerprint\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (\"writer_id\") do nothing returning \"writer"
+        },
+        {
+          "id": "2267c789ece38b08",
+          "count": 192,
+          "meanMs": 5.234,
+          "p95Ms": 11.163,
+          "totalMs": 1004.86,
+          "sqlPrefix": "with visible as ( select seq,ordinal from pi_history_frames where tenant_id=$1::uuid and block_id=$2::uuid ) select count(*)::text as n,(array_agg(seq order by seq desc,ordinal desc))[1]::text as seq, (array_agg(ordinal order by seq desc,ordinal desc))[1] as o"
+        },
+        {
+          "id": "f1bda116cc866cb2",
+          "count": 192,
+          "meanMs": 5.217,
+          "p95Ms": 12.138,
+          "totalMs": 1001.58,
+          "sqlPrefix": "insert into pi_history_bodies(tenant_id,id,body_kind,sha256,payload_text,payload_bytes) values($1::uuid,$2::uuid,'?',$3,$4,$5) on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256 where pi_history_bodies.payload_text=excluded.payload_te"
+        },
+        {
+          "id": "7db28c8f50809936",
+          "count": 192,
+          "meanMs": 5.206,
+          "p95Ms": 12.832,
+          "totalMs": 999.46,
+          "sqlPrefix": "select \"lease_id\", \"fencing_token\", \"session_id\", \"turn_id\", \"output_sealed_at\", \"output_seal_offset\", \"state\", \"row_version\", \"output_first_topic\", \"output_first_partition\" from \"runs\" where \"tenant_id\" = $1 and \"id\" = $2 for no key update"
+        },
+        {
+          "id": "791ee1248d3978e1",
+          "count": 192,
+          "meanMs": 5.167,
+          "p95Ms": 12.74,
+          "totalMs": 992.13,
+          "sqlPrefix": "select \"writer_failed_at\", \"writer_seal_offset\", \"pi_session_id\", \"fencing_token\" from \"session_leases\" where \"tenant_id\" = $1 and \"lease_id\" = $2 for no key update"
+        },
+        {
+          "id": "15d62ac19791509e",
+          "count": 192,
+          "meanMs": 5.145,
+          "p95Ms": 11.922,
+          "totalMs": 987.91,
+          "sqlPrefix": "select id from pi_sessions p where p.tenant_id=$1::uuid and p.id=$2 for update"
+        },
+        {
+          "id": "fcf2a69f48ac183c",
+          "count": 192,
+          "meanMs": 4.983,
+          "p95Ms": 10.282,
+          "totalMs": 956.8,
+          "sqlPrefix": "insert into pi_history_views(tenant_id,session_id,root_id) values($1::uuid,$2::uuid,$3::uuid) on conflict(tenant_id,session_id) do update set root_id=excluded.root_id"
+        },
+        {
+          "id": "60e8f2004870ee8c",
+          "count": 192,
+          "meanMs": 4.98,
+          "p95Ms": 11.03,
+          "totalMs": 956.14,
+          "sqlPrefix": "select position::text,header_body_id,fields from pi_history_blocks where tenant_id=$1::uuid and id=$2::uuid and header_body_id is not null for key share"
+        },
+        {
+          "id": "d25b8b805c8ef8fa",
+          "count": 192,
+          "meanMs": 4.976,
+          "p95Ms": 11.848,
+          "totalMs": 955.39,
+          "sqlPrefix": "select \"child_session_id\" from \"subagent_conversations\" where \"tenant_id\" = $1 and \"root_run_id\" = $2"
+        },
+        {
+          "id": "0321f41e71d8f44c",
+          "count": 192,
+          "meanMs": 4.844,
+          "p95Ms": 10.643,
+          "totalMs": 930.04,
+          "sqlPrefix": "select root_id from pi_history_views where tenant_id=$1::uuid and session_id=$2::uuid for update"
+        },
+        {
+          "id": "5b70cf5051759432",
+          "count": 192,
+          "meanMs": 4.816,
+          "p95Ms": 11.077,
+          "totalMs": 924.77,
+          "sqlPrefix": "select \"session_kind\" from \"sessions\" where \"tenant_id\" = $1 and \"id\" = $2 and \"pruned_at\" is null"
+        },
+        {
+          "id": "5e6f0d72b594ccc3",
+          "count": 192,
+          "meanMs": 4.788,
+          "p95Ms": 10.343,
+          "totalMs": 919.24,
+          "sqlPrefix": "select \"context_hash\" from \"model_invocations\" where \"id\" = $1"
+        }
+      ],
+      "sseSetupFailures": 0
+    }
+  ],
+  "serverDuration": {
+    "serverDurationMs": 96635.48100000084,
+    "durationEvents": 70749,
+    "matchedEvents": 37037,
+    "unmatchedEvents": 3326,
+    "ambiguousEvents": 30386,
+    "method": "Same-PID timestamp match, 1ms clock/rounding tolerance. Parse/Bind/Execute server duration events are separately summed. Ambiguous events are excluded from per-query groups.",
+    "scope": "Projection-pool PIDs during the workload, including some snapshot metadata reads. Not a perfect one-to-one subtraction from the instrumented query union; ambiguous per-query timestamp matches are excluded."
+  },
+  "idleDatabase": {
+    "scope": "idle same-Pod PG path, one warmed prepared scalar, no writes",
+    "settings": {
+      "version": "17.6",
+      "jit": "on",
+      "maximum_connections": "100"
+    },
+    "count": 500,
+    "meanMs": 0.3473183580000006,
+    "p50Ms": 0.3247029999999995,
+    "p95Ms": 0.4983729999999582,
+    "maximumMs": 1.2896969999999897
+  },
+  "cpu": {
+    "fixed12-cpu": {
+      "total": {
+        "sampledMs": 27121.501,
+        "fraction": 1.0
+      },
+      "pgQueryPath": {
+        "sampledMs": 8307.141,
+        "fraction": 0.306293556540252
+      },
+      "diagnosticEmit": {
+        "sampledMs": 354.469,
+        "fraction": 0.01306966749369808
+      },
+      "idle": {
+        "sampledMs": 2161.622,
+        "fraction": 0.07970141475576886
+      },
+      "pgSocketWrite": {
+        "sampledMs": 6610.309,
+        "fraction": 0.2437294676279163
+      }
+    },
+    "fixed32-cpu": {
+      "total": {
+        "sampledMs": 29339.655,
+        "fraction": 1.0
+      },
+      "idle": {
+        "sampledMs": 2130.932,
+        "fraction": 0.07262975655303378
+      },
+      "pgSocketWrite": {
+        "sampledMs": 7091.223,
+        "fraction": 0.24169415080034173
+      },
+      "pgQueryPath": {
+        "sampledMs": 8948.594,
+        "fraction": 0.3049999735852381
+      },
+      "diagnosticEmit": {
+        "sampledMs": 402.624,
+        "fraction": 0.01372286074938509
+      }
+    },
+    "scope": "V8 main-thread stack samples, not whole-system CPU. Inclusive pgQueryPath contains pgSocketWrite; do not add them."
+  },
+  "quotaObservation": {
+    "at": "2026-11-18T07:36:15+08:00",
+    "sessionRuntime": {
+      "cpuMax": "max 100000",
+      "nrThrottled": 0
+    },
+    "postgres": {
+      "cpuMax": "max 100000",
+      "nrThrottled": 0
+    }
+  },
+  "verification": {
+    "eventLogUnitPassed": 61,
+    "eventLogUnitSkipped": 8,
+    "releaseHelpersPassed": 355,
+    "releaseHelpersSkipped": 5,
+    "deterministicRegressionFailedBeforeFix": true,
+    "deterministicReaderPublicationPassed": 11,
+    "rf3ExistingPassed": 12,
+    "rf3NewFilePassed": 2,
+    "rf3FixtureCorrection": "Wait for all four committed transaction markers to become visible before starting the EOF-only reader."
+  },
+  "preservation": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  },
+  "readerFix": {
+    "status": "source verified; publication pending",
+    "fileSha256": "7913647852c9141ad93b536f708f752b1a6d1be994dc5f5257da3fd6ec837a35"
+  }
+}

@@ -1,5 +1,9 @@
 # Delivery and research evidence
 
+- [Projector SQL cost and idle startup](projector-sql-diagnosis-20261118.md):
+  client/server timings, V8 samples, twelve/thirty-two-connection comparison,
+  many small SQL operations and the reproduced idle-EOF assignment regression.
+
 - [Projector consumption and memory](projector-prefetch-memory-delivery-20261118.md):
   #46/#47, bounded prefetch, coherent identity caches, measured cleanup and serial
   recovery/load acceptance. Receive amplification is repaired; sustained capacity

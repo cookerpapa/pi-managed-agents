@@ -36,6 +36,7 @@ import {
 import { serializeRelease } from "./lib/release-lock.mjs";
 import { nativeHistory, nativeMessages } from "./lib/native-session-history.mjs";
 import { waitForOwnedReceiptDelivery } from "./lib/source-delivery-barrier.mjs";
+import { kafkaProducerLane } from "../packages/runtime-core/src/kafka-accepted-fact.ts";
 
 assert.equal(
   process.env.PI_CLOUD_RUNTIME_LOAD_CHECK,
@@ -353,6 +354,8 @@ async function executeWork(
     textBytes = 0,
     toolResults = 0,
     sseReconnects = 0,
+    lastStreamStatus,
+    streamFailures = [],
     submitting = 0,
     accepted;
   const onEvent = (event) => {
@@ -389,10 +392,14 @@ async function executeWork(
         onSnapshot: () => ready.resolve(),
         onEvent: i === 0 ? onEvent : () => {},
         onStatus: (status) => {
+          lastStreamStatus = status;
           if (status.phase === "reconnecting") sseReconnects++;
         },
       })
-      .catch(() => {}),
+      .catch((error) => {
+        if (!streams.signal.aborted && streamFailures.length < 4)
+          streamFailures.push({ reader: i, error: String(error.message).slice(0, 300) });
+      }),
   );
   // API uses its production client. A separate slow reader below exercises stream backpressure.
   let slow;
@@ -502,6 +509,11 @@ async function executeWork(
       ...(accepted ? { runId: accepted.runId, turnId: accepted.turnId } : {}),
       planId: plan.id,
       error: String(error.message).slice(0, 300),
+      stage: accepted ? "run_observation" : submitting ? "input_admission" : "stream_setup",
+      streamSetupMs: (submitting || Date.now()) - setup,
+      sseReconnects,
+      lastStreamStatus,
+      streamFailures,
     };
   } finally {
     clearTimeout(setupTimer);
@@ -712,6 +724,66 @@ async function historyStage() {
   await save();
 }
 
+async function idlePartitionStreams() {
+  phase("idle-partition-streams");
+  const workload = report.inventory.find((w) => w.name === "pi-cloud-session-runtime");
+  const partitions = Number(
+    workload?.containers
+      .flatMap((c) => c.configuration)
+      .find((v) => v.name === "PI_CLOUD_KAFKA_PARTITIONS")?.value,
+  );
+  assert(
+    Number.isSafeInteger(partitions) && partitions > 0 && partitions <= 64,
+    "Idle stream coverage exceeds this host's declared test budget",
+  );
+  const selected = new Map();
+  for (let attempts = 0; selected.size < partitions && attempts < partitions * 16; attempts++) {
+    const session = await newSession("Idle partition snapshot");
+    const native = await database
+      .selectFrom("sessions")
+      .select("pi_session_id")
+      .where("id", "=", session.sessionId)
+      .executeTakeFirstOrThrow();
+    const partition = kafkaProducerLane(native.pi_session_id, partitions);
+    if (!selected.has(partition)) selected.set(partition, session);
+  }
+  assert.equal(selected.size, partitions, "Owned Sessions did not cover every partition");
+  const streams = new AbortController(),
+    subscriptions = [];
+  try {
+    const times = await Promise.all(
+      [...selected].map(async ([partition, session]) => {
+        const ready = Promise.withResolvers(),
+          started = Date.now();
+        const timer = setTimeout(
+          () => ready.reject(new Error("Idle partition snapshot timed out: " + partition)),
+          15000,
+        );
+        subscriptions.push(
+          api
+            .streamSession({
+              sessionId: session.sessionId,
+              signal: streams.signal,
+              onSnapshot: () => ready.resolve(Date.now() - started),
+              onEvent() {},
+              onStatus() {},
+            })
+            .catch((error) => ready.reject(error)),
+        );
+        try {
+          return await ready.promise;
+        } finally {
+          clearTimeout(timer);
+        }
+      }),
+    );
+    return { idlePartitionsReady: selected.size, idleSnapshotMaximumMs: Math.max(...times) };
+  } finally {
+    streams.abort();
+    await Promise.allSettled(subscriptions);
+  }
+}
+
 async function faultStage(kind, tools) {
   phase(kind);
   const count = 4,
@@ -908,6 +980,7 @@ async function faultStage(kind, tools) {
       evidence = {
         writersPreserved: true,
         sseReconnects: results.reduce((n, r) => n + r.sseReconnects, 0),
+        ...(await idlePartitionStreams()),
       };
     }
     await metrics.stop();

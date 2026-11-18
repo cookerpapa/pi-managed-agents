@@ -1,5 +1,18 @@
 # Maintained backlog
 
+## Projection cost diagnosis and idle startup — in progress
+
+- [x] Decompose Projector time using bounded pg client spans, read-only PG waits,
+  V8 samples and session-scoped server duration logging; compare twelve/thirty-two
+  connections without weakening durability or changing permanent settings.
+- [x] Reproduce the idle-EOF assignment race with a failing deterministic test;
+  verify the correction with RF3 and three observed 192-Run cases.
+- [ ] Publish the idle-startup correction and verify initial snapshots across
+  all Session partitions after Projector restart, plus ordinary recovery/load checks.
+- [ ] Record the SQL findings and review a bounded reduction of round trips inside
+  one native commit. Do not enlarge transaction scope or drop recovery checks as
+  an unmeasured shortcut.
+
 ## Projector consumption and memory — delivered
 
 - [x] [#47](https://github.com/cookerpapa/pi-managed-agents/issues/47): replace
@@ -57,11 +70,11 @@ completed, while high offered-rate workloads hit the driver's in-flight cap.
   and actual Run timing. The [consumer diagnosis](reports/projector-consumption-diagnosis-20261117.md)
   confirms that per-record native pause discards prefetched data, causes repeated
   fetches and creates delivery gaps; progress commits also serialize and queue.
-- [ ] Review a bounded prefetched-record scheduler and progress-commit strategy,
+- [x] Review a bounded prefetched-record scheduler and progress-commit strategy,
   evaluating the pinned SDK's public API first. Preserve partition ordering,
   processed EOF/replay evidence, generation fencing and confirmed Tool admission.
-  The diagnostic buffered control is not a production replacement. Measure actual
-  end-to-end improvements after a reviewed repair; no capacity gain is claimed yet.
+  Delivered under ADR-0331; the diagnostic buffered control is not a production
+  replacement. Actual measurements and remaining limits are recorded above.
 
 ## Runtime throughput baseline — delivered
 

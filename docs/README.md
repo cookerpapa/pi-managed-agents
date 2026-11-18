@@ -51,6 +51,9 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+- [Projector SQL diagnosis, November 18](reports/projector-sql-diagnosis-20261118.md):
+  where projection time goes, why more connections did not help, and idle startup recovery.
+
 - [Projector consumption and memory delivery, November 18](reports/projector-prefetch-memory-delivery-20261118.md):
   bounded prefetch, coherent caches, partial-output recovery, measured cleanup and
   the remaining sustained-throughput limit.
