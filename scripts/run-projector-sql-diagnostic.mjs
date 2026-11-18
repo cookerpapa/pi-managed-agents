@@ -154,11 +154,17 @@ if (cpuOnly) {
     (await readFile("packages/runtime-core/src/session-projector.ts", "utf8"));
   data["entry.mjs"] = `import {projectorCpuProbe} from './cpu.mjs';
 const cpu=projectorCpuProbe('/tmp/pma-projector-profile.json');
-await cpu.start();
-process.on('SIGUSR2',()=>cpu.stop().catch(e=>console.error(JSON.stringify({event:'diag.cpu.failed',code:e.code??e.name}))));
+let started=false;
+process.on('SIGUSR2',()=>{
+ const job=started?cpu.stop():cpu.start().then(()=>console.log(JSON.stringify({event:'diag.cpu.started',pid:process.pid})));
+ started=true;
+ job.catch(e=>console.error(JSON.stringify({event:'diag.cpu.failed',code:e.code??e.name})));
+});
 console.log(JSON.stringify({event:'diag.cpu.ready',pid:process.pid}));\n`;
   await transform(data["session-projector.ts"], { loader: "ts", format: "esm" });
 }
+for (const [file, source] of Object.entries(data))
+  if (file.endsWith(".mjs")) await transform(source, { loader: "js", format: "esm" });
 modified.spec.volumes ??= [];
 modified.spec.volumes.push({ name, configMap: { name, defaultMode: 420 } });
 container.volumeMounts ??= [];
@@ -260,6 +266,36 @@ try {
     pod,
     "--follow",
   ]);
+  if (cpuOnly) {
+    const deadline = Date.now() + 10000;
+    let ready;
+    while (!ready) {
+      ready = (await readFile(resolve(directory, "runtime.log"), "utf8"))
+        .split("\n")
+        .flatMap((line) => {
+          try {
+            const r = JSON.parse(line);
+            return r.event === "diag.cpu.ready" ? [r] : [];
+          } catch {
+            return [];
+          }
+        })[0];
+      assert(Date.now() < deadline, "CPU-only listener is not ready");
+      if (!ready) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert(Number.isSafeInteger(ready.pid) && ready.pid > 0);
+    // Activate only after normal application startup. Profiling is not a module
+    // initialization dependency or part of a native commit's execution path.
+    kubectl(["exec", pod, "--", "node", "-e", `process.kill(${ready.pid},'SIGUSR2')`]);
+    while (
+      !(await readFile(resolve(directory, "runtime.log"), "utf8")).includes(
+        '"event":"diag.cpu.started"',
+      )
+    ) {
+      assert(Date.now() < deadline, "CPU-only sampler did not start");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
   const pods = JSON.parse(kubectl(["get", "pods", "-o", "json"])).items;
   const roles = new Map(
     pods.map((p) => [p.status.podIP, p.metadata.name.replace(/-[a-f0-9]{8,10}-[a-z0-9]{5}$/, "")]),
@@ -351,6 +387,24 @@ try {
   receipt.phase = "measured";
   await save();
   assert.equal(receipt.loadExit, 0, "Observed workload failed; preserve private evidence");
+} catch (error) {
+  receipt.failure = String(error.code ?? error.message).slice(0, 600);
+  const pods = JSON.parse(kubectl(["get", "pods", "-o", "json"])).items.filter((p) =>
+    p.spec.volumes?.some((v) => v.configMap?.name === name),
+  );
+  for (const [index, pod] of pods.entries()) {
+    try {
+      await writeFile(
+        resolve(directory, `failed-pod-${index}.log`),
+        kubectl(["logs", pod.metadata.name, "--tail=100"], { maxBuffer: 512 * 1024 }),
+        { mode: 0o600 },
+      );
+    } catch {
+      /* The private receipt still identifies this observation. */
+    }
+  }
+  await save();
+  throw error;
 } finally {
   abort.abort();
   await watching?.catch((error) => {
