@@ -87,6 +87,7 @@ assert(
     "matrix",
     "capacity",
     "projection-tail",
+    "live-burst",
     "soak",
     "faults",
     "provider-faults",
@@ -350,7 +351,15 @@ async function newSession(title, thinkingLevel = "low") {
 async function executeWork(
   session,
   plan,
-  { views = 1, paddingBytes = 0, readHistory = false, slowReaderMs = 0, timeoutMs = 120000 } = {},
+  {
+    views = 1,
+    paddingBytes = 0,
+    readHistory = false,
+    slowReaderMs = 0,
+    timeoutMs = 120000,
+    beforeSubmit,
+    onText,
+  } = {},
 ) {
   const streams = new AbortController(),
     ready = Promise.withResolvers(),
@@ -369,6 +378,7 @@ async function executeWork(
     if (event.type === "assistant.text.delta") {
       firstTextAt ??= Date.now();
       textBytes += Buffer.byteLength(event.payload.text);
+      if (event.payload.text) onText?.(event);
     }
     if (event.type === "tool.completed") toolResults++;
     if (["turn.completed", "turn.failed", "turn.cancelled"].includes(event.type))
@@ -433,6 +443,7 @@ async function executeWork(
         }),
       ]);
     clearTimeout(setupTimer);
+    if (beforeSubmit) await beforeSubmit();
     submitting = Date.now();
     accepted = await api.acceptTurn(
       session.sessionId,
@@ -564,7 +575,8 @@ async function stage(profile) {
   assert(
     Number.isSafeInteger(profile.concurrency) &&
       profile.concurrency >= 1 &&
-      profile.concurrency <= 128,
+      (profile.concurrency <= 128 ||
+        (mode === "live-burst" && profile.count === 192 && profile.concurrency === 192)),
     "Invalid workload concurrency",
   );
   assert(
@@ -591,6 +603,25 @@ async function stage(profile) {
   await metrics.start();
   const began = Date.now();
   const signal = AbortSignal.any([stop.signal, metrics.abort.signal]);
+  // Give every client an established view before timing a single simultaneous wave.
+  const wave = Promise.withResolvers();
+  let readyClients = 0,
+    waveTimeout;
+  const beforeSubmit =
+    mode === "live-burst"
+      ? async () => {
+          if (++readyClients === 1) {
+            waveTimeout = setTimeout(() => wave.resolve(false), 25_000);
+            waveTimeout.unref();
+          }
+          if (readyClients === profile.count) {
+            clearTimeout(waveTimeout);
+            wave.resolve(true);
+          }
+          assert(await wave.promise, "All synchronized clients must establish their SSE view");
+          signal.throwIfAborted();
+        }
+      : undefined;
   const load = await runLoad({
     mode: profile.arrivalRate ? "arrival" : "closed",
     concurrency: profile.concurrency,
@@ -614,6 +645,7 @@ async function stage(profile) {
           ...(profile.fault ? { fault: profile.fault } : {}),
         },
         {
+          beforeSubmit,
           views: profile.views ?? 1,
           paddingBytes: profile.paddingBytes ?? 0,
           readHistory: profile.readHistory ?? false,
@@ -862,18 +894,32 @@ async function faultStage(kind, tools) {
   const before = await fixture.mcpState();
   const metrics = new RuntimeLoadMetrics({ database, tenantId: tenant.tenantId, fixture });
   await metrics.start();
+  const streaming = kind === "projector-restart" || kind === "live-stop";
   const began = performance.now(),
     plans = owned.map(() => ({
       id: randomUUID(),
-      kind: kind === "projector-restart" ? "text" : "mcp",
+      kind: streaming ? "text" : "mcp",
       toolName: kind === "lost-tool-reply" ? tools.lost_write : tools.hold,
       rounds: 1,
-      firstByteMs: kind === "projector-restart" ? 3000 : 100,
-      outputBytes: kind === "projector-restart" ? 4096 : 1024,
+      firstByteMs: streaming ? 3000 : 100,
+      outputBytes: streaming ? 4096 : 1024,
       chunkBytes: 64,
-      chunkMs: kind === "projector-restart" ? 100 : 0,
+      chunkMs: streaming ? 100 : 0,
     }));
-  const operations = owned.map((session, i) => executeWork(session, plans[i], { views: 2 }));
+  const visible = owned.map(() => ({ ids: new Set(), prefix: "" }));
+  const operations = owned.map((session, i) =>
+    executeWork(session, plans[i], {
+      views: 2,
+      onText: streaming
+        ? (event) => {
+            const v = visible[i];
+            if (v.ids.size >= 2 || v.ids.has(event.eventId)) return;
+            v.ids.add(event.eventId);
+            v.prefix = event.payload.replace ? event.payload.text : v.prefix + event.payload.text;
+          }
+        : undefined,
+    }),
+  );
   let stoppedRuntime = false,
     evidence = {},
     stageError;
@@ -891,7 +937,7 @@ async function faultStage(kind, tools) {
       "Unrelated active work prevents component interruption",
     );
   try {
-    if (kind !== "projector-restart")
+    if (!streaming)
       await until(
         async () => (await fixture.mcpState()).calls.length >= before.calls.length + count,
         "Owned Tool admission",
@@ -931,14 +977,8 @@ async function faultStage(kind, tools) {
       await metrics.refreshTargets();
     } else if (kind === "projector-restart") {
       await until(
-        async () =>
-          await database
-            .selectFrom("runs")
-            .select("id")
-            .where("tenant_id", "=", tenant.tenantId)
-            .where("state", "=", "running")
-            .executeTakeFirst(),
-        "Active text loop",
+        async () => visible.some((v) => v.ids.size === 2 && Buffer.byteLength(v.prefix) < 4096),
+        "Visible partial answer before Projector restart",
       );
       const owners = await database
         .selectFrom("runs")
@@ -964,6 +1004,20 @@ async function faultStage(kind, tools) {
       stoppedRuntime = false;
       await metrics.refreshTargets();
       evidence.owners = owners;
+    } else if (kind === "live-stop") {
+      await until(
+        async () =>
+          visible.slice(0, 2).every((v) => v.ids.size === 2 && Buffer.byteLength(v.prefix) < 4096),
+        "Visible partial answers before Stop",
+      );
+      for (const session of owned.slice(0, 2)) {
+        const r = await database
+          .selectFrom("runs")
+          .select("turn_id")
+          .where("session_id", "=", session.sessionId)
+          .executeTakeFirstOrThrow();
+        await api.cancelTurn(session.sessionId, r.turn_id, newIdempotencyKey("visible-text-stop"));
+      }
     } else if (kind === "stop-under-load") {
       const cancelledRuns = [];
       for (const session of owned.slice(0, 2)) {
@@ -991,7 +1045,32 @@ async function faultStage(kind, tools) {
       physicalWrites: after.writes - before.writes,
     });
     await save();
-    if (kind === "stop-under-load") {
+    if (kind === "live-stop") {
+      assert(
+        results.slice(0, 2).every((r) => r.state === "cancelled") &&
+          results.slice(2).every((r) => r.success),
+      );
+      for (const [i, r] of results.slice(0, 2).entries()) {
+        const messages = nativeMessages(await nativeHistory(database, { runId: r.runId }));
+        assert(
+          messages.some(
+            (m) =>
+              m.role === "assistant" &&
+              m.stopReason === "aborted" &&
+              m.content
+                .filter((b) => b.type === "text")
+                .map((b) => b.text)
+                .join("")
+                .startsWith(visible[i].prefix),
+          ),
+          "Aborted native message lost already-visible text",
+        );
+      }
+      evidence = {
+        cancelled: 2,
+        verifiedVisiblePrefixBytes: visible.slice(0, 2).map((v) => Buffer.byteLength(v.prefix)),
+      };
+    } else if (kind === "stop-under-load") {
       assert(results.slice(0, 2).every((r) => r.state === "cancelled"));
       assert(results.slice(2).every((r) => r.state === "completed"));
       for (const result of results.slice(0, 2))
@@ -1047,8 +1126,23 @@ async function faultStage(kind, tools) {
         ),
         "Projector restart replaced a healthy writer",
       );
+      for (const [i, r] of results.entries()) {
+        const prefix = "PMA_DONE " + plans[i].id + "\n";
+        const expected = prefix + "x".repeat(plans[i].outputBytes - prefix.length);
+        const answers = nativeMessages(await nativeHistory(database, { runId: r.runId }))
+          .filter((m) => m.role === "assistant")
+          .map((m) =>
+            m.content
+              .filter((b) => b.type === "text")
+              .map((b) => b.text)
+              .join(""),
+          );
+        assert.deepEqual(answers, [expected], "Replayed answer changed or was materialized twice");
+      }
       evidence = {
         writersPreserved: true,
+        exactAnswers: results.length,
+        visibleBeforeRestart: true,
         sseReconnects: results.reduce((n, r) => n + r.sseReconnects, 0),
         ...(await idlePartitionStreams()),
       };
@@ -1385,7 +1479,21 @@ try {
                         fault: "disconnect_once",
                       },
                     ];
-    for (const profile of profiles) {
+    const selected =
+      mode === "live-burst"
+        ? [
+            {
+              name: "synchronized-192",
+              concurrency: 192,
+              count: 192,
+              kind: "text",
+              firstByteMs: 0,
+              chunkMs: 0,
+              outputBytes: 4096,
+            },
+          ]
+        : profiles;
+    for (const profile of selected) {
       if (stop.signal.aborted) break;
       await stage(profile);
     }
@@ -1402,11 +1510,12 @@ try {
         "worker-handoff",
         "projector-restart",
         "stop-under-load",
+        "live-stop",
         "lost-tool-reply",
       ])
         await faultStage(kind, tools);
     report.accepted =
-      report.measurements.length === profiles.length + (mode === "faults" ? 4 : 0) &&
+      report.measurements.length === selected.length + (mode === "faults" ? 5 : 0) &&
       report.measurements.every(
         (m) =>
           (m.expectedOutcomesPassed || m.summary.failed === 0) &&

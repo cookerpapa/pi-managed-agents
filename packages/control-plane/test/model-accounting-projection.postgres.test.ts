@@ -133,6 +133,7 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
     expect(projector.statistics().nativeLive).toEqual({
       views: 0,
       pendingDocuments: 0,
+      deferredReceipts: 0,
       estimatedBytes: 0,
     });
     expect(projector.statistics().prefixes).toBe(0);

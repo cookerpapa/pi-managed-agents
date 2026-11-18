@@ -51,6 +51,8 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+[Kafka-backed live progress](adr/0336-kafka-live-progress.md) covers the #50 performance candidate. [Measurements and recovery checks](reports/kafka-live-progress-20261118.md) include the paired control.
+
 - [Ordered projection and Run tail latency](reports/ordered-projection-tail-20261118.md)
   compares the source candidate, the serving implementation and two-owner operation.
 

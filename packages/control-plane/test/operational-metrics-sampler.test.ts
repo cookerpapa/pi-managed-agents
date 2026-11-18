@@ -25,7 +25,7 @@ const diagnosticState = {
       coalesced: 1,
       evictions: 1,
     },
-    nativeLive: { views: 1, pendingDocuments: 1, estimatedBytes: 4096 },
+    nativeLive: { views: 1, pendingDocuments: 1, deferredReceipts: 0, estimatedBytes: 4096 },
   },
   prefetch: {
     records: 4,

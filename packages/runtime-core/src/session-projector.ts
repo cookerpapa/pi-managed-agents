@@ -23,7 +23,7 @@ import { HttpPublicationClient } from "./http-publication-client.ts";
 import { SessionLiveView } from "./session-live-view.ts";
 import { SessionOutboxRelay } from "./session-outbox-relay.ts";
 import { KafkaSafeRetention } from "./kafka-safe-retention.ts";
-import { loadFactReplayOffsets, recordFactProjection } from "./accepted-fact-recovery.ts";
+import { loadFactReplayPlan, recordFactProjection } from "./accepted-fact-recovery.ts";
 import type {
   KafkaAcceptedFactRecord,
   KafkaToolDispatchRecord,
@@ -153,16 +153,17 @@ export class SessionProjector {
         // choosing the recovery floor: later changes are necessarily replayed.
         // Loading before bounds could skip a change committed during handoff.
         const current = currentControlAssignment;
-        const offsets = await loadFactReplayOffsets(options.database, topic, bounds);
+        const plan = await loadFactReplayPlan(options.database, topic, bounds);
         if (current())
           await this.#throughGate(async () => {
-            if (current())
-              await options.controlChanges?.load(
-                bounds.map((b) => b.partition),
-                current,
-              );
+            if (!current()) return;
+            this.#projection.restoreProjectedPositions(topic, plan.projectedNext);
+            await options.controlChanges?.load(
+              bounds.map((b) => b.partition),
+              current,
+            );
           });
-        return offsets;
+        return plan.starts;
       },
       onReset: () => {
         this.#projection.reset();

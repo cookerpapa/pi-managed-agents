@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+[Issue #50](https://github.com/cookerpapa/pi-managed-agents/issues/50) targets the per-fragment cost of native live progress. The performance candidate follows [ADR-0336](adr/0336-kafka-live-progress.md) and the #48 rollout gate.
+
 ## Ordered Session projection under load
 
 [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) has a

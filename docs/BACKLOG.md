@@ -1,5 +1,9 @@
 # Maintained backlog
 
+## Kafka-backed live progress
+
+- [x] [#50](https://github.com/cookerpapa/pi-managed-agents/issues/50) verifies zero-SQL ordinary live updates, stable Worker flush, protected recovery and the synchronized 192-Run comparison. [Controlled results](reports/kafka-live-progress-20261118.md). Permanent rollout follows #48. [Decision](adr/0336-kafka-live-progress.md).
+
 ## Projection cost diagnosis and idle startup — delivered
 
 - [x] Decompose Projector time using bounded pg client spans, read-only PG waits,

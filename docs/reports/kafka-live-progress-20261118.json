@@ -1,0 +1,180 @@
+[
+  {
+    "case": "old-first",
+    "runs": 192,
+    "diagnosticSourceHash": "a47bcf42dd82a24f2371719358d064e681b46c7a0e088648698d9befcb98873b",
+    "workloadMs": 31215.15,
+    "runsPerSecond": 6.15,
+    "lastPostMs": 44,
+    "lastClientConfirmationMs": 29025,
+    "inFlightDocChangeCalls": {
+      "7": 373,
+      "8": 192
+    },
+    "nativeCallsPerRun": 88.6,
+    "modelFinishToTerminalCommitMs": {
+      "mean": 10722.59,
+      "p50": 10826.76,
+      "p95": 16929.92,
+      "max": 19811.07
+    },
+    "terminalLocalQueueMs": {
+      "mean": 9799.92,
+      "p50": 10020,
+      "p95": 16167,
+      "max": 19224
+    },
+    "groupLagSamples": [
+      [-2222, 0],
+      [3812, 563],
+      [9682, 1253],
+      [15973, 1827],
+      [21344, 1639],
+      [26986, 544],
+      [29699, 0]
+    ],
+    "sampledPeakLag": 1827,
+    "drainedLag": 0,
+    "cleaned": true
+  },
+  {
+    "case": "candidate-1",
+    "runs": 192,
+    "diagnosticSourceHash": "6ec1dd3244dfa2a97566ad1582357a46da012b458f3fdf18e10a6bf368925993",
+    "workloadMs": 14443.76,
+    "runsPerSecond": 13.29,
+    "lastPostMs": 36,
+    "lastClientConfirmationMs": 12046,
+    "inFlightDocChangeCalls": {
+      "0": 189,
+      "8": 192
+    },
+    "nativeCallsPerRun": 75.67,
+    "modelFinishToTerminalCommitMs": {
+      "mean": 2740.62,
+      "p50": 2737.15,
+      "p95": 4292.9,
+      "max": 5428.09
+    },
+    "terminalLocalQueueMs": {
+      "mean": 2319.74,
+      "p50": 2134,
+      "p95": 4004,
+      "max": 5186
+    },
+    "groupLagSamples": [
+      [-2430, 0],
+      [4937, 556],
+      [10049, 1285],
+      [12425, 0]
+    ],
+    "sampledPeakLag": 1285,
+    "drainedLag": 0,
+    "cleaned": true
+  },
+  {
+    "case": "candidate-2",
+    "runs": 192,
+    "diagnosticSourceHash": "6ec1dd3244dfa2a97566ad1582357a46da012b458f3fdf18e10a6bf368925993",
+    "workloadMs": 12544.2,
+    "runsPerSecond": 15.31,
+    "lastPostMs": 27,
+    "lastClientConfirmationMs": 9394,
+    "inFlightDocChangeCalls": {
+      "0": 131,
+      "8": 192
+    },
+    "nativeCallsPerRun": 75.57,
+    "modelFinishToTerminalCommitMs": {
+      "mean": 2231.65,
+      "p50": 2152.74,
+      "p95": 3965.33,
+      "max": 4694.82
+    },
+    "terminalLocalQueueMs": {
+      "mean": 1829.88,
+      "p50": 1652,
+      "p95": 3537,
+      "max": 4450
+    },
+    "groupLagSamples": [
+      [-3176, 0],
+      [3476, 665],
+      [9389, 449],
+      [9782, 1]
+    ],
+    "sampledPeakLag": 665,
+    "drainedLag": 0,
+    "cleaned": true
+  },
+  {
+    "case": "old-repeat",
+    "runs": 192,
+    "diagnosticSourceHash": "037e99d2783c3f47fd4990a97e7789c7ddba7bfa19f8ba7b170272b52a89f7e7",
+    "workloadMs": 12717.61,
+    "runsPerSecond": 15.1,
+    "lastPostMs": 18,
+    "lastClientConfirmationMs": 10175,
+    "inFlightDocChangeCalls": {
+      "7": 159,
+      "8": 192
+    },
+    "nativeCallsPerRun": 80.79,
+    "modelFinishToTerminalCommitMs": {
+      "mean": 2982.08,
+      "p50": 2964.15,
+      "p95": 4970.58,
+      "max": 6066.14
+    },
+    "terminalLocalQueueMs": {
+      "mean": 2481.86,
+      "p50": 2396,
+      "p95": 4587,
+      "max": 5766
+    },
+    "groupLagSamples": [
+      [-2565, 0],
+      [4081, 1429],
+      [9956, 251],
+      [10575, 0]
+    ],
+    "sampledPeakLag": 1429,
+    "drainedLag": 0,
+    "cleaned": true
+  },
+  {
+    "case": "candidate-paired",
+    "runs": 192,
+    "diagnosticSourceHash": "ce608932ce4c92aef3bf355e441fe0bc4dcac6a5f59ee6715f02c3fdd4ab8de9",
+    "workloadMs": 15703.84,
+    "runsPerSecond": 12.23,
+    "lastPostMs": 27,
+    "lastClientConfirmationMs": 13582,
+    "inFlightDocChangeCalls": {
+      "0": 178,
+      "8": 192
+    },
+    "nativeCallsPerRun": 75.81,
+    "modelFinishToTerminalCommitMs": {
+      "mean": 3413.75,
+      "p50": 3220.79,
+      "p95": 6492.25,
+      "max": 7475.47
+    },
+    "terminalLocalQueueMs": {
+      "mean": 2891.38,
+      "p50": 2714,
+      "p95": 5817,
+      "max": 6874
+    },
+    "groupLagSamples": [
+      [-2152, 0],
+      [4569, 1251],
+      [11673, 250],
+      [14386, 0]
+    ],
+    "sampledPeakLag": 1251,
+    "drainedLag": 0,
+    "cleaned": true
+  }
+]

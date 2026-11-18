@@ -122,6 +122,7 @@ export class OperationalMetricsSampler {
         identity_loads: identityCache.pendingLoads,
         native_views: nativeLive.views,
         native_live: nativeLive.pendingDocuments,
+        native_live_receipts: nativeLive.deferredReceipts,
         display_tail: snapshot.liveTail.cachedEvents,
         empty_display: snapshot.liveTail.emptyHolders,
         event_ids: snapshot.projection.pendingEventIds,

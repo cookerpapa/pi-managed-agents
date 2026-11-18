@@ -353,6 +353,7 @@ The active owner keeps acknowledged state in memory. PG materializes:
 - live-state checkpoints at settlement or ordered writer handoff.
 
 Streaming `pi.live` deltas stay in Kafka, not as repeated PG text histories.
+[ADR-0336](adr/0336-kafka-live-progress.md) allows a fully admitted owner to deliver successive protected live-only changes directly from Kafka. At the next stable or handoff transaction it materializes the contiguous integrity receipts in bulk. The first replay pin and mixed native commits stay transactional. During partition recovery, an exact, fully covered root message can be verified read-only before the earliest outstanding document that needs it. An unrelated Session’s higher partition checkpoint never proves an unseen native commit.
 Protected replay references retain the suffix needed after a Projector restart or
 writer handoff. Rebuilding views does not allocate sequence, dispatch Tools or
 create a second execution authority. Native batch atomicity is retained.

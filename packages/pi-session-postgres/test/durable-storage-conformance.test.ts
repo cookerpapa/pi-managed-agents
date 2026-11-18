@@ -347,6 +347,83 @@ it("keeps native live progress out of PG while preserving current reads across f
   }
 });
 
+it("flushes the Worker record overlay through its stable sequence while live text is only in Kafka", async () => {
+  const f = await fixture();
+  const waits: number[] = [];
+  const store = await PublishedDurableStorage.open({
+    projection: f.projection,
+    maximumBufferedWrites: 1,
+    publish: async (batch) => {
+      if (batch.seq === 1)
+        await f.projection.apply(batch, [], { topic: "live", partition: 0, offset: 1n });
+    },
+    waitProjected: async (seq) => {
+      waits.push(seq);
+      if (seq > 1) throw new Error("Fixture attachment metadata has not settled");
+    },
+  });
+  const id = 2 as import("@earendil-works/pi-durable").DocumentId;
+  try {
+    await store.commit(
+      [
+        { type: "conversation", value: { id: 1 as never } },
+        {
+          type: "document.create",
+          record: {
+            id,
+            kind: "pi.live",
+            scope: { kind: "conversation", conversationId: 1 as never },
+            history: "latest",
+            fork: "initial",
+          },
+          content: { kind: "base", version: 1, value: {} },
+        },
+      ],
+      BACKGROUND_CONTEXT,
+    );
+    for (let i = 0; i < 40; i++) {
+      await store.commit(
+        [
+          {
+            type: "document.change",
+            id,
+            content: { kind: "delta", version: 1, ops: [["s", ["generation"], { text: "x" + i }]] },
+          },
+        ],
+        BACKGROUND_CONTEXT,
+      );
+      await store.flush();
+    }
+    expect(waits).toEqual([1]);
+    expect(store.committedSequence).toBe(41);
+    expect((await f.projection.head()).seq).toBe(1);
+    expect(await store.document(id, "current", BACKGROUND_CONTEXT)).toMatchObject({
+      value: { generation: { text: "x39" } },
+    });
+    await store.commit(
+      [
+        {
+          type: "document.change",
+          id,
+          content: {
+            kind: "base",
+            version: 1,
+            value: {
+              generation: { content: [{ type: "image", mimeType: "image/png", data: "aA==" }] },
+            },
+          },
+        },
+      ],
+      BACKGROUND_CONTEXT,
+    );
+    await expect(store.flush()).rejects.toThrow("Fixture attachment metadata has not settled");
+    expect(waits).toEqual([1, 42]);
+  } finally {
+    await store.close(BACKGROUND_CONTEXT);
+    await f.close();
+  }
+});
+
 it("replays accepted live state after owner loss and makes one exact handoff checkpoint", async () => {
   const batches: DurableBatch[] = [];
   const position = (batch: DurableBatch) => ({

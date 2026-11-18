@@ -42,6 +42,7 @@ export class ExecutionStreamProjector {
   readonly #database: Kysely<Database>;
   readonly #boundary: ExecutionStreamBoundary;
   readonly #durable: PostgresDurableCommitProjector;
+  #recovery: { topic: string; next: ReadonlyMap<number, bigint> } | undefined;
   readonly #prefixes = new Map<string, ExecutionPrefix>();
 
   constructor(
@@ -54,7 +55,12 @@ export class ExecutionStreamProjector {
     this.#durable = new PostgresDurableCommitProjector(database, undefined, modelAccounting);
   }
 
+  restoreProjectedPositions(topic: string, next: ReadonlyMap<number, bigint>): void {
+    this.#recovery = { topic, next };
+  }
+
   reset(): void {
+    this.#recovery = undefined;
     this.#boundary.reset();
     this.#durable.reset();
     this.#prefixes.clear();
@@ -89,7 +95,20 @@ export class ExecutionStreamProjector {
     current: () => boolean = () => true,
   ): Promise<ExecutionProjectionResult | undefined> {
     const { fact } = record;
-    if (fact.kind === "work_finished") return this.#finishWork(fact, record, current);
+    const next =
+      this.#recovery?.topic === record.topic
+        ? this.#recovery.next.get(record.partition)
+        : undefined;
+    const position: FactPosition =
+      next !== undefined && record.offset < next
+        ? {
+            topic: record.topic,
+            partition: record.partition,
+            offset: record.offset,
+            previouslyProjected: true,
+          }
+        : record;
+    if (fact.kind === "work_finished") return this.#finishWork(fact, position, current);
     if (fact.kind === "durable_commit") {
       const scopes = new Map(
         [fact.scope, ...fact.display.map((d) => d.scope)].map((scope) => [scope.sessionId, scope]),
@@ -102,7 +121,8 @@ export class ExecutionStreamProjector {
         await this.#durable.replay(fact, record, current);
         return { admitted: false };
       }
-      const projected = await this.#durable.project(fact, record, current);
+      const projected = await this.#durable.project(fact, position, current);
+      if (!current()) return { admitted: false };
       const sessions = new Set([...scopes.values()].map((scope) => scope.sessionId));
       const result = {
         admitted: projected.admitted,
@@ -134,7 +154,7 @@ export class ExecutionStreamProjector {
         const prefix = this.#prefixes.get(
           `${fact.scope.writerId}:${fact.scope.runId}:${fact.scope.sessionId}`,
         );
-        const terminal = await this.#seal(fact, record, prefix, current);
+        const terminal = await this.#seal(fact, position, prefix, current);
         this.#boundary.close(fact.scope, record.offset);
         this.#closeWriter(fact.scope.writerId, record.offset);
         return terminal ? { terminal, canonicalThroughSequence: terminal.seq } : undefined;
@@ -149,12 +169,13 @@ export class ExecutionStreamProjector {
       prefix.accept(event);
     }
     if (fact.kind === "execution_seal") {
-      const terminal = await this.#seal(fact, record, prefix, current);
+      const terminal = await this.#seal(fact, position, prefix, current);
       this.#boundary.close(fact.scope, record.offset);
       this.#closeWriter(fact.scope.writerId, record.offset);
       return terminal ? { terminal, canonicalThroughSequence: terminal.seq } : undefined;
     } else {
       if (fact.kind === "agent_event" && fact.nativeSequence !== undefined) {
+        await this.#durable.prepareCoverage(fact.scope, fact.nativeSequence, record, current);
         // A replay is valid only under the same authority/native-commit checks.
         // Lock before deciding: a concurrent advance or owner change must be
         // rechecked, even when this statement would otherwise be a no-op.

@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0336](0336-kafka-live-progress.md) moves ordinary in-flight Pi document progress onto the ordered Kafka projection path.
+
 [ADR-0334](0334-ordered-projection-round-trips.md) describes native projection
 within the existing PG transaction. The implementation is under performance
 review. The serving release remains the November 18 idle-startup repair.

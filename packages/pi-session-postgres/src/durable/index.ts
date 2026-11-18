@@ -6,6 +6,7 @@ export {
 export { DurablePostgresProjection } from "./postgres-projection.ts";
 export {
   NativeLiveState,
+  nativeCommitFingerprint,
   type NativeReplayPosition,
   type NativeLiveProjection,
 } from "./live-state.ts";

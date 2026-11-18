@@ -95,7 +95,10 @@ protocol, record the decision under `docs/adr/` before implementation.
   history. ADR-0243 stores Inbox/input metadata and Submissions as authoritative
   current values. ADR-0244 keeps native live progress in Kafka and materializes
   PG checkpoints at settlement or ordered writer handoff; outstanding replay
-  references protect that suffix across Run anchors. Other native writes retain
+  references protect that suffix across Run anchors. Under ADR-0336 an admitted,
+  already-pinned live-only suffix is folded from Kafka and displayed without a PG
+  transaction per fragment. Verify and bulk-materialize its small native receipts
+  at stable or handoff boundaries. Worker overlay flush waits for stable state. Other native writes retain
   their historical policy. Do not restore per-Step projection receipts or allocate sequence from
   a second active writer. Cold administrative mutations require Session quiescence.
   Bootstrap only the latest Compaction and active suffix, never lifetime JSONL.

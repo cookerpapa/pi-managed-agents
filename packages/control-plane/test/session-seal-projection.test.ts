@@ -270,7 +270,7 @@ it.each([true, false])(
       prefixes: 0,
       pendingEventIds: 0,
       prefixEstimatedBytes: 0,
-      nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+      nativeLive: { views: 0, pendingDocuments: 0, deferredReceipts: 0, estimatedBytes: 0 },
     });
     process.stdout.write(
       JSON.stringify({

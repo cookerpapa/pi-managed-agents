@@ -1,3 +1,4 @@
+import { workerProjectionDiagnostic } from "./lib/projector-worker-diagnostic.mjs";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { mkdir, readFile, writeFile, open } from "node:fs/promises";
@@ -29,8 +30,13 @@ const poolSize = process.argv[3] === undefined ? 12 : Number(process.argv[3]);
 const candidateReader = process.argv.slice(4).includes("reader-candidate");
 const candidateProjection = process.argv.slice(4).includes("projection-candidate");
 const clean = process.argv.slice(4).includes("clean");
+const liveBurst = process.argv.slice(4).includes("live-burst");
 const tailLoad = process.argv.slice(4).includes("tail-load");
 const faultLoad = process.argv.slice(4).includes("fault-load");
+assert(
+  !liveBurst || (!tailLoad && !faultLoad && poolSize === 12),
+  "Synchronized burst needs a single twelve-connection owner",
+);
 const genericPlans = process.argv.slice(4).includes("generic-plans");
 assert(
   !genericPlans || (tailLoad && clean && candidateProjection),
@@ -55,6 +61,7 @@ assert(
         "projection-candidate",
         "clean",
         "tail-load",
+        "live-burst",
         "fault-load",
         "generic-plans",
         "cpu",
@@ -120,18 +127,28 @@ const projectionSources = [
   "packages/runtime-core/src/frozen-history.ts",
   "packages/pi-session-postgres/src/durable/postgres-projection.ts",
   "packages/pi-session-postgres/src/durable/shared-entry-bodies.ts",
+  "packages/pi-session-postgres/src/durable/live-state.ts",
+  "packages/pi-session-postgres/src/durable/index.ts",
+  "packages/pi-session-postgres/src/durable/current-state.ts",
+  "packages/pi-session-postgres/src/durable/published-storage.ts",
+  "packages/control-plane/src/operational-metrics-sampler.ts",
 ];
 if (candidateProjection) sources.push(...projectionSources);
 const deployment = JSON.parse(await readFile(runtimeDirectory + "/k3s/deployment.json", "utf8"));
 const baselineRevision = deployment.components["session-runtime"].sourceRevision;
+const worker = candidateProjection
+  ? workerProjectionDiagnostic(name, deployment.components["supervisor-host"].sourceRevision)
+  : undefined;
 const data = {};
 for (const path of sources) {
-  const source = await readFile(path, "utf8");
-  const expected =
+  const expected = execFileSync("git", ["show", baselineRevision + ":" + path], {
+    encoding: "utf8",
+  });
+  const isCandidate =
     (candidateReader && path.endsWith("kafka-partition-reader.ts")) ||
-    (candidateProjection && projectionSources.includes(path))
-      ? execFileSync("git", ["show", `${baselineRevision}:${path}`], { encoding: "utf8" })
-      : source;
+    (candidateProjection &&
+      (projectionSources.includes(path) || path.endsWith("/session-projector.ts")));
+  const source = isCandidate ? await readFile(path, "utf8") : expected;
   const actual = kubectl([
     "exec",
     podFor("session-runtime"),
@@ -147,10 +164,53 @@ for (const path of sources) {
   );
   data[path.split("/").at(-1)] = source;
 }
+const plainProjector = data["session-projector.ts"];
 const replace = (text, from, to) => {
   assert.equal(text.split(from).length, 2, "Diagnostic source anchor changed");
   return text.replace(from, to);
 };
+if (liveBurst) {
+  const reader = "kafka-partition-reader.ts";
+  data[reader] = replace(
+    data[reader],
+    "this.#client.consume(1,",
+    'this.#client.consume(this.#options.groupId === "pi-cloud-session-projector-v2" ? 32 : 1,',
+  );
+  data[reader] = replace(
+    data[reader],
+    "this.#client.setDefaultConsumeTimeout(25);",
+    'this.#client.setDefaultConsumeTimeout(25); if (this.#options.groupId === "pi-cloud-session-projector-v2") this.#client.setDefaultIsTimeoutOnlyForFirstMessage(true);',
+  );
+  if (!clean) {
+    data["burst-reader.mjs"] = `
+const receivedAt = new WeakMap();
+export function received(message) { receivedAt.set(message, Date.now()); }
+export function start(message, work) {
+  const received = receivedAt.get(message);
+  if (received !== undefined) console.log(JSON.stringify({event:"diag.reader.record",
+    p:message.partition,o:message.offset,append:message.timestamp,received,started:Date.now()}));
+  return work();
+}`;
+    data[reader] =
+      'import {received, start as startMeasured} from "/pma-diagnostic/burst-reader.mjs";\n' +
+      data[reader];
+    data[reader] = replace(
+      data[reader],
+      "          this.#enqueue(message);",
+      '          if (this.#options.groupId === "pi-cloud-session-projector-v2") received(message);\n          this.#enqueue(message);',
+    );
+    data[reader] = replace(
+      data[reader],
+      "        this.#handler!({",
+      "        startMeasured(message, () => this.#handler!({",
+    );
+    data[reader] = replace(
+      data[reader],
+      "        }),\n      )\n      .catch((error) => this.#fail(error))",
+      "        })),\n      )\n      .catch((error) => this.#fail(error))",
+    );
+  }
+}
 data["session-projector.ts"] =
   'import { projectWithProbe } from "/pma-diagnostic/entry.mjs";\n' +
   replace(
@@ -216,9 +276,7 @@ export function observeDurationUrl(value) {
   await transform(data["session-runtime-main.ts"], { loader: "ts", format: "esm" });
 }
 if (cpuOnly) {
-  data["session-projector.ts"] =
-    'import "/pma-diagnostic/entry.mjs";\n' +
-    (await readFile("packages/runtime-core/src/session-projector.ts", "utf8"));
+  data["session-projector.ts"] = 'import "/pma-diagnostic/entry.mjs";\n' + plainProjector;
   data["entry.mjs"] = `import {projectorCpuProbe} from './cpu.mjs';
 const cpu=projectorCpuProbe('/tmp/pma-projector-profile.json');
 let started=false;
@@ -230,11 +288,7 @@ process.on('SIGUSR2',()=>{
 console.log(JSON.stringify({event:'diag.cpu.ready',pid:process.pid}));\n`;
   await transform(data["session-projector.ts"], { loader: "ts", format: "esm" });
 }
-if (clean)
-  data["session-projector.ts"] = await readFile(
-    "packages/runtime-core/src/session-projector.ts",
-    "utf8",
-  );
+if (clean) data["session-projector.ts"] = plainProjector;
 for (const [file, source] of Object.entries(data))
   if (file.endsWith(".mjs")) await transform(source, { loader: "js", format: "esm" });
 modified.spec.volumes ??= [];
@@ -249,6 +303,7 @@ for (const path of sources)
     readOnly: true,
   });
 const receipt = {
+  worker: worker?.receipt,
   name,
   target,
   original,
@@ -309,7 +364,7 @@ try {
       "--timestamps",
       "--since-time=" + receipt.startedAt,
     ]);
-  kubectl(["apply", "-f", "-"], {
+  kubectl(["create", "-f", "-"], {
     input: JSON.stringify({
       apiVersion: "v1",
       kind: "ConfigMap",
@@ -317,6 +372,7 @@ try {
       data,
     }),
   });
+  await worker?.apply();
   receipt.phase = "applying";
   await save();
   changed = true; // Restore even if the patch reply is lost after application.
@@ -452,7 +508,7 @@ try {
         "tsx",
         "scripts/run-runtime-load.mjs",
         "--mode",
-        tailLoad ? "projection-tail" : faultLoad ? "faults" : "custom",
+        liveBurst ? "live-burst" : tailLoad ? "projection-tail" : faultLoad ? "faults" : "custom",
         "--name",
         "observed-projection-pool-" + poolSize,
         "--concurrency",
@@ -588,6 +644,7 @@ try {
       await kubectlAsync(["rollout", "status", target, "--timeout=180s"]);
     }
   }
+  await worker?.restore();
   kubectl(["delete", "configmap", name, "--ignore-not-found"]);
   receipt.phase = "restored";
   receipt.restoredAt = new Date().toISOString();

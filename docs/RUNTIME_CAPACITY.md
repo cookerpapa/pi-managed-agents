@@ -72,7 +72,7 @@ matrix covers cold text tasks, paced responses, short/continuous MCP loops, a
 small real Guest workload, larger input, native children, SSE viewers/history,
 retained image results, arrival-rate bursts, provider-context expiry and native
 compaction. Fault mode includes synthetic provider failures, Worker handoff,
-Projector interruption, Stop and uncertain external results.
+Projector interruption after visible text, Stop during text or Tools, and uncertain external results.
 
 The projection-tail profile measures serial latency, two 64-in-flight bursts,
 400 arrivals scheduled at 20 per second, 128 in-flight clients with a five-second
@@ -91,6 +91,8 @@ The optional `capacity` extension raises concurrency to 64 and offered arrivals
 to 16/32 per second. Run it only after checking the lower matrix's headroom.
 Input padding stays below the public 100,000-character message limit; long
 contexts are built through retained multi-turn history.
+
+The `live-burst` mode prepares 192 independent SSE subscribers before releasing all 192 short 4 KiB requests together. Compare each provider's completion with the matching Run and observe the consumer group's per-partition lag through final drainage. The standard fixture and cleanup checks apply.
 
 Custom stages accept `--concurrency`, `--count`, `--rate`, `--kind text|mcp|guest|children`,
 `--first-byte-ms`, `--chunk-ms`, `--output-bytes`, `--input-bytes`, `--rounds`,

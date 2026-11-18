@@ -270,7 +270,7 @@ it("retires all child prefix identities on forced closure and preserves their ne
     prefixes: 0,
     pendingEventIds: 0,
     prefixEstimatedBytes: 0,
-    nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+    nativeLive: { views: 0, pendingDocuments: 0, deferredReceipts: 0, estimatedBytes: 0 },
   });
   for (const [i, child] of children.entries()) {
     const view = await f.database
@@ -285,6 +285,6 @@ it("retires all child prefix identities on forced closure and preserves their ne
     prefixes: 0,
     pendingEventIds: 0,
     prefixEstimatedBytes: 0,
-    nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+    nativeLive: { views: 0, pendingDocuments: 0, deferredReceipts: 0, estimatedBytes: 0 },
   });
 }, 30_000);

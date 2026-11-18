@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Kafka-backed live progress and recovery](kafka-live-progress-20261118.md) records the #50 SQL count, visible-prefix recovery and synchronized short-Run comparisons.
+
 - [Ordered Session projection and Run tail latency](ordered-projection-tail-20261118.md).
   Source-only feasibility, fixed-connection comparisons, failure acceptance and
   limits of the single-host measurements.

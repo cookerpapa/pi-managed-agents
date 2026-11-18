@@ -2,7 +2,12 @@ import type { Database } from "@pi-cloud/database";
 import { sql, type Kysely, type Transaction, type RawBuilder } from "kysely";
 
 export type KafkaPartitionBounds = Readonly<{ partition: number; low: bigint; high: bigint }>;
-export type FactPosition = Readonly<{ topic: string; partition: number; offset: bigint }>;
+export type FactPosition = Readonly<{
+  topic: string;
+  partition: number;
+  offset: bigint;
+  previouslyProjected?: true;
+}>;
 
 export function projectionOffsetWrite(position: FactPosition, ready?: RawBuilder<boolean>) {
   return sql`insert into accepted_fact_projection_offsets(topic,partition,next_offset)
@@ -16,16 +21,19 @@ export async function recordFactProjection(
   db: Transaction<Database>,
   position: FactPosition,
 ): Promise<void> {
-  await projectionOffsetWrite(position).execute(db);
+  if (!position.previouslyProjected) await projectionOffsetWrite(position).execute(db);
 }
 
 /** Caller captures Kafka bounds BEFORE this query, so a concurrent new Run or
  * first publication cannot disappear behind a later database checkpoint. */
-export async function loadFactReplayOffsets(
+export async function loadFactReplayPlan(
   db: Kysely<Database>,
   topic: string,
   bounds: readonly KafkaPartitionBounds[],
-): Promise<ReadonlyMap<number, bigint | Error>> {
+): Promise<{
+  starts: ReadonlyMap<number, bigint | Error>;
+  projectedNext: ReadonlyMap<number, bigint>;
+}> {
   const rows = await sql<{
     partition: number;
     next_offset: string | null;
@@ -46,9 +54,11 @@ export async function loadFactReplayOffsets(
       ) required
     ) pending on true`.execute(db);
   const starts = new Map<number, bigint | Error>();
+  const projectedNext = new Map<number, bigint>();
   for (const bound of bounds) {
     const row = rows.rows.find((r) => r.partition === bound.partition);
     const checkpoint = row?.next_offset == null ? bound.low : BigInt(row.next_offset);
+    if (row?.next_offset != null) projectedNext.set(bound.partition, checkpoint);
     const pending = row?.first_offset == null ? bound.high : BigInt(row.first_offset);
     const start = [checkpoint < bound.low ? bound.low : checkpoint, pending, bound.high].reduce(
       (a, b) => (a < b ? a : b),
@@ -60,5 +70,5 @@ export async function loadFactReplayOffsets(
         : start,
     );
   }
-  return starts;
+  return { starts, projectedNext };
 }

@@ -12,7 +12,7 @@ import { ExecutionStreamProjector } from "../../runtime-core/src/execution-strea
 import { PostgresDurableCommitProjector } from "../../runtime-core/src/postgres-durable-commit-projector.ts";
 import { SessionLiveView } from "../../runtime-core/src/session-live-view.ts";
 import { parseKafkaAcceptedFact } from "../../runtime-core/src/kafka-accepted-fact.ts";
-import { loadFactReplayOffsets } from "../../runtime-core/src/accepted-fact-recovery.ts";
+import { loadFactReplayPlan } from "../../runtime-core/src/accepted-fact-recovery.ts";
 import { KafkaSafeRetention } from "../../runtime-core/src/kafka-safe-retention.ts";
 import { readCanonicalPiTurnTranscripts } from "../../runtime-core/src/canonical-pi-conversation.ts";
 import type {
@@ -198,6 +198,267 @@ describe.sequential("native execution closure", () => {
     };
     return { seed, progress };
   };
+  function streamed(
+    f: Awaited<ReturnType<typeof fixture>>,
+    progress: AcceptedDurableCommitFact,
+    seq: number,
+    text: string,
+  ): AcceptedDurableCommitFact {
+    const event = f.delta(seq, text).event;
+    if (event.type !== "assistant.text.delta") throw new Error("Expected text fixture");
+    return {
+      ...progress,
+      factId: crypto.randomUUID(),
+      commit: {
+        ...progress.commit,
+        seq,
+        writes: [
+          {
+            type: "document.change",
+            id: 100,
+            content: {
+              kind: "delta",
+              version: 1,
+              ops: [["s", ["generation", "message", "text"], text]],
+            },
+          },
+        ],
+      },
+      display: [
+        {
+          scope: progress.scope,
+          events: [
+            {
+              event: { ...event, payload: {} },
+              source: {
+                kind: "document",
+                id: 100,
+                path: ["generation", "message", "text"],
+                start: 0,
+                end: text.length,
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  it("delivers a protected native suffix with zero PG calls, then replays it after loss", async () => {
+    const f = await fixture(),
+      { seed, progress } = liveFacts(f);
+    let denyDatabase = false;
+    const guarded = new Proxy(db, {
+      get(target, key) {
+        if (denyDatabase) throw new Error("Unexpected PostgreSQL access on a live-only fragment");
+        const v = Reflect.get(target, key, target);
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    const owner = new ExecutionStreamProjector(guarded);
+    await owner.project(f.record(seed, 10n));
+    await owner.project(f.record(progress, 20n));
+    const suffix = Array.from({ length: 40 }, (_, i) =>
+      streamed(f, progress, 3 + i, "visible " + i),
+    );
+    denyDatabase = true;
+    for (const fact of suffix) {
+      const p = f.record(fact, BigInt(fact.commit.seq * 10));
+      expect((await owner.project(p))?.events?.[0]).toMatchObject({
+        payload: { text: "visible " + (fact.commit.seq - 3) },
+      });
+      expect(await owner.accepts(p)).toBe(true);
+    }
+    const last = suffix.at(-1)!;
+    expect(await owner.project(f.record(last, 430n))).toMatchObject({ events: [] });
+    await expect(
+      owner.project(f.record(streamed(f, progress, last.commit.seq, "changed"), 431n)),
+    ).rejects.toThrow("changed bytes");
+    await expect(owner.project(f.record(streamed(f, progress, 45, "gap"), 432n))).rejects.toThrow(
+      "not contiguous",
+    );
+    expect((await f.projection.head()).seq).toBe(2);
+    // Another Session on this partition may advance its PG/group cursor while these bytes stay in Kafka.
+    await db
+      .updateTable("accepted_fact_projection_offsets")
+      .set({ next_offset: "500" })
+      .where("topic", "=", "seals-test")
+      .where("partition", "=", 0)
+      .execute();
+    const floor = await loadFactReplayPlan(db, "seals-test", [
+      { partition: 0, low: 0n, high: 501n },
+    ]);
+    expect(floor.starts.get(0)).toBeLessThanOrEqual(20n);
+    // The stable first commit precedes the still-open document's own replay floor.
+    await db
+      .transaction()
+      .setAccessMode("read only")
+      .execute(async (tx) => {
+        const reader = new ExecutionStreamProjector(tx);
+        reader.restoreProjectedPositions("seals-test", floor.projectedNext);
+        expect((await reader.project(f.record(seed, 10n)))?.admitted).toBe(true);
+      });
+    const replacement = new ExecutionStreamProjector(db);
+    replacement.restoreProjectedPositions("seals-test", floor.projectedNext);
+    await replacement.project(f.record(seed, 10n));
+    await replacement.project(f.record(progress, 20n));
+    for (const fact of suffix)
+      await replacement.project(f.record(fact, BigInt(fact.commit.seq * 10)));
+    await replacement.project(f.record(f.seal, 490n));
+    expect((await f.projection.head()).seq).toBe(last.commit.seq);
+    await f.projection.assertComplete();
+    expect((await f.projection.revisions(100, last.commit.seq)).at(-1)?.checkpoint).toMatchObject({
+      generation: { message: { text: "visible 39" } },
+    });
+    expect(replacement.statistics().nativeLive.deferredReceipts).toBe(0);
+  });
+
+  it("rolls deferred receipts back with a bad mixed commit and admits coverage against stable proof", async () => {
+    const f = await fixture(),
+      { seed, progress } = liveFacts(f),
+      owner = new ExecutionStreamProjector(db);
+    await owner.project(f.record(seed, 10n));
+    await owner.project(f.record(progress, 20n));
+    const live = streamed(f, progress, 3, "partial");
+    await owner.project(f.record(live, 30n));
+    const broken = { ...progress, commit: { seq: 4, nextId: 101, writes: seed.commit.writes } };
+    await expect(owner.project(f.record(broken, 40n))).rejects.toThrow();
+    expect((await f.projection.head()).seq).toBe(2);
+    expect(owner.statistics().nativeLive.deferredReceipts).toBe(1);
+    const coverage = { ...f.delta(4, ""), nativeSequence: 3 };
+    expect(await owner.project(f.record(coverage, 41n))).toMatchObject({
+      canonicalThroughSequence: 4,
+    });
+    expect((await f.projection.head()).seq).toBe(3);
+    expect(owner.statistics().nativeLive.deferredReceipts).toBe(0);
+    await owner.project(f.record(streamed(f, progress, 4, "next"), 42n));
+    const closed = {
+      ...progress,
+      commit: {
+        seq: 5,
+        nextId: 101,
+        writes: [
+          { type: "document.change", id: 100, content: { kind: "base", version: 1, value: {} } },
+        ],
+      },
+    };
+    await owner.project(f.record(closed, 50n));
+    await f.projection.assertComplete();
+    expect((await f.projection.head()).seq).toBe(5);
+    expect(owner.statistics().nativeLive.deferredReceipts).toBe(0);
+    await expect(
+      owner.project(f.record(streamed(f, progress, 3, "conflict"), 60n)),
+    ).rejects.toThrow("changed bytes");
+  });
+
+  it("keeps a sibling live document recoverable when another Conversation settles", async () => {
+    const f = await fixture(),
+      { seed, progress } = liveFacts(f);
+    const first = {
+      ...seed,
+      commit: {
+        seq: 1,
+        nextId: 103,
+        writes: [
+          ...seed.commit.writes,
+          { type: "conversation", value: { id: 101 } },
+          {
+            type: "document.create",
+            record: {
+              id: 102,
+              kind: "pi.live",
+              scope: { kind: "conversation", conversationId: 101 },
+              history: "latest",
+              fork: "initial",
+            },
+            content: { kind: "base", version: 1, value: {} },
+          },
+        ],
+      },
+    };
+    const change = (seq: number, id: number, text?: string): AcceptedDurableCommitFact => ({
+      ...progress,
+      commit: {
+        seq,
+        nextId: 103,
+        writes: [
+          {
+            type: "document.change",
+            id,
+            content: {
+              kind: "base",
+              version: 1,
+              value: text ? { generation: { message: { text } } } : {},
+            },
+          },
+        ],
+      },
+    });
+    const facts = [
+      first,
+      change(2, 100, "a"),
+      change(3, 100, "aa"),
+      change(4, 102, "b"),
+      change(5, 100, "aaa"),
+      change(6, 102, "bb"),
+      change(7, 100),
+    ];
+    const owner = new ExecutionStreamProjector(db);
+    for (const fact of facts) await owner.project(f.record(fact, BigInt(10 * fact.commit.seq)));
+    const { rows: pins } = await sql<{ id: string; replay_offset: string }>`
+      select id::text,replay_offset::text from pi_durable_current where tenant_id=${tenantId}::uuid
+        and session_id=${f.seal.scope.piSessionId} and replay_offset is not null`.execute(db);
+    expect(pins).toEqual([{ id: "102", replay_offset: "40" }]);
+    const pos = f.record(first, 10n);
+    const plan = await loadFactReplayPlan(db, pos.topic, [{ partition: 0, low: 0n, high: 90n }]);
+    const replacement = new ExecutionStreamProjector(db);
+    replacement.restoreProjectedPositions(pos.topic, plan.projectedNext);
+    for (const fact of facts)
+      await replacement.project(f.record(fact, BigInt(10 * fact.commit.seq)));
+    await replacement.project(f.record(change(8, 102, "bbb"), 80n));
+    expect(replacement.statistics().nativeLive.deferredReceipts).toBe(1);
+    await replacement.project(f.record(f.seal, 85n));
+    await f.projection.assertComplete();
+    expect((await f.projection.revisions(100, 8)).at(-1)?.checkpoint).toEqual({});
+    expect((await f.projection.revisions(102, 8)).at(-1)?.checkpoint).toMatchObject({
+      generation: { message: { text: "bbb" } },
+    });
+  });
+  it("reconstructs an already materialized root natively in a read-only transaction and still admits a missing Session sequence", async () => {
+    const f = await fixture(),
+      owner = new ExecutionStreamProjector(db),
+      stable = f.mutation("already in history");
+    const pos = f.record(stable, 10n);
+    await owner.project(pos);
+    await db
+      .updateTable("accepted_fact_projection_offsets")
+      .set({ next_offset: "80" })
+      .where("topic", "=", pos.topic)
+      .where("partition", "=", 0)
+      .execute();
+    const plan = await loadFactReplayPlan(db, pos.topic, [{ partition: 0, low: 0n, high: 80n }]);
+    expect(plan.projectedNext.get(0)).toBe(80n);
+    await db
+      .transaction()
+      .setAccessMode("read only")
+      .execute(async (tx) => {
+        const replacement = new ExecutionStreamProjector(tx);
+        replacement.restoreProjectedPositions(pos.topic, plan.projectedNext);
+        expect(await replacement.project(pos)).toMatchObject({ admitted: true, events: [] });
+        await expect(
+          replacement.project({
+            ...pos,
+            fact: { ...stable, commit: { ...stable.commit, nextId: stable.commit.nextId + 1 } },
+          }),
+        ).rejects.toThrow("changed bytes");
+      });
+    const recovery = new ExecutionStreamProjector(db);
+    recovery.restoreProjectedPositions(pos.topic, plan.projectedNext);
+    await recovery.project(pos);
+    const missing = f.mutation("also in Kafka");
+    await recovery.project(f.record(missing, 20n));
+    expect((await f.projection.head()).seq).toBe(missing.commit.seq);
+  });
   it("requires replayed live state before writer closure and commits one handoff checkpoint", async () => {
     const f = await fixture(),
       { seed, progress } = liveFacts(f);
@@ -312,7 +573,7 @@ describe.sequential("native execution closure", () => {
     expect(replacement.statistics()).toMatchObject({
       prefixes: 0,
       pendingEventIds: 0,
-      nativeLive: { views: 0, pendingDocuments: 0, estimatedBytes: 0 },
+      nativeLive: { views: 0, pendingDocuments: 0, deferredReceipts: 0, estimatedBytes: 0 },
     });
     expect(
       (await readCanonicalPiTurnTranscripts(db, { tenantId, turnIds: [f.first.turnId] })).get(
@@ -352,9 +613,9 @@ describe.sequential("native execution closure", () => {
       "prefix is missing",
     );
     expect(
-      (await loadFactReplayOffsets(db, "seals-test", [{ partition: 0, low: 51n, high: 61n }])).get(
-        0,
-      ),
+      (
+        await loadFactReplayPlan(db, "seals-test", [{ partition: 0, low: 51n, high: 61n }])
+      ).starts.get(0),
     ).toBeInstanceOf(Error);
   });
   it("retains unsealed data beyond the grace, then deletes only behind PG and broker time", async () => {

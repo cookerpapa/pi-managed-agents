@@ -94,3 +94,14 @@ same 1 MiB buffer on the host every two seconds. The Windows observer sampled
 the same interval. The report joins those observations by each timed stage's
 wall-clock bounds, retains sample counts, and leaves earlier cases unsampled.
 Neither observer changes system power or performance settings.
+
+## Synchronized native live progress
+
+Use `12 projection-candidate live-burst` to compare 192 simultaneously released text requests with one Projector, 32 Kafka partitions, a 32-record poll (waiting only for the first record), twelve projection connections and two Workers. Candidate observations mount the paired Worker flush implementation. The operator records both workload templates before applying the temporary source and restores both at exit. Set `PI_CLOUD_PROJECTOR_DIAGNOSTIC_REPETITIONS` for serial repetitions. The runtime load driver can also run `--mode live-burst` on a deployed pair.
+
+Pass each private load `report.json` to the summary tool. It matches synthetic provider completion to this Run's terminal PG COMMIT response and collects the consumer group's actual lag.
+
+```sh
+python3 scripts/experiments/projector-sql-20261118/summarize-live-progress.py output.json \
+  /private/baseline/load/report.json /private/candidate/load-1/report.json /private/candidate/load-2/report.json
+```

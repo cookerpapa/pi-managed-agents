@@ -36,6 +36,7 @@ import {
   type TaskRecord,
 } from "@earendil-works/pi-durable";
 import { PublicationNotSentError, NATIVE_HUMAN_INPUT_DOCUMENT } from "@pi-cloud/protocol";
+import { containsImage, retainedAttachmentReferences } from "@pi-cloud/session-attachments";
 import { DurablePostgresProjection, materializeNativeDocument } from "./postgres-projection.ts";
 import { applyImmutableBatches } from "@earendil-works/chord/delta";
 import { isLiveDocument, isSettledLiveValue } from "./current-state.ts";
@@ -61,6 +62,7 @@ export type NativeDocumentChange = Readonly<{
   after: StoredDocument | undefined;
 }>;
 type Prepared = {
+  progressOnly: boolean;
   batch: DurableBatch;
   records: IndexedRecord[];
   revisions: DocumentRevision[];
@@ -113,6 +115,7 @@ export class PublishedDurableStorage implements Storage {
   readonly #readCache = new Map<number, IndexedRecord | undefined>();
   #seq: number;
   #nextId: number;
+  #stableHead: { seq: number; nextId: number };
   #coldSeq: number;
   #coldNextId: number;
   readonly #addresses = new Map<string, DocumentRecord | undefined>();
@@ -124,6 +127,7 @@ export class PublishedDurableStorage implements Storage {
   readonly #readClose = new AbortController();
   private constructor(options: DurableStorageOptions, head: { seq: number; nextId: number }) {
     this.#options = options;
+    this.#stableHead = head;
     this.#seq = head.seq;
     this.#nextId = head.nextId;
     this.#coldSeq = head.seq;
@@ -256,8 +260,13 @@ export class PublishedDurableStorage implements Storage {
       }
       this.#seq = prepared.batch.seq;
       this.#nextId = Math.max(this.#nextId, prepared.batch.nextId);
-      this.#bufferedWrites += Math.max(1, prepared.batch.writes.length);
-      this.#bufferedBytes += Buffer.byteLength(JSON.stringify(prepared.batch));
+      // An active live value is already readable here after the Kafka ACK.
+      // Evicting the ordinary record overlay only needs the last stable commit.
+      if (!prepared.progressOnly) {
+        this.#stableHead = { seq: prepared.batch.seq, nextId: prepared.batch.nextId };
+        this.#bufferedWrites += Math.max(1, prepared.batch.writes.length);
+        this.#bufferedBytes += Buffer.byteLength(JSON.stringify(prepared.batch));
+      }
       const changedAddresses = new Set<string>();
       for (const record of prepared.records) {
         this.#readCache.delete(record.value.id);
@@ -283,7 +292,7 @@ export class PublishedDurableStorage implements Storage {
   }
   async #flush(): Promise<void> {
     if (!this.#bufferedWrites) return;
-    await this.#options.waitProjected(this.#seq);
+    await this.#options.waitProjected(this.#stableHead.seq);
     this.#assertOpen();
     this.#records.clear();
     this.#revisions.clear();
@@ -292,8 +301,8 @@ export class PublishedDurableStorage implements Storage {
     this.#addresses.clear();
     // PG's header watermark does not materialize an in-flight live document.
     for (const [id, live] of this.#live) if (isSettledLiveValue(live.value)) this.#live.delete(id);
-    this.#coldSeq = this.#seq;
-    this.#coldNextId = this.#nextId;
+    this.#coldSeq = this.#stableHead.seq;
+    this.#coldNextId = this.#stableHead.nextId;
     this.#bufferedBytes = 0;
     this.#bufferedWrites = 0;
   }
@@ -871,7 +880,17 @@ export class PublishedDurableStorage implements Storage {
       throw new Error("Document address already has a current incarnation");
     for (const [ordinal, write] of writes.entries())
       if ("value" in write) records.push(indexNative(write.type, write.value, seq, ordinal));
+    const progressOnly =
+      writes.length > 0 &&
+      writes.every((w) => {
+        if (w.type !== "document.change") return false;
+        const doc = live.get(w.id);
+        return doc !== undefined && !isSettledLiveValue(doc.value);
+      }) &&
+      !containsImage(writes) &&
+      !retainedAttachmentReferences(writes).length;
     return {
+      progressOnly,
       batch: { seq, nextId, writes },
       records,
       revisions,

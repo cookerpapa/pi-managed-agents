@@ -32,7 +32,7 @@ import { PostgresDurableCommitProjector } from "../../runtime-core/src/postgres-
 import { createExecutionPublication } from "../../runtime-core/src/execution-publication.ts";
 import type { AcceptedFact, AcceptedFactBus } from "../../runtime-core/src/accepted-fact.ts";
 import {
-  loadFactReplayOffsets,
+  loadFactReplayPlan,
   recordFactProjection,
 } from "../../runtime-core/src/accepted-fact-recovery.ts";
 import { acceptedFactRetentionFloors } from "../../runtime-core/src/kafka-safe-retention.ts";
@@ -1525,15 +1525,15 @@ describe.skipIf(!endpoint)("atomic Worker admission", () => {
         ).output_first_offset,
       ).toBe("10");
       expect(
-        (await loadFactReplayOffsets(db, record.topic, [{ partition: 0, low: 0n, high: 60n }])).get(
-          0,
-        ),
+        (
+          await loadFactReplayPlan(db, record.topic, [{ partition: 0, low: 0n, high: 60n }])
+        ).starts.get(0),
       ).toBe(0n);
       await db.transaction().execute((tx) => recordFactProjection(tx, { ...record, offset: 50n }));
       expect(
-        (await loadFactReplayOffsets(db, record.topic, [{ partition: 0, low: 0n, high: 60n }])).get(
-          0,
-        ),
+        (
+          await loadFactReplayPlan(db, record.topic, [{ partition: 0, low: 0n, high: 60n }])
+        ).starts.get(0),
       ).toBe(10n);
     },
   );
@@ -2408,9 +2408,9 @@ describe.skipIf(!endpoint)("atomic Worker admission", () => {
       ).toHaveLength(1);
       await db.transaction().execute((tx) => recordFactProjection(tx, { ...record, offset: 50n }));
       expect(
-        (await loadFactReplayOffsets(db, record.topic, [{ partition: 0, low: 0n, high: 60n }])).get(
-          0,
-        ),
+        (
+          await loadFactReplayPlan(db, record.topic, [{ partition: 0, low: 0n, high: 60n }])
+        ).starts.get(0),
       ).toBe(10n);
       expect((await acceptedFactRetentionFloors(db, record.topic, [0])).get(0)).toBe(10n);
       const replay = new ExecutionStreamProjector(db);

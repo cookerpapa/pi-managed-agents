@@ -134,6 +134,45 @@ export type CurrentStateSource = CurrentStateRow & {
   replay_offset: string | null;
   replay_seq: string | null;
 };
+export function changeCurrentDocument(
+  previous: CurrentStateRow,
+  write: Extract<StorageWrite, { type: "document.change" | "document.retire" }>,
+  seq: number,
+  ordinal: number,
+): CurrentStateRow {
+  if (previous.kind !== "document" || previous.retired_seq !== null)
+    throw new Error("Native current document is unavailable");
+  const base = JSON.parse(previous.body) as Extract<StorageWrite, { type: "document.create" }>;
+  if (base.content.kind !== "base") throw new Error("Native current base is invalid");
+  let deltaCount = previous.delta_count;
+  let nextContent = base.content;
+  if (write.type === "document.change") {
+    const content = write.content;
+    if (content.kind === "delta" && content.version !== base.content.version)
+      throw new Error("Native document version mismatch");
+    nextContent =
+      content.kind === "base"
+        ? content
+        : {
+            kind: "base",
+            version: content.version,
+            value: applyImmutableBatches(base.content.value, [content.ops]),
+          };
+    deltaCount = content.kind === "base" ? 0 : deltaCount + 1;
+  } else {
+    // Retired latest-only content is no longer addressable. Keep its identity.
+    nextContent = { ...base.content, value: {} };
+  }
+  return {
+    ...previous,
+    seq: String(seq),
+    ordinal,
+    body: JSON.stringify({ ...base, content: nextContent }),
+    delta_count: deltaCount,
+    retired_seq: write.type === "document.retire" ? String(seq) : null,
+  };
+}
+
 export function prepareCurrentStates(
   batch: DurableBatch,
   origins: ReadonlyMap<number, Record<string, string> | undefined>,
@@ -201,37 +240,7 @@ export function prepareCurrentStates(
     if (write.type !== "document.change" && write.type !== "document.retire") continue;
     const previous = rows.get(write.id);
     if (!previous) continue;
-    if (previous.kind !== "document" || previous.retired_seq !== null)
-      throw new Error("Native current document is unavailable");
-    const base = JSON.parse(previous.body) as Extract<StorageWrite, { type: "document.create" }>;
-    if (base.content.kind !== "base") throw new Error("Native current base is invalid");
-    let deltaCount = previous.delta_count;
-    let nextContent = base.content;
-    if (write.type === "document.change") {
-      const content = write.content;
-      if (content.kind === "delta" && content.version !== base.content.version)
-        throw new Error("Native document version mismatch");
-      nextContent =
-        content.kind === "base"
-          ? content
-          : {
-              kind: "base",
-              version: content.version,
-              value: applyImmutableBatches(base.content.value, [content.ops]),
-            };
-      deltaCount = content.kind === "base" ? 0 : deltaCount + 1;
-    } else {
-      // Retired latest-only content is no longer addressable. Keep its identity.
-      nextContent = { ...base.content, value: {} };
-    }
-    rows.set(write.id, {
-      ...previous,
-      seq: String(batch.seq),
-      ordinal,
-      body: JSON.stringify({ ...base, content: nextContent }),
-      delta_count: deltaCount,
-      retired_seq: write.type === "document.retire" ? String(batch.seq) : null,
-    });
+    rows.set(write.id, changeCurrentDocument(previous, write, batch.seq, ordinal));
     changed.add(write.id);
     omitted.add(ordinal);
   }

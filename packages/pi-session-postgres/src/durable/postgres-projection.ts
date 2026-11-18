@@ -7,7 +7,6 @@ import {
 } from "./shared-history-base.ts";
 import { assertIdleNativeSession } from "../idle-session-mutation.ts";
 import { retainedHistoryBody, writeNativeCommit } from "./shared-entry-bodies.ts";
-import { createHash } from "node:crypto";
 import { sql, type Kysely, type Transaction, type RawBuilder } from "kysely";
 import { databaseReadSignal, type Database } from "@pi-cloud/database";
 import {
@@ -42,6 +41,7 @@ import {
 } from "./current-state.ts";
 import {
   NativeLiveState,
+  nativeCommitFingerprint,
   type NativeLiveProjection,
   type NativeReplayPosition,
 } from "./live-state.ts";
@@ -495,9 +495,8 @@ export class DurablePostgresProjection {
     // Only non-image record metadata is interpreted here. Model/image parts
     // remain encoded in the canonical body and in derived document checkpoints.
     const batch = stored as DurableBatch;
-    const fingerprint = createHash("sha256")
-      .update(JSON.stringify({ batch, origins, cloudMetadata }))
-      .digest("hex");
+    const fingerprint = nativeCommitFingerprint(stored, origins, cloudMetadata);
+    if (live) await this.materializeLiveReceiptsIn(tx, live.state);
     const ownership = new Map(origins.map((origin) => [origin.recordId, origin]));
     const parentIds: number[] = [
       ...new Set(
@@ -557,13 +556,18 @@ export class DurablePostgresProjection {
           where ${this.scoped("r")} and r.id=any(${inputIds}::bigint[])
         ) row
       ) state on true`.execute(tx);
+    if (!head) throw new Error("Native projection did not return a commit head");
+    if (live) {
+      live.state.projectedThrough = Number(head.seq);
+      live.state.nextId = Number(head.next_id);
+    }
     if (head?.prior) {
       if (head.prior.fingerprint !== fingerprint)
         throw new Error("Native commit position changed bytes");
       if (live) await this.#replayLiveIn(tx, batch, head.prior.current_hashes, live);
       return { appended: false, sharedEntries: head.inherited_before !== null, finished: false };
     }
-    if (!head || batch.seq !== Number(head.seq) + 1 || batch.nextId < Number(head.next_id))
+    if (batch.seq !== Number(head.seq) + 1 || batch.nextId < Number(head.next_id))
       throw new Error("Native commit sequence or ID watermark is not contiguous");
     if (head.inherited_before !== null) {
       // Only immutable Entries can be inherited. Newly minted IDs and owned
@@ -739,6 +743,8 @@ export class DurablePostgresProjection {
           else live.state.rows.delete(Number(row.id));
         }
       live.state.through = batch.seq;
+      live.state.projectedThrough = batch.seq;
+      live.state.nextId = batch.nextId;
     }
     return { appended: true, sharedEntries: head.inherited_before !== null, finished };
   }
@@ -879,9 +885,7 @@ export class DurablePostgresProjection {
     }>`select fingerprint,current_hashes
       from pi_durable_commits c where ${this.scoped("c")} and seq=${stored.seq}`.execute(tx);
     if (!header.rows[0]) return false;
-    const fingerprint = createHash("sha256")
-      .update(JSON.stringify({ batch: stored, origins, cloudMetadata }))
-      .digest("hex");
+    const fingerprint = nativeCommitFingerprint(stored, origins, cloudMetadata);
     if (header.rows[0].fingerprint !== fingerprint)
       throw new Error("Native replay position changed bytes");
     await this.#replayLiveIn(
@@ -892,6 +896,40 @@ export class DurablePostgresProjection {
     );
     return true;
   }
+  /** The caller holds the physical Session lock. A source transaction whose
+   * reply was lost may already contain the range: compare every overlapping
+   * receipt, and append only a contiguous missing suffix. No live body is sent. */
+  async materializeLiveReceiptsIn(
+    tx: Transaction<Database>,
+    state: NativeLiveState,
+  ): Promise<void> {
+    if (!state.receipts.size) return;
+    const receipts = [...state.receipts.values()];
+    const {
+      rows: [proof],
+    } = await sql<{ accepted: number }>`
+      with incoming as materialized (
+        select * from jsonb_to_recordset(${JSON.stringify(receipts)}::jsonb)
+          as r(seq bigint,"nextId" bigint,fingerprint text,"writeCount" int,hashes jsonb)
+      ), head as materialized (
+        select seq from pi_durable_commits c where ${this.scoped("c")} order by seq desc limit 1
+      ), existing as (
+        select count(*)::int as n from incoming i join pi_durable_commits c
+          on ${this.scoped("c")} and c.seq=i.seq and c.next_id=i."nextId"
+          and c.fingerprint=i.fingerprint and c.current_hashes=i.hashes
+          and c.write_count=i."writeCount" and c.history_write_count=0 and c.history_fingerprint=${historyFingerprint([])} and c.cloud_metadata is null
+      ), appended as (
+        insert into pi_durable_commits
+          (tenant_id,session_id,seq,next_id,fingerprint,write_count,history_write_count,history_fingerprint,current_hashes)
+        select ${this.scope.tenantId}::uuid,${this.scope.sessionId},i.seq,i."nextId",i.fingerprint,
+          i."writeCount",0,${historyFingerprint([])},i.hashes from incoming i,head
+        where head.seq>=${receipts[0]!.seq - 1}::bigint and i.seq>head.seq order by i.seq
+        returning seq
+      ) select (n+(select count(*) from appended))::int as accepted from existing`.execute(tx);
+    if (proof?.accepted !== receipts.length)
+      throw new Error("Deferred native live receipts changed or lost their protected prefix");
+    state.receiptsMaterialized(receipts.at(-1)!.seq);
+  }
   /** Caller holds the existing closure authority locks. No native sequence is allocated. */
   async checkpointLiveIn(
     tx: Transaction<Database>,
@@ -901,6 +939,7 @@ export class DurablePostgresProjection {
     await sql`select id from pi_sessions p where p.tenant_id=${this.scope.tenantId}::uuid and p.id=${this.scope.sessionId} for update`.execute(
       tx,
     );
+    await this.materializeLiveReceiptsIn(tx, state);
     const head = await new DurablePostgresProjection(tx, this.scope).head();
     if (expectedHead !== undefined && expectedHead !== head.seq)
       throw new Error("Root completion does not follow its final native commit");
