@@ -20,9 +20,11 @@ The idle-EOF fix is deployed as `projector-idle-eof-20261118-r1` (two images bui
 twelve reused). One clean post-release burst reached 15.06 Runs/s; this is not a
 new sustained-capacity guarantee.
 
-- [ ] Review a bounded reduction of round trips inside one native commit before
-  implementing the proposed SQL restructuring. Preserve lock order, native
-  state/Fork semantics and existing commit/recovery/effect boundaries.
+- [ ] [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48): use ordered
+  Session facts and a complete admitted context to reduce repeated PG reads and
+  batch materialization inside one native commit. Review the atomic database
+  protection before removing current checks/locks; preserve native state/Fork,
+  recovery and effect boundaries. Implementation is not started.
 
 ## Projector consumption and memory — delivered
 
