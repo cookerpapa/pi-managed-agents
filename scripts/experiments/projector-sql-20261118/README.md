@@ -13,6 +13,8 @@ PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1 node --import tsx \
   scripts/run-projector-sql-diagnostic.mjs /private/observation-32 32 cpu
 PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1 node --import tsx \
   scripts/run-projector-sql-diagnostic.mjs /private/observation-server 12 server-duration
+PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1 node --import tsx \
+  scripts/run-projector-sql-diagnostic.mjs /private/cpu-calibration 12 cpu-only
 ```
 
 The source checkout must match the serving files. The optional `reader-candidate`
@@ -29,6 +31,8 @@ catalog; any truncated evidence is explicit. Observations use stdout and private
 files, not native history, Kafka or a new telemetry service.
 
 `cpu` uses Node's in-process Inspector profiler without opening a network port.
+`cpu-only` calibrates that result without pg wrappers, per-record async context,
+SQL timing logs or PG activity sampling; it keeps the serving pool size.
 The installed signal handler is verified before stopping the sampler. A profile
 contains code stacks, not argument values. `server-duration` sets PostgreSQL
 logging options only on this temporary projection pool: `log_duration=on`, with

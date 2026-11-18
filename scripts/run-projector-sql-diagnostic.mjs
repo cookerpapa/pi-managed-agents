@@ -27,13 +27,20 @@ serializeRelease(runtimeDirectory);
 const directory = resolve(process.argv[2] ?? ".cache/projector-sql-" + Date.now());
 const poolSize = process.argv[3] === undefined ? 12 : Number(process.argv[3]);
 const candidateReader = process.argv.slice(4).includes("reader-candidate");
-const cpuProfile = process.argv.slice(4).includes("cpu");
+const cpuOnly = process.argv.slice(4).includes("cpu-only");
+const cpuProfile = cpuOnly || process.argv.slice(4).includes("cpu");
 const serverDuration = process.argv.slice(4).includes("server-duration");
 assert(
-  process.argv.slice(4).every((v) => ["reader-candidate", "cpu", "server-duration"].includes(v)),
+  process.argv
+    .slice(4)
+    .every((v) => ["reader-candidate", "cpu", "cpu-only", "server-duration"].includes(v)),
   "Unknown diagnostic option",
 );
 assert([12, 24, 32].includes(poolSize), "Use one of the bounded experimental pool sizes");
+assert(
+  !cpuOnly || (poolSize === 12 && !serverDuration),
+  "CPU-only calibration preserves the serving pool and server logging",
+);
 await mkdir(directory, { mode: 0o700 });
 const name = "pma-projector-sql-" + randomUUID().slice(0, 8),
   target = "deployment/pi-cloud-session-runtime";
@@ -141,6 +148,17 @@ export function observeDurationUrl(value) {
     );
   await transform(data["session-runtime-main.ts"], { loader: "ts", format: "esm" });
 }
+if (cpuOnly) {
+  data["session-projector.ts"] =
+    'import "/pma-diagnostic/entry.mjs";\n' +
+    (await readFile("packages/runtime-core/src/session-projector.ts", "utf8"));
+  data["entry.mjs"] = `import {projectorCpuProbe} from './cpu.mjs';
+const cpu=projectorCpuProbe('/tmp/pma-projector-profile.json');
+await cpu.start();
+process.on('SIGUSR2',()=>cpu.stop().catch(e=>console.error(JSON.stringify({event:'diag.cpu.failed',code:e.code??e.name}))));
+console.log(JSON.stringify({event:'diag.cpu.ready',pid:process.pid}));\n`;
+  await transform(data["session-projector.ts"], { loader: "ts", format: "esm" });
+}
 modified.spec.volumes ??= [];
 modified.spec.volumes.push({ name, configMap: { name, defaultMode: 420 } });
 container.volumeMounts ??= [];
@@ -160,6 +178,7 @@ const receipt = {
   poolSize,
   candidateReader,
   cpuProfile,
+  cpuOnly,
   serverDuration,
   baselineRevision,
   phase: "prepared",
@@ -245,12 +264,22 @@ try {
   const roles = new Map(
     pods.map((p) => [p.status.podIP, p.metadata.name.replace(/-[a-f0-9]{8,10}-[a-z0-9]{5}$/, "")]),
   );
-  watching = sampleProjectorSql(
-    database,
-    roles,
-    resolve(directory, "pg-samples.json"),
-    abort.signal,
-  );
+  if (!cpuOnly)
+    watching = sampleProjectorSql(
+      database,
+      roles,
+      resolve(directory, "pg-samples.json"),
+      abort.signal,
+    );
+  else
+    await writeFile(
+      resolve(directory, "pg-samples.json"),
+      JSON.stringify({
+        disabled: true,
+        reason: "CPU-only calibration has no SQL spans or activity sampling",
+      }) + "\n",
+      { mode: 0o600 },
+    );
   const load = await start(
     "load.log",
     process.execPath,
