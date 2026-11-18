@@ -621,6 +621,29 @@ it("keeps native ID ordering while a Fork excludes IDs published after its captu
   });
   expect(await source.projection.get(15)).toBeDefined();
   expect(await target.projection.get(15)).toBeUndefined();
+  // An inherited Entry has no owned index row in the Fork. A new current
+  // document may not silently shadow its ID, even after the source advances.
+  const head = await target.projection.head();
+  await expect(
+    target.projection.apply({
+      seq: (head.seq + 1) as never,
+      nextId: head.nextId,
+      writes: [
+        {
+          type: "document.create",
+          record: {
+            id: 20 as never,
+            kind: "pi.live",
+            scope: { kind: "conversation", conversationId: fork.conversationId as never },
+            history: "latest",
+            fork: "initial",
+          },
+          content: { kind: "base", version: 1, value: {} },
+        },
+      ],
+    }),
+  ).rejects.toThrow("ownership changed");
+  expect(await target.projection.head()).toEqual(head);
   await target.projection.rebuild();
   const storage = await target.open();
   try {

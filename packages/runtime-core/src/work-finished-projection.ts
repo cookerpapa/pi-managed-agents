@@ -5,7 +5,7 @@ import { isTerminalRunState } from "@pi-cloud/domain";
 import { parsePiCloudEvent, type PiCloudEvent } from "@pi-cloud/protocol";
 import type { AcceptedWorkFinishedFact } from "./accepted-fact.ts";
 import type { FactPosition } from "./accepted-fact-recovery.ts";
-import { recordFactProjection } from "./accepted-fact-recovery.ts";
+import { projectionOffsetWrite } from "./accepted-fact-recovery.ts";
 import { transitionLockedRun, type RunTransitionState } from "./run-state.ts";
 import { advanceLaneReadiness } from "./run-readiness.ts";
 import { settleHistoryTurn, settleChildHistory } from "./presentation-settlement.ts";
@@ -28,13 +28,12 @@ export async function finishWorkIn(
     // A different terminal decision wins, but this ordered native completion
     // still proves the local family has exited. Keep that evidence for the
     // pending forced closure; it is not proof that Cube processes stopped.
-    await tx
+    const released = tx
       .updateTable("runs")
       .set({ agent_exited_at: now, execution_released_at: now })
       .where("tenant_id", "=", fact.scope.tenantId)
-      .where("id", "=", fact.scope.runId)
-      .execute();
-    await recordFactProjection(tx, position);
+      .where("id", "=", fact.scope.runId);
+    await sql`with released as (${released}) ${projectionOffsetWrite(position)}`.execute(tx);
     return;
   }
   const terminal = fact.terminal;
@@ -77,25 +76,22 @@ export async function finishWorkIn(
     occurredAt: fact.occurredAt,
     ...terminal,
   });
-  await tx
-    .insertInto("session_terminal_events")
-    .values({
-      event_id: event.eventId,
-      tenant_id: fact.scope.tenantId,
-      session_id: fact.scope.sessionId,
-      turn_id: fact.scope.turnId,
-      agent_id: event.agentId,
-      run_id: fact.scope.runId,
-      seq: event.seq,
-      schema_version: event.schemaVersion,
-      type: terminal.type,
-      payload: terminal.payload,
-      occurred_at: new Date(fact.occurredAt),
-      persisted_at: now,
-      interrupted_prefix: null,
-    })
-    .execute();
-  await tx
+  const terminalEvent = tx.insertInto("session_terminal_events").values({
+    event_id: event.eventId,
+    tenant_id: fact.scope.tenantId,
+    session_id: fact.scope.sessionId,
+    turn_id: fact.scope.turnId,
+    agent_id: event.agentId,
+    run_id: fact.scope.runId,
+    seq: event.seq,
+    schema_version: event.schemaVersion,
+    type: terminal.type,
+    payload: terminal.payload,
+    occurred_at: new Date(fact.occurredAt),
+    persisted_at: now,
+    interrupted_prefix: null,
+  });
+  const sealed = tx
     .updateTable("runs")
     .set({
       output_sealed_at: now,
@@ -109,17 +105,15 @@ export async function finishWorkIn(
       output_first_offset: sql`coalesce(output_first_offset,${position.offset.toString()}::bigint)`,
     })
     .where("tenant_id", "=", fact.scope.tenantId)
-    .where("id", "=", fact.scope.runId)
-    .execute();
-  await tx
+    .where("id", "=", fact.scope.runId);
+  const cancellations = tx
     .updateTable("turn_control_requests")
     .set({ state: "completed", completed_at: now, failure_code: null })
     .where("tenant_id", "=", fact.scope.tenantId)
     .where("target_run_id", "=", fact.scope.runId)
     .where("kind", "=", "cancel")
-    .where("state", "in", ["pending", "dispatched", "acknowledged"])
-    .execute();
-  await tx
+    .where("state", "in", ["pending", "dispatched", "acknowledged"]);
+  const session = tx
     .updateTable("sessions")
     .set({
       state: "idle",
@@ -129,20 +123,22 @@ export async function finishWorkIn(
       last_active_at: now,
     })
     .where("tenant_id", "=", fact.scope.tenantId)
-    .where("id", "=", fact.scope.sessionId)
-    .execute();
-  if (retireWriter)
-    await tx
-      .updateTable("session_leases")
-      .set({
-        writer_sealed_at: now,
-        writer_seal_offset: position.offset.toString(),
-        released_at: now,
-      })
-      .where("tenant_id", "=", fact.scope.tenantId)
-      .where("lease_id", "=", fact.scope.writerId)
-      .execute();
-  await recordFactProjection(tx, position);
+    .where("id", "=", fact.scope.sessionId);
+  const writer = tx
+    .updateTable("session_leases")
+    .set({
+      writer_sealed_at: now,
+      writer_seal_offset: position.offset.toString(),
+      released_at: now,
+    })
+    .where("tenant_id", "=", fact.scope.tenantId)
+    .where("lease_id", "=", fact.scope.writerId);
+  // These mutations target distinct tables under the admitted Run/writer locks.
+  // Subsequent history assembly reads their effects in a new statement.
+  await sql`with finished as (${terminalEvent}), sealed as (${sealed}),
+    cancellations as (${cancellations}), session_state as (${session})
+    ${retireWriter ? sql`, retired as (${writer})` : sql``}
+    ${projectionOffsetWrite(position)}`.execute(tx);
   await settleHistoryTurn(tx, fact.scope.tenantId, fact.scope.sessionId, fact.scope.turnId);
   await settleChildHistory(tx, fact.scope.tenantId, fact.scope.runId);
   await advanceLaneReadiness(tx, fact.scope.tenantId, fact.scope.sessionId);

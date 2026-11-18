@@ -1,0 +1,2824 @@
+{
+  "format": "pma.projection-tail.v1",
+  "servingRelease": "projector-idle-eof-20261118-r1",
+  "scope": "Single-host development PG / RF3 Kafka / real Workers and Session client / deterministic model. Time spans and client-visible SSE percentiles join observations by Run. PG settlement is timestamped within its terminal transaction.",
+  "cases": {
+    "control": {
+      "projectors": 1,
+      "projectionConnectionsEach": 12,
+      "partitions": [32],
+      "candidate": false,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 10881.8,
+          "completeRunsPerSecond": 2.206,
+          "PGSettlementP95Ms": 531,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 373,
+            "p95": 578,
+            "p99": 740
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 172,
+            "p95": 325,
+            "p99": 370
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 150,
+            "p95": 266,
+            "p99": 332
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 197,
+            "p95": 354,
+            "p99": 393
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 5522.8,
+          "completeRunsPerSecond": 5.794,
+          "PGSettlementP95Ms": 3815,
+          "peakObservedRunning": 16,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 2313,
+            "p95": 3872,
+            "p99": 4017
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 1348,
+            "p95": 2477,
+            "p99": 2551
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 462,
+            "p95": 1091,
+            "p99": 1202
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 1468,
+            "p95": 2716,
+            "p99": 2901
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 32193.3,
+          "completeRunsPerSecond": 5.964,
+          "PGSettlementP95Ms": 16252,
+          "peakObservedRunning": 62,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 190,
+            "p50": 8222,
+            "p95": 16427,
+            "p99": 19097
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 6708,
+            "p95": 15150,
+            "p99": 18150
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 341,
+            "p95": 3533,
+            "p99": 4141
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 7004,
+            "p95": 15242,
+            "p99": 18186
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 33820.4,
+          "completeRunsPerSecond": 5.677,
+          "PGSettlementP95Ms": 19079,
+          "peakObservedRunning": 63,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 191,
+            "p50": 9154,
+            "p95": 19234,
+            "p99": 25177
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 7563,
+            "p95": 16777,
+            "p99": 22798
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 420,
+            "p95": 4585,
+            "p99": 5019
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 7620,
+            "p95": 17067,
+            "p99": 23031
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 200,
+          "completed": 200,
+          "failed": 0,
+          "notLaunched": 200,
+          "maxInFlight": 64,
+          "elapsedMs": 22029.4,
+          "completeRunsPerSecond": 9.079,
+          "PGSettlementP95Ms": 11135,
+          "peakObservedRunning": 61,
+          "modelRequests": 200,
+          "submitToVisibleTerminalMs": {
+            "count": 200,
+            "p50": 5416,
+            "p95": 11174,
+            "p99": 13346
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 200,
+            "p50": 4810,
+            "p95": 10236,
+            "p99": 11486
+          },
+          "beforeProviderMs": {
+            "count": 200,
+            "p50": 283,
+            "p95": 1262,
+            "p99": 1384
+          },
+          "afterProviderMs": {
+            "count": 200,
+            "p50": 4865,
+            "p95": 10609,
+            "p99": 11943
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 8095.9,
+          "completeRunsPerSecond": 15.81,
+          "PGSettlementP95Ms": 6697,
+          "peakObservedRunning": 128,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 6407,
+            "p95": 6733,
+            "p99": 7852
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 88,
+            "p95": 154,
+            "p99": 273
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 1249,
+            "p95": 1589,
+            "p99": 2655
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 114,
+            "p95": 190,
+            "p99": 307
+          },
+          "peakConcurrentModelRequests": 128,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        }
+      },
+      "loadDriverSha256": "5f7bfd233e8169572872a330af7afb8c293ba2fac72eec7df5c04fcee231f426"
+    },
+    "two-owners": {
+      "projectors": 2,
+      "projectionConnectionsEach": 6,
+      "partitions": [16, 16],
+      "candidate": false,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 12684.0,
+          "completeRunsPerSecond": 1.892,
+          "PGSettlementP95Ms": 631,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 425,
+            "p95": 661,
+            "p99": 756
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 225,
+            "p95": 416,
+            "p99": 421
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 151,
+            "p95": 237,
+            "p99": 355
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 247,
+            "p95": 438,
+            "p99": 447
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 5251.6,
+          "completeRunsPerSecond": 6.093,
+          "PGSettlementP95Ms": 3975,
+          "peakObservedRunning": 15,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 2019,
+            "p95": 4073,
+            "p99": 4140
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 1106,
+            "p95": 2784,
+            "p99": 2841
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 443,
+            "p95": 1150,
+            "p99": 1293
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 1213,
+            "p95": 2960,
+            "p99": 3020
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 24360.8,
+          "completeRunsPerSecond": 7.882,
+          "PGSettlementP95Ms": 16483,
+          "peakObservedRunning": 62,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 5738,
+            "p95": 16613,
+            "p99": 20375
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 3789,
+            "p95": 13647,
+            "p99": 15171
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 595,
+            "p95": 4565,
+            "p99": 5261
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 4132,
+            "p95": 14304,
+            "p99": 15929
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 8500.1,
+          "completeRunsPerSecond": 22.588,
+          "PGSettlementP95Ms": 4390,
+          "peakObservedRunning": 59,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 2241,
+            "p95": 4443,
+            "p99": 5170
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 759,
+            "p95": 2691,
+            "p99": 3043
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 848,
+            "p95": 2258,
+            "p99": 2501
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 988,
+            "p95": 2898,
+            "p99": 3458
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 380,
+          "completed": 380,
+          "failed": 0,
+          "notLaunched": 20,
+          "maxInFlight": 64,
+          "elapsedMs": 26370.3,
+          "completeRunsPerSecond": 14.41,
+          "PGSettlementP95Ms": 6776,
+          "peakObservedRunning": 50,
+          "modelRequests": 380,
+          "submitToVisibleTerminalMs": {
+            "count": 380,
+            "p50": 433,
+            "p95": 6842,
+            "p99": 8523
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 380,
+            "p50": 218,
+            "p95": 4817,
+            "p99": 6943
+          },
+          "beforeProviderMs": {
+            "count": 380,
+            "p50": 155,
+            "p95": 2040,
+            "p99": 2290
+          },
+          "afterProviderMs": {
+            "count": 380,
+            "p50": 248,
+            "p95": 5178,
+            "p99": 7111
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 16119.7,
+          "completeRunsPerSecond": 7.941,
+          "PGSettlementP95Ms": 15200,
+          "peakObservedRunning": 117,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 13165,
+            "p95": 15236,
+            "p99": 15442
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 3066,
+            "p95": 6857,
+            "p99": 7626
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 4239,
+            "p95": 8054,
+            "p99": 8403
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 3222,
+            "p95": 7120,
+            "p99": 7721
+          },
+          "peakConcurrentModelRequests": 89,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "f414658a364d3727d9da90d327a3305671af6b3024e164dced5acae9ca380aa1"
+      },
+      "loadDriverSha256": "5f7bfd233e8169572872a330af7afb8c293ba2fac72eec7df5c04fcee231f426"
+    },
+    "grouped-one": {
+      "projectors": 1,
+      "projectionConnectionsEach": 12,
+      "partitions": [32],
+      "candidate": true,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 8597.3,
+          "completeRunsPerSecond": 2.792,
+          "PGSettlementP95Ms": 374,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 273,
+            "p95": 437,
+            "p99": 607
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 57,
+            "p95": 169,
+            "p99": 216
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 164,
+            "p95": 251,
+            "p99": 279
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 80,
+            "p95": 194,
+            "p99": 247
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 4655.6,
+          "completeRunsPerSecond": 6.873,
+          "PGSettlementP95Ms": 2754,
+          "peakObservedRunning": 13,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 1825,
+            "p95": 2976,
+            "p99": 3039
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 1073,
+            "p95": 1941,
+            "p99": 2197
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 392,
+            "p95": 785,
+            "p99": 789
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 1248,
+            "p95": 2121,
+            "p99": 2238
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 22404.1,
+          "completeRunsPerSecond": 8.57,
+          "PGSettlementP95Ms": 10637,
+          "peakObservedRunning": 64,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 6550,
+            "p95": 10707,
+            "p99": 13349
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 5159,
+            "p95": 9271,
+            "p99": 10284
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 367,
+            "p95": 3171,
+            "p99": 3507
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 5310,
+            "p95": 9398,
+            "p99": 10322
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 20023.6,
+          "completeRunsPerSecond": 9.589,
+          "PGSettlementP95Ms": 8633,
+          "peakObservedRunning": 63,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 5694,
+            "p95": 8732,
+            "p99": 9707
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 4470,
+            "p95": 7156,
+            "p99": 7929
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 371,
+            "p95": 3067,
+            "p99": 3446
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 4625,
+            "p95": 7199,
+            "p99": 7967
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 235,
+          "completed": 235,
+          "failed": 0,
+          "notLaunched": 165,
+          "maxInFlight": 64,
+          "elapsedMs": 23409.8,
+          "completeRunsPerSecond": 10.039,
+          "PGSettlementP95Ms": 8330,
+          "peakObservedRunning": 62,
+          "modelRequests": 235,
+          "submitToVisibleTerminalMs": {
+            "count": 234,
+            "p50": 5394,
+            "p95": 8192,
+            "p99": 9181
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 235,
+            "p50": 4726,
+            "p95": 7600,
+            "p99": 8739
+          },
+          "beforeProviderMs": {
+            "count": 235,
+            "p50": 289,
+            "p95": 1015,
+            "p99": 1086
+          },
+          "afterProviderMs": {
+            "count": 235,
+            "p50": 4836,
+            "p95": 7730,
+            "p99": 8776
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 8064.6,
+          "completeRunsPerSecond": 15.872,
+          "PGSettlementP95Ms": 7666,
+          "peakObservedRunning": 128,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 6646,
+            "p95": 7694,
+            "p99": 7833
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 50,
+            "p95": 97,
+            "p99": 131
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 1567,
+            "p95": 2548,
+            "p99": 2669
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 87,
+            "p95": 165,
+            "p99": 218
+          },
+          "peakConcurrentModelRequests": 128,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "3deb4b1aa567b4341e93cdc482aca9dcca543990e768cb3728e24a6b67681a03",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "e765195fa99ed798fd723cc757f4ee8c4bc45d0996fa3a63329c37f4f0efb77a"
+    },
+    "grouped-two": {
+      "projectors": 2,
+      "projectionConnectionsEach": 6,
+      "partitions": [16, 16],
+      "candidate": true,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 8727.6,
+          "completeRunsPerSecond": 2.75,
+          "PGSettlementP95Ms": 467,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 265,
+            "p95": 533,
+            "p99": 542
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 69,
+            "p95": 210,
+            "p99": 235
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 152,
+            "p95": 200,
+            "p99": 210
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 89,
+            "p95": 242,
+            "p99": 264
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 1634.9,
+          "completeRunsPerSecond": 19.573,
+          "PGSettlementP95Ms": 821,
+          "peakObservedRunning": 0,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 519,
+            "p95": 860,
+            "p99": 1032
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 178,
+            "p95": 510,
+            "p99": 535
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 243,
+            "p95": 332,
+            "p99": 738
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 235,
+            "p95": 540,
+            "p99": 566
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 7677.0,
+          "completeRunsPerSecond": 25.01,
+          "PGSettlementP95Ms": 3318,
+          "peakObservedRunning": 59,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 1968,
+            "p95": 3373,
+            "p99": 4002
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 543,
+            "p95": 1605,
+            "p99": 1885
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 987,
+            "p95": 1745,
+            "p99": 2389
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 822,
+            "p95": 1987,
+            "p99": 2274
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 7792.6,
+          "completeRunsPerSecond": 24.639,
+          "PGSettlementP95Ms": 3443,
+          "peakObservedRunning": 61,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 2263,
+            "p95": 3498,
+            "p99": 3920
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 129,
+            "p95": 1277,
+            "p99": 1902
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1513,
+            "p95": 2021,
+            "p99": 2314
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 655,
+            "p95": 1759,
+            "p99": 2387
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 218,
+          "completed": 218,
+          "failed": 0,
+          "notLaunched": 182,
+          "maxInFlight": 64,
+          "elapsedMs": 24166.8,
+          "completeRunsPerSecond": 9.021,
+          "PGSettlementP95Ms": 11142,
+          "peakObservedRunning": 61,
+          "modelRequests": 218,
+          "submitToVisibleTerminalMs": {
+            "count": 218,
+            "p50": 5129,
+            "p95": 11293,
+            "p99": 13075
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 218,
+            "p50": 3193,
+            "p95": 8515,
+            "p99": 10331
+          },
+          "beforeProviderMs": {
+            "count": 218,
+            "p50": 879,
+            "p95": 2732,
+            "p99": 3006
+          },
+          "afterProviderMs": {
+            "count": 218,
+            "p50": 3559,
+            "p95": 9019,
+            "p99": 10780
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 13470.1,
+          "completeRunsPerSecond": 9.503,
+          "PGSettlementP95Ms": 12565,
+          "peakObservedRunning": 103,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 10185,
+            "p95": 12658,
+            "p99": 12798
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 259,
+            "p95": 3292,
+            "p99": 3655
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 4140,
+            "p95": 7222,
+            "p99": 7618
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 323,
+            "p95": 3433,
+            "p99": 3892
+          },
+          "peakConcurrentModelRequests": 97,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "f414658a364d3727d9da90d327a3305671af6b3024e164dced5acae9ca380aa1",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "e765195fa99ed798fd723cc757f4ee8c4bc45d0996fa3a63329c37f4f0efb77a"
+    },
+    "control-r2": {
+      "projectors": 1,
+      "projectionConnectionsEach": 12,
+      "partitions": [32],
+      "candidate": false,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 11493.4,
+          "completeRunsPerSecond": 2.088,
+          "PGSettlementP95Ms": 535,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 413,
+            "p95": 592,
+            "p99": 719
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 204,
+            "p95": 376,
+            "p99": 427
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 146,
+            "p95": 182,
+            "p99": 195
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 229,
+            "p95": 398,
+            "p99": 449
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 5459.7,
+          "completeRunsPerSecond": 5.861,
+          "PGSettlementP95Ms": 4424,
+          "peakObservedRunning": 15,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 1935,
+            "p95": 4479,
+            "p99": 4690
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 1308,
+            "p95": 3463,
+            "p99": 3593
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 357,
+            "p95": 852,
+            "p99": 1108
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 1444,
+            "p95": 3672,
+            "p99": 3770
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 25493.9,
+          "completeRunsPerSecond": 7.531,
+          "PGSettlementP95Ms": 15626,
+          "peakObservedRunning": 63,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 6342,
+            "p95": 15740,
+            "p99": 19769
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 5270,
+            "p95": 13407,
+            "p99": 17387
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 277,
+            "p95": 2986,
+            "p99": 3325
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 5394,
+            "p95": 13550,
+            "p99": 17874
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 24232.9,
+          "completeRunsPerSecond": 7.923,
+          "PGSettlementP95Ms": 11380,
+          "peakObservedRunning": 63,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 6683,
+            "p95": 11566,
+            "p99": 16518
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 5546,
+            "p95": 10327,
+            "p99": 13740
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 299,
+            "p95": 2890,
+            "p99": 3171
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 5663,
+            "p95": 10366,
+            "p99": 14045
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 400,
+          "completed": 400,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 23,
+          "elapsedMs": 20741.5,
+          "completeRunsPerSecond": 19.285,
+          "PGSettlementP95Ms": 1395,
+          "peakObservedRunning": 19,
+          "modelRequests": 400,
+          "submitToVisibleTerminalMs": {
+            "count": 400,
+            "p50": 720,
+            "p95": 1462,
+            "p99": 2058
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 400,
+            "p50": 482,
+            "p95": 1220,
+            "p99": 1835
+          },
+          "beforeProviderMs": {
+            "count": 400,
+            "p50": 143,
+            "p95": 167,
+            "p99": 182
+          },
+          "afterProviderMs": {
+            "count": 400,
+            "p50": 511,
+            "p95": 1250,
+            "p99": 1865
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 15606.5,
+          "completeRunsPerSecond": 8.202,
+          "PGSettlementP95Ms": 14608,
+          "peakObservedRunning": 128,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 127,
+            "p50": 12284,
+            "p95": 14661,
+            "p99": 15164
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 5347,
+            "p95": 8028,
+            "p99": 8462
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 1268,
+            "p95": 4122,
+            "p99": 4417
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 5494,
+            "p95": 8153,
+            "p99": 8591
+          },
+          "peakConcurrentModelRequests": 128,
+          "hostProcessorPerformance": null,
+          "fixedHashWallMs": null
+        }
+      },
+      "loadDriverSha256": "e765195fa99ed798fd723cc757f4ee8c4bc45d0996fa3a63329c37f4f0efb77a"
+    },
+    "grouped-counted": {
+      "projectors": 1,
+      "projectionConnectionsEach": 12,
+      "partitions": null,
+      "candidate": true,
+      "genericPlans": false,
+      "sqlTracing": true,
+      "cleanupConfirmed": true,
+      "stages": {
+        "observed-projection-pool-12": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 9967.6,
+          "completeRunsPerSecond": 19.263,
+          "PGSettlementP95Ms": 3776,
+          "peakObservedRunning": 63,
+          "modelRequests": 192,
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": {
+            "samples": 4,
+            "median": 169.0,
+            "minimum": 164,
+            "maximum": 173
+          },
+          "fixedHashWallMs": {
+            "samples": 5,
+            "median": 2.099,
+            "minimum": 1.963,
+            "maximum": 2.343
+          }
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "f0cbed41d063fb5737a56063e09e88ec3b33d5a23f0541e4ef243f2f4b44bc96",
+        "session-runtime-main.ts": "3deb4b1aa567b4341e93cdc482aca9dcca543990e768cb3728e24a6b67681a03",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "e765195fa99ed798fd723cc757f4ee8c4bc45d0996fa3a63329c37f4f0efb77a"
+    },
+    "grouped-faults": {
+      "projectors": 1,
+      "projectionConnectionsEach": 12,
+      "partitions": null,
+      "candidate": true,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "once-rate-limit": {
+          "passed": true,
+          "automaticReplayClaimed": false
+        },
+        "once-disconnect": {
+          "passed": true,
+          "automaticReplayClaimed": false
+        },
+        "worker-handoff": {
+          "passed": true,
+          "physicalCalls": 4
+        },
+        "projector-restart": {
+          "passed": true,
+          "idlePartitionsReady": 32,
+          "idleSnapshotMaximumMs": 381
+        },
+        "stop-under-load": {
+          "passed": true,
+          "cancelled": 2,
+          "lateReplyIgnored": true
+        },
+        "lost-tool-reply": {
+          "passed": true,
+          "physicalWrites": 4
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "3deb4b1aa567b4341e93cdc482aca9dcca543990e768cb3728e24a6b67681a03",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "e765195fa99ed798fd723cc757f4ee8c4bc45d0996fa3a63329c37f4f0efb77a"
+    },
+    "grouped-two-generic": {
+      "projectors": 2,
+      "projectionConnectionsEach": 6,
+      "partitions": [16, 16],
+      "candidate": true,
+      "genericPlans": true,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 8140.6,
+          "completeRunsPerSecond": 2.948,
+          "PGSettlementP95Ms": 322,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 265,
+            "p95": 378,
+            "p99": 399
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 37,
+            "p95": 128,
+            "p99": 132
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 162,
+            "p95": 247,
+            "p99": 252
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 64,
+            "p95": 151,
+            "p99": 153
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": {
+            "samples": 3,
+            "median": 96,
+            "minimum": 71,
+            "maximum": 163
+          },
+          "fixedHashWallMs": {
+            "samples": 4,
+            "median": 3.685,
+            "minimum": 1.952,
+            "maximum": 4.052
+          }
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 4081.6,
+          "completeRunsPerSecond": 7.84,
+          "PGSettlementP95Ms": 3224,
+          "peakObservedRunning": 15,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 1481,
+            "p95": 3310,
+            "p99": 3842
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 652,
+            "p95": 2222,
+            "p99": 2336
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 563,
+            "p95": 1409,
+            "p99": 1451
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 859,
+            "p95": 2373,
+            "p99": 2586
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 2,
+            "median": 51.0,
+            "minimum": 45,
+            "maximum": 57
+          },
+          "fixedHashWallMs": {
+            "samples": 2,
+            "median": 8.848,
+            "minimum": 7.918,
+            "maximum": 9.778
+          }
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 21040.3,
+          "completeRunsPerSecond": 9.125,
+          "PGSettlementP95Ms": 11213,
+          "peakObservedRunning": 60,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 5290,
+            "p95": 11309,
+            "p99": 13962
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 2601,
+            "p95": 8534,
+            "p99": 10475
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1730,
+            "p95": 4878,
+            "p99": 5694
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 2994,
+            "p95": 9038,
+            "p99": 11002
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": {
+            "samples": 9,
+            "median": 45,
+            "minimum": 41,
+            "maximum": 65
+          },
+          "fixedHashWallMs": {
+            "samples": 10,
+            "median": 8.929,
+            "minimum": 7.291,
+            "maximum": 12.397
+          }
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 17805.0,
+          "completeRunsPerSecond": 10.783,
+          "PGSettlementP95Ms": 8974,
+          "peakObservedRunning": 62,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 4639,
+            "p95": 9132,
+            "p99": 10769
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 2578,
+            "p95": 6472,
+            "p99": 8188
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1502,
+            "p95": 4207,
+            "p99": 4683
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 2889,
+            "p95": 6926,
+            "p99": 8652
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 7,
+            "median": 46,
+            "minimum": 44,
+            "maximum": 53
+          },
+          "fixedHashWallMs": {
+            "samples": 9,
+            "median": 8.952,
+            "minimum": 7.525,
+            "maximum": 9.639
+          }
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 278,
+          "completed": 278,
+          "failed": 0,
+          "notLaunched": 122,
+          "maxInFlight": 64,
+          "elapsedMs": 24000.4,
+          "completeRunsPerSecond": 11.583,
+          "PGSettlementP95Ms": 9577,
+          "peakObservedRunning": 60,
+          "modelRequests": 278,
+          "submitToVisibleTerminalMs": {
+            "count": 278,
+            "p50": 3550,
+            "p95": 9740,
+            "p99": 12798
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 278,
+            "p50": 2172,
+            "p95": 8395,
+            "p99": 11308
+          },
+          "beforeProviderMs": {
+            "count": 278,
+            "p50": 561,
+            "p95": 1698,
+            "p99": 1792
+          },
+          "afterProviderMs": {
+            "count": 278,
+            "p50": 2488,
+            "p95": 8695,
+            "p99": 11663
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 10,
+            "median": 51.0,
+            "minimum": 49,
+            "maximum": 102
+          },
+          "fixedHashWallMs": {
+            "samples": 12,
+            "median": 8.068,
+            "minimum": 3.969,
+            "maximum": 11.666
+          }
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 10291.0,
+          "completeRunsPerSecond": 12.438,
+          "PGSettlementP95Ms": 9605,
+          "peakObservedRunning": 124,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 8711,
+            "p95": 9622,
+            "p99": 9770
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 27,
+            "p95": 53,
+            "p99": 91
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 3649,
+            "p95": 4509,
+            "p99": 4622
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 52,
+            "p95": 95,
+            "p99": 157
+          },
+          "peakConcurrentModelRequests": 128,
+          "hostProcessorPerformance": {
+            "samples": 4,
+            "median": 139.5,
+            "minimum": 46,
+            "maximum": 168
+          },
+          "fixedHashWallMs": {
+            "samples": 5,
+            "median": 2.722,
+            "minimum": 1.916,
+            "maximum": 8.535
+          }
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "d6ff93a62887e98318795889cd7a5c5f16712e1028ebaaf4e6028c47a40512b4",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "e765195fa99ed798fd723cc757f4ee8c4bc45d0996fa3a63329c37f4f0efb77a"
+    },
+    "grouped-two-r2": {
+      "projectors": 2,
+      "projectionConnectionsEach": 6,
+      "partitions": [16, 16],
+      "candidate": true,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 8638.4,
+          "completeRunsPerSecond": 2.778,
+          "PGSettlementP95Ms": 373,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 272,
+            "p95": 435,
+            "p99": 475
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 61,
+            "p95": 175,
+            "p99": 175
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 149,
+            "p95": 185,
+            "p99": 205
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 88,
+            "p95": 199,
+            "p99": 200
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": {
+            "samples": 4,
+            "median": 101.5,
+            "minimum": 97,
+            "maximum": 106
+          },
+          "fixedHashWallMs": {
+            "samples": 4,
+            "median": 3.769,
+            "minimum": 3.27,
+            "maximum": 4.698
+          }
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 3891.5,
+          "completeRunsPerSecond": 8.223,
+          "PGSettlementP95Ms": 2337,
+          "peakObservedRunning": 8,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 1416,
+            "p95": 2469,
+            "p99": 2796
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 436,
+            "p95": 1312,
+            "p99": 1367
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 567,
+            "p95": 1181,
+            "p99": 1259
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 663,
+            "p95": 1590,
+            "p99": 1650
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 1,
+            "median": 51,
+            "minimum": 51,
+            "maximum": 51
+          },
+          "fixedHashWallMs": {
+            "samples": 2,
+            "median": 8.833,
+            "minimum": 7.073,
+            "maximum": 10.593
+          }
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 14238.9,
+          "completeRunsPerSecond": 13.484,
+          "PGSettlementP95Ms": 9032,
+          "peakObservedRunning": 56,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 3744,
+            "p95": 9168,
+            "p99": 12517
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 1483,
+            "p95": 5465,
+            "p99": 7300
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1496,
+            "p95": 4188,
+            "p99": 4829
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 1816,
+            "p95": 5885,
+            "p99": 7788
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 6,
+            "median": 51.0,
+            "minimum": 47,
+            "maximum": 172
+          },
+          "fixedHashWallMs": {
+            "samples": 8,
+            "median": 7.807,
+            "minimum": 1.936,
+            "maximum": 8.781
+          }
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 7150.6,
+          "completeRunsPerSecond": 26.851,
+          "PGSettlementP95Ms": 3240,
+          "peakObservedRunning": 59,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 1941,
+            "p95": 3275,
+            "p99": 4458
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 96,
+            "p95": 965,
+            "p99": 1865
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1284,
+            "p95": 2086,
+            "p99": 2312
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 574,
+            "p95": 1411,
+            "p99": 2256
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 3,
+            "median": 164,
+            "minimum": 163,
+            "maximum": 165
+          },
+          "fixedHashWallMs": {
+            "samples": 3,
+            "median": 2.375,
+            "minimum": 2.262,
+            "maximum": 2.635
+          }
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 241,
+          "completed": 241,
+          "failed": 0,
+          "notLaunched": 159,
+          "maxInFlight": 64,
+          "elapsedMs": 25651.7,
+          "completeRunsPerSecond": 9.395,
+          "PGSettlementP95Ms": 10259,
+          "peakObservedRunning": 59,
+          "modelRequests": 241,
+          "submitToVisibleTerminalMs": {
+            "count": 239,
+            "p50": 4566,
+            "p95": 11152,
+            "p99": 14223
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 241,
+            "p50": 3036,
+            "p95": 9117,
+            "p99": 12805
+          },
+          "beforeProviderMs": {
+            "count": 241,
+            "p50": 838,
+            "p95": 1899,
+            "p99": 2095
+          },
+          "afterProviderMs": {
+            "count": 241,
+            "p50": 3413,
+            "p95": 9273,
+            "p99": 12975
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": {
+            "samples": 9,
+            "median": 45,
+            "minimum": 38,
+            "maximum": 46
+          },
+          "fixedHashWallMs": {
+            "samples": 13,
+            "median": 8.99,
+            "minimum": 7.65,
+            "maximum": 13.993
+          }
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 15730.8,
+          "completeRunsPerSecond": 8.137,
+          "PGSettlementP95Ms": 14752,
+          "peakObservedRunning": 94,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 11633,
+            "p95": 14778,
+            "p99": 14834
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 211,
+            "p95": 2950,
+            "p99": 4134
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 5346,
+            "p95": 9685,
+            "p99": 9725
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 477,
+            "p95": 3231,
+            "p99": 4430
+          },
+          "peakConcurrentModelRequests": 75,
+          "hostProcessorPerformance": {
+            "samples": 7,
+            "median": 52,
+            "minimum": 43,
+            "maximum": 92
+          },
+          "fixedHashWallMs": {
+            "samples": 8,
+            "median": 8.563,
+            "minimum": 3.338,
+            "maximum": 14.394
+          }
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "f414658a364d3727d9da90d327a3305671af6b3024e164dced5acae9ca380aa1",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "365be957223acecc71aff8ac12d046dd0231de0295083e71d49a980402427682"
+    },
+    "two-owners-r2": {
+      "projectors": 2,
+      "projectionConnectionsEach": 6,
+      "partitions": [16, 16],
+      "candidate": false,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 9836.0,
+          "completeRunsPerSecond": 2.44,
+          "PGSettlementP95Ms": 475,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 357,
+            "p95": 506,
+            "p99": 563
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 168,
+            "p95": 260,
+            "p99": 261
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 115,
+            "p95": 171,
+            "p99": 233
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 191,
+            "p95": 290,
+            "p99": 297
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": {
+            "samples": 5,
+            "median": 162,
+            "minimum": 94,
+            "maximum": 165
+          },
+          "fixedHashWallMs": {
+            "samples": 5,
+            "median": 2.157,
+            "minimum": 1.883,
+            "maximum": 6.53
+          }
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 5732.0,
+          "completeRunsPerSecond": 5.583,
+          "PGSettlementP95Ms": 3526,
+          "peakObservedRunning": 15,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 2079,
+            "p95": 3766,
+            "p99": 4501
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 1201,
+            "p95": 2471,
+            "p99": 3200
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 469,
+            "p95": 888,
+            "p99": 1489
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 1417,
+            "p95": 2961,
+            "p99": 3676
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": {
+            "samples": 2,
+            "median": 44.5,
+            "minimum": 43,
+            "maximum": 46
+          },
+          "fixedHashWallMs": {
+            "samples": 3,
+            "median": 8.766,
+            "minimum": 7.418,
+            "maximum": 9.241
+          }
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 24647.6,
+          "completeRunsPerSecond": 7.79,
+          "PGSettlementP95Ms": 13840,
+          "peakObservedRunning": 63,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 6107,
+            "p95": 14029,
+            "p99": 19347
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 4157,
+            "p95": 11166,
+            "p99": 15112
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 599,
+            "p95": 4895,
+            "p99": 5350
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 4485,
+            "p95": 11391,
+            "p99": 15534
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 10,
+            "median": 49.0,
+            "minimum": 43,
+            "maximum": 73
+          },
+          "fixedHashWallMs": {
+            "samples": 13,
+            "median": 8.293,
+            "minimum": 3.987,
+            "maximum": 12.193
+          }
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 22305.1,
+          "completeRunsPerSecond": 8.608,
+          "PGSettlementP95Ms": 13396,
+          "peakObservedRunning": 60,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 191,
+            "p50": 5029,
+            "p95": 13490,
+            "p99": 19416
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 3912,
+            "p95": 11079,
+            "p99": 15148
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 536,
+            "p95": 4283,
+            "p99": 4737
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 4042,
+            "p95": 11499,
+            "p99": 15565
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": {
+            "samples": 9,
+            "median": 49,
+            "minimum": 46,
+            "maximum": 108
+          },
+          "fixedHashWallMs": {
+            "samples": 11,
+            "median": 8.21,
+            "minimum": 3.37,
+            "maximum": 11.744
+          }
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 219,
+          "completed": 219,
+          "failed": 0,
+          "notLaunched": 181,
+          "maxInFlight": 64,
+          "elapsedMs": 25098.7,
+          "completeRunsPerSecond": 8.726,
+          "PGSettlementP95Ms": 11248,
+          "peakObservedRunning": 60,
+          "modelRequests": 219,
+          "submitToVisibleTerminalMs": {
+            "count": 219,
+            "p50": 5451,
+            "p95": 11322,
+            "p99": 12958
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 219,
+            "p50": 4238,
+            "p95": 10161,
+            "p99": 11370
+          },
+          "beforeProviderMs": {
+            "count": 219,
+            "p50": 500,
+            "p95": 1554,
+            "p99": 1665
+          },
+          "afterProviderMs": {
+            "count": 219,
+            "p50": 4530,
+            "p95": 10229,
+            "p99": 11460
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 11,
+            "median": 52,
+            "minimum": 45,
+            "maximum": 100
+          },
+          "fixedHashWallMs": {
+            "samples": 13,
+            "median": 8.206,
+            "minimum": 3.244,
+            "maximum": 11.835
+          }
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 8152.6,
+          "completeRunsPerSecond": 15.7,
+          "PGSettlementP95Ms": 7730,
+          "peakObservedRunning": 128,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 6886,
+            "p95": 7757,
+            "p99": 7943
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 69,
+            "p95": 138,
+            "p99": 242
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 1764,
+            "p95": 2603,
+            "p99": 2693
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 104,
+            "p95": 191,
+            "p99": 279
+          },
+          "peakConcurrentModelRequests": 128,
+          "hostProcessorPerformance": {
+            "samples": 4,
+            "median": 166.0,
+            "minimum": 164,
+            "maximum": 170
+          },
+          "fixedHashWallMs": {
+            "samples": 4,
+            "median": 2.33,
+            "minimum": 1.802,
+            "maximum": 2.366
+          }
+        },
+        "three-tools": {
+          "offered": 64,
+          "accepted": 64,
+          "completed": 64,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 32,
+          "elapsedMs": 9330.0,
+          "completeRunsPerSecond": 6.86,
+          "PGSettlementP95Ms": 6731,
+          "peakObservedRunning": 32,
+          "modelRequests": 256,
+          "physicalToolCalls": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 64,
+            "p50": 3501,
+            "p95": 6759,
+            "p99": 7882
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 64,
+            "p50": 100,
+            "p95": 813,
+            "p99": 1455
+          },
+          "beforeProviderMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          },
+          "afterProviderMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 4,
+            "median": 163.0,
+            "minimum": 161,
+            "maximum": 165
+          },
+          "fixedHashWallMs": {
+            "samples": 4,
+            "median": 2.351,
+            "minimum": 2.244,
+            "maximum": 2.564
+          }
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "f414658a364d3727d9da90d327a3305671af6b3024e164dced5acae9ca380aa1"
+      },
+      "loadDriverSha256": "057b389a9f95f7c60bf9c155b7a885a2116b962d35382796fc6fd6b7124fea37"
+    },
+    "grouped-two-r3": {
+      "projectors": 2,
+      "projectionConnectionsEach": 6,
+      "partitions": [16, 16],
+      "candidate": true,
+      "genericPlans": false,
+      "sqlTracing": false,
+      "cleanupConfirmed": true,
+      "stages": {
+        "serial": {
+          "offered": 24,
+          "accepted": 24,
+          "completed": 24,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 1,
+          "elapsedMs": 8191.4,
+          "completeRunsPerSecond": 2.93,
+          "PGSettlementP95Ms": 367,
+          "peakObservedRunning": 1,
+          "modelRequests": 24,
+          "submitToVisibleTerminalMs": {
+            "count": 24,
+            "p50": 264,
+            "p95": 423,
+            "p99": 448
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 24,
+            "p50": 60,
+            "p95": 159,
+            "p99": 210
+          },
+          "beforeProviderMs": {
+            "count": 24,
+            "p50": 145,
+            "p95": 175,
+            "p99": 194
+          },
+          "afterProviderMs": {
+            "count": 24,
+            "p50": 84,
+            "p95": 183,
+            "p99": 236
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": {
+            "samples": 4,
+            "median": 101.0,
+            "minimum": 100,
+            "maximum": 104
+          },
+          "fixedHashWallMs": {
+            "samples": 4,
+            "median": 3.24,
+            "minimum": 3.03,
+            "maximum": 3.4
+          }
+        },
+        "warm": {
+          "offered": 32,
+          "accepted": 32,
+          "completed": 32,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 16,
+          "elapsedMs": 3848.1,
+          "completeRunsPerSecond": 8.316,
+          "PGSettlementP95Ms": 2035,
+          "peakObservedRunning": 6,
+          "modelRequests": 32,
+          "submitToVisibleTerminalMs": {
+            "count": 32,
+            "p50": 1388,
+            "p95": 2213,
+            "p99": 2798
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 32,
+            "p50": 419,
+            "p95": 1182,
+            "p99": 1753
+          },
+          "beforeProviderMs": {
+            "count": 32,
+            "p50": 558,
+            "p95": 1226,
+            "p99": 1310
+          },
+          "afterProviderMs": {
+            "count": 32,
+            "p50": 609,
+            "p95": 1544,
+            "p99": 1824
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 2,
+            "median": 72.0,
+            "minimum": 51,
+            "maximum": 93
+          },
+          "fixedHashWallMs": {
+            "samples": 2,
+            "median": 6.62,
+            "minimum": 4.748,
+            "maximum": 8.493
+          }
+        },
+        "burst64-1": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 7073.4,
+          "completeRunsPerSecond": 27.144,
+          "PGSettlementP95Ms": 3302,
+          "peakObservedRunning": 61,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 1855,
+            "p95": 3326,
+            "p99": 4453
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 136,
+            "p95": 1609,
+            "p99": 1886
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1162,
+            "p95": 1660,
+            "p99": 2468
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 565,
+            "p95": 1954,
+            "p99": 2371
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": {
+            "samples": 3,
+            "median": 170,
+            "minimum": 166,
+            "maximum": 172
+          },
+          "fixedHashWallMs": {
+            "samples": 3,
+            "median": 2.391,
+            "minimum": 2.156,
+            "maximum": 2.678
+          }
+        },
+        "burst64-2": {
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 64,
+          "elapsedMs": 7064.6,
+          "completeRunsPerSecond": 27.178,
+          "PGSettlementP95Ms": 2846,
+          "peakObservedRunning": 58,
+          "modelRequests": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 192,
+            "p50": 2078,
+            "p95": 2896,
+            "p99": 3131
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 192,
+            "p50": 98,
+            "p95": 650,
+            "p99": 948
+          },
+          "beforeProviderMs": {
+            "count": 192,
+            "p50": 1398,
+            "p95": 2004,
+            "p99": 2244
+          },
+          "afterProviderMs": {
+            "count": 192,
+            "p50": 610,
+            "p95": 1076,
+            "p99": 1355
+          },
+          "peakConcurrentModelRequests": 1,
+          "hostProcessorPerformance": {
+            "samples": 3,
+            "median": 162,
+            "minimum": 161,
+            "maximum": 163
+          },
+          "fixedHashWallMs": {
+            "samples": 3,
+            "median": 2.263,
+            "minimum": 2.159,
+            "maximum": 2.314
+          }
+        },
+        "arrivals-20": {
+          "offered": 400,
+          "accepted": 310,
+          "completed": 310,
+          "failed": 0,
+          "notLaunched": 90,
+          "maxInFlight": 64,
+          "elapsedMs": 23044.1,
+          "completeRunsPerSecond": 13.452,
+          "PGSettlementP95Ms": 7321,
+          "peakObservedRunning": 53,
+          "modelRequests": 310,
+          "submitToVisibleTerminalMs": {
+            "count": 310,
+            "p50": 453,
+            "p95": 7418,
+            "p99": 8700
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 310,
+            "p50": 233,
+            "p95": 4804,
+            "p99": 6269
+          },
+          "beforeProviderMs": {
+            "count": 310,
+            "p50": 161,
+            "p95": 2526,
+            "p99": 2692
+          },
+          "afterProviderMs": {
+            "count": 310,
+            "p50": 286,
+            "p95": 5212,
+            "p99": 6777
+          },
+          "peakConcurrentModelRequests": 2,
+          "hostProcessorPerformance": {
+            "samples": 9,
+            "median": 46,
+            "minimum": 42,
+            "maximum": 164
+          },
+          "fixedHashWallMs": {
+            "samples": 11,
+            "median": 8.083,
+            "minimum": 2.027,
+            "maximum": 22.582
+          }
+        },
+        "waiting-128": {
+          "offered": 128,
+          "accepted": 128,
+          "completed": 128,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 128,
+          "elapsedMs": 13398.1,
+          "completeRunsPerSecond": 9.554,
+          "PGSettlementP95Ms": 12459,
+          "peakObservedRunning": 109,
+          "modelRequests": 128,
+          "submitToVisibleTerminalMs": {
+            "count": 128,
+            "p50": 9822,
+            "p95": 12486,
+            "p99": 12941
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 128,
+            "p50": 274,
+            "p95": 2220,
+            "p99": 2912
+          },
+          "beforeProviderMs": {
+            "count": 128,
+            "p50": 4013,
+            "p95": 7382,
+            "p99": 7856
+          },
+          "afterProviderMs": {
+            "count": 128,
+            "p50": 375,
+            "p95": 2546,
+            "p99": 3146
+          },
+          "peakConcurrentModelRequests": 99,
+          "hostProcessorPerformance": {
+            "samples": 5,
+            "median": 47,
+            "minimum": 42,
+            "maximum": 78
+          },
+          "fixedHashWallMs": {
+            "samples": 7,
+            "median": 8.344,
+            "minimum": 5.029,
+            "maximum": 10.977
+          }
+        },
+        "three-tools": {
+          "offered": 64,
+          "accepted": 64,
+          "completed": 64,
+          "failed": 0,
+          "notLaunched": 0,
+          "maxInFlight": 32,
+          "elapsedMs": 16703.6,
+          "completeRunsPerSecond": 3.832,
+          "PGSettlementP95Ms": 13164,
+          "peakObservedRunning": 32,
+          "modelRequests": 256,
+          "physicalToolCalls": 192,
+          "submitToVisibleTerminalMs": {
+            "count": 64,
+            "p50": 5650,
+            "p95": 13250,
+            "p99": 14184
+          },
+          "terminalCreationToSettlementMs": {
+            "count": 64,
+            "p50": 502,
+            "p95": 3231,
+            "p99": 3647
+          },
+          "beforeProviderMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          },
+          "afterProviderMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          },
+          "peakConcurrentModelRequests": 3,
+          "hostProcessorPerformance": {
+            "samples": 7,
+            "median": 49,
+            "minimum": 46,
+            "maximum": 93
+          },
+          "fixedHashWallMs": {
+            "samples": 8,
+            "median": 8.189,
+            "minimum": 5.535,
+            "maximum": 11.91
+          }
+        }
+      },
+      "overlayRestored": true,
+      "applicationSourceHashes": {
+        "session-projector.ts": "cffe9f5e1ac80f82a70f1bc6dacd8d018ee2dae7244fb1d4682cff6284e7d25b",
+        "session-runtime-main.ts": "f414658a364d3727d9da90d327a3305671af6b3024e164dced5acae9ca380aa1",
+        "accepted-fact-recovery.ts": "797fdb0ae2a05735ac41316b48dfc961bc7a15a927e6726d52b7b5a8b191c703",
+        "execution-stream-projection.ts": "42754a9ffb6a4d3c2c61c8512a0648c4013515b8b0fc86f21ee18c810fdb06de",
+        "work-finished-projection.ts": "b552a833adbbe6d896df005d929aaeb241306d79140614ca6f4d50d2648023e9",
+        "postgres-durable-commit-projector.ts": "2cc7b9f1671b063c8fe1e76964debe492a195fee4beae544fbc5c20bef5bf15f",
+        "frozen-history.ts": "e570c091c0d499fd4fc690ca518f86fa95bb81609b1ced0d683d226e2190b0e0",
+        "postgres-projection.ts": "a88268444df0e53aeef3622d41186a6a57c5cc690c7894bbd424585d9c6c4b32",
+        "shared-entry-bodies.ts": "7d714673326943993de0f90d3348f39272a4c70b029d796548db8060748f119a"
+      },
+      "loadDriverSha256": "cf25738f285c227d854649fc458a4b237366976ad18738a265c9035db98f3c4e"
+    }
+  },
+  "candidateSQL": {
+    "runs": 192,
+    "records": 2308,
+    "byKind": {
+      "durable_commit": {
+        "records": 1156,
+        "calls": 10396,
+        "minCalls": 7,
+        "maxCalls": 11
+      },
+      "agent_event": {
+        "records": 576,
+        "calls": 192,
+        "minCalls": 0,
+        "maxCalls": 1
+      },
+      "generationTaskOnly": {
+        "records": 192,
+        "calls": 1152,
+        "minCalls": 6,
+        "maxCalls": 6
+      },
+      "assistantEntryCommit": {
+        "records": 192,
+        "calls": 2879,
+        "minCalls": 14,
+        "maxCalls": 15
+      },
+      "work_finished": {
+        "records": 192,
+        "calls": 4800,
+        "minCalls": 25,
+        "maxCalls": 25
+      }
+    },
+    "callsPerRun": 101.141
+  }
+}

@@ -607,36 +607,62 @@ describe.skipIf(!endpoint)("atomic Worker admission", () => {
     expect(queries.length).toBeLessThanOrEqual(15);
     expect(queries[0]!.sql).toContain("set_config('lock_timeout'");
     queries.length = 0;
-    await projector.project(
-      {
-        ...first,
-        factId: randomUUID(),
-        commit: {
-          seq: 2,
-          nextId: 4,
-          writes: [
-            {
-              type: "task",
-              value: {
-                id: 3,
-                conversationId: 1,
-                kind: "test.task",
-                version: 1,
-                input: {},
-                background: false,
-                abortRequested: false,
-                state: { status: "pending", checkpoint: { phase: "start" } },
-              },
-            },
-          ],
-        },
-        origins: [
-          { recordId: 3, sessionId: scope.sessionId, runId: scope.runId, turnId: scope.turnId },
+    const taskValue = {
+      id: 3,
+      conversationId: 1,
+      kind: "test.task",
+      version: 1,
+      input: {},
+      background: false,
+      abortRequested: false,
+      state: { status: "pending", checkpoint: { phase: "start" } },
+    };
+    const task: typeof first = {
+      ...first,
+      factId: randomUUID(),
+      commit: {
+        seq: 2,
+        nextId: 4,
+        writes: [
+          {
+            type: "task",
+            value: taskValue,
+          },
         ],
       },
-      { topic: f.worker, partition: 0, offset: 11n },
+      origins: [
+        { recordId: 3, sessionId: scope.sessionId, runId: scope.runId, turnId: scope.turnId },
+      ],
+    };
+    const position = { topic: f.worker, partition: 0, offset: 11n };
+    await projector.project(task, position);
+    expect(queries.filter((q) => q.sql.includes("insert into "))).toHaveLength(1);
+    expect(queries.find((q) => q.sql.includes("insert into "))!.sql).toContain(
+      "accepted_fact_projection_offsets",
     );
-    expect(queries.length).toBeLessThanOrEqual(11);
+    // The same bytes at a later offset acknowledge a duplicate without reapplying
+    // indexes. A rejected index write must roll back both the header and cursor.
+    await projector.project(task, { ...position, offset: 12n });
+    const conflict: typeof first = {
+      ...task,
+      commit: {
+        seq: 3,
+        nextId: 4,
+        writes: [{ type: "task", value: { ...taskValue, id: 1 } }],
+      },
+      origins: [{ ...task.origins[0]!, recordId: 1 }],
+    };
+    await expect(projector.project(conflict, { ...position, offset: 13n })).rejects.toThrow(
+      "ownership changed",
+    );
+    const {
+      rows: [progress],
+    } = await sql<{ cursor: string; head: string }>`select
+      (select next_offset::text from accepted_fact_projection_offsets where topic=${position.topic} and partition=0) cursor,
+      (select max(seq)::text from pi_durable_commits where tenant_id=${scope.tenantId}::uuid and session_id=${scope.piSessionId}) head`.execute(
+      db,
+    );
+    expect(progress).toEqual({ cursor: "13", head: "2" });
     queries.length = 0;
     const view = await new ConversationReader(measured, f.tenant.tenantId).getConversationView(
       f.session.sessionId,
@@ -1289,7 +1315,8 @@ describe.skipIf(!endpoint)("atomic Worker admission", () => {
             pause &&
             (order === "input-first"
               ? query.startsWith('with "accepted_run"')
-              : query.startsWith('update "sessions"') && query.includes('"next_event_seq"'))
+              : query.trimStart().startsWith("with finished as") &&
+                query.includes('update "sessions" set'))
           ) {
             pause = false;
             held.add(queryId);

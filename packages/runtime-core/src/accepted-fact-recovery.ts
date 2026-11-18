@@ -1,18 +1,22 @@
 import type { Database } from "@pi-cloud/database";
-import { sql, type Kysely, type Transaction } from "kysely";
+import { sql, type Kysely, type Transaction, type RawBuilder } from "kysely";
 
 export type KafkaPartitionBounds = Readonly<{ partition: number; low: bigint; high: bigint }>;
 export type FactPosition = Readonly<{ topic: string; partition: number; offset: bigint }>;
+
+export function projectionOffsetWrite(position: FactPosition, ready?: RawBuilder<boolean>) {
+  return sql`insert into accepted_fact_projection_offsets(topic,partition,next_offset)
+    select ${position.topic},${position.partition},${(position.offset + 1n).toString()}::bigint ${ready ? sql`where ${ready}` : sql``}
+    on conflict(topic,partition) do update set next_offset=excluded.next_offset
+    where accepted_fact_projection_offsets.next_offset<excluded.next_offset`;
+}
 
 /** Co-commit with native headers/semantic data. Display-only deltas do not write PG. */
 export async function recordFactProjection(
   db: Transaction<Database>,
   position: FactPosition,
 ): Promise<void> {
-  await sql`insert into accepted_fact_projection_offsets(topic,partition,next_offset)
-    values(${position.topic},${position.partition},${(position.offset + 1n).toString()}::bigint)
-    on conflict(topic,partition) do update set next_offset=excluded.next_offset
-    where accepted_fact_projection_offsets.next_offset<excluded.next_offset`.execute(db);
+  await projectionOffsetWrite(position).execute(db);
 }
 
 /** Caller captures Kafka bounds BEFORE this query, so a concurrent new Run or

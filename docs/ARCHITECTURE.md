@@ -690,6 +690,12 @@ partitions; Cube nodes add execution capacity. Cold Sessions do not require
 dedicated processes or OS threads. Independent authorities are not duplicated by
 an extra Actor framework, cache, scheduler or per-Step projection receipt.
 
+The [ordered projection experiment](reports/ordered-projection-tail-20261118.md)
+compares one and two Session Runtime partition owners with the same total
+projection-pool capacity. [ADR-0334](adr/0334-ordered-projection-round-trips.md)
+describes reducing PG calls inside each native commit, including atomic cursor
+updates. This source candidate is under review and has not been released.
+
 ## Intentional coupling and unverified boundaries
 
 - API and Projector are separate processes, but live SSE still needs the execution

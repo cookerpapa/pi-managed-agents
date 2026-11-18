@@ -437,7 +437,7 @@ it("does not admit a successor before closure COMMIT and ignores the old seal af
   }
 }, 30000);
 
-it("reuses the locked Run during recovery with nineteen business SQL statements", async () => {
+it("reuses the locked Run during recovery with a bounded number of database calls", async () => {
   const f = await fixture();
   const queries: string[] = [];
   const database = f.database.withPlugin({
@@ -458,7 +458,7 @@ it("reuses the locked Run during recovery with nineteen business SQL statements"
   await projector.project(seal);
   const reads = queries.filter((q) => /^select\b/.test(q) && q.includes('from "runs"'));
   expect(reads).toHaveLength(1);
-  expect(queries).toHaveLength(20);
+  expect(queries.length).toBeLessThanOrEqual(19);
   process.stdout.write(
     JSON.stringify({
       measurement: "recovery_seal_sql",

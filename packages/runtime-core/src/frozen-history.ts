@@ -65,7 +65,18 @@ export async function captureNativePresentation(
   scope: { tenantId: string; sessionId: string },
   sequence: number,
   onlyTurnId?: string,
+  admittedTurn?: Readonly<{
+    sessionId: string;
+    turnId: string;
+    mailboxPosition: string;
+    pruned: boolean;
+    sharedEntries: boolean;
+  }>,
 ): Promise<void> {
+  const entries =
+    admittedTurn?.sharedEntries === false
+      ? sql.table("pi_durable_owned_records")
+      : sql.table("pi_durable_records");
   const { rows } = await sql<{
     retained_id: string;
     ordinal: number;
@@ -89,10 +100,10 @@ export async function captureNativePresentation(
     join sessions s on s.tenant_id=g.tenant_id and s.id=(g.cloud_origin->>'cloudSession')::uuid
     left join pi_history_bodies b on b.tenant_id=g.tenant_id and b.id=g.entry_body_id
     left join pi_durable_owned_records task on task.tenant_id=r.tenant_id and task.session_id=r.session_id and task.id=(r.fields->>'task')::bigint and task.kind='task'
-    left join lateral(select p.id from pi_durable_records p where p.tenant_id=r.tenant_id and p.session_id=r.session_id
+    left join lateral(select p.id from ${entries} p where p.tenant_id=r.tenant_id and p.session_id=r.session_id
       and r.fields->>'role'='toolResult' and coalesce(r.fields->>'assistant',task.fields->>'assistant') is null
       and p.kind='entry' and p.fields->>'conversation'=r.fields->>'conversation' and p.fields->>'role'='assistant' and p.id<r.id order by p.id desc limit 1) a on true
-    left join pi_durable_records assistant on assistant.tenant_id=r.tenant_id and assistant.session_id=r.session_id
+    left join ${entries} assistant on assistant.tenant_id=r.tenant_id and assistant.session_id=r.session_id
       and assistant.id=coalesce(r.fields->>'assistant',task.fields->>'assistant',a.id::text)::bigint and assistant.kind='entry'
     where ref.tenant_id=${scope.tenantId}::uuid and ref.session_id=${scope.sessionId} and ref.seq=${sequence} and not ref.base
       ${onlyTurnId ? sql`and g.cloud_origin->>'turn'=${onlyTurnId}` : sql``}
@@ -100,7 +111,7 @@ export async function captureNativePresentation(
         where block.tenant_id=ref.tenant_id and block.source_pi_session_id=ref.session_id and block.turn_id=(g.cloud_origin->>'turn')::uuid and (frame.seq,frame.ordinal)=(ref.seq,ref.ordinal))
       and (g.record_kind='entry' or (g.record_kind='task' and (g.phase='"retry"'
         or ((g.seq,g.ordinal)=(r.seq,r.ordinal) and r.fields->>'nativeKind' in ('"pi.tool"','"pi.compaction"') and r.fields->>'status'='terminal'
-          and not(r.fields ? 'resultEntry') and not exists(select 1 from pi_durable_records result
+          and not(r.fields ? 'resultEntry') and not exists(select 1 from ${entries} result
             where result.tenant_id=r.tenant_id and result.session_id=r.session_id and result.kind='entry' and result.fields->>'task'=r.id::text)))))
     order by ref.ordinal`.execute(tx);
   if (!rows.length) return;
@@ -110,7 +121,7 @@ export async function captureNativePresentation(
         await sql<{
           id: string;
           fields: Record<string, string>;
-        }>`select id::text,fields from pi_durable_records
+        }>`select id::text,fields from pi_durable_owned_records
     where tenant_id=${scope.tenantId}::uuid and session_id=${scope.sessionId} and kind='submission' and fields->>'entry'=any(${users.map((r) => r.id)}::text[])`.execute(
           tx,
         )
@@ -134,13 +145,30 @@ export async function captureNativePresentation(
   });
   const humans = await readHumanInputPresentation(tx, scope, requests);
   const sources = [...new Map(rows.map((row) => [row.turn_id, row])).values()];
+  const known = sources.filter(
+    (row) =>
+      row.source_session_id === admittedTurn?.sessionId && row.turn_id === admittedTurn.turnId,
+  );
+  const unknown = sources.filter((row) => !known.includes(row));
+  const routing =
+    known.length && !admittedTurn!.pruned
+      ? sql`select ${admittedTurn!.sessionId}::uuid as session_id,${admittedTurn!.turnId}::uuid as turn_id,${admittedTurn!.mailboxPosition}::bigint as mailbox_position`
+      : sql`select null::uuid as session_id,null::uuid as turn_id,null::bigint as mailbox_position where false`;
+  // Hot root presentation already holds the admitted Run lock. Child/cold
+  // presentation still resolves its own view; it cannot borrow the root ID.
+  const otherRouting = unknown.length
+    ? sql`select t.session_id,t.turn_id,t.mailbox_position from conversation_turns t
+      join (values ${sql.join(unknown.map((r) => sql`(${r.source_session_id}::uuid,${r.turn_id}::uuid)`))}) a(session_id,turn_id)
+        on t.session_id=a.session_id and t.turn_id=a.turn_id
+      where t.tenant_id=${scope.tenantId}::uuid and t.pruned_at is null`
+    : sql`select null::uuid as session_id,null::uuid as turn_id,null::bigint as mailbox_position where false`;
   const blocks = (
     await sql<{ id: string; turn_id: string }>`with affected(session_id,turn_id) as (
     values ${sql.join(sources.map((row) => sql`(${row.source_session_id}::uuid,${row.turn_id}::uuid)`))}
-  ), inserted as (
+  ), routing as (${routing} union all ${otherRouting}), inserted as (
     insert into pi_history_blocks(tenant_id,source_session_id,source_pi_session_id,owner_pi_session_id,turn_id,origin_session_id,position)
     select ${scope.tenantId}::uuid,a.session_id,${scope.sessionId},${scope.sessionId},a.turn_id,a.session_id,t.mailbox_position
-      from affected a join conversation_turns t on t.tenant_id=${scope.tenantId}::uuid and t.session_id=a.session_id and t.turn_id=a.turn_id where t.pruned_at is null
+      from affected a join routing t on t.session_id=a.session_id and t.turn_id=a.turn_id
     on conflict(tenant_id,source_pi_session_id,turn_id) do nothing returning id,turn_id
   ) select * from inserted union all select b.id,b.turn_id from pi_history_blocks b join affected a on a.turn_id=b.turn_id and a.session_id=b.source_session_id
     where b.tenant_id=${scope.tenantId}::uuid and b.source_pi_session_id=${scope.sessionId}`.execute(

@@ -1,5 +1,13 @@
 # Implementation roadmap
 
+## Ordered Session projection under load
+
+[#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) has a
+[measured source implementation](reports/ordered-projection-tail-20261118.md).
+It reduces synchronous PG calls within each native commit and measures one or
+two partition owners with the same total of twelve projection connections.
+Sustained capacity remains under evaluation. The serving release is unchanged.
+
 ## Projection cost investigation and startup repair — delivered
 
 The [SQL investigation](reports/projector-sql-diagnosis-20261118.md) identifies

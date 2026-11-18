@@ -159,15 +159,18 @@ export class ExecutionStreamProjector {
         // Lock before deciding: a concurrent advance or owner change must be
         // rechecked, even when this statement would otherwise be a no-op.
         const covered = await sql`with owner as materialized (
-          select id from runs where tenant_id=${fact.scope.tenantId}::uuid and id=${fact.scope.runId}::uuid
+          select id,session_id,turn_id from runs where tenant_id=${fact.scope.tenantId}::uuid and id=${fact.scope.runId}::uuid
             and lease_id=${fact.scope.writerId}::uuid
             and exists(select 1 from pi_durable_commits c where c.tenant_id=${fact.scope.tenantId}::uuid
               and c.session_id=${fact.scope.piSessionId} and c.seq=${fact.nativeSequence})
           for no key update
         ), admitted as materialized (
-          select v.* from conversation_turns v join owner on owner.id=v.id
-          where v.tenant_id=${fact.scope.tenantId}::uuid and v.session_id=${fact.scope.sessionId}::uuid
-            and v.turn_id=${fact.scope.turnId}::uuid
+          select id,session_id,turn_id from owner where session_id=${fact.scope.sessionId}::uuid and turn_id=${fact.scope.turnId}::uuid
+          union all
+          select o.id,c.child_session_id,c.child_turn_id from owner o
+            join subagent_conversations c on c.tenant_id=${fact.scope.tenantId}::uuid and c.root_run_id=o.id
+            join sessions s on s.tenant_id=c.tenant_id and s.id=c.child_session_id
+          where c.child_session_id=${fact.scope.sessionId}::uuid and c.child_turn_id=${fact.scope.turnId}::uuid
         ), root as (
           update runs r set output_display_seq=greatest(r.output_display_seq,${fact.event.seq}),
             output_display_native_seq=greatest(r.output_display_native_seq,${fact.nativeSequence})
@@ -335,18 +338,13 @@ export class ExecutionStreamProjector {
         await recordFactProjection(tx, position);
         return this.#readTerminal(tx, fact.scope);
       }
-      if (fact.nativeSequence > 0) {
-        const head = await sql<{
-          seq: string;
-        }>`select coalesce(max(seq),0)::text seq from (
-          select seq from pi_durable_commits where tenant_id=${fact.scope.tenantId}::uuid and session_id=${fact.scope.piSessionId}
-          union all select through_seq from pi_durable_bases where tenant_id=${fact.scope.tenantId}::uuid and session_id=${fact.scope.piSessionId}
-        ) positions`.execute(tx);
-        if (Number(head.rows[0]!.seq) !== fact.nativeSequence)
-          throw new Error("Root completion does not follow its final native commit");
-      }
       const retire = writer.writer_failed_at === null;
-      adopt = await this.#durable.checkpointLiveIn(tx, fact.scope, current);
+      adopt = await this.#durable.checkpointLiveIn(
+        tx,
+        fact.scope,
+        current,
+        fact.nativeSequence || undefined,
+      );
       if (retire) await this.#handoffViews(tx, fact.scope);
       const result = await finishWorkIn(
         tx,

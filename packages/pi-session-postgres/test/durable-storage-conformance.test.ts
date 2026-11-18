@@ -1171,7 +1171,7 @@ it("batches document revision metadata without per-document reads and keeps fixe
       })) as unknown as StorageWrite[],
       BACKGROUND_CONTEXT,
     );
-    expect(queries.filter((query) => /^select/i.test(query.trim())).length).toBe(3);
+    expect(queries.filter((query) => /^select/i.test(query.trim())).length).toBe(2);
     expect(
       queries.filter((query) => query.startsWith("insert into pi_durable_document_revisions")),
     ).toHaveLength(1);
@@ -1189,6 +1189,66 @@ it("batches document revision metadata without per-document reads and keeps fixe
       ),
     ).toMatchObject({ value: { text: "after" } });
   } finally {
+    await f.store.close(BACKGROUND_CONTEXT);
+  }
+});
+
+it("loads the native head after a competing Session lock commits and shares the receipt timestamp", async () => {
+  const f = await fixture();
+  const prepared = Promise.withResolvers<void>(),
+    release = Promise.withResolvers<void>(),
+    waiter = Promise.withResolvers<number>();
+  const first = database.transaction().execute(async (tx) => {
+    await f.projection.applyIn(tx, {
+      seq: 1,
+      nextId: 3,
+      writes: [
+        { type: "conversation", value: { id: 1 } },
+        { type: "entry", value: { id: 2, conversationId: 1, kind: "fixture", data: "first" } },
+      ],
+    } as unknown as DurableBatch);
+    prepared.resolve();
+    await release.promise;
+  });
+  let second: Promise<boolean> | undefined;
+  try {
+    await prepared.promise;
+    second = database.transaction().execute(async (tx) => {
+      const {
+        rows: [row],
+      } = await sql<{ pid: number }>`select pg_backend_pid() as pid`.execute(tx);
+      waiter.resolve(row!.pid);
+      return f.projection.applyIn(tx, {
+        seq: 2,
+        nextId: 4,
+        writes: [
+          { type: "entry", value: { id: 3, conversationId: 1, kind: "fixture", data: "second" } },
+        ],
+      } as unknown as DurableBatch);
+    });
+    const pid = await waiter.promise;
+    await vi.waitFor(async () => {
+      const {
+        rows: [row],
+      } = await sql<{
+        blocked: boolean;
+      }>`select cardinality(pg_blocking_pids(${pid})) > 0 as blocked`.execute(database);
+      expect(row!.blocked).toBe(true);
+    });
+    release.resolve();
+    await first;
+    expect(await second).toBe(true);
+    expect(await f.projection.head()).toMatchObject({ seq: 2, nextId: 4 });
+    const { rows } = await sql<{ count: number; matching: boolean }>`
+      select count(*)::int as count,bool_and(h.committed_at=c.committed_at) as matching
+      from pi_history_records h join pi_durable_commits c using(tenant_id,session_id,seq)
+      where h.tenant_id=${f.projection.scope.tenantId}::uuid and h.session_id=${f.projection.scope.sessionId}`.execute(
+      database,
+    );
+    expect(rows).toEqual([{ count: 3, matching: true }]);
+  } finally {
+    release.resolve();
+    await Promise.allSettled([first, second]);
     await f.store.close(BACKGROUND_CONTEXT);
   }
 });

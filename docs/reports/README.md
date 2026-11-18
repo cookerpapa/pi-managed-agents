@@ -1,5 +1,9 @@
 # Delivery and research evidence
 
+- [Ordered Session projection and Run tail latency](ordered-projection-tail-20261118.md).
+  Source-only feasibility, fixed-connection comparisons, failure acceptance and
+  limits of the single-host measurements.
+
 - [Projector SQL cost and idle startup](projector-sql-diagnosis-20261118.md):
   client/server timings, V8 samples, twelve/thirty-two-connection comparison,
   many small SQL operations and the reproduced idle-EOF assignment regression.

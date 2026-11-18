@@ -1,5 +1,9 @@
 # Current architecture decisions
 
+[ADR-0334](0334-ordered-projection-round-trips.md) describes native projection
+within the existing PG transaction. The implementation is under performance
+review. The serving release remains the November 18 idle-startup repair.
+
 [ADR-0333](0333-development-picomatch-review.md) records one exact development-only
 audit exception for an unpatched advisory, retaining raw findings and runtime gates.
 

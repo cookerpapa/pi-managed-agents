@@ -27,16 +27,52 @@ serializeRelease(runtimeDirectory);
 const directory = resolve(process.argv[2] ?? ".cache/projector-sql-" + Date.now());
 const poolSize = process.argv[3] === undefined ? 12 : Number(process.argv[3]);
 const candidateReader = process.argv.slice(4).includes("reader-candidate");
+const candidateProjection = process.argv.slice(4).includes("projection-candidate");
+const clean = process.argv.slice(4).includes("clean");
+const tailLoad = process.argv.slice(4).includes("tail-load");
+const faultLoad = process.argv.slice(4).includes("fault-load");
+const genericPlans = process.argv.slice(4).includes("generic-plans");
+assert(
+  !genericPlans || (tailLoad && clean && candidateProjection),
+  "Generic plan comparison is isolated to the candidate projection pool",
+);
+assert(
+  !faultLoad || (clean && !tailLoad),
+  "Recovery workload requires a clean single-owner comparison",
+);
+const replicas = Number(process.env.PI_CLOUD_DIAGNOSTIC_PROJECTORS ?? "1");
+const repetitions = Number(process.env.PI_CLOUD_PROJECTOR_DIAGNOSTIC_REPETITIONS ?? "1");
+assert(Number.isSafeInteger(repetitions) && repetitions >= 1 && repetitions <= 5);
 const cpuOnly = process.argv.slice(4).includes("cpu-only");
 const cpuProfile = cpuOnly || process.argv.slice(4).includes("cpu");
 const serverDuration = process.argv.slice(4).includes("server-duration");
 assert(
   process.argv
     .slice(4)
-    .every((v) => ["reader-candidate", "cpu", "cpu-only", "server-duration"].includes(v)),
+    .every((v) =>
+      [
+        "reader-candidate",
+        "projection-candidate",
+        "clean",
+        "tail-load",
+        "fault-load",
+        "generic-plans",
+        "cpu",
+        "cpu-only",
+        "server-duration",
+      ].includes(v),
+    ),
   "Unknown diagnostic option",
 );
-assert([12, 24, 32].includes(poolSize), "Use one of the bounded experimental pool sizes");
+assert([6, 12, 24, 32].includes(poolSize), "Use one of the bounded experimental pool sizes");
+assert(
+  replicas === 1 || (replicas === 2 && poolSize === 6 && clean && tailLoad),
+  "A two-owner comparison requires a six-connection pool per owner and a clean tail run",
+);
+assert(
+  !clean || (!cpuProfile && !serverDuration && poolSize * replicas === 12),
+  "Clean comparison preserves total projection pool capacity and disables observers",
+);
 assert(
   !cpuOnly || (poolSize === 12 && !serverDuration),
   "CPU-only calibration preserves the serving pool and server logging",
@@ -56,7 +92,18 @@ const {
   database,
 );
 assert.equal(activity.n, 0, "Unrelated active work prevents temporary Projector instrumentation");
-const original = JSON.parse(kubectl(["get", target, "-o", "json"])).spec.template;
+const originalSpec = JSON.parse(kubectl(["get", target, "-o", "json"])).spec;
+const original = originalSpec.template;
+const compareOwners = tailLoad || faultLoad;
+if (compareOwners) {
+  assert.equal(originalSpec.replicas, 1, "The matched comparison starts from one owner");
+  assert(
+    !JSON.parse(kubectl(["get", "hpa", "-o", "json"])).items.some(
+      (h) => h.spec.scaleTargetRef.name === target.split("/")[1],
+    ),
+    "An autoscaler owns the target size",
+  );
+}
 const modified = structuredClone(original),
   container = modified.spec.containers.find((c) => c.name === "session-runtime");
 assert(container, "Session runtime container missing");
@@ -65,13 +112,24 @@ const sources = [
   "packages/control-plane/src/session-runtime-main.ts",
 ];
 if (candidateReader) sources.push("packages/event-log/src/kafka-partition-reader.ts");
+const projectionSources = [
+  "packages/runtime-core/src/accepted-fact-recovery.ts",
+  "packages/runtime-core/src/execution-stream-projection.ts",
+  "packages/runtime-core/src/work-finished-projection.ts",
+  "packages/runtime-core/src/postgres-durable-commit-projector.ts",
+  "packages/runtime-core/src/frozen-history.ts",
+  "packages/pi-session-postgres/src/durable/postgres-projection.ts",
+  "packages/pi-session-postgres/src/durable/shared-entry-bodies.ts",
+];
+if (candidateProjection) sources.push(...projectionSources);
 const deployment = JSON.parse(await readFile(runtimeDirectory + "/k3s/deployment.json", "utf8"));
 const baselineRevision = deployment.components["session-runtime"].sourceRevision;
 const data = {};
 for (const path of sources) {
   const source = await readFile(path, "utf8");
   const expected =
-    candidateReader && path.endsWith("kafka-partition-reader.ts")
+    (candidateReader && path.endsWith("kafka-partition-reader.ts")) ||
+    (candidateProjection && projectionSources.includes(path))
       ? execFileSync("git", ["show", `${baselineRevision}:${path}`], { encoding: "utf8" })
       : source;
   const actual = kubectl([
@@ -106,6 +164,15 @@ if (poolSize !== 12)
     "const projectionDatabase = createDatabase({\n      connectionString: config.databaseNotificationUrl,\n      maxConnections: 12,",
     `const projectionDatabase = createDatabase({\n      connectionString: config.databaseNotificationUrl,\n      maxConnections: ${poolSize},`,
   );
+if (genericPlans) {
+  data["session-runtime-main.ts"] = replace(
+    data["session-runtime-main.ts"],
+    "const projectionDatabase = createDatabase({\n      connectionString: config.databaseNotificationUrl,",
+    `const projectionUrl = new URL(config.databaseNotificationUrl);
+    projectionUrl.searchParams.set("options", ((projectionUrl.searchParams.get("options") ?? "") + " -c plan_cache_mode=force_generic_plan").trim());
+    const projectionDatabase = createDatabase({\n      connectionString: projectionUrl.toString(),`,
+  );
+}
 for (const file of sources.map((p) => p.split("/").at(-1)))
   await transform(data[file], { loader: "ts", format: "esm" });
 data["probe.mjs"] = await readFile("scripts/lib/projector-database-probe.mjs", "utf8");
@@ -163,6 +230,11 @@ process.on('SIGUSR2',()=>{
 console.log(JSON.stringify({event:'diag.cpu.ready',pid:process.pid}));\n`;
   await transform(data["session-projector.ts"], { loader: "ts", format: "esm" });
 }
+if (clean)
+  data["session-projector.ts"] = await readFile(
+    "packages/runtime-core/src/session-projector.ts",
+    "utf8",
+  );
 for (const [file, source] of Object.entries(data))
   if (file.endsWith(".mjs")) await transform(source, { loader: "js", format: "esm" });
 modified.spec.volumes ??= [];
@@ -183,6 +255,12 @@ const receipt = {
   modified,
   poolSize,
   candidateReader,
+  candidateProjection,
+  clean,
+  repetitions,
+  replicas,
+  genericPlans,
+  originalReplicas: originalSpec.replicas,
   cpuProfile,
   cpuOnly,
   serverDuration,
@@ -249,10 +327,58 @@ try {
     "-p",
     JSON.stringify([
       { op: "test", path: "/spec/template", value: original },
+      ...(compareOwners
+        ? [{ op: "test", path: "/spec/replicas", value: originalSpec.replicas }]
+        : []),
       { op: "replace", path: "/spec/template", value: modified },
+      ...(compareOwners ? [{ op: "replace", path: "/spec/replicas", value: replicas }] : []),
     ]),
   ]);
   await kubectlAsync(["rollout", "status", target, "--timeout=180s"]);
+  if (tailLoad) {
+    const token = (
+      await readFile(resolve(runtimeDirectory, "secrets/supervisor-management-token"), "utf8")
+    ).trim();
+    const deadline = Date.now() + 90_000;
+    for (;;) {
+      const owners = JSON.parse(
+        kubectl(["get", "pods", "-l", "app.kubernetes.io/component=session-runtime", "-o", "json"]),
+      ).items.filter(
+        (p) =>
+          !p.metadata.deletionTimestamp &&
+          p.status.conditions?.some((c) => c.type === "Ready" && c.status === "True"),
+      );
+      const membership = await Promise.all(
+        owners.map(async (p) => {
+          try {
+            const response = await fetch(
+              "http://" + p.status.podIP + ":3000/internal/v1/session-publication/health/local",
+              { headers: { authorization: "Bearer " + token }, signal: AbortSignal.timeout(2500) },
+            );
+            if (!response.ok) {
+              await response.body?.cancel();
+              return [];
+            }
+            return (await response.json()).partitions;
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const all = membership.flat();
+      if (
+        membership.length === replicas &&
+        membership.every((ps) => ps.length) &&
+        all.length === 32 &&
+        new Set(all).size === 32
+      ) {
+        receipt.partitionsPerOwner = membership.map((ps) => ps.length);
+        break;
+      }
+      assert(Date.now() < deadline, "Partition ownership did not settle before measuring");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
   receipt.phase = "observing";
   await save();
   const pod = podFor("session-runtime");
@@ -300,7 +426,7 @@ try {
   const roles = new Map(
     pods.map((p) => [p.status.podIP, p.metadata.name.replace(/-[a-f0-9]{8,10}-[a-z0-9]{5}$/, "")]),
   );
-  if (!cpuOnly)
+  if (!cpuOnly && !clean)
     watching = sampleProjectorSql(
       database,
       roles,
@@ -312,39 +438,45 @@ try {
       resolve(directory, "pg-samples.json"),
       JSON.stringify({
         disabled: true,
-        reason: "CPU-only calibration has no SQL spans or activity sampling",
+        reason: "Comparison has no SQL spans or activity sampling",
       }) + "\n",
       { mode: 0o600 },
     );
-  const load = await start(
-    "load.log",
-    process.execPath,
-    [
-      "--import",
-      "tsx",
-      "scripts/run-runtime-load.mjs",
-      "--mode",
-      "custom",
-      "--name",
-      "observed-projection-pool-" + poolSize,
-      "--concurrency",
-      "64",
-      "--count",
-      "192",
-      "--kind",
-      "text",
-      "--first-byte-ms",
-      "0",
-      "--chunk-ms",
-      "0",
-      "--output-bytes",
-      "4096",
-      "--output",
-      resolve(directory, "load"),
-    ],
-    { ...process.env, PI_CLOUD_RUNTIME_LOAD_CHECK: "1" },
-  );
-  receipt.loadExit = await load.ended;
+  receipt.loads = [];
+  for (let repeat = 0; repeat < repetitions; repeat++) {
+    const load = await start(
+      repetitions === 1 ? "load.log" : `load-${repeat + 1}.log`,
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "scripts/run-runtime-load.mjs",
+        "--mode",
+        tailLoad ? "projection-tail" : faultLoad ? "faults" : "custom",
+        "--name",
+        "observed-projection-pool-" + poolSize,
+        "--concurrency",
+        "64",
+        "--count",
+        "192",
+        "--kind",
+        "text",
+        "--first-byte-ms",
+        "0",
+        "--chunk-ms",
+        "0",
+        "--output-bytes",
+        "4096",
+        "--output",
+        resolve(directory, repetitions === 1 ? "load" : `load-${repeat + 1}`),
+      ],
+      { ...process.env, PI_CLOUD_RUNTIME_LOAD_CHECK: "1" },
+    );
+    receipt.loadExit = await load.ended;
+    receipt.loads.push(receipt.loadExit);
+    await save();
+    if (receipt.loadExit !== 0) break;
+  }
   abort.abort();
   await watching;
   if (cpuProfile) {
@@ -414,29 +546,47 @@ try {
   await Promise.allSettled(jobs.map((j) => j.ended));
   await Promise.allSettled(files.map((file) => file.close()));
   if (changed) {
-    const live = JSON.parse(kubectl(["get", target, "-o", "json"])).spec.template;
-    const stripped = structuredClone(live);
-    stripped.spec.volumes = stripped.spec.volumes.filter((v) => v.name !== name);
-    stripped.spec.containers.find((c) => c.name === "session-runtime").volumeMounts =
-      stripped.spec.containers
-        .find((c) => c.name === "session-runtime")
-        .volumeMounts.filter((m) => m.name !== name);
-    assert.deepEqual(
-      stripped,
-      original,
-      "Unrelated template change prevents automatic restoration",
-    );
-    kubectl([
-      "patch",
-      target,
-      "--type=json",
-      "-p",
-      JSON.stringify([
-        { op: "test", path: "/spec/template", value: live },
-        { op: "replace", path: "/spec/template", value: original },
-      ]),
-    ]);
-    await kubectlAsync(["rollout", "status", target, "--timeout=180s"]);
+    const state = JSON.parse(kubectl(["get", target, "-o", "json"])).spec;
+    const live = state.template;
+    // The request can fail before application, or succeed despite a lost reply.
+    // In the former case the original template is already serving.
+    const hasOverlay = live.spec.volumes?.some((v) => v.name === name);
+    if (!hasOverlay) {
+      assert.deepEqual(live, original, "Another workload replaced the diagnostic template");
+      if (compareOwners)
+        assert.equal(
+          state.replicas,
+          originalSpec.replicas,
+          "Owner count changed outside the comparison",
+        );
+    } else {
+      const stripped = structuredClone(live);
+      stripped.spec.volumes = stripped.spec.volumes.filter((v) => v.name !== name);
+      stripped.spec.containers.find((c) => c.name === "session-runtime").volumeMounts =
+        stripped.spec.containers
+          .find((c) => c.name === "session-runtime")
+          .volumeMounts.filter((m) => m.name !== name);
+      assert.deepEqual(
+        stripped,
+        original,
+        "Unrelated template change prevents automatic restoration",
+      );
+      kubectl([
+        "patch",
+        target,
+        "--type=json",
+        "-p",
+        JSON.stringify([
+          { op: "test", path: "/spec/template", value: live },
+          ...(compareOwners ? [{ op: "test", path: "/spec/replicas", value: replicas }] : []),
+          { op: "replace", path: "/spec/template", value: original },
+          ...(compareOwners
+            ? [{ op: "replace", path: "/spec/replicas", value: originalSpec.replicas }]
+            : []),
+        ]),
+      ]);
+      await kubectlAsync(["rollout", "status", target, "--timeout=180s"]);
+    }
   }
   kubectl(["delete", "configmap", name, "--ignore-not-found"]);
   receipt.phase = "restored";

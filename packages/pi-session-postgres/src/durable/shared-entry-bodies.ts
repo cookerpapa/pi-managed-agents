@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { sql, type Transaction, type Kysely } from "kysely";
+import { sql, type Transaction, type Kysely, type RawBuilder } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import type { StorageWrite } from "@earendil-works/pi-durable";
 import type { DurableScope } from "./types.ts";
@@ -33,14 +33,75 @@ export function retainedHistoryBody(write: StorageWrite): string {
   );
 }
 
-/** One immutable payload object may back entries in independently owned Sessions. */
-export async function writeRetainedHistory(
+export type NativeCommitMutations = {
+  historyIndexes: RawBuilder<unknown> | undefined;
+  checkpoints: RawBuilder<unknown> | undefined;
+  currentIndexes: RawBuilder<unknown> | undefined;
+  historyIndexCount: number;
+  checkpointCount: number;
+  finish?: (valid: RawBuilder<boolean>) => RawBuilder<unknown>;
+};
+
+/** Persist the commit receipt and its immutable history in one statement.
+ * One immutable payload object may back independently owned Sessions. */
+export async function writeNativeCommit(
   tx: Transaction<Database>,
+  scope: DurableScope,
+  commit: {
+    seq: number;
+    nextId: number;
+    fingerprint: string;
+    writeCount: number;
+    historyFingerprint: string;
+    currentHashes: Record<string, string>;
+    cloudMetadata?: Readonly<Record<string, unknown>>;
+  },
+  history: readonly HistoryWriteRow[],
+  mutations: NativeCommitMutations,
+): Promise<void> {
+  const { seq } = commit;
+  const receipt = sql`insert into pi_durable_commits(tenant_id,session_id,seq,next_id,fingerprint,write_count,history_write_count,history_fingerprint,current_hashes,cloud_metadata)
+    values(${scope.tenantId}::uuid,${scope.sessionId},${seq},${commit.nextId},${commit.fingerprint},${commit.writeCount},${history.length},${commit.historyFingerprint},${JSON.stringify(commit.currentHashes)}::jsonb,${commit.cloudMetadata === undefined ? null : JSON.stringify(commit.cloudMetadata)}) returning committed_at`;
+  const ctes = [sql`commit_receipt as (${receipt})`];
+  if (history.length) ctes.push(retainedHistoryCtes(scope, seq, history));
+  else
+    ctes.push(
+      sql`written_refs as (select tenant_id,session_id,seq,ordinal,retained_record_id,clear_owner from pi_durable_write_refs where false)`,
+    );
+
+  const count = (name: string, mutation: RawBuilder<unknown> | undefined) => {
+    if (!mutation) return sql`0`;
+    ctes.push(sql`${sql.id(name)} as (${mutation})`);
+    return sql`(select count(*)::int from ${sql.table(name)})`;
+  };
+  const historyIndexes = count("history_indexes", mutations.historyIndexes);
+  const checkpoints = count("checkpoints", mutations.checkpoints);
+  const currentIndexes = count("current_indexes", mutations.currentIndexes);
+  ctes.push(sql`counts as materialized (select ${historyIndexes} as history_indexes,
+    ${checkpoints} as checkpoints, ${currentIndexes} as current_indexes)`);
+  if (mutations.finish) {
+    const valid = sql<boolean>`(select history_indexes=${mutations.historyIndexCount}
+      and checkpoints=${mutations.checkpointCount} and current_indexes=${mutations.checkpointCount} from counts)`;
+    ctes.push(sql`completed as (${mutations.finish(valid)})`);
+  }
+  const {
+    rows: [result],
+  } = await sql<{ history_indexes: number; checkpoints: number; current_indexes: number }>`
+    with ${sql.join(ctes)} select * from counts`.execute(tx);
+  if (result?.checkpoints !== mutations.checkpointCount)
+    throw new Error("Native current checkpoint changed identity or regressed");
+  if (
+    result.history_indexes !== mutations.historyIndexCount ||
+    result.current_indexes !== mutations.checkpointCount
+  )
+    throw new Error("Native record ID ownership changed");
+}
+
+function retainedHistoryCtes(
   scope: DurableScope,
   seq: number,
   history: readonly HistoryWriteRow[],
-): Promise<void> {
-  if (!history.length) return;
+) {
   const entries = new Map<number, ReturnType<typeof splitEntry>>();
   const fields = new Map<number, Record<string, string>>();
   const images: { ordinal: number; imageId: string }[] = [];
@@ -69,7 +130,7 @@ export async function writeRetainedHistory(
     on conflict(tenant_id,body_kind,sha256) do update set sha256=excluded.sha256
       where pi_history_bodies.payload_text=excluded.payload_text returning id,sha256`
     : sql`select null::uuid as id,null::text as sha256 where false`;
-  await sql`with stream as (
+  return sql`stream as (
     insert into pi_history_streams(tenant_id,id) values(${scope.tenantId}::uuid,${scope.sessionId}) on conflict do nothing
   ), bodies as (${objects}), writes(ordinal,record_kind,record_id,body,phase,cloud_origin,digest,conversation_id,task_id,fields) as (
     values ${sql.join(
@@ -84,7 +145,7 @@ export async function writeRetainedHistory(
       entry_body_id,entry_conversation_id,entry_task_id,committed_at,fields)
     select ${scope.tenantId}::uuid,${scope.sessionId},${seq},w.ordinal,w.record_kind,w.record_id,w.body,w.phase,w.cloud_origin,
       b.id,w.conversation_id,w.task_id,
-      (select committed_at from pi_durable_commits where tenant_id=${scope.tenantId}::uuid and session_id=${scope.sessionId} and seq=${seq}),w.fields
+      (select committed_at from commit_receipt),w.fields
       from writes w left join bodies b on b.sha256=w.digest
       returning tenant_id,session_id,seq,ordinal,id
     ), image_refs as (
@@ -95,8 +156,8 @@ export async function writeRetainedHistory(
         on conflict do nothing`
           : sql`select 1`
       }
-    ) insert into pi_durable_write_refs(tenant_id,session_id,seq,ordinal,retained_record_id)
-      select tenant_id,session_id,seq,ordinal,id from retained`.execute(tx);
+    ), written_refs as (insert into pi_durable_write_refs(tenant_id,session_id,seq,ordinal,retained_record_id)
+      select tenant_id,session_id,seq,ordinal,id from retained returning tenant_id,session_id,seq,ordinal,retained_record_id,clear_owner)`;
 }
 
 /** Only unreferenced PG objects; retiring native histories is a separate guarded operation. */

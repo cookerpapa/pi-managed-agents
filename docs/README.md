@@ -51,6 +51,9 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+- [Ordered projection and Run tail latency](reports/ordered-projection-tail-20261118.md)
+  compares the source candidate, the serving implementation and two-owner operation.
+
 - [Projector SQL diagnosis, November 18](reports/projector-sql-diagnosis-20261118.md):
   where projection time goes, why more connections did not help, and idle startup recovery.
 

@@ -11,7 +11,7 @@ import {
   type StoredDurableBatch,
 } from "@pi-cloud/pi-session-postgres/durable";
 import type { AcceptedDurableCommitFact } from "./accepted-fact.ts";
-import { recordFactProjection, type FactPosition } from "./accepted-fact-recovery.ts";
+import { projectionOffsetWrite, type FactPosition } from "./accepted-fact-recovery.ts";
 import { projectionTransaction, type ProjectionBudget } from "./projection-transaction.ts";
 import { captureNativePresentation, mayCaptureNativePresentation } from "./frozen-history.ts";
 import type { ModelAccountingPort } from "./model-accounting-port.ts";
@@ -105,8 +105,8 @@ export class PostgresDurableCommitProjector {
     const prepared = await projectionTransaction(
       this.database,
       async (tx) => {
-        // Every child view shares the root Run. Materialize its lock before
-        // locking the lease; the native Session lock follows in applyIn().
+        // Materialized dependencies take the Run, writer and physical Session
+        // locks in that order. Native reads use a subsequent READ COMMITTED snapshot.
         const {
           rows: [run],
         } = await sql<{
@@ -119,16 +119,22 @@ export class PostgresDurableCommitProjector {
           output_first_partition: number | null;
           output_first_offset: string | null;
           output_display_seq: string;
+          mailbox_position: string;
+          pruned_at: Date | null;
           writer_seal_offset: string | null;
           writer_fencing_token: string;
           writer_pi_session_id: string;
         }>`with locked_run as materialized (
-          select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text
+          select id,session_id,turn_id,lease_id,output_seal_offset::text,output_first_topic,output_first_partition,output_first_offset::text,output_display_seq::text,mailbox_position::text,pruned_at
           from runs where tenant_id=${fact.scope.tenantId}::uuid and id=${fact.scope.runId}::uuid
           for no key update
-        ) select r.*,l.writer_seal_offset,l.fencing_token as writer_fencing_token,l.pi_session_id as writer_pi_session_id from locked_run r join session_leases l
+        ), owner as materialized (
+          select r.*,l.writer_seal_offset,l.fencing_token as writer_fencing_token,l.pi_session_id as writer_pi_session_id from locked_run r join session_leases l
           on l.tenant_id=${fact.scope.tenantId}::uuid and l.lease_id=${fact.scope.writerId}::uuid
-        for no key update of l`.execute(tx);
+          for no key update of l
+        ) select o.* from owner o join pi_sessions p on p.tenant_id=${fact.scope.tenantId}::uuid
+          and p.id=o.writer_pi_session_id and p.id=${fact.scope.piSessionId}
+          for update of p`.execute(tx);
         if (
           !run ||
           Number(run.writer_fencing_token) !== fact.scope.fencingToken ||
@@ -152,7 +158,10 @@ export class PostgresDurableCommitProjector {
         if (!current()) throw new Error("Native projection owner changed before state loading");
         const view = this.#view(fact.scope),
           state = view.liveState.fork();
-        const displayViews = fact.display.length
+        const childViews = fact.display
+          .filter((d) => d.scope.sessionId !== run.session_id)
+          .map((d) => d.scope.sessionId);
+        const displayViews = childViews.length
           ? await sql<{
               session_id: string;
               turn_id: string;
@@ -160,9 +169,10 @@ export class PostgresDurableCommitProjector {
               output_display_seq: string;
             }>`select session_id,turn_id,id,output_display_seq::text from conversation_turns
           where tenant_id=${fact.scope.tenantId}::uuid and id=${fact.scope.runId}::uuid
-            and session_id=any(${fact.display.map((d) => d.scope.sessionId)}::uuid[])`.execute(tx)
+            and session_id=any(${childViews}::uuid[])`.execute(tx)
           : { rows: [] };
-        const displays = new Map(displayViews.rows.map((r) => [r.session_id, r]));
+        // The locked root Run already supplies this exact identity and coverage.
+        const displays = new Map([run, ...displayViews.rows].map((r) => [r.session_id, r]));
         for (const display of fact.display) {
           const target = displays.get(display.scope.sessionId);
           if (
@@ -176,7 +186,15 @@ export class PostgresDurableCommitProjector {
         }
         const batch = fact.commit as unknown as StoredDurableBatch;
         const nativeConfirmations: ReturnType<typeof collectInputConfirmations> = [];
-        const appended = await view.applyIn(
+        const capture = mayCaptureNativePresentation(batch.writes);
+        const covered = fact.display.filter((d) => d.coveredThrough !== undefined);
+        const finalNativeWrite =
+          run.output_first_offset !== null &&
+          !covered.length &&
+          !capture &&
+          !fact.modelEvidence?.length &&
+          !fact.inputQueueSessions?.length;
+        const { appended, sharedEntries, finished } = await view.applyLockedIn(
           tx,
           batch,
           fact.origins,
@@ -186,6 +204,7 @@ export class PostgresDurableCommitProjector {
             ? (rows, previous) =>
                 nativeConfirmations.push(...collectInputConfirmations(view.scope, rows, previous))
             : undefined,
+          finalNativeWrite ? (ready) => projectionOffsetWrite(position, ready) : undefined,
         );
         admitted = true;
         if (appended && fact.modelEvidence?.length) {
@@ -211,23 +230,20 @@ export class PostgresDurableCommitProjector {
             inputConfirmations.push({ ...confirmation, sessionId });
           }
         }
-        if (appended && mayCaptureNativePresentation(batch.writes))
+        if (appended && capture)
           await captureNativePresentation(
             tx,
             { tenantId: fact.scope.tenantId, sessionId: fact.scope.piSessionId },
             fact.commit.seq,
+            undefined,
+            {
+              sessionId: run.session_id,
+              turnId: run.turn_id,
+              mailboxPosition: run.mailbox_position,
+              pruned: run.pruned_at !== null,
+              sharedEntries,
+            },
           );
-        if (run.output_first_offset === null)
-          await tx
-            .updateTable("runs")
-            .set({
-              output_first_topic: position.topic,
-              output_first_partition: position.partition,
-              output_first_offset: position.offset.toString(),
-            })
-            .where("tenant_id", "=", fact.scope.tenantId)
-            .where("id", "=", fact.scope.runId)
-            .execute();
         for (const display of fact.display) {
           const previous = Number(displays.get(display.scope.sessionId)!.output_display_seq);
           // Historical live documents may have been superseded by a newer PG
@@ -250,25 +266,34 @@ export class PostgresDurableCommitProjector {
           if (display.coveredThrough !== undefined)
             covers.push({ sessionId: display.scope.sessionId, through: display.coveredThrough });
         }
-        const covered = fact.display.filter((d) => d.coveredThrough !== undefined);
-        if (covered.length) {
-          const coverage = sql`(values ${sql.join(covered.map((d) => sql`(${d.scope.sessionId}::uuid,${d.scope.turnId}::uuid,${d.coveredThrough!}::bigint)`))})`;
-          await sql`with coverage(session_id,turn_id,through) as ${coverage}, root as (
-          update runs r set
-          output_display_seq=greatest(r.output_display_seq,c.through),
-          output_display_native_seq=greatest(r.output_display_native_seq,${fact.commit.seq})
-          from coverage c where r.session_id=c.session_id and r.turn_id=c.turn_id
-            and r.id=${fact.scope.runId}::uuid and r.tenant_id=${fact.scope.tenantId}::uuid
-            and (r.output_display_seq<c.through or r.output_display_native_seq<${fact.commit.seq}) returning r.id)
-          update subagent_conversations v set output_display_seq=greatest(v.output_display_seq,c.through),
-            output_display_native_seq=greatest(v.output_display_native_seq,${fact.commit.seq})
-          from coverage c where v.child_session_id=c.session_id and v.child_turn_id=c.turn_id
-            and v.root_run_id=${fact.scope.runId}::uuid and v.tenant_id=${fact.scope.tenantId}::uuid
-            and (v.output_display_seq<c.through or v.output_display_native_seq<${fact.commit.seq})`.execute(
+        const root = covered.find((d) => d.scope.sessionId === run.session_id);
+        const children = covered.filter((d) => d.scope.sessionId !== run.session_id);
+        const changes = [];
+        if (run.output_first_offset === null || root) {
+          const columns = [];
+          if (run.output_first_offset === null)
+            columns.push(sql`output_first_topic=${position.topic},
+            output_first_partition=${position.partition},output_first_offset=${position.offset.toString()}::bigint`);
+          if (root)
+            columns.push(sql`output_display_seq=greatest(output_display_seq,${root.coveredThrough}::bigint),
+            output_display_native_seq=greatest(output_display_native_seq,${fact.commit.seq}::bigint)`);
+          changes.push(sql`root as (update runs set ${sql.join(columns)} where tenant_id=${fact.scope.tenantId}::uuid
+            and id=${fact.scope.runId}::uuid
+            ${run.output_first_offset !== null && root ? sql`and (output_display_seq<${root.coveredThrough}::bigint or output_display_native_seq<${fact.commit.seq}::bigint)` : sql``})`);
+        }
+        if (children.length) {
+          changes.push(sql`children as (update subagent_conversations child set
+            output_display_seq=greatest(child.output_display_seq,c.through),
+            output_display_native_seq=greatest(child.output_display_native_seq,${fact.commit.seq}::bigint)
+            from (values ${sql.join(children.map((d) => sql`(${d.scope.sessionId}::uuid,${d.scope.turnId}::uuid,${d.coveredThrough}::bigint)`))}) c(session_id,turn_id,through)
+            where child.tenant_id=${fact.scope.tenantId}::uuid and child.root_run_id=${fact.scope.runId}::uuid
+            and child.child_session_id=c.session_id and child.child_turn_id=c.turn_id and
+            (child.output_display_seq<c.through or child.output_display_native_seq<${fact.commit.seq}::bigint))`);
+        }
+        if (!finished)
+          await sql`${changes.length ? sql`with ${sql.join(changes)}` : sql``} ${projectionOffsetWrite(position)}`.execute(
             tx,
           );
-        }
-        await recordFactProjection(tx, position);
         if (!current()) throw new Error("Native projection owner changed before commit");
         return { view, state };
       },
@@ -337,11 +362,12 @@ export class PostgresDurableCommitProjector {
     tx: Transaction<Database>,
     scope: AcceptedDurableCommitFact["scope"],
     current: () => boolean,
+    expectedHead?: number,
   ): Promise<() => void> {
     if (!current()) throw new Error("Native checkpoint owner changed before state loading");
     const view = this.#view(scope),
       state = view.liveState.fork();
-    await view.checkpointLiveIn(tx, state);
+    await view.checkpointLiveIn(tx, state, expectedHead);
     if (!current()) throw new Error("Native checkpoint owner changed before commit");
     return this.#viewCleanup(this.#key(scope), view, current);
   }

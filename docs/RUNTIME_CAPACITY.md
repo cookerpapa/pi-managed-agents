@@ -60,6 +60,8 @@ PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode capacity --output /private/capacity-upper-points
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
+  --mode projection-tail --output /private/projection-tail
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode soak --count 240 --rate 1 --output /private/capacity-soak
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/run-runtime-load.mjs \
   --mode faults --output /private/capacity-faults
@@ -71,6 +73,14 @@ small real Guest workload, larger input, native children, SSE viewers/history,
 retained image results, arrival-rate bursts, provider-context expiry and native
 compaction. Fault mode includes synthetic provider failures, Worker handoff,
 Projector interruption, Stop and uncertain external results.
+
+The projection-tail profile measures serial latency, two 64-in-flight bursts,
+400 arrivals scheduled at 20 per second, 128 in-flight clients with a five-second
+model delay, and 32-in-flight multi-step work with three MCP calls per Run.
+It counts which scheduled arrivals actually launched. After each timed stage it
+joins each completed Run with its own root terminal timestamp. Reports distinguish
+Worker terminal creation, the PG settlement timestamp inside the transaction, and
+client receipt of the terminal SSE event. The SSE sample count is explicit.
 `provider-faults` reruns only the two provider failure cases. With the pinned
 Codex adapter/proxy, the synthetic 429 becomes a terminal usage-limit message,
 and a lost upstream WebSocket is not automatically replayed. These checks require

@@ -21,7 +21,12 @@ import {
   runtimeInventory,
   hostResources,
 } from "./lib/runtime-load-metrics.mjs";
-import { runLoad, summarizeLoad, distribution } from "./lib/runtime-load-scheduler.mjs";
+import {
+  runLoad,
+  summarizeLoad,
+  distribution,
+  summarizeSingleRequestPhases,
+} from "./lib/runtime-load-scheduler.mjs";
 import {
   settleOwnedAcceptanceRuns,
   purgeOwnedAcceptanceTenant,
@@ -81,6 +86,7 @@ assert(
     "http",
     "matrix",
     "capacity",
+    "projection-tail",
     "soak",
     "faults",
     "provider-faults",
@@ -522,6 +528,34 @@ async function executeWork(
   }
 }
 
+function projectionTailProfiles(tools) {
+  const text = { kind: "text", firstByteMs: 0, outputBytes: 4096 };
+  return [
+    { ...text, name: "serial", concurrency: 1, count: 24 },
+    { ...text, name: "warm", concurrency: 16, count: 32 },
+    ...[1, 2].map((n) => ({ ...text, name: "burst64-" + n, concurrency: 64, count: 192 })),
+    { ...text, name: "arrivals-20", arrivalRate: 20, concurrency: 64, count: 400 },
+    {
+      ...text,
+      name: "waiting-128",
+      concurrency: 128,
+      count: 128,
+      firstByteMs: 5000,
+      outputBytes: 1024,
+    },
+    {
+      name: "three-tools",
+      kind: "mcp",
+      toolName: tools.echo,
+      rounds: 3,
+      concurrency: 32,
+      count: 64,
+      firstByteMs: 0,
+      outputBytes: 1024,
+    },
+  ];
+}
+
 async function stage(profile) {
   assert(
     Number.isSafeInteger(profile.count) && profile.count >= 1 && profile.count <= 2000,
@@ -548,6 +582,10 @@ async function stage(profile) {
     queue.push(
       await newSession(profile.name + " " + i, profile.kind === "children" ? "ultra" : "low"),
     );
+  const initialCalls =
+    mode === "projection-tail" && profile.kind === "mcp"
+      ? (await fixture.mcpState()).calls.length
+      : undefined;
   const startProvider = await fixture.metrics(true),
     metrics = new RuntimeLoadMetrics({ database, tenantId: tenant.tenantId, fixture });
   await metrics.start();
@@ -618,6 +656,38 @@ async function stage(profile) {
     samples,
     metrics: metrics.samples,
   };
+  if (mode === "projection-tail") {
+    // Read only after the timed work. Worker creates this event before Kafka
+    // publication; runs.settled_at is set inside the final PG transaction.
+    const results = load.results.filter((r) => r.success && r.runId);
+    const { rows } = await sql`select e.run_id,e.occurred_at from session_terminal_events e
+      join runs r on (r.tenant_id,r.id,r.session_id,r.turn_id)=(e.tenant_id,e.run_id,e.session_id,e.turn_id)
+      where r.tenant_id=${tenant.tenantId}::uuid and r.id=any(${results.map((r) => r.runId)}::uuid[])
+      and e.type='turn.completed'`.execute(database);
+    const created = new Map(rows.map((r) => [r.run_id, r.occurred_at.getTime()]));
+    assert.equal(created.size, results.length, "Incomplete root terminal evidence");
+    value.tail = {
+      ...summarizeSingleRequestPhases(results, samples),
+      terminalCreationToSettlementMs: distribution(
+        results.map((r) => r.settledAt - created.get(r.runId)),
+      ),
+      submitToVisibleTerminalMs: distribution(
+        results
+          .filter((r) => Number.isFinite(r.visibleTerminalAt))
+          .map((r) => r.visibleTerminalAt - r.submittedAt),
+      ),
+    };
+    if (initialCalls !== undefined) {
+      const calls = (await fixture.mcpState()).calls.length - initialCalls;
+      value.tail.physicalToolCalls = calls;
+      assert.equal(calls, results.length * profile.rounds, "Multi-step result scope changed");
+      assert.equal(
+        samples.length,
+        results.length * (profile.rounds + 1),
+        "Multi-step model request count changed",
+      );
+    }
+  }
   value.historyReadsMs = distribution(load.results.map((r) => r.historyMs));
   value.historyPages = {
     count: load.results.reduce((n, r) => n + (r.historyPages ?? 0), 0),
@@ -1295,24 +1365,26 @@ try {
                       rounds: 3,
                     },
                   ]
-                : [
-                    {
-                      name: "once-rate-limit",
-                      kind: "text",
-                      concurrency: 4,
-                      count: 8,
-                      firstByteMs: 100,
-                      fault: "rate_limit_once",
-                    },
-                    {
-                      name: "once-disconnect",
-                      kind: "text",
-                      concurrency: 4,
-                      count: 8,
-                      firstByteMs: 100,
-                      fault: "disconnect_once",
-                    },
-                  ];
+                : mode === "projection-tail"
+                  ? projectionTailProfiles(tools)
+                  : [
+                      {
+                        name: "once-rate-limit",
+                        kind: "text",
+                        concurrency: 4,
+                        count: 8,
+                        firstByteMs: 100,
+                        fault: "rate_limit_once",
+                      },
+                      {
+                        name: "once-disconnect",
+                        kind: "text",
+                        concurrency: 4,
+                        count: 8,
+                        firstByteMs: 100,
+                        fault: "disconnect_once",
+                      },
+                    ];
     for (const profile of profiles) {
       if (stop.signal.aborted) break;
       await stage(profile);

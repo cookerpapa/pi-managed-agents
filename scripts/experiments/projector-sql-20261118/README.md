@@ -64,3 +64,33 @@ Do not discard the receipt while restoration or owned cleanup is uncertain.
 The [research report](../../../docs/reports/projector-sql-diagnosis-20261118.md)
 retains failed setup samples separately from valid measurements. No paid model
 requests are used by this experiment.
+
+## Ordered projection comparison
+
+The `projection-tail` workload in `scripts/run-runtime-load.mjs` produces the
+unmodified control. From the source candidate checkout, the commands below run
+the equivalent full workload. Set `PI_CLOUD_RUNTIME_DIRECTORY` to the development
+runtime directory when using a separate worktree. Each command owns its private
+output directory and must complete its restoration before starting another.
+
+```sh
+PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1 \
+  node --import tsx scripts/run-projector-sql-diagnostic.mjs /private/grouped-one 12 projection-candidate clean tail-load
+PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1 PI_CLOUD_DIAGNOSTIC_PROJECTORS=2 \
+  node --import tsx scripts/run-projector-sql-diagnostic.mjs /private/grouped-two 6 projection-candidate clean tail-load
+```
+
+Omit `projection-candidate` for the stock source. `clean` omits SQL spans and
+CPU instrumentation. `generic-plans` is a comparison limited to the candidate's
+dedicated projection pool. `fault-load` runs the maintained recovery workload
+under a single clean owner. A counted candidate run uses `projection-candidate`
+with the ordinary twelve-connection diagnostic. `summarize-tail.py` reads the
+named November 18 private evidence directories and exports only aggregate
+measurements, source digests and restoration results.
+
+For the later WSL cases a separate observer timed four SHA-256 hashes of the
+same 1 MiB buffer on the host every two seconds. The Windows observer sampled
+`Win32_PerfFormattedData_Counters_ProcessorInformation` for `_Total` at roughly
+the same interval. The report joins those observations by each timed stage's
+wall-clock bounds, retains sample counts, and leaves earlier cases unsampled.
+Neither observer changes system power or performance settings.

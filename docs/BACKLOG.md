@@ -24,7 +24,9 @@ new sustained-capacity guarantee.
   Session facts and a complete admitted context to reduce repeated PG reads and
   batch materialization inside one native commit. Review the atomic database
   protection before removing current checks/locks; preserve native state/Fork,
-  recovery and effect boundaries. Implementation is not started.
+  recovery and effect boundaries. [The source and controlled load results](reports/ordered-projection-tail-20261118.md)
+  cover this step. Keep this issue open for sustainable throughput and client
+  tail latency under a defined workload. Publication remains on hold.
 
 ## Projector consumption and memory — delivered
 
