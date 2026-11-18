@@ -2702,7 +2702,606 @@
     "failures": []
   },
   "readerFix": {
-    "status": "source verified; publication pending",
-    "fileSha256": "7913647852c9141ad93b536f708f752b1a6d1be994dc5f5257da3fd6ec837a35"
-  }
+    "status": "deployed and accepted",
+    "fileSha256": "7913647852c9141ad93b536f708f752b1a6d1be994dc5f5257da3fd6ec837a35",
+    "version": "projector-idle-eof-20261118-r1",
+    "revision": "cd1624b498bfcc9219ebc8ac5b67c446641ec2fa",
+    "fixCommit": "2adcfc11"
+  },
+  "publication": {
+    "version": "projector-idle-eof-20261118-r1",
+    "revision": "cd1624b498bfcc9219ebc8ac5b67c446641ec2fa",
+    "maintenance": {
+      "storage": false,
+      "native": false,
+      "reasons": [],
+      "physical": false,
+      "schemaChanged": false
+    },
+    "built": ["control-plane", "supervisor-host"],
+    "reused": [
+      "workspace-volume-gateway",
+      "web-ui",
+      "provider-egress-relay",
+      "ssh-gateway",
+      "cli-proxy-api",
+      "cube-api-authorizer",
+      "cube-egress-gateway",
+      "cube-api",
+      "cube-master",
+      "cube-templatecenter",
+      "cubelet",
+      "cubesandbox-tool"
+    ]
+  },
+  "cleanColdAcceptance": {
+    "accepted": true,
+    "cleanupConfirmed": true,
+    "realProviderRequests": false,
+    "measurements": [
+      {
+        "name": "published-eof-cold-64",
+        "summary": {
+          "mode": "closed",
+          "concurrency": 64,
+          "offered": 192,
+          "accepted": 192,
+          "completed": 192,
+          "failed": 0,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 12749.191452,
+          "successfulRunsPerSecond": 15.059778553241543,
+          "maximumInFlight": 64,
+          "acknowledgementMs": {
+            "count": 192,
+            "p50": 24,
+            "p95": 75,
+            "p99": 1880,
+            "max": 1882
+          },
+          "queueMs": {
+            "count": 192,
+            "p50": 38,
+            "p95": 138,
+            "p99": 258,
+            "max": 277
+          },
+          "firstDurableTextMs": {
+            "count": 192,
+            "p50": 2981,
+            "p95": 6369,
+            "p99": 7080,
+            "max": 7987
+          },
+          "settlementMs": {
+            "count": 192,
+            "p50": 3152,
+            "p95": 6726,
+            "p99": 7516,
+            "max": 8127
+          },
+          "generatorDelayMs": {
+            "count": 192,
+            "p50": 0.00034100000630132854,
+            "p95": 0.0017329999973298982,
+            "p99": 0.007022999998298474,
+            "max": 0.021710999993956648
+          },
+          "sseReconnects": 0
+        }
+      }
+    ]
+  },
+  "faultAcceptance": {
+    "accepted": true,
+    "cleanupConfirmed": true,
+    "realProviderRequests": false,
+    "measurements": [
+      {
+        "name": "once-rate-limit",
+        "summary": {
+          "mode": "closed",
+          "concurrency": 4,
+          "offered": 8,
+          "accepted": 8,
+          "completed": 0,
+          "failed": 8,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 2629.718216999994,
+          "successfulRunsPerSecond": 0,
+          "maximumInFlight": 4,
+          "acknowledgementMs": {
+            "count": 8,
+            "p50": 51,
+            "p95": 65,
+            "p99": 65,
+            "max": 65
+          },
+          "queueMs": {
+            "count": 8,
+            "p50": 70,
+            "p95": 142,
+            "p99": 142,
+            "max": 142
+          },
+          "firstDurableTextMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "settlementMs": {
+            "count": 8,
+            "p50": 922,
+            "p95": 1159,
+            "p99": 1159,
+            "max": 1159
+          },
+          "generatorDelayMs": {
+            "count": 8,
+            "p50": 0.001803999999538064,
+            "p95": 0.045535999997809995,
+            "p99": 0.045535999997809995,
+            "max": 0.045535999997809995
+          },
+          "sseReconnects": 0
+        },
+        "evidence": {
+          "terminalFailure": 8,
+          "subsequentUserRequestsCompleted": 8,
+          "automaticReplayClaimed": false
+        }
+      },
+      {
+        "name": "once-disconnect",
+        "summary": {
+          "mode": "closed",
+          "concurrency": 4,
+          "offered": 8,
+          "accepted": 8,
+          "completed": 0,
+          "failed": 8,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 1981.2721359999996,
+          "successfulRunsPerSecond": 0,
+          "maximumInFlight": 4,
+          "acknowledgementMs": {
+            "count": 8,
+            "p50": 44,
+            "p95": 198,
+            "p99": 198,
+            "max": 198
+          },
+          "queueMs": {
+            "count": 8,
+            "p50": 60,
+            "p95": 175,
+            "p99": 175,
+            "max": 175
+          },
+          "firstDurableTextMs": {
+            "count": 8,
+            "p50": 718,
+            "p95": 823,
+            "p99": 823,
+            "max": 823
+          },
+          "settlementMs": {
+            "count": 8,
+            "p50": 762,
+            "p95": 933,
+            "p99": 933,
+            "max": 933
+          },
+          "generatorDelayMs": {
+            "count": 8,
+            "p50": 0.00026000000070780516,
+            "p95": 0.0015229999989969656,
+            "p99": 0.0015229999989969656,
+            "max": 0.0015229999989969656
+          },
+          "sseReconnects": 0
+        },
+        "evidence": {
+          "terminalFailure": 8,
+          "subsequentUserRequestsCompleted": 8,
+          "automaticReplayClaimed": false
+        }
+      },
+      {
+        "name": "worker-handoff",
+        "summary": {
+          "mode": "fault",
+          "concurrency": 4,
+          "offered": 4,
+          "accepted": 4,
+          "completed": 4,
+          "failed": 0,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 22589.736151000005,
+          "successfulRunsPerSecond": 0.17707156795733214,
+          "maximumInFlight": 4,
+          "acknowledgementMs": {
+            "count": 4,
+            "p50": 49,
+            "p95": 69,
+            "p99": 69,
+            "max": 69
+          },
+          "queueMs": {
+            "count": 4,
+            "p50": 56,
+            "p95": 106,
+            "p99": 106,
+            "max": 106
+          },
+          "firstDurableTextMs": {
+            "count": 4,
+            "p50": 813,
+            "p95": 829,
+            "p99": 829,
+            "max": 829
+          },
+          "settlementMs": {
+            "count": 4,
+            "p50": 17626,
+            "p95": 21696,
+            "p99": 21696,
+            "max": 21696
+          },
+          "generatorDelayMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "sseReconnects": 0
+        },
+        "evidence": {
+          "sameRun": true,
+          "writerChanged": true,
+          "physicalCalls": 4
+        }
+      },
+      {
+        "name": "projector-restart",
+        "summary": {
+          "mode": "fault",
+          "concurrency": 4,
+          "offered": 4,
+          "accepted": 4,
+          "completed": 4,
+          "failed": 0,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 44250.45871900002,
+          "successfulRunsPerSecond": 0.09039454314814825,
+          "maximumInFlight": 4,
+          "acknowledgementMs": {
+            "count": 4,
+            "p50": 45,
+            "p95": 110,
+            "p99": 110,
+            "max": 110
+          },
+          "queueMs": {
+            "count": 4,
+            "p50": 79,
+            "p95": 159,
+            "p99": 159,
+            "max": 159
+          },
+          "firstDurableTextMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "settlementMs": {
+            "count": 4,
+            "p50": 40162,
+            "p95": 40228,
+            "p99": 40228,
+            "max": 40228
+          },
+          "generatorDelayMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "sseReconnects": 131
+        },
+        "evidence": {
+          "writersPreserved": true,
+          "sseReconnects": 131,
+          "idlePartitionsReady": 32,
+          "idleSnapshotMaximumMs": 349
+        }
+      },
+      {
+        "name": "stop-under-load",
+        "summary": {
+          "mode": "fault",
+          "concurrency": 4,
+          "offered": 4,
+          "accepted": 4,
+          "completed": 2,
+          "failed": 2,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 4023.752803999989,
+          "successfulRunsPerSecond": 0.4970484265364939,
+          "maximumInFlight": 4,
+          "acknowledgementMs": {
+            "count": 4,
+            "p50": 93,
+            "p95": 114,
+            "p99": 114,
+            "max": 114
+          },
+          "queueMs": {
+            "count": 4,
+            "p50": 111,
+            "p95": 164,
+            "p99": 164,
+            "max": 164
+          },
+          "firstDurableTextMs": {
+            "count": 4,
+            "p50": 1059,
+            "p95": 1389,
+            "p99": 1389,
+            "max": 1389
+          },
+          "settlementMs": {
+            "count": 4,
+            "p50": 2284,
+            "p95": 3048,
+            "p99": 3048,
+            "max": 3048
+          },
+          "generatorDelayMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "sseReconnects": 0
+        },
+        "evidence": {
+          "cancelled": 2,
+          "lateReplyIgnored": true
+        }
+      },
+      {
+        "name": "lost-tool-reply",
+        "summary": {
+          "mode": "fault",
+          "concurrency": 4,
+          "offered": 4,
+          "accepted": 4,
+          "completed": 4,
+          "failed": 0,
+          "historyFailures": 0,
+          "dropped": 0,
+          "elapsedMs": 2522.8873809999786,
+          "successfulRunsPerSecond": 1.5854849606543076,
+          "maximumInFlight": 4,
+          "acknowledgementMs": {
+            "count": 4,
+            "p50": 38,
+            "p95": 45,
+            "p99": 45,
+            "max": 45
+          },
+          "queueMs": {
+            "count": 4,
+            "p50": 54,
+            "p95": 72,
+            "p99": 72,
+            "max": 72
+          },
+          "firstDurableTextMs": {
+            "count": 4,
+            "p50": 547,
+            "p95": 856,
+            "p99": 856,
+            "max": 856
+          },
+          "settlementMs": {
+            "count": 4,
+            "p50": 1023,
+            "p95": 1651,
+            "p99": 1651,
+            "max": 1651
+          },
+          "generatorDelayMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "sseReconnects": 0
+        },
+        "evidence": {
+          "physicalWrites": 4
+        }
+      }
+    ]
+  },
+  "nativeAcceptance": {
+    "model": "gpt-6-luna",
+    "accepted": true,
+    "cleanupConfirmed": true,
+    "cases": [
+      {
+        "scenario": "consume",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "stop",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "recover",
+        "oneRun": true,
+        "stableRetryIdentity": true,
+        "editedNativeInput": true,
+        "noRetainedEditBodies": true
+      },
+      {
+        "scenario": "stream_stop",
+        "observedCharacters": 140,
+        "observedPrefixSha256": "a3340158d6e6240bac2cfc83d9aecb7b5527ae5244b76f3ea78c6934e3319e73",
+        "noPgStreamingBodies": true,
+        "preservedNativePartial": true,
+        "oneRun": true
+      },
+      {
+        "scenario": "stream_both_crash",
+        "observedCharacters": 151,
+        "observedPrefixSha256": "0d4a0b02dd56ceec13cf15af96584dae99c9da148d4b814fd574c14c4bf6fb38",
+        "noPgStreamingBodies": true,
+        "preservedNativePartial": true,
+        "oneRun": true
+      }
+    ]
+  },
+  "cpuCalibration": {
+    "cpuOnly": true,
+    "poolSize": 12,
+    "accepted": true,
+    "cleanupConfirmed": true,
+    "restored": true,
+    "sourceHashes": {
+      "session-projector.ts": "a6d5131ec827e2daa5eb63b0060cd2c7174f659c6bc53efdc8881b2ff59c5992",
+      "session-runtime-main.ts": "3deb4b1aa567b4341e93cdc482aca9dcca543990e768cb3728e24a6b67681a03",
+      "probe.mjs": "1e6a2e6a7912d761a927b11b6496099630d678c7b77a3e9dc011544339475d54",
+      "entry.mjs": "f74ea7231bfc869e8a09b9d43385e7440e904f13007126163b7242847f466857",
+      "cpu.mjs": "7e1482f70b487bb94fbe95d994ffdbfda42909596b68833061902ef140a337ae"
+    },
+    "summary": {
+      "mode": "closed",
+      "concurrency": 64,
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "historyFailures": 0,
+      "dropped": 0,
+      "elapsedMs": 34104.210846,
+      "successfulRunsPerSecond": 5.629803336221141,
+      "maximumInFlight": 64,
+      "acknowledgementMs": {
+        "count": 192,
+        "p50": 59,
+        "p95": 606,
+        "p99": 1762,
+        "max": 1773
+      },
+      "queueMs": {
+        "count": 192,
+        "p50": 100,
+        "p95": 3327,
+        "p99": 3733,
+        "max": 3833
+      },
+      "firstDurableTextMs": {
+        "count": 192,
+        "p50": 7964,
+        "p95": 16590,
+        "p99": 23121,
+        "max": 25052
+      },
+      "settlementMs": {
+        "count": 192,
+        "p50": 8644,
+        "p95": 17452,
+        "p99": 25532,
+        "max": 26192
+      },
+      "generatorDelayMs": {
+        "count": 192,
+        "p50": 0.0011430000013206154,
+        "p95": 0.0030260000057751313,
+        "p99": 0.019906999994418584,
+        "max": 0.04712899999867659
+      },
+      "sseReconnects": 0
+    },
+    "samples": {
+      "total": {
+        "sampledMs": 34104.362,
+        "fraction": 1.0
+      },
+      "idle": {
+        "sampledMs": 2711.748,
+        "fraction": 0.07951323059496025
+      },
+      "pgSocketWrite": {
+        "sampledMs": 8873.541,
+        "fraction": 0.2601878610132041
+      },
+      "pgQueryPath": {
+        "sampledMs": 11027.041,
+        "fraction": 0.32333227638153733
+      }
+    },
+    "firstSetup": {
+      "loadStarted": false,
+      "restored": true,
+      "outcome": "Readiness timeout; no workload. Revised probe activates only after normal service readiness, never as a module startup dependency."
+    }
+  },
+  "preservationFinal": {
+    "preserved": true,
+    "originalFiles": 393,
+    "originalMachines": 2,
+    "failures": []
+  },
+  "settledFinal": {
+    "at": "2026-11-18T00:50:16.923Z",
+    "state": {
+      "active_runs": 0,
+      "active_leases": 0
+    },
+    "instances": [
+      {
+        "entries": {
+          "identity": 0,
+          "identity_loads": 0,
+          "native_views": 0,
+          "native_live": 0,
+          "display_tail": 0,
+          "empty_display": 0,
+          "event_ids": 0,
+          "prefetch": 0
+        }
+      }
+    ]
+  },
+  "health": {
+    "at": "2026-11-18T00:50:42.692Z",
+    "running": 37,
+    "ready": 37,
+    "completed": 1
+  },
+  "finalizedAt": "2026-11-18T00:50:43.072306+00:00"
 }

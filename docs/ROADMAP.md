@@ -1,13 +1,15 @@
 # Implementation roadmap
 
-## Projection cost investigation — measured; startup repair pending publication
+## Projection cost investigation and startup repair — delivered
 
 The [SQL investigation](reports/projector-sql-diagnosis-20261118.md) identifies
 approximately 155–159 pg calls per short Run, acquisition waiting and substantial
 client protocol work. Increasing the pool removes its queue without increasing
 observed throughput. A future reduction should stay inside a native commit's
-existing authority/transaction boundary. An idle-EOF assignment race was also
-reproduced and corrected; matched publication and final acceptance remain.
+existing authority/transaction boundary. The reproduced idle-EOF assignment race
+is corrected and deployed, with all-partition idle snapshot and native recovery
+acceptance. The clean post-release burst reached 15.06 Runs/s; profiling effects
+and the sustained capacity limit remain explicitly separate from that result.
 
 ## Projector consumption and memory — delivered
 

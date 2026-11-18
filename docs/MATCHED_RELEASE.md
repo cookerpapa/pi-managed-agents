@@ -5,11 +5,16 @@ serving roles and physical maintenance separately under
 [ADR-0320](adr/0320-release-plans-and-artifact-reuse.md). Preparation does not change
 the serving catalog. All builds and native/live checks on the WSL host run serially.
 
-The current verified record is `prefetch-cache-20261118-r1`, schema 226, catalog v2, Session
+The current verified record is `projector-idle-eof-20261118-r1`, schema 226, catalog v2, Session
 topic v22, reply topic v4, resource capsule 4, provider contract 1, Guest executor
 1, fixed Tool payload 7, Android executor 2 and public terminal 2. Core, Tool-host
 and Web artifacts retain their own source revisions. The
-[latest delivery](reports/projector-prefetch-memory-delivery-20261118.md) records
+[latest investigation and delivery](reports/projector-sql-diagnosis-20261118.md)
+records the idle-EOF correction, all-partition snapshot/recovery acceptance and
+SQL/client cost measurements. Two images were built and twelve reused; production
+pool settings and native compute/storage were preserved. SQL restructuring remains
+a proposed next slice. The
+[preceding delivery](reports/projector-prefetch-memory-delivery-20261118.md) records
 bounded Projector prefetch, coalesced progress confirmation, coherent identity
 caches and safe live-state cleanup. Three artifacts were built and eleven reused;
 native compute/storage were preserved. Serial live recovery and load checks retain

@@ -26,7 +26,7 @@ restarting platform services; users select them on the resource page. Existing
 Android devices can be registered for an organization and bound to idle Sessions.
 There is no automatic provider fallback or emulator-provisioning UI. See the
 [backend contract](docs/RESOURCE_BACKENDS.md) and
-[current delivery evidence](docs/reports/projector-prefetch-memory-delivery-20261118.md).
+[current delivery evidence](docs/reports/projector-sql-diagnosis-20261118.md).
 
 > **Open to opportunities:** The maintainer is looking for engineering roles in
 > Agent Runtime, Harness or Managed Agents infrastructure, based in **Guangzhou,
@@ -286,6 +286,10 @@ The [Projector consumption and memory delivery](docs/reports/projector-prefetch-
 verifies bounded prefetch, coherent identity caches and partial-output recovery.
 Repeated native fetching is repaired; the report separates burst improvements
 from the remaining sustained-throughput limit.
+The [SQL investigation and idle startup repair](docs/reports/projector-sql-diagnosis-20261118.md)
+measures client/server costs, preserves original assets and verifies idle stream
+readiness on every partition after restart. Pool growth alone did not remove the
+remaining cost of many small database operations.
 The [runtime and resource-accounting delivery](docs/reports/runtime-accounting-20261107.md)
 records real quota growth, receipt recovery, an 86-second management outage,
 native crash recovery and image preservation on the maintained single-host setup.

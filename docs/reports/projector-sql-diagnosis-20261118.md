@@ -8,8 +8,8 @@ the query call-to-callback interval. Main-thread samples show substantial databa
 protocol send/receive work, while PG has real but more limited server-side costs.
 
 This investigation also found an idle-partition EOF race that can prevent a new
-web stream from obtaining its initial snapshot. Its source correction has passed
-deterministic, RF3 and observed live checks; matched publication is pending.
+web stream from obtaining its initial snapshot. Its correction is deployed as
+`projector-idle-eof-20261118-r1`, application `cd1624b4`, with matched live acceptance.
 SQL batching/restructuring is a proposed next slice, not an implemented change.
 
 [Aggregate evidence](projector-sql-diagnosis-20261118.json) excludes test identities,
@@ -140,6 +140,44 @@ See the [operator instructions](../../scripts/experiments/projector-sql-20261118
 All cases held the release lock, used owned tenants/fixtures and restored their
 configuration. Original accounts, model/provider configuration, credentials, two
 machine intents and 393 sampled Workspace files passed preservation checks.
+
+## Publication and profiling calibration
+
+The matched release built only the control-plane and Worker images and reused
+twelve artifacts. Schema, native compute, Workspace storage, model/provider
+configuration and the production twelve-connection pool were preserved. Cached
+vulnerability evidence passed; no dependency or database upgrade was introduced.
+
+After publication, the clean 64-concurrency / 192-Run case completed every Run at
+15.06 Runs/s, with settlement p95 6.73 seconds and no initial-stream failure.
+That is one short burst, not a new sustained capacity guarantee. All six deployed
+failure scenarios passed. The Projector-restart case now opens an idle Session on
+every partition without submitting a new Run: all thirty-two initial snapshots
+arrived, with a maximum of 349 ms. Worker replacement retained original replies,
+Stop ignored late replies and lost external replies produced UNKNOWN without
+repeating the four physical writes.
+
+Five bounded GPT-6 Luna/Cube cases passed, including native Inbox editing/Stop,
+Worker recovery, interrupted visible text and simultaneous Worker/Projector kill.
+No PG streaming-body history was added. The container-inspection race during the
+intentional kill remained visible; independent exit/recovery assertions passed.
+
+A final calibration removed pg wrappers, per-record async context, SQL timing
+logs and PG activity sampling, retaining only V8 profiling. It completed all
+192 Runs at 5.63 Runs/s. Main-thread samples were about 8% idle, with about 32%
+in the pg query-send path inclusively and 26% in its socket-write subset. Thus
+the stack pattern is not produced solely by the detailed SQL wrappers. The large
+throughput variation between clean and profiled runs also means profiler effects,
+cold state and background work have not been isolated; do not use these profiles
+to claim an exact uninstrumented CPU budget or fixed throughput ceiling.
+
+The first CPU-only setup did not become ready and ran no workload; its template
+was restored. The revised operator activates profiling only after normal service
+readiness and confirms its signal handler before collection. The revised setup
+passed the same-image startup smoke and the full calibration. All observation
+mounts were removed afterward, all 37 running Pods were Ready, original asset
+preservation passed again, and active Runs/leases plus pending live/prefix/prefetch
+state were zero at final verification.
 
 The default event-log suite passed 61 tests; the release-helper suite passed 355.
 The existing RF3 cases passed, and the new EOF-only test passed after correcting

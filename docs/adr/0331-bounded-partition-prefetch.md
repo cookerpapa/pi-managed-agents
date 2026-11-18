@@ -42,6 +42,8 @@ partitions from their verified start even if that poll returned only EOF and no
 data. Dropping such an EOF without replay can leave an idle partition waiting
 forever for a notification that only new data would otherwise retrigger. The
 November 18 SQL investigation adds deterministic and RF3 coverage of this edge.
+The correction is deployed as `projector-idle-eof-20261118-r1`; all thirty-two
+partitions passed idle initial-snapshot acceptance after Projector restart.
 
 ## Offset confirmation
 

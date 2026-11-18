@@ -1,17 +1,28 @@
 # Maintained backlog
 
-## Projection cost diagnosis and idle startup — in progress
+## Projection cost diagnosis and idle startup — delivered
 
 - [x] Decompose Projector time using bounded pg client spans, read-only PG waits,
   V8 samples and session-scoped server duration logging; compare twelve/thirty-two
   connections without weakening durability or changing permanent settings.
 - [x] Reproduce the idle-EOF assignment race with a failing deterministic test;
   verify the correction with RF3 and three observed 192-Run cases.
-- [ ] Publish the idle-startup correction and verify initial snapshots across
+- [x] Publish the idle-startup correction and verify initial snapshots across
   all Session partitions after Projector restart, plus ordinary recovery/load checks.
-- [ ] Record the SQL findings and review a bounded reduction of round trips inside
-  one native commit. Do not enlarge transaction scope or drop recovery checks as
-  an unmeasured shortcut.
+- [x] Record SQL findings and CPU-only calibration, retaining failed setup cases
+  and instrumentation limits. All 32 idle partitions returned initial snapshots;
+  final live/native recovery, preservation and cleanup checks passed.
+
+[Evidence](reports/projector-sql-diagnosis-20261118.md): roughly 155–159 pg calls
+per short Run. Increasing the pool removes acquisition waiting without improving
+observed throughput; substantial client protocol/transaction work remains.
+The idle-EOF fix is deployed as `projector-idle-eof-20261118-r1` (two images built,
+twelve reused). One clean post-release burst reached 15.06 Runs/s; this is not a
+new sustained-capacity guarantee.
+
+- [ ] Review a bounded reduction of round trips inside one native commit before
+  implementing the proposed SQL restructuring. Preserve lock order, native
+  state/Fork semantics and existing commit/recovery/effect boundaries.
 
 ## Projector consumption and memory — delivered
 
