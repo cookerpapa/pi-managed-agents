@@ -2,13 +2,25 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createDatabase, runMigrations, type Database } from "@pi-cloud/database";
+import {
+  assertProjectionHistoryCompatible,
+  createDatabase,
+  runMigrations,
+  type Database,
+} from "@pi-cloud/database";
 import { createStorageConformance } from "@earendil-works/pi-durable/testing";
-import type { Storage, StorageWrite } from "@earendil-works/pi-durable";
+import type {
+  ConversationId,
+  DocumentId,
+  Seq,
+  Storage,
+  StorageWrite,
+} from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { sql, type Kysely } from "kysely";
 import { PublishedDurableStorage } from "../src/durable/published-storage.ts";
 import { DurablePostgresProjection } from "../src/durable/postgres-projection.ts";
+import { readNativeUsageBatch } from "../src/durable/conversation-usage.ts";
 import type { DurableBatch } from "../src/durable/types.ts";
 import { PublicationNotSentError } from "@pi-cloud/protocol";
 import { Harness, createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
@@ -268,6 +280,89 @@ for (const cold of [false, true])
       for (const contract of cases) it(contract.name, contract.run);
     },
   );
+
+it("retains one usage value per live document through replay, retirement and index rebuild", async () => {
+  const f = await fixture(),
+    scope = f.projection.scope;
+  const totals = (input: number) => ({
+    models: { "test/model": { input, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: input } },
+    tools: {},
+  });
+  const create = (
+    id: number,
+    conversationId: number,
+    value: number,
+    key?: string,
+  ): StorageWrite => ({
+    type: "document.create",
+    record: {
+      id: id as DocumentId,
+      kind: "pi.usage",
+      history: "latest",
+      fork: "initial",
+      scope: { kind: "conversation", conversationId: conversationId as ConversationId },
+      ...(key ? { key } : {}),
+    },
+    content: { kind: "base", version: 1, value: totals(value) },
+  });
+  const change = (id: number, value: number): StorageWrite => ({
+    type: "document.change",
+    id: id as DocumentId,
+    content: { kind: "base", version: 1, value: totals(value) },
+  });
+  const apply = (seq: number, writes: StorageWrite[]) =>
+    f.projection.apply({ seq: seq as Seq, nextId: 7, writes });
+  const read = async () =>
+    Array.from((await readNativeUsageBatch(database, scope, [1, 2, 99])).entries())
+      .map(([id, u]) => [id, u.tokens.input])
+      .sort((a, b) => a[0]! - b[0]!);
+  try {
+    expect(await read()).toEqual([]);
+    await apply(1, [
+      { type: "conversation", value: { id: 1 as ConversationId } },
+      { type: "conversation", value: { id: 2 as ConversationId } },
+      create(3, 1, 0),
+      create(4, 2, 0),
+      create(5, 1, 99, "separate"),
+    ]);
+    await apply(2, [change(3, 10), change(4, 20)]);
+    await apply(3, [change(3, 30)]);
+    expect(await apply(3, [change(3, 30)])).toBe(false);
+    await expect(apply(3, [change(3, 31)])).rejects.toThrow("changed bytes");
+    expect(await read()).toEqual([
+      [1, 30],
+      [2, 20],
+    ]);
+    await apply(4, [{ type: "document.retire", id: 3 as DocumentId }, create(6, 1, 7)]);
+    await f.projection.rebuild();
+    expect(await read()).toEqual([
+      [1, 7],
+      [2, 20],
+    ]);
+    expect(
+      (
+        await sql<{ active: number; history: number; revisions: number }>`select
+      (select count(*)::int from pi_durable_current where tenant_id=${f.tenantId}::uuid and session_id=${f.sessionId} and retired_seq is null) as active,
+      (select count(*)::int from pi_durable_writes where tenant_id=${f.tenantId}::uuid and session_id=${f.sessionId} and record_kind like 'document.%') as history,
+      (select count(*)::int from pi_durable_document_revisions where tenant_id=${f.tenantId}::uuid and session_id=${f.sessionId}) as revisions`.execute(
+          database,
+        )
+      ).rows[0],
+    ).toEqual({ active: 3, history: 0, revisions: 0 });
+    await sql`delete from pi_durable_current where tenant_id=${f.tenantId}::uuid and session_id=${f.sessionId} and id=6`.execute(
+      database,
+    );
+    await expect(read()).rejects.toThrow("Native usage checkpoint is missing");
+    await expect(assertProjectionHistoryCompatible(database)).rejects.toThrow(
+      "incomplete pi.usage",
+    );
+    await expect(f.projection.rebuild()).rejects.toThrow(
+      "current-state recovery set is incomplete",
+    );
+  } finally {
+    await f.close();
+  }
+});
 
 it("keeps native live progress out of PG while preserving current reads across flush", async () => {
   const f = await fixture();

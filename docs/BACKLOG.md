@@ -1,5 +1,9 @@
 # Maintained backlog
 
+## Native usage and system context projection
+
+- [x] The [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) candidate retains current Conversation usage and excludes system Entries from the chat index. Native reconstruction, public usage, Forks, deletion, backup recovery and seven fault scenarios passed. The permanent rollout gate remains open given the measured terminal queue under burst load. [Decision](adr/0337-native-usage-and-chat-presentation.md). [Measurements](reports/native-usage-and-chat-history-20261118.md).
+
 ## Kafka-backed live progress
 
 - [x] [#50](https://github.com/cookerpapa/pi-managed-agents/issues/50) verifies zero-SQL ordinary live updates, stable Worker flush, protected recovery and the synchronized 192-Run comparison. [Controlled results](reports/kafka-live-progress-20261118.md). Permanent rollout follows #48. [Decision](adr/0336-kafka-live-progress.md).

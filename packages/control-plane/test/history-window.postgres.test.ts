@@ -1,8 +1,14 @@
+import { ConversationDeletionService } from "../src/conversation-deletion-service.ts";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { sql, type Kysely, type CompiledQuery } from "kysely";
-import { createDatabase, runMigrations, type Database } from "@pi-cloud/database";
+import {
+  assertProjectionHistoryCompatible,
+  createDatabase,
+  runMigrations,
+  type Database,
+} from "@pi-cloud/database";
 import { DurablePostgresProjection } from "@pi-cloud/pi-session-postgres/durable";
 import {
   parseConversationDetailResource,
@@ -13,8 +19,12 @@ import { createPrivateTenant } from "../src/tenant-administration.ts";
 import { ControlPlaneStore } from "../src/control-plane-store.ts";
 import { ConversationTreeService } from "../src/conversation-tree-service.ts";
 import { conversationMarkdown } from "@pi-cloud/runtime-core/conversation-markdown";
-import { captureNativePresentation } from "../../runtime-core/src/frozen-history.ts";
+import {
+  captureNativePresentation,
+  mayCaptureNativePresentation,
+} from "../../runtime-core/src/frozen-history.ts";
 import { settleHistoryTurn } from "../../runtime-core/src/presentation-settlement.ts";
+import { readCanonicalHistoryWindow } from "../../runtime-core/src/canonical-history-window.ts";
 import { readFrozenHistoryWindow } from "../../runtime-core/src/frozen-history-window.ts";
 import { decodeHistoryPosition } from "../../runtime-core/src/history-position.ts";
 
@@ -259,6 +269,163 @@ it("pages inside one long Run in both directions and seeks an Entry without earl
   });
   expect(around.turns[0]?.transcript?.items.at(-1)).toMatchObject({ text: "entry-80" });
 }, 30000);
+
+it("keeps system context out of live and frozen pages, including mixed commits and Forks", async () => {
+  const f = await fixture();
+  const first = await f.append("before");
+  const system = (id: number) => ({
+    type: "entry",
+    value: {
+      id,
+      conversationId: 1,
+      kind: "pi.system",
+      model: [
+        {
+          role: "system",
+          content: "",
+          sections: { instructions: "internal context" },
+          timestamp: id,
+        },
+      ],
+    },
+  });
+  const systems = Array.from({ length: 65 }, (_, i) => system(f.nextId() + i));
+  const mixedSystem = system(f.nextId() + systems.length);
+  const last = mixedSystem.value.id + 1;
+  const usageId = last + 1;
+  f.setId(usageId + 1);
+  const mixed = [
+    mixedSystem,
+    {
+      type: "entry",
+      value: {
+        id: last,
+        conversationId: 1,
+        kind: "pi.assistant",
+        model: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "after" }],
+            stopReason: "stop",
+            timestamp: last,
+          },
+        ],
+      },
+    },
+    {
+      type: "document.create",
+      record: {
+        id: usageId,
+        kind: "pi.usage",
+        scope: { kind: "conversation", conversationId: 1 },
+        history: "latest",
+        fork: "initial",
+      },
+      content: {
+        kind: "base",
+        version: 1,
+        value: {
+          models: { "test/model": { input: 11, output: 8, cacheRead: 0, cacheWrite: 0 } },
+          tools: {},
+        },
+      },
+    },
+  ];
+  expect(mayCaptureNativePresentation(systems as never)).toBe(false);
+  expect(mayCaptureNativePresentation(mixed as never)).toBe(true);
+  await f.apply(systems);
+  await f.apply(mixed);
+  // An active Run exposes native writes only through its existing coverage.
+  await db
+    .updateTable("runs")
+    .set({
+      state: "running",
+      output_display_seq: "2",
+      output_display_native_seq: String(f.sequence()),
+    })
+    .where("id", "=", f.accepted.runId)
+    .execute();
+  async function checkPages(frozen: boolean) {
+    const turns = [
+      {
+        turnId: f.accepted.turnId,
+        originSessionId: f.session.sessionId,
+        piSessionId: f.native.pi_session_id,
+        operationKind: "chat" as const,
+        frozen,
+      },
+    ];
+    for (const direction of ["before", "after"] as const) {
+      const page = await readCanonicalHistoryWindow(db, {
+        tenantId: f.tenant.tenantId,
+        sessionId: f.session.sessionId,
+        turns,
+        direction,
+      });
+      expect(page.more).toBe(false);
+      expect(page.positions.map((p) => [p.sequence, p.ordinal])).toEqual([
+        [0, 0],
+        [2, 0],
+        [4, 1],
+      ]);
+      expect(
+        page.transcripts
+          .get(f.accepted.turnId)
+          ?.items.map((i) => (i.kind === "text" ? i.text : i.kind)),
+      ).toEqual(["before", "after"]);
+    }
+  }
+  await checkPages(false);
+  await f.freeze();
+  await checkPages(true);
+  const {
+    rows: [frames],
+  } = await sql<{ n: number }>`select count(*)::int as n from pi_history_frames f
+    join pi_history_records g on g.tenant_id=f.tenant_id and g.id=f.entry_record_id
+    where g.tenant_id=${f.tenant.tenantId}::uuid and g.session_id=${f.native.pi_session_id} and g.fields->>'nativeKind'='"pi.system"'`.execute(
+    db,
+  );
+  expect(frames?.n).toBe(0);
+  await expect(
+    db.transaction().execute(async (tx) => {
+      await sql`insert into pi_history_frames(tenant_id,block_id,seq,ordinal,record_id,entry_id,entry_record_id,body_id,body_bytes,fields)
+      select f.tenant_id,f.block_id,g.seq,g.ordinal,g.record_id,g.record_id,g.id,f.body_id,f.body_bytes,f.fields
+      from pi_history_frames f join pi_history_records g on g.tenant_id=f.tenant_id
+      where f.tenant_id=${f.tenant.tenantId}::uuid and f.entry_id=${last} and g.session_id=${f.native.pi_session_id}
+        and g.record_kind='entry' and g.record_id=${mixedSystem.value.id}`.execute(tx);
+      await assertProjectionHistoryCompatible(tx);
+    }),
+  ).rejects.toThrow("pi.system chat frames");
+  const fork = await new ConversationTreeService({ database: db }).fork(
+    f.tenant.tenantId,
+    f.session.sessionId,
+    randomUUID(),
+    { turnId: f.accepted.turnId, entryId: String(last) },
+  );
+  expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(19);
+  expect((await f.store.getConversationUsage(fork.session.sessionId)).tokens.total).toBe(0);
+  const branch = new DurablePostgresProjection(db, {
+    tenantId: f.tenant.tenantId,
+    sessionId: fork.session.sessionId,
+  });
+  expect((await branch.get(first))?.kind).toBe("entry");
+  await new ConversationDeletionService({ database: db }).delete(
+    f.tenant.tenantId,
+    f.session.sessionId,
+  );
+  for (const id of [systems[0]!.value.id, mixedSystem.value.id]) {
+    expect((await branch.get(id))?.value).toMatchObject({
+      kind: "pi.system",
+      model: [{ sections: { instructions: "internal context" } }],
+    });
+  }
+  expect(
+    (await f.store.getConversation(fork.session.sessionId)).turns
+      .flatMap((t) => t.transcript?.items ?? [])
+      .filter((i) => i.kind === "text")
+      .map((i) => i.text),
+  ).toEqual(["before", "after"]);
+});
 
 it("applies the byte budget before body fetching and retains every page", async () => {
   const f = await fixture();

@@ -5,6 +5,8 @@ serving roles and physical maintenance separately under
 [ADR-0320](adr/0320-release-plans-and-artifact-reuse.md). Preparation does not change
 the serving catalog. All builds and native/live checks on the WSL host run serially.
 
+The ADR-0337 candidate changes the projection format under migration `228_native_usage_and_chat_history`. Before a permanent matched upgrade, retire development conversations using the obsolete usage journal or frozen system frames via normal Session deletion, including dependent families that retain those frames, and allow shared history collection to complete. The release preflight checks for those data while the existing API is still available. The migration checks again after draining writers. Native commit fingerprints and immutable Fork directory ranges make deleting individual live usage writes or frames from an old retained history invalid. Accounts, model/provider configuration, credentials and resource ownership have separate lifetimes.
+
 The current verified record is `projector-idle-eof-20261118-r1`, schema 226, catalog v2, Session
 topic v22, reply topic v4, resource capsule 4, provider contract 1, Guest executor
 1, fixed Tool payload 7, Android executor 2 and public terminal 2. Core, Tool-host

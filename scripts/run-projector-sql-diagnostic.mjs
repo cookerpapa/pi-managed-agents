@@ -1,4 +1,9 @@
-import { workerProjectionDiagnostic } from "./lib/projector-worker-diagnostic.mjs";
+import {
+  historyPresentationSources,
+  nativeProjectionSources,
+  sessionApiProjectionDiagnostic,
+  workerProjectionDiagnostic,
+} from "./lib/projector-diagnostic-readers.mjs";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { mkdir, readFile, writeFile, open } from "node:fs/promises";
@@ -118,19 +123,14 @@ const sources = [
   "packages/runtime-core/src/session-projector.ts",
   "packages/control-plane/src/session-runtime-main.ts",
 ];
-if (candidateReader) sources.push("packages/event-log/src/kafka-partition-reader.ts");
+if (candidateReader || liveBurst) sources.push("packages/event-log/src/kafka-partition-reader.ts");
 const projectionSources = [
   "packages/runtime-core/src/accepted-fact-recovery.ts",
   "packages/runtime-core/src/execution-stream-projection.ts",
   "packages/runtime-core/src/work-finished-projection.ts",
   "packages/runtime-core/src/postgres-durable-commit-projector.ts",
-  "packages/runtime-core/src/frozen-history.ts",
-  "packages/pi-session-postgres/src/durable/postgres-projection.ts",
-  "packages/pi-session-postgres/src/durable/shared-entry-bodies.ts",
-  "packages/pi-session-postgres/src/durable/live-state.ts",
-  "packages/pi-session-postgres/src/durable/index.ts",
-  "packages/pi-session-postgres/src/durable/current-state.ts",
-  "packages/pi-session-postgres/src/durable/published-storage.ts",
+  ...nativeProjectionSources,
+  ...historyPresentationSources,
   "packages/control-plane/src/operational-metrics-sampler.ts",
 ];
 if (candidateProjection) sources.push(...projectionSources);
@@ -138,6 +138,21 @@ const deployment = JSON.parse(await readFile(runtimeDirectory + "/k3s/deployment
 const baselineRevision = deployment.components["session-runtime"].sourceRevision;
 const worker = candidateProjection
   ? workerProjectionDiagnostic(name, deployment.components["supervisor-host"].sourceRevision)
+  : undefined;
+const api = candidateProjection
+  ? sessionApiProjectionDiagnostic(name, deployment.components["session-api"].sourceRevision)
+  : undefined;
+const sourceRevision = process.env.PI_CLOUD_PROJECTOR_CANDIDATE_REVISION
+  ? execFileSync(
+      "git",
+      [
+        "rev-parse",
+        "--verify",
+        "--end-of-options",
+        process.env.PI_CLOUD_PROJECTOR_CANDIDATE_REVISION + "^{commit}",
+      ],
+      { encoding: "utf8" },
+    ).trim()
   : undefined;
 const data = {};
 for (const path of sources) {
@@ -148,7 +163,11 @@ for (const path of sources) {
     (candidateReader && path.endsWith("kafka-partition-reader.ts")) ||
     (candidateProjection &&
       (projectionSources.includes(path) || path.endsWith("/session-projector.ts")));
-  const source = isCandidate ? await readFile(path, "utf8") : expected;
+  const source = !isCandidate
+    ? expected
+    : sourceRevision
+      ? execFileSync("git", ["show", sourceRevision + ":" + path], { encoding: "utf8" })
+      : await readFile(path, "utf8");
   const actual = kubectl([
     "exec",
     podFor("session-runtime"),
@@ -304,6 +323,8 @@ for (const path of sources)
   });
 const receipt = {
   worker: worker?.receipt,
+  readerPod: api?.name,
+  sourceRevision,
   name,
   target,
   original,
@@ -349,6 +370,50 @@ async function start(file, command, args, env = process.env) {
   const job = { child, ended };
   jobs.push(job);
   return job;
+}
+async function restoreProjector() {
+  if (!changed) return;
+  const state = JSON.parse(kubectl(["get", target, "-o", "json"])).spec;
+  const live = state.template;
+  // The request can fail before application, or succeed despite a lost reply.
+  // In the former case the original template is already serving.
+  const hasOverlay = live.spec.volumes?.some((v) => v.name === name);
+  if (!hasOverlay) {
+    assert.deepEqual(live, original, "Another workload replaced the diagnostic template");
+    if (compareOwners)
+      assert.equal(
+        state.replicas,
+        originalSpec.replicas,
+        "Owner count changed outside the comparison",
+      );
+  } else {
+    const stripped = structuredClone(live);
+    stripped.spec.volumes = stripped.spec.volumes.filter((v) => v.name !== name);
+    stripped.spec.containers.find((c) => c.name === "session-runtime").volumeMounts =
+      stripped.spec.containers
+        .find((c) => c.name === "session-runtime")
+        .volumeMounts.filter((m) => m.name !== name);
+    assert.deepEqual(
+      stripped,
+      original,
+      "Unrelated template change prevents automatic restoration",
+    );
+    kubectl([
+      "patch",
+      target,
+      "--type=json",
+      "-p",
+      JSON.stringify([
+        { op: "test", path: "/spec/template", value: live },
+        ...(compareOwners ? [{ op: "test", path: "/spec/replicas", value: replicas }] : []),
+        { op: "replace", path: "/spec/template", value: original },
+        ...(compareOwners
+          ? [{ op: "replace", path: "/spec/replicas", value: originalSpec.replicas }]
+          : []),
+      ]),
+    ]);
+    await kubectlAsync(["rollout", "status", target, "--timeout=180s"]);
+  }
 }
 try {
   if (serverDuration)
@@ -498,6 +563,7 @@ try {
       }) + "\n",
       { mode: 0o600 },
     );
+  const apiUrl = await api?.start();
   receipt.loads = [];
   for (let repeat = 0; repeat < repetitions; repeat++) {
     const load = await start(
@@ -526,7 +592,11 @@ try {
         "--output",
         resolve(directory, repetitions === 1 ? "load" : `load-${repeat + 1}`),
       ],
-      { ...process.env, PI_CLOUD_RUNTIME_LOAD_CHECK: "1" },
+      {
+        ...process.env,
+        PI_CLOUD_RUNTIME_LOAD_CHECK: "1",
+        ...(apiUrl ? { PI_CLOUD_LOAD_API_URL: apiUrl } : {}),
+      },
     );
     receipt.loadExit = await load.ended;
     receipt.loads.push(receipt.loadExit);
@@ -601,50 +671,20 @@ try {
   for (const job of jobs) if (job.child.exitCode === null) job.child.kill("SIGTERM");
   await Promise.allSettled(jobs.map((j) => j.ended));
   await Promise.allSettled(files.map((file) => file.close()));
-  if (changed) {
-    const state = JSON.parse(kubectl(["get", target, "-o", "json"])).spec;
-    const live = state.template;
-    // The request can fail before application, or succeed despite a lost reply.
-    // In the former case the original template is already serving.
-    const hasOverlay = live.spec.volumes?.some((v) => v.name === name);
-    if (!hasOverlay) {
-      assert.deepEqual(live, original, "Another workload replaced the diagnostic template");
-      if (compareOwners)
-        assert.equal(
-          state.replicas,
-          originalSpec.replicas,
-          "Owner count changed outside the comparison",
-        );
-    } else {
-      const stripped = structuredClone(live);
-      stripped.spec.volumes = stripped.spec.volumes.filter((v) => v.name !== name);
-      stripped.spec.containers.find((c) => c.name === "session-runtime").volumeMounts =
-        stripped.spec.containers
-          .find((c) => c.name === "session-runtime")
-          .volumeMounts.filter((m) => m.name !== name);
-      assert.deepEqual(
-        stripped,
-        original,
-        "Unrelated template change prevents automatic restoration",
-      );
-      kubectl([
-        "patch",
-        target,
-        "--type=json",
-        "-p",
-        JSON.stringify([
-          { op: "test", path: "/spec/template", value: live },
-          ...(compareOwners ? [{ op: "test", path: "/spec/replicas", value: replicas }] : []),
-          { op: "replace", path: "/spec/template", value: original },
-          ...(compareOwners
-            ? [{ op: "replace", path: "/spec/replicas", value: originalSpec.replicas }]
-            : []),
-        ]),
-      ]);
-      await kubectlAsync(["rollout", "status", target, "--timeout=180s"]);
+  const restoreFailures = [];
+  for (const restore of [restoreProjector, () => api?.close(), () => worker?.restore()]) {
+    try {
+      await restore();
+    } catch (error) {
+      restoreFailures.push(error);
     }
   }
-  await worker?.restore();
+  if (restoreFailures.length) {
+    receipt.phase = "restore-failed";
+    await save();
+    await database.destroy();
+    throw new AggregateError(restoreFailures, "Could not restore every diagnostic role");
+  }
   kubectl(["delete", "configmap", name, "--ignore-not-found"]);
   receipt.phase = "restored";
   receipt.restoredAt = new Date().toISOString();

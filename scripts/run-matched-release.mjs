@@ -40,7 +40,12 @@ import {
   kubeconfig,
   namespace,
 } from "./lib/production-kubernetes.mjs";
-import { createDatabase, runMigrations } from "../packages/database/src/index.ts";
+import {
+  assertProjectionHistoryCompatible,
+  createDatabase,
+  projectionRetentionMigration,
+  runMigrations,
+} from "../packages/database/src/index.ts";
 import { OfficialCubeSandboxRuntimeClient } from "../packages/sandbox-control/src/cubesandbox-runtime-client.ts";
 import { CubePersistentCapsuleCodec } from "../packages/sandbox-control/src/cube-persistent-capsule.ts";
 import { createComputeRetirementRepository } from "./lib/compute-retirement-postgres.mjs";
@@ -443,6 +448,28 @@ if (applyReceipt) {
   assert.equal(applyReceipt.baselineDigest, candidate.baselineDigest);
   assertMatchedServingComponents(recordedDeployment, candidate.plan, liveWorkloads);
 } else assertServingComponents(recordedDeployment, liveWorkloads);
+async function openReleaseDatabase() {
+  const endpoint = new URL(
+    (await readFile(resolve(runtimeDirectory, "secrets/database-url"), "utf8")).trim(),
+  );
+  endpoint.hostname = serviceAddress("postgres");
+  return createDatabase({ connectionString: endpoint.toString(), maxConnections: 2 });
+}
+if (candidate.plan.maintenance.schemaChanged) {
+  const probe = await openReleaseDatabase();
+  try {
+    const {
+      rows: [installed],
+    } =
+      await sql`select exists(select 1 from kysely_migration where name='204_shared_native_history_bases')
+      and not exists(select 1 from kysely_migration where name=${projectionRetentionMigration}) as pending`.execute(
+        probe,
+      );
+    if (installed.pending) await assertProjectionHistoryCompatible(probe);
+  } finally {
+    await probe.destroy();
+  }
+}
 const storageWasStopped = await nativeStorageMaintenancePending(directory);
 const physicalMaintenance = candidate.plan.maintenance.physical;
 assert(
@@ -530,11 +557,7 @@ if (nativeImports.length) {
   }
 }
 
-const endpoint = new URL(
-  (await readFile(resolve(runtimeDirectory, "secrets/database-url"), "utf8")).trim(),
-);
-endpoint.hostname = serviceAddress("postgres");
-const database = createDatabase({ connectionString: endpoint.toString(), maxConnections: 2 });
+const database = await openReleaseDatabase();
 const services = [
   "web",
   "ssh-gateway",

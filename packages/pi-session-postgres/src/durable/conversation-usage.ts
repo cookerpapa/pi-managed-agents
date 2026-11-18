@@ -1,14 +1,15 @@
 import { sql, type Kysely } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import type { UsageTokens, ImagePacked } from "@pi-cloud/protocol";
-import type { EntryRecord } from "@earendil-works/pi-durable";
+import type { ConversationId, EntryRecord, StorageWrite } from "@earendil-works/pi-durable";
 import type { Message, Usage } from "@earendil-works/pi-ai";
 import {
   estimateMessageTokens,
   calculateContextTokens,
 } from "@earendil-works/pi-ai/utils/estimate";
 import { readDurableEntries } from "./history.ts";
-import type { DurableScope } from "./types.ts";
+import { documentAddress, type DurableScope } from "./types.ts";
+import { NATIVE_USAGE_DOCUMENT } from "./current-state.ts";
 
 export const emptyUsageTokens = (): UsageTokens => ({
   input: 0,
@@ -53,8 +54,11 @@ export function nativeUsageTotals(value: unknown) {
   return { tokens: total, models };
 }
 
-/** UsageDoc has a public checkpointWhen(always) contract. Batch latest bases,
- * without replaying message history or opening a native Harness in the API. */
+function isUsageBucket(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Batch the current, unkeyed UsageDoc of each requested native Conversation. */
 export async function readNativeUsageBatch(
   database: Kysely<Database>,
   scope: DurableScope,
@@ -62,25 +66,42 @@ export async function readNativeUsageBatch(
 ) {
   const result = new Map<number, ReturnType<typeof nativeUsageTotals>>();
   if (!conversations.length) return result;
-  const rows = await sql<{ scope: string; body: string }>`select r.fields->>'scope' as scope,l.body
-    from pi_durable_records r
-    join lateral (select seq,ordinal from pi_durable_document_revisions d
-      where d.tenant_id=r.tenant_id and d.session_id=r.session_id and d.document_id=r.id
-      order by d.seq desc limit 1) latest on true
-    join pi_durable_log l on l.tenant_id=r.tenant_id and l.session_id=r.session_id and l.seq=latest.seq and l.ordinal=latest.ordinal
+  const addresses = conversations.map((conversationId) =>
+    documentAddress({
+      kind: NATIVE_USAGE_DOCUMENT,
+      scope: { kind: "conversation", conversationId: conversationId as ConversationId },
+    }),
+  );
+  const { rows } = await sql<{
+    id: string;
+    address: string;
+    body: string | null;
+  }>`select r.id::text,r.fields->>'address' as address,c.body
+    from pi_durable_owned_records r left join pi_durable_current c
+      on (c.tenant_id,c.session_id,c.id,c.seq)=(r.tenant_id,r.session_id,r.id,r.seq)
+      and c.kind='document' and c.retired_seq is null
     where r.tenant_id=${scope.tenantId}::uuid and r.session_id=${scope.sessionId}
-      and r.kind='document' and r.retired_seq is null and r.fields->>'nativeKind'=${JSON.stringify("pi.usage")}
-      and r.fields->>'scope'=any(${conversations.map((id) => JSON.stringify(["conversation", id]))}::text[])`.execute(
+      and r.kind='document' and r.retired_seq is null and r.fields->>'address'=any(${addresses}::text[])`.execute(
     database,
   );
-  for (const row of rows.rows) {
-    const write = JSON.parse(row.body);
+  for (const row of rows) {
+    if (row.body === null) throw new Error("Native usage checkpoint is missing");
+    const write = JSON.parse(row.body) as Extract<StorageWrite, { type: "document.create" }>;
     if (
-      !["document.create", "document.change"].includes(write.type) ||
-      write.content?.kind !== "base"
-    )
-      throw new Error("Pinned native UsageDoc did not provide a complete checkpoint");
-    result.set(Number(JSON.parse(row.scope)[1]), nativeUsageTotals(write.content.value));
+      write.type !== "document.create" ||
+      write.record?.scope?.kind !== "conversation" ||
+      write.record.kind !== NATIVE_USAGE_DOCUMENT ||
+      String(write.record.id) !== row.id ||
+      documentAddress(write.record) !== row.address ||
+      write.content?.kind !== "base" ||
+      !isUsageBucket(write.content.value?.models) ||
+      !isUsageBucket(write.content.value?.tools)
+    ) {
+      throw new Error("Invalid native usage checkpoint");
+    }
+    const id = write.record.scope.conversationId;
+    if (result.has(id)) throw new Error("Duplicate native usage document");
+    result.set(id, nativeUsageTotals(write.content.value));
   }
   return result;
 }

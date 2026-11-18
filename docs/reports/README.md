@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Native usage and chat history under load](native-usage-and-chat-history-20261118.md) measures current-value storage, per-message projection cost, the terminal queue and fixed-rate arrivals.
+
 - [Kafka-backed live progress and recovery](kafka-live-progress-20261118.md) records the #50 SQL count, visible-prefix recovery and synchronized short-Run comparisons.
 
 - [Ordered Session projection and Run tail latency](ordered-projection-tail-20261118.md).

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { beforeAll, afterAll, expect, it } from "vitest";
 import { createDatabase, runMigrations, type Database } from "@pi-cloud/database";
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { Harness, createRegistry, UsageDoc } from "@earendil-works/pi-durable";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -202,6 +202,24 @@ it("reads native current usage and context without admitting work or hydrating i
       usage.models[`${empty.model.provider}/${empty.model.modelId}`]!.output += 5;
     }, BACKGROUND_CONTEXT);
     expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(125);
+    const {
+      rows: [document],
+    } = await sql<{ id: string; checkpoints: number; revisions: number; history: number }>`
+      select r.id::text,
+       (select count(*)::int from pi_durable_current c where (c.tenant_id,c.session_id,c.id)=(r.tenant_id,r.session_id,r.id)) as checkpoints,
+       (select count(*)::int from pi_durable_document_revisions d where (d.tenant_id,d.session_id,d.document_id)=(r.tenant_id,r.session_id,r.id)) as revisions,
+       (select count(*)::int from pi_durable_writes w where (w.tenant_id,w.session_id,w.record_id)=(r.tenant_id,r.session_id,r.id)) as history
+      from pi_durable_owned_records r where r.tenant_id=${f.tenant.tenantId}::uuid and r.session_id=${row.pi_session_id}
+        and r.fields->>'nativeKind'='"pi.usage"'`.execute(db);
+    expect(document).toMatchObject({ checkpoints: 1, revisions: 0, history: 0 });
+    await projection.rebuild();
+    expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(125);
+    expect(
+      (await projection.revisions(Number(document!.id), storage.committedSequence)).at(-1)
+        ?.checkpoint,
+    ).toMatchObject({
+      models: { [`${empty.model.provider}/${empty.model.modelId}`]: { output: 25 } },
+    });
     expect(
       await db
         .selectFrom("runs")

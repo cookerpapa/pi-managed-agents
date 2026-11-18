@@ -1,3 +1,4 @@
+import * as nativeUsageAndChatHistory from "./228_native_usage_and_chat_history.ts";
 import * as computeServicePeriods from "./224_compute_service_periods.ts";
 import * as httpMcpConnections from "./225_http_mcp_connections.ts";
 import * as modelChargeEvidence from "./226_model_charge_evidence.ts";
@@ -421,6 +422,7 @@ export const migrationProvider: MigrationProvider = {
       "224_compute_service_periods": computeServicePeriods,
       "225_http_mcp_connections": httpMcpConnections,
       "226_model_charge_evidence": modelChargeEvidence,
+      "228_native_usage_and_chat_history": nativeUsageAndChatHistory,
     };
   },
 };

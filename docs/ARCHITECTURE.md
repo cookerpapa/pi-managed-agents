@@ -348,7 +348,7 @@ code-owned trusted extensions run in the Worker.
 The active owner keeps acknowledged state in memory. PG materializes:
 
 - immutable semantic history and indexed shared bodies;
-- authoritative latest Inbox, input metadata and Submission values;
+- authoritative latest Inbox, input metadata, Submission and conversation usage values;
 - native document metadata/checkpoints needed for cold reads;
 - live-state checkpoints at settlement or ordered writer handoff.
 
@@ -360,6 +360,8 @@ create a second execution authority. Native batch atomicity is retained.
 See [ADR-0243](adr/0243-native-input-current-state.md),
 [ADR-0244](adr/0244-kafka-backed-native-live-state.md) and
 [ADR-0245](adr/0245-native-commit-text-presentation.md).
+
+Under [ADR-0337](adr/0337-native-usage-and-chat-presentation.md) the presentation selector excludes native system context before allocating a page or frozen frame. Mixed batches keep their visible Entries and Task events. Native context and Forks still resolve the original system Entries. The Session API reads each Conversation’s unkeyed `pi.usage` through its current document and address index. Model charging uses its own request evidence.
 
 Frozen history paging fixes a bounded set of visible positions before resolving
 their immutable record/body IDs. Body loading does not reopen the shared history

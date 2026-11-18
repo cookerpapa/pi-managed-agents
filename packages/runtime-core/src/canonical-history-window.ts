@@ -13,6 +13,7 @@ import {
   type UserUpload,
 } from "@pi-cloud/protocol";
 import {
+  NATIVE_SYSTEM_ENTRY,
   projectDurableTranscript,
   type NativeHistoryRow,
   terminalMetadata,
@@ -171,7 +172,7 @@ async function readLiveHistoryWindow(
       (select l.record_id as id,l.seq,l.ordinal,r.fields,l.body_bytes::int as body_bytes,false as header
         from pi_durable_log l join pi_durable_records r on r.tenant_id=l.tenant_id and r.session_id=l.session_id and r.id=l.record_id
         where t.operation_kind='chat' and l.tenant_id=t.tenant_id and l.session_id=t.pi_session_id and l.cloud_origin->>'turn'=t.turn_id::text
-          and (l.record_kind='entry' or (l.record_kind='task' and l.phase='"retry"'))
+          and ((l.record_kind='entry' and r.fields->>'nativeKind' is distinct from ${JSON.stringify(NATIVE_SYSTEM_ENTRY)}) or (l.record_kind='task' and l.phase='"retry"'))
           and r.fields->>'turn'=t.turn_id::text
           and (t.ended or l.seq<=t.output_display_native_seq or r.fields->>'role'='user')
           ${bound("l")}

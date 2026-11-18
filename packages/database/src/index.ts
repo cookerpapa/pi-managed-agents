@@ -6,6 +6,10 @@ export {
   type CreateDatabaseOptions,
 } from "./client.ts";
 export { retryTransaction } from "./retry-transaction.ts";
+export {
+  assertProjectionHistoryCompatible,
+  migrationName as projectionRetentionMigration,
+} from "./migrations/228_native_usage_and_chat_history.ts";
 export { databaseTime } from "./authority-time.ts";
 export { environmentForImage } from "./environment-image.ts";
 export { PostgresQueueWake, PostgresNotificationWake } from "./postgres-queue-wake.ts";

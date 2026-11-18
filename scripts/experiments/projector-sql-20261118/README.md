@@ -99,6 +99,8 @@ Neither observer changes system power or performance settings.
 
 Use `12 projection-candidate live-burst` to compare 192 simultaneously released text requests with one Projector, 32 Kafka partitions, a 32-record poll (waiting only for the first record), twelve projection connections and two Workers. Candidate observations mount the paired Worker flush implementation. The operator records both workload templates before applying the temporary source and restores both at exit. Set `PI_CLOUD_PROJECTOR_DIAGNOSTIC_REPETITIONS` for serial repetitions. The runtime load driver can also run `--mode live-burst` on a deployed pair.
 
+Set `PI_CLOUD_PROJECTOR_CANDIDATE_REVISION` to a local Git commit to time its projection and readers with the same workload and instrumentation as the working tree. For a candidate, the diagnostic mounts matched native readers on the Workers and uses a private Session API Pod with the same role policy. Its address and test overlays are removed during restoration.
+
 Pass each private load `report.json` to the summary tool. It matches synthetic provider completion to this Run's terminal PG COMMIT response and collects the consumer group's actual lag.
 
 ```sh

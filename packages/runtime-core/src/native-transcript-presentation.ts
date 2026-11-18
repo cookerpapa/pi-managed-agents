@@ -8,6 +8,9 @@ import {
   toolContentView,
   type UserUpload,
 } from "@pi-cloud/protocol";
+/** Native context and tool declarations stay available to Pi and Forks. */
+export const NATIVE_SYSTEM_ENTRY = "pi.system";
+
 type JsonRecord = Record<string, unknown>;
 type TerminalProjectionMetadata = Pick<
   ConversationTurnTranscriptResource,
@@ -102,6 +105,7 @@ export function projectDurableTranscript(
   for (const row of rows) {
     const entry = record(JSON.parse(row.body).value);
     if (!entry) throw new Error("Native history pointer is invalid");
+    if (entry.kind === NATIVE_SYSTEM_ENTRY) continue;
     if (record(entry.state)?.status !== undefined) {
       const checkpoint = record(record(entry.state)?.checkpoint);
       if (

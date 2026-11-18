@@ -74,6 +74,8 @@ retained image results, arrival-rate bursts, provider-context expiry and native
 compaction. Fault mode includes synthetic provider failures, Worker handoff,
 Projector interruption after visible text, Stop during text or Tools, and uncertain external results.
 
+Set `PI_CLOUD_PROJECTION_TAIL_STAGE=arrivals-20` to run only the fixed arrival stage of the projection-tail profile. It reports the number actually issued out of 400 scheduled starts. Individual stages still use the normal fixture and cleanup.
+
 The projection-tail profile measures serial latency, two 64-in-flight bursts,
 400 arrivals scheduled at 20 per second, 128 in-flight clients with a five-second
 model delay, and 32-in-flight multi-step work with three MCP calls per Run.
@@ -91,6 +93,8 @@ The optional `capacity` extension raises concurrency to 64 and offered arrivals
 to 16/32 per second. Run it only after checking the lower matrix's headroom.
 Input padding stays below the public 100,000-character message limit; long
 contexts are built through retained multi-turn history.
+
+For projection-layout comparisons the diagnostic starts a private instance of the normal Session API with the candidate sources and the API's network policy. Only the owned load client uses its Pod address. After the timed stage it records counts of native system Entries, frozen frames, usage checkpoints, native journal rows and revision rows. Public usage and history are checked against the immutable assistant Entry.
 
 The `live-burst` mode prepares 192 independent SSE subscribers before releasing all 192 short 4 KiB requests together. Compare each provider's completion with the matching Run and observe the consumer group's per-partition lag through final drainage. The standard fixture and cleanup checks apply.
 

@@ -99,7 +99,9 @@ protocol, record the decision under `docs/adr/` before implementation.
   already-pinned live-only suffix is folded from Kafka and displayed without a PG
   transaction per fragment. Verify and bulk-materialize its small native receipts
   at stable or handoff boundaries. Worker overlay flush waits for stable state. Other native writes retain
-  their historical policy. Do not restore per-Step projection receipts or allocate sequence from
+  their historical policy. Under ADR-0337 the unkeyed conversation UsageDoc is
+  read from native current state. Keep system Entries in native model history
+  and exclude them from chat pagination and frozen frames. Do not restore per-Step projection receipts or allocate sequence from
   a second active writer. Cold administrative mutations require Session quiescence.
   Bootstrap only the latest Compaction and active suffix, never lifetime JSONL.
 - Under ADR-0329 Workers publish directly through one long-lived idempotent

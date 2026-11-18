@@ -1,3 +1,4 @@
+import { NATIVE_SYSTEM_ENTRY } from "./native-transcript-presentation.ts";
 import { settleHistoryTurn } from "./presentation-settlement.ts";
 import { HistoryDirectory, type StoredDurableBatch } from "@pi-cloud/pi-session-postgres/durable";
 import { PostgresPresentationDirectory } from "./presentation-directory.ts";
@@ -46,7 +47,7 @@ export type HistoryTurnRow = {
  * their result/reference eligibility still belongs to the capture transaction. */
 export function mayCaptureNativePresentation(writes: StoredDurableBatch["writes"]): boolean {
   return writes.some((write) => {
-    if (write.type === "entry") return true;
+    if (write.type === "entry") return write.value.kind !== NATIVE_SYSTEM_ENTRY;
     if (write.type !== "task") return false;
     const task = write.value;
     return (
@@ -109,7 +110,7 @@ export async function captureNativePresentation(
       ${onlyTurnId ? sql`and g.cloud_origin->>'turn'=${onlyTurnId}` : sql``}
       and not exists(select 1 from pi_history_blocks block join pi_history_frames frame on frame.tenant_id=block.tenant_id and frame.block_id=block.id
         where block.tenant_id=ref.tenant_id and block.source_pi_session_id=ref.session_id and block.turn_id=(g.cloud_origin->>'turn')::uuid and (frame.seq,frame.ordinal)=(ref.seq,ref.ordinal))
-      and (g.record_kind='entry' or (g.record_kind='task' and (g.phase='"retry"'
+      and ((g.record_kind='entry' and r.fields->>'nativeKind' is distinct from ${JSON.stringify(NATIVE_SYSTEM_ENTRY)}) or (g.record_kind='task' and (g.phase='"retry"'
         or ((g.seq,g.ordinal)=(r.seq,r.ordinal) and r.fields->>'nativeKind' in ('"pi.tool"','"pi.compaction"') and r.fields->>'status'='terminal'
           and not(r.fields ? 'resultEntry') and not exists(select 1 from ${entries} result
             where result.tenant_id=r.tenant_id and result.session_id=r.session_id and result.kind='entry' and result.fields->>'task'=r.id::text)))))

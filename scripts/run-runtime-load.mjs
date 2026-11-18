@@ -105,7 +105,9 @@ const databaseUrl = new URL(
 );
 databaseUrl.hostname = serviceAddress("postgres");
 const database = createDatabase({ connectionString: databaseUrl.toString(), maxConnections: 3 });
-const baseUrl = `http://127.0.0.1:${runtimeEnvironment().PI_CLOUD_HTTP_PORT}`;
+const baseUrl =
+  process.env.PI_CLOUD_LOAD_API_URL ??
+  `http://127.0.0.1:${runtimeEnvironment().PI_CLOUD_HTTP_PORT}`;
 const terminal = (state) => ["completed", "failed", "cancelled", "timed_out"].includes(state);
 async function until(read, label, ms = 120000) {
   const deadline = Date.now() + ms;
@@ -541,7 +543,7 @@ async function executeWork(
 
 function projectionTailProfiles(tools) {
   const text = { kind: "text", firstByteMs: 0, outputBytes: 4096 };
-  return [
+  const profiles = [
     { ...text, name: "serial", concurrency: 1, count: 24 },
     { ...text, name: "warm", concurrency: 16, count: 32 },
     ...[1, 2].map((n) => ({ ...text, name: "burst64-" + n, concurrency: 64, count: 192 })),
@@ -565,6 +567,70 @@ function projectionTailProfiles(tools) {
       outputBytes: 1024,
     },
   ];
+  const requested = process.env.PI_CLOUD_PROJECTION_TAIL_STAGE;
+  if (!requested) return profiles;
+  const profile = profiles.find((p) => p.name === requested);
+  assert(profile, "Unknown projection-tail stage");
+  return [profile];
+}
+
+/** Inspect only the owned text fixtures, after their timed work has finished. */
+async function verifyTextStorage(sessions) {
+  const {
+    rows: [layout],
+  } = await sql`with usage_docs as materialized (
+    select r.tenant_id,r.session_id,r.id from pi_durable_owned_records r
+    where r.tenant_id=${tenant.tenantId}::uuid and r.kind='document'
+      and r.retired_seq is null and r.fields->>'nativeKind'='"pi.usage"'
+  ), system_entries as materialized (
+    select g.id from pi_history_records g where g.tenant_id=${tenant.tenantId}::uuid
+      and g.record_kind='entry' and g.fields->>'nativeKind'='"pi.system"'
+  ) select (select count(*)::int from usage_docs) as usage_docs,
+    (select count(*)::int from usage_docs u join pi_durable_current c using(tenant_id,session_id,id)) as usage_checkpoints,
+    (select count(*)::int from usage_docs u join pi_durable_document_revisions d on (d.tenant_id,d.session_id,d.document_id)=(u.tenant_id,u.session_id,u.id)) as usage_revisions,
+    (select count(*)::int from usage_docs u join pi_history_records g on (g.tenant_id,g.session_id,g.record_id)=(u.tenant_id,u.session_id,u.id) where g.record_kind like 'document.%') as usage_journal_rows,
+    (select count(*)::int from system_entries) as native_system_entries,
+    (select count(*)::int from pi_history_frames f join system_entries s on s.id=f.entry_record_id where f.tenant_id=${tenant.tenantId}::uuid) as system_frames`.execute(
+    database,
+  );
+  assert.equal(layout.usage_docs, sessions.length);
+  assert.equal(layout.native_system_entries, sessions.length);
+  // Both sides of an A/B run verify their own public API against the raw
+  // provider counters in the corresponding immutable native assistant Entry.
+  const checks = [0, Math.floor(sessions.length / 2), sessions.length - 1];
+  for (const index of checks) {
+    const sessionId = sessions[index].sessionId;
+    const {
+      rows: [stored],
+    } = await sql`select b.payload_text from pi_history_records g join pi_history_bodies b
+      on (b.tenant_id,b.id)=(g.tenant_id,g.entry_body_id)
+      where g.tenant_id=${tenant.tenantId}::uuid and g.session_id=${sessionId}
+        and g.fields->>'role'='assistant'`.execute(database);
+    const message = JSON.parse(stored.payload_text).model[0];
+    const { input, output, cacheRead, cacheWrite } = message.usage;
+    const usage = await api.getConversationUsage(sessionId);
+    assert.deepEqual(usage.tokens, {
+      input: input + cacheRead + cacheWrite,
+      output,
+      cacheRead,
+      cacheWrite,
+      total: input + cacheRead + cacheWrite + output,
+    });
+    const history = await api.getConversation(sessionId);
+    const text = history.turns
+      .flatMap((t) => t.transcript?.items ?? [])
+      .filter((i) => i.kind === "text")
+      .map((i) => i.text)
+      .join("");
+    assert.equal(
+      text,
+      message.content
+        .filter((p) => p.type === "text")
+        .map((p) => p.text)
+        .join(""),
+    );
+  }
+  return { ...layout, publicUsageAndHistoryChecks: checks.length };
 }
 
 async function stage(profile) {
@@ -720,6 +786,8 @@ async function stage(profile) {
       );
     }
   }
+  if (mode === "live-burst" && load.results.every((r) => r.success))
+    value.textStorage = await verifyTextStorage(queue);
   value.historyReadsMs = distribution(load.results.map((r) => r.historyMs));
   value.historyPages = {
     count: load.results.reduce((n, r) => n + (r.historyPages ?? 0), 0),

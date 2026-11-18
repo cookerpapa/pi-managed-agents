@@ -1,3 +1,4 @@
+import { readNativeUsageBatch } from "../src/durable/conversation-usage.ts";
 import { retainIdleFamily } from "../src/durable/history-retention.ts";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -6,6 +7,7 @@ import { createDatabase, runMigrations, type Database } from "@pi-cloud/database
 import {
   createSession,
   defineDoc,
+  UsageDoc,
   type ConversationId,
   type EntryRecord,
   type StorageWrite,
@@ -392,6 +394,18 @@ it("reorganizes a closed multi-Conversation family without losing child ancestry
     (tx) => tx.forkConversation(1 as never, entries[1]!.id, { ownership: { kind: "ownerless" } }),
     context,
   );
+  await session.commit(async (tx) => {
+    const usage = {
+      input: 7,
+      output: 3,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 10,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
+    (await tx.doc(UsageDoc, 1 as ConversationId)).models["test/model"] = usage;
+    (await tx.doc(UsageDoc, child.id)).models["test/model"] = usage;
+  }, context);
   await store.flush();
   await session.close(context);
   await db
@@ -401,6 +415,10 @@ it("reorganizes a closed multi-Conversation family without losing child ancestry
   expect(await target.projection.get(entries[1]!.id)).toBeDefined();
   expect(await target.projection.get(childEntry.id)).toBeDefined();
   await target.projection.rebuild();
+  const retained = await readNativeUsageBatch(db, target.scope, [1, root.id, child.id]);
+  expect(retained.get(child.id)?.tokens.total).toBe(10);
+  expect(retained.has(1)).toBe(false);
+
   const reopened = await target.open();
   expect(await createSession(reopened).snapshot(ForkProvenanceDocument, context)).toEqual({
     origin,

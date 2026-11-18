@@ -1,0 +1,483 @@
+{
+  "controlRevision": "ad0c7bc62204da400ac9e9bfa4aefef27967eaff",
+  "hundredCumulativeUpdates": [
+    {
+      "variant": "control",
+      "current_rows": 0,
+      "revisions": 1,
+      "retained_usage_rows": 101,
+      "logical_usage_payload_bytes": 18884,
+      "web_frames": 1,
+      "usageBeforeAndAfterRebuild": 100,
+      "destructiveCutover": {
+        "refusedBeforeOwnerDeletion": true,
+        "succeededAfterOwnerDeletion": true,
+        "preserved": {
+          "users": 1,
+          "projects": 1,
+          "workspaces": 1,
+          "sessions": 0
+        }
+      }
+    },
+    {
+      "variant": "candidate",
+      "current_rows": 1,
+      "revisions": 0,
+      "retained_usage_rows": 0,
+      "logical_usage_payload_bytes": 304,
+      "web_frames": 0,
+      "usageBeforeAndAfterRebuild": 100
+    }
+  ],
+  "bursts": [
+    {
+      "case": "control-1",
+      "runs": 192,
+      "diagnosticSourceHash": "97ffab477844d1e5f96176a216c034c2cbec6829abf47b2ea727c0e23fd1cc8e",
+      "workloadMs": 28775.93,
+      "runsPerSecond": 6.67,
+      "lastPostMs": 33,
+      "lastClientConfirmationMs": 26526,
+      "inFlightDocChangeCalls": {
+        "0": 376,
+        "8": 192
+      },
+      "nativeCallsPerRun": 75.98,
+      "callsPerEntryBatch": {
+        "entry:pi.user": {
+          "11": 192
+        },
+        "entry:pi.system": {
+          "10": 192
+        },
+        "entry:pi.assistant": {
+          "15": 4,
+          "16": 188
+        }
+      },
+      "storage": {
+        "usage_docs": 192,
+        "usage_checkpoints": 0,
+        "usage_revisions": 192,
+        "usage_journal_rows": 384,
+        "native_system_entries": 192,
+        "system_frames": 192,
+        "publicUsageAndHistoryChecks": 3
+      },
+      "modelFinishToTerminalCommitMs": {
+        "mean": 8369.11,
+        "p50": 8466.08,
+        "p95": 14384.64,
+        "max": 16163.0
+      },
+      "modelFinishToTerminalReceiptMs": {
+        "mean": 505.4,
+        "p50": 464,
+        "p95": 1052,
+        "max": 1331
+      },
+      "terminalLocalQueueMs": {
+        "mean": 7444.22,
+        "p50": 7713,
+        "p95": 13722,
+        "max": 14959
+      },
+      "terminalHandlerStartToCommitMs": {
+        "mean": 419.49,
+        "p50": 314.35,
+        "p95": 829.69,
+        "max": 1008.71
+      },
+      "terminalQueueOverlap": {
+        "earlierSamePartitionHandlerPercent": 87.67,
+        "earlierAssistantBatchPercent": 13.18
+      },
+      "groupLagSamples": [
+        [-2286, 0],
+        [5522, 475],
+        [11562, 1113],
+        [17579, 1911],
+        [23162, 842],
+        [27211, 0]
+      ],
+      "sampledPeakLag": 1911,
+      "drainedLag": 0,
+      "cleaned": true
+    },
+    {
+      "case": "candidate-1",
+      "runs": 192,
+      "diagnosticSourceHash": "626b14ef1b4f27bfdbe20e9dd9a3343877629ff9a9953f13e1579acfd3e107eb",
+      "workloadMs": 21080.87,
+      "runsPerSecond": 9.11,
+      "lastPostMs": 27,
+      "lastClientConfirmationMs": 18857,
+      "inFlightDocChangeCalls": {
+        "0": 324,
+        "8": 192
+      },
+      "nativeCallsPerRun": 69.96,
+      "callsPerEntryBatch": {
+        "entry:pi.user": {
+          "11": 192
+        },
+        "entry:pi.system": {
+          "6": 192
+        },
+        "entry:pi.assistant": {
+          "13": 7,
+          "14": 185
+        }
+      },
+      "storage": {
+        "usage_docs": 192,
+        "usage_checkpoints": 192,
+        "usage_revisions": 0,
+        "usage_journal_rows": 0,
+        "native_system_entries": 192,
+        "system_frames": 0,
+        "publicUsageAndHistoryChecks": 3
+      },
+      "modelFinishToTerminalCommitMs": {
+        "mean": 5836.22,
+        "p50": 5626.39,
+        "p95": 10259.85,
+        "max": 11604.64
+      },
+      "modelFinishToTerminalReceiptMs": {
+        "mean": 419.53,
+        "p50": 391,
+        "p95": 914,
+        "max": 1067
+      },
+      "terminalLocalQueueMs": {
+        "mean": 5111.97,
+        "p50": 4931,
+        "p95": 9706,
+        "max": 11082
+      },
+      "terminalHandlerStartToCommitMs": {
+        "mean": 304.72,
+        "p50": 293.57,
+        "p95": 659.97,
+        "max": 777.12
+      },
+      "terminalQueueOverlap": {
+        "earlierSamePartitionHandlerPercent": 86.4,
+        "earlierAssistantBatchPercent": 12.04
+      },
+      "groupLagSamples": [
+        [-2256, 0],
+        [5330, 572],
+        [11319, 1367],
+        [16435, 1493],
+        [19281, 48]
+      ],
+      "sampledPeakLag": 1493,
+      "drainedLag": 0,
+      "cleaned": true
+    },
+    {
+      "case": "candidate-2",
+      "runs": 192,
+      "diagnosticSourceHash": "626b14ef1b4f27bfdbe20e9dd9a3343877629ff9a9953f13e1579acfd3e107eb",
+      "workloadMs": 12800.23,
+      "runsPerSecond": 15.0,
+      "lastPostMs": 47,
+      "lastClientConfirmationMs": 9841,
+      "inFlightDocChangeCalls": {
+        "0": 187,
+        "8": 192
+      },
+      "nativeCallsPerRun": 69.77,
+      "callsPerEntryBatch": {
+        "entry:pi.user": {
+          "11": 192
+        },
+        "entry:pi.system": {
+          "6": 192
+        },
+        "entry:pi.assistant": {
+          "12": 7,
+          "13": 31,
+          "14": 154
+        }
+      },
+      "storage": {
+        "usage_docs": 192,
+        "usage_checkpoints": 192,
+        "usage_revisions": 0,
+        "usage_journal_rows": 0,
+        "native_system_entries": 192,
+        "system_frames": 0,
+        "publicUsageAndHistoryChecks": 3
+      },
+      "modelFinishToTerminalCommitMs": {
+        "mean": 2091.1,
+        "p50": 2034.95,
+        "p95": 3618.11,
+        "max": 3999.9
+      },
+      "modelFinishToTerminalReceiptMs": {
+        "mean": 339.55,
+        "p50": 338,
+        "p95": 577,
+        "max": 770
+      },
+      "terminalLocalQueueMs": {
+        "mean": 1615.45,
+        "p50": 1615,
+        "p95": 3225,
+        "max": 3716
+      },
+      "terminalHandlerStartToCommitMs": {
+        "mean": 136.1,
+        "p50": 137.87,
+        "p95": 214.72,
+        "max": 638.8
+      },
+      "terminalQueueOverlap": {
+        "earlierSamePartitionHandlerPercent": 85.81,
+        "earlierAssistantBatchPercent": 11.78
+      },
+      "groupLagSamples": [
+        [-2993, 0],
+        [3654, 846],
+        [9531, 493],
+        [10230, 2]
+      ],
+      "sampledPeakLag": 846,
+      "drainedLag": 0,
+      "cleaned": true
+    },
+    {
+      "case": "control-2",
+      "runs": 192,
+      "diagnosticSourceHash": "97ffab477844d1e5f96176a216c034c2cbec6829abf47b2ea727c0e23fd1cc8e",
+      "workloadMs": 26674.28,
+      "runsPerSecond": 7.2,
+      "lastPostMs": 26,
+      "lastClientConfirmationMs": 24408,
+      "inFlightDocChangeCalls": {
+        "0": 418,
+        "8": 192
+      },
+      "nativeCallsPerRun": 75.98,
+      "callsPerEntryBatch": {
+        "entry:pi.user": {
+          "11": 192
+        },
+        "entry:pi.system": {
+          "10": 192
+        },
+        "entry:pi.assistant": {
+          "15": 4,
+          "16": 188
+        }
+      },
+      "storage": {
+        "usage_docs": 192,
+        "usage_checkpoints": 0,
+        "usage_revisions": 192,
+        "usage_journal_rows": 384,
+        "native_system_entries": 192,
+        "system_frames": 192,
+        "publicUsageAndHistoryChecks": 3
+      },
+      "modelFinishToTerminalCommitMs": {
+        "mean": 7476.89,
+        "p50": 7588.0,
+        "p95": 11339.6,
+        "max": 13429.11
+      },
+      "modelFinishToTerminalReceiptMs": {
+        "mean": 533.83,
+        "p50": 478,
+        "p95": 1117,
+        "max": 1327
+      },
+      "terminalLocalQueueMs": {
+        "mean": 6555.49,
+        "p50": 6725,
+        "p95": 10436,
+        "max": 12594
+      },
+      "terminalHandlerStartToCommitMs": {
+        "mean": 387.57,
+        "p50": 278.79,
+        "p95": 814.2,
+        "max": 1035.32
+      },
+      "terminalQueueOverlap": {
+        "earlierSamePartitionHandlerPercent": 87.0,
+        "earlierAssistantBatchPercent": 12.21
+      },
+      "groupLagSamples": [
+        [-2296, 0],
+        [5400, 533],
+        [11691, 1180],
+        [17179, 1825],
+        [22808, 434],
+        [25010, 0]
+      ],
+      "sampledPeakLag": 1825,
+      "drainedLag": 0,
+      "cleaned": true
+    },
+    {
+      "case": "candidate-final",
+      "runs": 192,
+      "diagnosticSourceHash": "14e2ebaceb40ee56316511ef8be592c14b31c31aefc9f3b340c6e439446bb153",
+      "workloadMs": 18196.07,
+      "runsPerSecond": 10.55,
+      "lastPostMs": 45,
+      "lastClientConfirmationMs": 15613,
+      "inFlightDocChangeCalls": {
+        "0": 263,
+        "8": 192
+      },
+      "nativeCallsPerRun": 69.91,
+      "callsPerEntryBatch": {
+        "entry:pi.user": {
+          "11": 192
+        },
+        "entry:pi.system": {
+          "6": 192
+        },
+        "entry:pi.assistant": {
+          "13": 18,
+          "14": 174
+        }
+      },
+      "storage": {
+        "usage_docs": 192,
+        "usage_checkpoints": 192,
+        "usage_revisions": 0,
+        "usage_journal_rows": 0,
+        "native_system_entries": 192,
+        "system_frames": 0,
+        "publicUsageAndHistoryChecks": 3
+      },
+      "modelFinishToTerminalCommitMs": {
+        "mean": 4079.05,
+        "p50": 3550.44,
+        "p95": 7000.03,
+        "max": 8984.19
+      },
+      "modelFinishToTerminalReceiptMs": {
+        "mean": 357.76,
+        "p50": 345,
+        "p95": 805,
+        "max": 977
+      },
+      "terminalLocalQueueMs": {
+        "mean": 3480.17,
+        "p50": 3023,
+        "p95": 6454,
+        "max": 8381
+      },
+      "terminalHandlerStartToCommitMs": {
+        "mean": 241.12,
+        "p50": 121.35,
+        "p95": 646.19,
+        "max": 823.86
+      },
+      "terminalQueueOverlap": {
+        "earlierSamePartitionHandlerPercent": 85.52,
+        "earlierAssistantBatchPercent": 11.8
+      },
+      "groupLagSamples": [
+        [-2610, 0],
+        [4941, 587],
+        [10818, 1343],
+        [15799, 322],
+        [16188, 0]
+      ],
+      "sampledPeakLag": 1343,
+      "drainedLag": 0,
+      "cleaned": true
+    }
+  ],
+  "fixedArrivals": [
+    {
+      "variant": "control",
+      "offeredRate": 20,
+      "clients": 64,
+      "scheduled": 400,
+      "completed": 400,
+      "dropped": 0,
+      "runsPerSecond": 19.82,
+      "submitToVisibleTerminalMs": {
+        "count": 400,
+        "p50": 252,
+        "p95": 1695,
+        "p99": 1870,
+        "max": 2052
+      },
+      "sampledPeakLag": 322,
+      "drainedLag": 0
+    },
+    {
+      "variant": "candidate",
+      "offeredRate": 20,
+      "clients": 64,
+      "scheduled": 400,
+      "completed": 400,
+      "dropped": 0,
+      "runsPerSecond": 19.74,
+      "submitToVisibleTerminalMs": {
+        "count": 400,
+        "p50": 236,
+        "p95": 589,
+        "p99": 981,
+        "max": 1117
+      },
+      "sampledPeakLag": 140,
+      "drainedLag": 0
+    }
+  ],
+  "faults": [
+    {
+      "case": "once-rate-limit",
+      "terminalFailure": 8,
+      "subsequentUserRequestsCompleted": 8,
+      "automaticReplayClaimed": false
+    },
+    {
+      "case": "once-disconnect",
+      "terminalFailure": 8,
+      "subsequentUserRequestsCompleted": 8,
+      "automaticReplayClaimed": false
+    },
+    {
+      "case": "worker-handoff",
+      "sameRun": true,
+      "writerChanged": true,
+      "physicalCalls": 4
+    },
+    {
+      "case": "projector-restart",
+      "writersPreserved": true,
+      "exactAnswers": 4,
+      "visibleBeforeRestart": true,
+      "sseReconnects": 126,
+      "idlePartitionsReady": 32,
+      "idleSnapshotMaximumMs": 330
+    },
+    {
+      "case": "stop-under-load",
+      "cancelled": 2,
+      "lateReplyIgnored": true
+    },
+    {
+      "case": "live-stop",
+      "cancelled": 2,
+      "verifiedVisiblePrefixBytes": [192, 192]
+    },
+    {
+      "case": "lost-tool-reply",
+      "physicalWrites": 4
+    }
+  ]
+}

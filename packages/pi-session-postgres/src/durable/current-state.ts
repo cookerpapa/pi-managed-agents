@@ -55,14 +55,23 @@ export const currentStateFingerprint = (r: CurrentStateRow): string =>
     r.retired_seq === null ? null : String(r.retired_seq),
     origin(r.cloud_origin),
   ]);
+export const NATIVE_USAGE_DOCUMENT = "pi.usage";
+const currentDocumentKinds = new Set([
+  "pi.inbox",
+  NATIVE_HUMAN_INPUT_DOCUMENT,
+  "pi.live",
+  NATIVE_USAGE_DOCUMENT,
+]);
+const indexedCurrentDocumentKinds = new Set(
+  [...currentDocumentKinds].map((kind) => JSON.stringify(kind)),
+);
+
 export const isCurrentStateDocument = (
   record: Pick<DocumentRecord, "kind" | "scope" | "history">,
 ): boolean =>
   record.scope.kind === "conversation" &&
   record.history === "latest" &&
-  (record.kind === "pi.inbox" ||
-    record.kind === NATIVE_HUMAN_INPUT_DOCUMENT ||
-    record.kind === "pi.live");
+  currentDocumentKinds.has(record.kind);
 
 export const isLiveDocument = (
   record: Pick<DocumentRecord, "kind" | "scope" | "history">,
@@ -189,11 +198,7 @@ export function prepareCurrentStates(
         row.indexed_fields.currentOnly === "true" &&
         row.indexed_fields.scope !== undefined &&
         JSON.parse(row.indexed_fields.scope)[0] === "conversation" &&
-        [
-          JSON.stringify("pi.inbox"),
-          JSON.stringify(NATIVE_HUMAN_INPUT_DOCUMENT),
-          JSON.stringify("pi.live"),
-        ].includes(row.indexed_fields.nativeKind!));
+        indexedCurrentDocumentKinds.has(row.indexed_fields.nativeKind!));
     if (required && !row.body) throw new Error("Native current state is missing");
     if (row.body) rows.set(Number(row.id), row);
   }

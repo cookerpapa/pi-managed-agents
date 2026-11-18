@@ -16,6 +16,7 @@ import { createTestWorker } from "../../packages/control-plane/test/admit-test-e
 import { PostgresAttachmentStore } from "../../packages/session-attachments/src/store.ts";
 import { WorkspaceUploadService } from "../../packages/control-plane/src/workspace-upload-service.ts";
 import { readDurableEntries } from "../../packages/pi-session-postgres/src/durable/history.ts";
+import { readNativeUsageBatch } from "../../packages/pi-session-postgres/src/durable/conversation-usage.ts";
 import { DurablePostgresProjection } from "../../packages/pi-session-postgres/src/durable/postgres-projection.ts";
 
 let pg,
@@ -183,7 +184,7 @@ beforeAll(async () => {
   const head = await native.head();
   await native.apply({
     seq: head.seq + 1,
-    nextId: head.nextId + 2,
+    nextId: head.nextId + 3,
     writes: [
       {
         type: "document.create",
@@ -195,6 +196,24 @@ beforeAll(async () => {
           fork: "initial",
         },
         content: { kind: "base", version: 1, value: { items: [] } },
+      },
+      {
+        type: "document.create",
+        record: {
+          id: head.nextId + 2,
+          kind: "pi.usage",
+          scope: { kind: "conversation", conversationId: 1 },
+          history: "latest",
+          fork: "initial",
+        },
+        content: {
+          kind: "base",
+          version: 1,
+          value: {
+            models: { "fixture/fixture": { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 } },
+            tools: {},
+          },
+        },
       },
       {
         type: "submission",
@@ -272,7 +291,7 @@ beforeAll(async () => {
     .execute();
   before = await logs(source);
   beforeCurrent = await currentValues(source);
-  expect(beforeCurrent).toHaveLength(2);
+  expect(beforeCurrent).toHaveLength(3);
 }, 120_000);
 
 afterAll(async () => {
@@ -443,6 +462,12 @@ it("restores after source loss, preserves exact native history/images and admits
     sessionId: scope.sessionId,
   }).rebuild();
   expect(await currentValues(target)).toEqual(beforeCurrent);
+  const usage = await readNativeUsageBatch(
+    target,
+    { tenantId: scope.tenantId, sessionId: scope.sessionId },
+    [1],
+  );
+  expect(usage.get(1)?.tokens.total).toBe(2);
   expect(
     await new PostgresAttachmentStore(target, targetImages.blobs).get(scope.tenantId, image),
   ).toEqual(bytes);
