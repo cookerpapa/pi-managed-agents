@@ -296,6 +296,17 @@ export class KafkaPartitionReader {
           }
           this.#enqueue(message);
         }
+        // Async assignment can finish inside a poll of the same generation.
+        // An EOF-only result then has no message to trigger the rewind above.
+        // Re-observe from its verified start; a discarded EOF may not repeat
+        // until new data arrives, leaving an otherwise idle partition unready.
+        for (const [partition, offset] of this.#starts)
+          if (
+            !epochs.has(partition) &&
+            this.#assigned.has(partition) &&
+            !this.#seeking.has(partition)
+          )
+            this.seek({ topic: this.#options.topic, partition, offset: String(offset) });
         for (const partition of this.#eof.keys()) this.#advance(partition);
       } else if (!this.#closing && this.#failed === undefined) {
         // A poll can span assignment. No new-generation record has been delivered

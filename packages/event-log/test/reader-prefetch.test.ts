@@ -135,6 +135,48 @@ async function create(handler: KafkaJS.EachBatchHandler, prefetch?: PrefetchLimi
   return { reader, native: fixture.client, positions, errors };
 }
 
+it("re-observes an EOF-only tail when asynchronous assignment finishes inside a poll", async () => {
+  const install = Promise.withResolvers<void>();
+  const positions: [number, bigint][] = [];
+  const reader = new KafkaPartitionReader({
+    brokers: ["unused"],
+    clientId: "late-assignment",
+    groupId: "late-assignment",
+    topic: "prefetch",
+    logger: { error() {} } as unknown as KafkaJS.Logger,
+    rebalance: async (_error, assignments, functions) => {
+      await install.promise;
+      functions.assign(assignments.map((a) => ({ ...a, offset: 7 })));
+    },
+    onPosition: (partition, offset) => positions.push([partition, offset]),
+  });
+  readers.push(reader);
+  await reader.connect();
+  const native = fixture.client;
+  native.add(0, 7, "", true);
+  native.add(1, 7, "", true);
+  const consume = native.consume.bind(native);
+  native.consume = (count: number, callback: unknown) => {
+    // Poll captures the new generation before the async PG bootstrap assigns
+    // partitions. Only EOF is returned: there is no data message to trigger rewind.
+    queueMicrotask(() => install.resolve());
+    consume(count, callback);
+  };
+  await reader.subscribe({ topics: ["prefetch"] });
+  await reader.run({
+    eachBatch: async () => {
+      throw new Error("No data should be delivered");
+    },
+  });
+  await vi.waitFor(
+    () => {
+      expect(positions).toContainEqual([0, 7n]);
+      expect(positions).toContainEqual([1, 7n]);
+    },
+    { timeout: 500 },
+  );
+});
+
 it("prefetches without per-record pause and holds EOF behind queued and active records", async () => {
   const release = Promise.withResolvers<void>(),
     entered = Promise.withResolvers<void>();

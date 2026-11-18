@@ -36,6 +36,13 @@ delivery and rewind the verified start. Old completions cannot alter a successor
 queue, pause state, offsets or publication authority. Reader failure retires its
 generation; native handles outlive every borrowed transaction and handler.
 
+Asynchronous assignment may finish inside a poll whose generation is already
+current but whose partition snapshot is still empty. Re-observe newly assigned
+partitions from their verified start even if that poll returned only EOF and no
+data. Dropping such an EOF without replay can leave an idle partition waiting
+forever for a notification that only new data would otherwise retrigger. The
+November 18 SQL investigation adds deterministic and RF3 coverage of this edge.
+
 ## Offset confirmation
 
 Ordinary completed progress is coalesced by the existing periodic committer,
