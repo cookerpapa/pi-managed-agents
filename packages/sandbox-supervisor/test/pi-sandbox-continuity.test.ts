@@ -32,6 +32,44 @@ async function fixture() {
     close: () => harness.close(BACKGROUND_CONTEXT),
   };
 }
+it("adopts the initial observation only after the binding transaction succeeds", async () => {
+  const f = await fixture();
+  try {
+    const world = await PiSessionWorldStateController.create(
+      f.harness,
+      f.root.id,
+      continuity("first"),
+    );
+    await expect(
+      world.withInitialObservation((write) =>
+        f.root.commit(async (tx) => {
+          await write(tx);
+          throw new Error("binding failed");
+        }, BACKGROUND_CONTEXT),
+      ),
+    ).rejects.toThrow("binding failed");
+    await world.withInitialObservation((write) => f.root.commit(write, BACKGROUND_CONTEXT));
+    const publications: unknown[] = [];
+    const unsubscribe = f.harness.subscribeCommits((p) => publications.push(p));
+    try {
+      expect((await world.capture()).modelMessages).toEqual([]);
+      expect(publications).toEqual([]);
+      const reopened = await PiSessionWorldStateController.create(
+        f.harness,
+        f.root.id,
+        continuity("first"),
+      );
+      await expect(
+        reopened.withInitialObservation((write) => f.root.commit(write, BACKGROUND_CONTEXT)),
+      ).rejects.toThrow("already observed");
+    } finally {
+      unsubscribe();
+    }
+  } finally {
+    await f.close();
+  }
+});
+
 it("retains physical result identity before a model boundary and verifies it after handoff without waking a pure-chat Run", async () => {
   const f = await fixture();
   try {

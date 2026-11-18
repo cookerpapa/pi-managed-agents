@@ -51,6 +51,8 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+[Projector storage review](reports/projector-pg-review-20261118.md) covers the bounded latest receipt, atomic cold binding and the read/write cost of each projection layer.
+
 [Projector terminal queue and native head lookup](reports/terminal-projector-queue-20261118.md) records the controlled pool comparison and long-history query plans.
 
 [Native usage and chat presentation](adr/0337-native-usage-and-chat-presentation.md) defines which current values and history frames are retained. [Storage and load measurements](reports/native-usage-and-chat-history-20261118.md) compare the two layouts.

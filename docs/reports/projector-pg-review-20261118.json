@@ -1,0 +1,1599 @@
+{
+  "controlRevision": "c3856b734b247b2517bd121ff5abaeacb85b5a5d",
+  "headPlans": [
+    {
+      "variant": "original",
+      "receipts": 8,
+      "otherReceipts": 8192,
+      "queryHash": "8482a25838a62061",
+      "planningMs": {
+        "median": 0.639,
+        "p95": 0.932,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.213,
+        "p95": 0.317,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 1.856,
+        "p95": 2.282,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 2
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 8,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        }
+      ]
+    },
+    {
+      "variant": "bounded",
+      "receipts": 8,
+      "otherReceipts": 8192,
+      "queryHash": "2c7c4bd9378f8c4a",
+      "planningMs": {
+        "median": 0.644,
+        "p95": 0.89,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.214,
+        "p95": 0.306,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 1.864,
+        "p95": 2.367,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 2
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Backward",
+          "rows": 1,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        }
+      ]
+    },
+    {
+      "variant": "original",
+      "receipts": 20000,
+      "otherReceipts": 8192,
+      "queryHash": "8482a25838a62061",
+      "planningMs": {
+        "median": 0.698,
+        "p95": 0.915,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 4.497,
+        "p95": 5.269,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 5.796,
+        "p95": 6.998,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Seq Scan",
+          "rows": 20000,
+          "loops": 1,
+          "removedByFilter": 8192,
+          "localBlocks": 511
+        }
+      ]
+    },
+    {
+      "variant": "bounded",
+      "receipts": 20000,
+      "otherReceipts": 8192,
+      "queryHash": "2c7c4bd9378f8c4a",
+      "planningMs": {
+        "median": 0.733,
+        "p95": 0.924,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.266,
+        "p95": 0.41,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 2.144,
+        "p95": 2.992,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Backward",
+          "rows": 1,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 4
+        }
+      ]
+    },
+    {
+      "variant": "original",
+      "receipts": 100000,
+      "otherReceipts": 8192,
+      "queryHash": "8482a25838a62061",
+      "planningMs": {
+        "median": 0.861,
+        "p95": 1.186,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 22.214,
+        "p95": 25.221,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 21.14,
+        "p95": 26.41,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Seq Scan",
+          "rows": 100000,
+          "loops": 1,
+          "removedByFilter": 8192,
+          "localBlocks": 2050
+        }
+      ]
+    },
+    {
+      "variant": "bounded",
+      "receipts": 100000,
+      "otherReceipts": 8192,
+      "queryHash": "2c7c4bd9378f8c4a",
+      "planningMs": {
+        "median": 0.775,
+        "p95": 1.141,
+        "samples": 25
+      },
+      "executionMs": {
+        "median": 0.249,
+        "p95": 0.343,
+        "samples": 25
+      },
+      "clientMs": {
+        "median": 2.431,
+        "p95": 3.107,
+        "samples": 50
+      },
+      "receiptAccess": [
+        {
+          "node": "Index Scan",
+          "direction": "Forward",
+          "rows": 0,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 3
+        },
+        {
+          "node": "Index Scan",
+          "direction": "Backward",
+          "rows": 1,
+          "loops": 1,
+          "removedByFilter": 0,
+          "localBlocks": 4
+        }
+      ]
+    }
+  ],
+  "largeReadSelectors": {
+    "rows": 100000,
+    "samples": [
+      {
+        "index": "pi_durable_submission_request",
+        "phase": "present",
+        "medianMs": 0.065,
+        "indexNames": ["pi_durable_submission_request"],
+        "rowsRemoved": 0,
+        "localBlocks": 4
+      },
+      {
+        "index": "pi_durable_submission_request",
+        "phase": "removed",
+        "medianMs": 10.484,
+        "indexNames": ["pi_durable_conversation_records"],
+        "rowsRemoved": 9999,
+        "localBlocks": 2861
+      },
+      {
+        "index": "pi_durable_submission_request",
+        "phase": "restored",
+        "medianMs": 0.101,
+        "indexNames": ["pi_durable_submission_request"],
+        "rowsRemoved": 0,
+        "localBlocks": 4
+      },
+      {
+        "index": "pi_durable_pending_tool_reply",
+        "phase": "present",
+        "medianMs": 0.075,
+        "indexNames": ["pi_durable_pending_tool_reply"],
+        "rowsRemoved": 0,
+        "localBlocks": 12
+      },
+      {
+        "index": "pi_durable_pending_tool_reply",
+        "phase": "removed",
+        "medianMs": 0.519,
+        "indexNames": ["pi_durable_pending_tool_binding"],
+        "rowsRemoved": 990,
+        "localBlocks": 1001
+      },
+      {
+        "index": "pi_durable_pending_tool_reply",
+        "phase": "restored",
+        "medianMs": 0.062,
+        "indexNames": ["pi_durable_pending_tool_reply"],
+        "rowsRemoved": 0,
+        "localBlocks": 12
+      }
+    ]
+  },
+  "databaseVersions": {
+    "measuredLoggedDatabase": "PostgreSQL 17.6, fsync=on, synchronous_commit=on",
+    "servingCatalog": "226_model_charge_evidence",
+    "candidateSchemaMarker": "228_native_usage_and_chat_history"
+  },
+  "isolatedFinalCommit": {
+    "raw": {
+      "queriesPerAnswer": [3],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 1701.85,
+          "p50Ms": 6.38,
+          "p95Ms": 9.84,
+          "clusterWalIntervalBytes": 759552
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 1745.69,
+          "p50Ms": 6.27,
+          "p95Ms": 9.05,
+          "clusterWalIntervalBytes": 759552
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 1384.28,
+          "p50Ms": 7.98,
+          "p95Ms": 11.48,
+          "clusterWalIntervalBytes": 759576
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 96,
+        "commits": 0,
+        "frames": 0,
+        "accounting": 0,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "assay_append": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 0,
+          "tableGrowthBytes": 950272
+        }
+      }
+    },
+    "raw-key": {
+      "queriesPerAnswer": [3],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 1600.18,
+          "p50Ms": 6.71,
+          "p95Ms": 11.66,
+          "clusterWalIntervalBytes": 771320
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 1610.83,
+          "p50Ms": 6.88,
+          "p95Ms": 11.37,
+          "clusterWalIntervalBytes": 771232
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 1681.16,
+          "p50Ms": 6.24,
+          "p95Ms": 10.16,
+          "clusterWalIntervalBytes": 776696
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 96,
+        "commits": 0,
+        "frames": 0,
+        "accounting": 0,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "assay_append": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 901120
+        }
+      }
+    },
+    "native-required": {
+      "queriesPerAnswer": [5],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 671.63,
+          "p50Ms": 15.32,
+          "p95Ms": 34.34,
+          "clusterWalIntervalBytes": 1444376
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 768.82,
+          "p50Ms": 12.41,
+          "p95Ms": 34.05,
+          "clusterWalIntervalBytes": 1446920
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 793.73,
+          "p50Ms": 12.26,
+          "p95Ms": 32.64,
+          "clusterWalIntervalBytes": 1457608
+        }
+      ],
+      "excludedNonUniqueIndexes": [
+        "pi_durable_cloud_turn",
+        "pi_durable_control_commits",
+        "pi_durable_conversation_records",
+        "pi_durable_conversation_work",
+        "pi_durable_document_address",
+        "pi_durable_document_base",
+        "pi_durable_document_scope",
+        "pi_durable_entry_body_reference",
+        "pi_durable_entry_role",
+        "pi_durable_entry_task",
+        "pi_durable_head",
+        "pi_durable_history_position",
+        "pi_durable_live_replay_floor",
+        "pi_durable_live_replay_session",
+        "pi_durable_log_record",
+        "pi_durable_navigation",
+        "pi_durable_owner_conversation",
+        "pi_durable_owner_task",
+        "pi_durable_pending_tool_binding",
+        "pi_durable_pending_tool_reply",
+        "pi_durable_record_kind",
+        "pi_durable_retained_record",
+        "pi_durable_submission_entry",
+        "pi_durable_submission_request",
+        "pi_durable_submission_status",
+        "pi_durable_task_history_position",
+        "pi_durable_task_kind",
+        "pi_durable_task_status",
+        "pi_history_entry_head",
+        "pi_history_entry_range"
+      ],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 0,
+        "accounting": 0,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 98304
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 106496
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 94,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 155648
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_bodies": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 688128
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 212992
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.672,
+        "terminalTasks": 0.472,
+        "usage": 0.527
+      }
+    },
+    "native-history-indexes": {
+      "queriesPerAnswer": [5],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 707.07,
+          "p50Ms": 13.48,
+          "p95Ms": 35.11,
+          "clusterWalIntervalBytes": 1551856
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 740.22,
+          "p50Ms": 12.77,
+          "p95Ms": 33,
+          "clusterWalIntervalBytes": 1537488
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 813.18,
+          "p50Ms": 12,
+          "p95Ms": 34.05,
+          "clusterWalIntervalBytes": 1548416
+        }
+      ],
+      "excludedNonUniqueIndexes": [
+        "pi_durable_cloud_turn",
+        "pi_durable_control_commits",
+        "pi_durable_conversation_records",
+        "pi_durable_conversation_work",
+        "pi_durable_document_address",
+        "pi_durable_document_base",
+        "pi_durable_document_scope",
+        "pi_durable_entry_role",
+        "pi_durable_entry_task",
+        "pi_durable_head",
+        "pi_durable_live_replay_floor",
+        "pi_durable_live_replay_session",
+        "pi_durable_navigation",
+        "pi_durable_owner_conversation",
+        "pi_durable_owner_task",
+        "pi_durable_pending_tool_binding",
+        "pi_durable_pending_tool_reply",
+        "pi_durable_record_kind",
+        "pi_durable_submission_entry",
+        "pi_durable_submission_request",
+        "pi_durable_submission_status",
+        "pi_durable_task_history_position",
+        "pi_durable_task_kind",
+        "pi_durable_task_status"
+      ],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 0,
+        "accounting": 0,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 98304
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 98304
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 91,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 163840
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_bodies": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 688128
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 212992
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.678,
+        "terminalTasks": 0.489,
+        "usage": 0.522
+      }
+    },
+    "native": {
+      "queriesPerAnswer": [5],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 666.8,
+          "p50Ms": 14.14,
+          "p95Ms": 42.57,
+          "clusterWalIntervalBytes": 2026816
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 679.81,
+          "p50Ms": 14.11,
+          "p95Ms": 41.15,
+          "clusterWalIntervalBytes": 2019328
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 684.93,
+          "p50Ms": 14.17,
+          "p95Ms": 41.65,
+          "clusterWalIntervalBytes": 2018624
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 0,
+        "accounting": 0,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 98304
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 122880
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 237568,
+          "tableGrowthBytes": 155648
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_bodies": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 696320
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 204800
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.678,
+        "terminalTasks": 0.486,
+        "usage": 0.398
+      }
+    },
+    "chat": {
+      "queriesPerAnswer": [8],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 472.45,
+          "p50Ms": 20.19,
+          "p95Ms": 58.28,
+          "clusterWalIntervalBytes": 2168080
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 472.56,
+          "p50Ms": 18.96,
+          "p95Ms": 59.7,
+          "clusterWalIntervalBytes": 2171288
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 463.15,
+          "p50Ms": 20.47,
+          "p95Ms": 61.18,
+          "clusterWalIntervalBytes": 2149464
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 96,
+        "accounting": 0,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 98304
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 106496
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 237568,
+          "tableGrowthBytes": 172032
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_bodies": {
+          "inserts": 174,
+          "updates": 20,
+          "deletes": 0,
+          "hotUpdates": 19,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 688128
+        },
+        "pi_history_frames": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 73728,
+          "tableGrowthBytes": 204800
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.68,
+        "terminalTasks": 0.527,
+        "usage": 0.343
+      }
+    },
+    "accounting": {
+      "queriesPerAnswer": [10],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 404.37,
+          "p50Ms": 22.74,
+          "p95Ms": 63.24,
+          "clusterWalIntervalBytes": 2387760
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 407.68,
+          "p50Ms": 22.45,
+          "p95Ms": 64.55,
+          "clusterWalIntervalBytes": 2396280
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 408.39,
+          "p50Ms": 21.54,
+          "p95Ms": 65.51,
+          "clusterWalIntervalBytes": 2391984
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 96,
+        "accounting": 96,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "model_invocations": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 24576,
+          "tableGrowthBytes": 139264
+        },
+        "model_metering_events": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 147456
+        },
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 98304
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 106496
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 237568,
+          "tableGrowthBytes": 163840
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_bodies": {
+          "inserts": 172,
+          "updates": 21,
+          "deletes": 1,
+          "hotUpdates": 19,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 696320
+        },
+        "pi_history_frames": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 212992
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.71,
+        "terminalTasks": 0.521,
+        "usage": 0.376
+      }
+    },
+    "accepted": {
+      "queriesPerAnswer": [13],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 338.11,
+          "p50Ms": 27.47,
+          "p95Ms": 88.16,
+          "clusterWalIntervalBytes": 2669936
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 341.38,
+          "p50Ms": 26.86,
+          "p95Ms": 77.71,
+          "clusterWalIntervalBytes": 2727560
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 348.58,
+          "p50Ms": 26.65,
+          "p95Ms": 79.55,
+          "clusterWalIntervalBytes": 2693272
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 96,
+        "accounting": 96,
+        "finished": 0
+      },
+      "medianTableChangesPer96": {
+        "accepted_fact_projection_offsets": {
+          "inserts": 12,
+          "updates": 84,
+          "deletes": 0,
+          "hotUpdates": 84,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 8192
+        },
+        "model_invocations": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 24576,
+          "tableGrowthBytes": 139264
+        },
+        "model_metering_events": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 139264
+        },
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 106496
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 114688
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 237568,
+          "tableGrowthBytes": 172032
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_bodies": {
+          "inserts": 176,
+          "updates": 16,
+          "deletes": 0,
+          "hotUpdates": 13,
+          "indexGrowthBytes": 40960,
+          "tableGrowthBytes": 688128
+        },
+        "pi_history_frames": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 204800
+        },
+        "runs": {
+          "inserts": 0,
+          "updates": 96,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 73728
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.684,
+        "terminalTasks": 0.503,
+        "usage": 0.352
+      }
+    },
+    "finished": {
+      "queriesPerAnswer": [38],
+      "threeRounds": [
+        {
+          "round": 1,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 160.55,
+          "p50Ms": 63.37,
+          "p95Ms": 139.12,
+          "clusterWalIntervalBytes": 3989248
+        },
+        {
+          "round": 2,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 161.5,
+          "p50Ms": 63.77,
+          "p95Ms": 139.51,
+          "clusterWalIntervalBytes": 3924848
+        },
+        {
+          "round": 3,
+          "count": 96,
+          "lanes": 12,
+          "answersPerSecond": 167.15,
+          "p50Ms": 61.34,
+          "p95Ms": 145.16,
+          "clusterWalIntervalBytes": 3905336
+        }
+      ],
+      "excludedNonUniqueIndexes": [],
+      "verifiedPerRound": {
+        "raw": 0,
+        "commits": 96,
+        "frames": 96,
+        "accounting": 96,
+        "finished": 96
+      },
+      "medianTableChangesPer96": {
+        "accepted_fact_projection_offsets": {
+          "inserts": 12,
+          "updates": 180,
+          "deletes": 0,
+          "hotUpdates": 180,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 8192
+        },
+        "model_execution_writers": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 131072
+        },
+        "model_invocations": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 24576,
+          "tableGrowthBytes": 139264
+        },
+        "model_metering_events": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 139264
+        },
+        "outbox": {
+          "inserts": 96,
+          "updates": 96,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 81920,
+          "tableGrowthBytes": 122880
+        },
+        "pi_durable_commits": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 106496
+        },
+        "pi_durable_current": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 106496
+        },
+        "pi_durable_owned_records": {
+          "inserts": 96,
+          "updates": 384,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 237568,
+          "tableGrowthBytes": 147456
+        },
+        "pi_durable_write_refs": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_blocks": {
+          "inserts": 0,
+          "updates": 192,
+          "deletes": 0,
+          "hotUpdates": 161,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 57344
+        },
+        "pi_history_bodies": {
+          "inserts": 281,
+          "updates": 7,
+          "deletes": 0,
+          "hotUpdates": 6,
+          "indexGrowthBytes": 57344,
+          "tableGrowthBytes": 688128
+        },
+        "pi_history_frames": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 81920,
+          "tableGrowthBytes": 98304
+        },
+        "pi_history_records": {
+          "inserts": 192,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 65536,
+          "tableGrowthBytes": 212992
+        },
+        "pi_history_view_nodes": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 24576,
+          "tableGrowthBytes": 237568
+        },
+        "pi_history_views": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 8192
+        },
+        "run_transitions": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 16384,
+          "tableGrowthBytes": 131072
+        },
+        "runs": {
+          "inserts": 0,
+          "updates": 288,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 8192,
+          "tableGrowthBytes": 204800
+        },
+        "session_leases": {
+          "inserts": 0,
+          "updates": 96,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 0,
+          "tableGrowthBytes": 0
+        },
+        "session_terminal_events": {
+          "inserts": 96,
+          "updates": 0,
+          "deletes": 0,
+          "hotUpdates": 0,
+          "indexGrowthBytes": 32768,
+          "tableGrowthBytes": 131072
+        },
+        "sessions": {
+          "inserts": 0,
+          "updates": 192,
+          "deletes": 0,
+          "hotUpdates": 84,
+          "indexGrowthBytes": 24576,
+          "tableGrowthBytes": 57344
+        }
+      },
+      "medianOfReadP50Ms": {
+        "entry": 0.704,
+        "terminalTasks": 0.503,
+        "usage": 0.419
+      }
+    }
+  },
+  "input": {
+    "mixedFinal": [
+      "entry:pi.assistant",
+      "submission",
+      "task:pi.generation",
+      "document.change",
+      "document.change"
+    ],
+    "encodedInMemoryBytes": 7171,
+    "source": "Pinned native Pi Harness with local faux model; 4 KiB unique text, cold materialized predecessor, separate clones and deterministic identities."
+  },
+  "kafkaAppend": {
+    "rawKafkaPg": true,
+    "partitions": 32,
+    "replicas": 3,
+    "minIsr": 2,
+    "connections": 12,
+    "poll": 1,
+    "verifiedRows": 608,
+    "topicAndGroupRemoved": true,
+    "results": [
+      {
+        "count": 192,
+        "payloadBytes": 6953,
+        "allProducerAcksMs": 46,
+        "firstDeliveryToLastPgCommitMs": 257,
+        "startToAllAcksAndPgMs": 272,
+        "recordsPerSecond": 706.56
+      },
+      {
+        "count": 192,
+        "payloadBytes": 6953,
+        "allProducerAcksMs": 36,
+        "firstDeliveryToLastPgCommitMs": 216,
+        "startToAllAcksAndPgMs": 226,
+        "recordsPerSecond": 848.99
+      },
+      {
+        "count": 192,
+        "payloadBytes": 6953,
+        "allProducerAcksMs": 46,
+        "firstDeliveryToLastPgCommitMs": 241,
+        "startToAllAcksAndPgMs": 254,
+        "recordsPerSecond": 756.7
+      }
+    ]
+  },
+  "samePage": [
+    {
+      "extraEntries": 0,
+      "direction": "before",
+      "items": 1,
+      "more": false,
+      "resultsIdentical": true,
+      "liveMs": {
+        "count": 15,
+        "p50": 4.9919169999993755,
+        "p95": 43.50421600000118,
+        "p99": 43.50421600000118,
+        "max": 43.50421600000118
+      },
+      "frozenMs": {
+        "count": 15,
+        "p50": 5.836304000000382,
+        "p95": 72.7893210000002,
+        "p99": 72.7893210000002,
+        "max": 72.7893210000002
+      }
+    },
+    {
+      "extraEntries": 0,
+      "direction": "after",
+      "items": 1,
+      "more": false,
+      "resultsIdentical": true,
+      "liveMs": {
+        "count": 15,
+        "p50": 5.1132460000007995,
+        "p95": 35.85136799999964,
+        "p99": 35.85136799999964,
+        "max": 35.85136799999964
+      },
+      "frozenMs": {
+        "count": 15,
+        "p50": 5.854954000000362,
+        "p95": 9.881290999999692,
+        "p99": 9.881290999999692,
+        "max": 9.881290999999692
+      }
+    },
+    {
+      "extraEntries": 2048,
+      "direction": "before",
+      "items": 64,
+      "more": true,
+      "resultsIdentical": true,
+      "liveMs": {
+        "count": 15,
+        "p50": 102.986809,
+        "p95": 109.27135500000077,
+        "p99": 109.27135500000077,
+        "max": 109.27135500000077
+      },
+      "frozenMs": {
+        "count": 15,
+        "p50": 20.74113099999886,
+        "p95": 22.672781999999643,
+        "p99": 22.672781999999643,
+        "max": 22.672781999999643
+      }
+    },
+    {
+      "extraEntries": 2048,
+      "direction": "after",
+      "items": 62,
+      "more": true,
+      "resultsIdentical": true,
+      "liveMs": {
+        "count": 15,
+        "p50": 123.02717800000028,
+        "p95": 185.33326300000044,
+        "p99": 185.33326300000044,
+        "max": 185.33326300000044
+      },
+      "frozenMs": {
+        "count": 15,
+        "p50": 26.772705999999744,
+        "p95": 48.91592500000115,
+        "p99": 48.91592500000115,
+        "max": 48.91592500000115
+      }
+    }
+  ],
+  "waves": {
+    "control": {
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 192,
+      "visibleTerminalSamples": 190,
+      "submitToStoredSettlementP95Ms": 17087,
+      "runsPerSecond": 9.48,
+      "peakLag": 1478,
+      "endLag": 0,
+      "publicChecks": 3,
+      "combinedWorldAndRun": null,
+      "submitToTerminalSseP95Ms": 17111
+    },
+    "head-only": {
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 192,
+      "visibleTerminalSamples": 192,
+      "submitToStoredSettlementP95Ms": 16995,
+      "runsPerSecond": 9.64,
+      "peakLag": 1339,
+      "endLag": 0,
+      "publicChecks": 3,
+      "combinedWorldAndRun": null,
+      "submitToTerminalSseP95Ms": 17024
+    },
+    "combined": {
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 192,
+      "visibleTerminalSamples": 192,
+      "submitToStoredSettlementP95Ms": 13178,
+      "runsPerSecond": 12.01,
+      "peakLag": 1587,
+      "endLag": 0,
+      "publicChecks": 3,
+      "combinedWorldAndRun": 192,
+      "submitToTerminalSseP95Ms": 13212
+    },
+    "combined-repeat": {
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 192,
+      "visibleTerminalSamples": 191,
+      "submitToStoredSettlementP95Ms": 7614,
+      "runsPerSecond": 19.0,
+      "peakLag": 1446,
+      "endLag": 0,
+      "publicChecks": 3,
+      "combinedWorldAndRun": 192,
+      "submitToTerminalSseP95Ms": 7628
+    },
+    "control-repeat": {
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 192,
+      "visibleTerminalSamples": 192,
+      "submitToStoredSettlementP95Ms": 7374,
+      "runsPerSecond": 19.16,
+      "peakLag": 1594,
+      "endLag": 0,
+      "publicChecks": 3,
+      "combinedWorldAndRun": null,
+      "submitToTerminalSseP95Ms": 7391
+    },
+    "combined-counted": {
+      "offered": 192,
+      "accepted": 192,
+      "completed": 192,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 192,
+      "visibleTerminalSamples": 192,
+      "submitToStoredSettlementP95Ms": 9698,
+      "runsPerSecond": 15.19,
+      "peakLag": 1011,
+      "endLag": 0,
+      "publicChecks": 3,
+      "combinedWorldAndRun": 192,
+      "submitToTerminalSseP95Ms": 9729
+    },
+    "arrivals": {
+      "offered": 400,
+      "accepted": 400,
+      "completed": 400,
+      "failed": 0,
+      "dropped": 0,
+      "maximumInFlight": 18,
+      "visibleTerminalSamples": 400,
+      "submitToStoredSettlementP95Ms": 432,
+      "runsPerSecond": 19.82,
+      "peakLag": 189,
+      "endLag": 0,
+      "publicChecks": null,
+      "combinedWorldAndRun": null,
+      "submitToTerminalSseP95Ms": 493
+    }
+  },
+  "faults": [
+    {
+      "name": "once-rate-limit",
+      "terminalFailure": 8,
+      "subsequentUserRequestsCompleted": 8,
+      "automaticReplayClaimed": false
+    },
+    {
+      "name": "once-disconnect",
+      "terminalFailure": 8,
+      "subsequentUserRequestsCompleted": 8,
+      "automaticReplayClaimed": false
+    },
+    {
+      "name": "worker-handoff",
+      "sameRun": true,
+      "writerChanged": true,
+      "physicalCalls": 4
+    },
+    {
+      "name": "projector-restart",
+      "writersPreserved": true,
+      "exactAnswers": 4,
+      "visibleBeforeRestart": true,
+      "sseReconnects": 124,
+      "idlePartitionsReady": 32,
+      "idleSnapshotMaximumMs": 415
+    },
+    {
+      "name": "stop-under-load",
+      "cancelled": 2,
+      "lateReplyIgnored": true
+    },
+    {
+      "name": "live-stop",
+      "cancelled": 2,
+      "verifiedVisiblePrefixBytes": [192, 192]
+    },
+    {
+      "name": "lost-tool-reply",
+      "physicalWrites": 4
+    }
+  ],
+  "counted": {
+    "nativeSqlPerRun": 61.73,
+    "nativeTransactionsPerRun": 7,
+    "workFinishedInnerCalls": 25,
+    "rootHistoryFreezeCalls": 11,
+    "rootFreezeShareOfInnerQueryTimePercent": 37.55
+  }
+}

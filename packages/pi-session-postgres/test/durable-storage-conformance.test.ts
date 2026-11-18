@@ -107,6 +107,30 @@ async function fixture(
   };
 }
 
+it("continues from the inherited sequence and ID watermark and recognizes an older local receipt", async () => {
+  const f = await fixture();
+  const batch = (seq: number, nextId: number): DurableBatch => ({
+    seq: seq as Seq,
+    nextId,
+    writes: [],
+  });
+  try {
+    expect(await f.projection.head(true)).toEqual({ seq: 0, nextId: 2 });
+    await sql`insert into pi_durable_bases(tenant_id,session_id,through_seq,next_id,history_count,history_fingerprint)
+      values(${f.tenantId}::uuid,${f.sessionId},100,40,0,'fixture')`.execute(database);
+    expect(await f.projection.head(true)).toEqual({ seq: 100, nextId: 40 });
+    await expect(f.projection.apply(batch(101, 39))).rejects.toThrow("not contiguous");
+    await expect(f.projection.apply(batch(102, 45))).rejects.toThrow("not contiguous");
+    expect(await f.projection.apply(batch(101, 45))).toBe(true);
+    expect(await f.projection.apply(batch(102, 48))).toBe(true);
+    expect(await f.projection.apply(batch(101, 45))).toBe(false);
+    await expect(f.projection.apply(batch(101, 46))).rejects.toThrow("changed bytes");
+    expect(await f.projection.head(true)).toEqual({ seq: 102, nextId: 48 });
+  } finally {
+    await f.close();
+  }
+});
+
 it("retains cloud dispatch references with the native commit and rejects changed replay metadata", async () => {
   let saved: DurableBatch | undefined;
   const metadata = {

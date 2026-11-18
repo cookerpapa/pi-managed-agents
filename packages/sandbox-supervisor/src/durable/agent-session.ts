@@ -46,6 +46,7 @@ import {
   type EntryId,
   type Storage,
   type TaskId,
+  type Tx,
   type ToolRegistration,
   type AgentChange,
   type HarnessSettings,
@@ -447,6 +448,7 @@ export class DurableAgentSession {
   async bind(
     run: DurableRunConfiguration,
     mode: "initialize" | "reattach" = "initialize",
+    writeInitialWorld?: (tx: Tx) => Promise<void>,
   ): Promise<Conversation> {
     await run.assertCurrent();
     let conversation = await this.#harness.conversation(
@@ -528,6 +530,7 @@ export class DurableAgentSession {
     };
     const model = this.#models.register(run.runId, run.conversationId, descriptor);
     await conversation.commit(async (tx) => {
+      if (writeInitialWorld) await writeInitialWorld(tx);
       const state = await tx.doc(CloudRunDocument, conversation.id);
       for (const key of Object.keys(state)) delete state[key];
       const { headers: _headers, ...modelDescriptor } = descriptor;

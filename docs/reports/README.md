@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Projector → PostgreSQL design and cost review](projector-pg-review-20261118.md) maps schema, SQL, staged write costs, read tradeoffs and two verified repairs.
+
 - [Projector terminal queue and native head lookup](terminal-projector-queue-20261118.md) traces earlier same-partition work, tests pool size and measures latest-receipt lookup as a Session grows.
 
 - [Native usage and chat history under load](native-usage-and-chat-history-20261118.md) measures current-value storage, per-message projection cost, the terminal queue and fixed-rate arrivals.

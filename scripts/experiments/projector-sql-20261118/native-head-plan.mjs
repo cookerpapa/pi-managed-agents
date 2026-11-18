@@ -53,15 +53,17 @@ async function captureHead(seq, cold = false) {
   assert(query?.sql.includes(cold ? "select h.seq,h.next_id" : "select coalesce(h.seq,0)::text"));
   return { text: query.sql, values: [...query.parameters] };
 }
-function boundedHead(query) {
+// Reproduce the old plan by removing only the local bound. The candidate SQL
+// and its parameters are compiled by the two production callers.
+function unboundedControl(query) {
   const pattern =
-    /(select seq,next_id from pi_durable_commits c where [\s\S]+?)(\s+union all select through_seq,next_id)/g;
+    /\((select seq,next_id from pi_durable_commits c where [\s\S]+?)\s+order by c\.seq desc limit 1\)(\s+union all select through_seq,next_id)/g;
   assert.equal([...query.text.matchAll(pattern)].length, 1, "Native head query shape changed");
-  return { ...query, text: query.text.replace(pattern, "($1 order by c.seq desc limit 1)$2") };
+  return { ...query, text: query.text.replace(pattern, "$1$2") };
 }
 async function compare(client, query, seq, nextId) {
-  const original = await client.query(query);
-  const bounded = await client.query(boundedHead(query));
+  const original = await client.query(unboundedControl(query));
+  const bounded = await client.query(query);
   assert.deepEqual(original.rows, bounded.rows);
   assert.equal(Number(original.rows[0].seq), seq);
   assert.equal(Number(original.rows[0].next_id ?? 2), nextId);
@@ -164,7 +166,7 @@ try {
       }
       await client.query("delete from pg_temp.pi_durable_bases");
     }
-    const variants = [query, boundedHead(query)].map((q, i) => ({
+    const variants = [unboundedControl(query), query].map((q, i) => ({
       name: i ? "bounded" : "original",
       query: q,
       clientMs: [],

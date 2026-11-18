@@ -3,7 +3,8 @@
 ## Projection queue and native head lookup
 
 - [x] Attribute waiting on previous Sessions, SQL callbacks, pool checkouts and ordinary control records in the synchronized 192-Run workload. Compare 12, 32 and 12 projection connections. [Queue diagnosis](reports/terminal-projector-queue-20261118.md).
-- [ ] Apply the measured bounded latest-receipt query to stable projection and cold head reads. Validate replay and shared bases. Evaluate cold-start transaction coalescing independently for short Runs. [Issue #48](https://github.com/cookerpapa/pi-managed-agents/issues/48).
+- [x] Use one bounded latest-receipt selector in stable projection and cold reads. Co-commit the first root environment observation and Run configuration. Verify replay, Fork and crash boundaries and compare the two changes independently. [Storage and cost review](reports/projector-pg-review-20261118.md).
+- [ ] Compare frame capture using accepted native write results, then evaluate deferred frozen history for ordinary unbranched Sessions. Measure writes, paging, Fork, prune and deletion before changing the synchronous contract. Test the overlapping Run indexes on admission and settlement separately. [Issue #48](https://github.com/cookerpapa/pi-managed-agents/issues/48).
 
 ## Native usage and system context projection
 

@@ -361,6 +361,8 @@ See [ADR-0243](adr/0243-native-input-current-state.md),
 [ADR-0244](adr/0244-kafka-backed-native-live-state.md) and
 [ADR-0245](adr/0245-native-commit-text-presentation.md).
 
+The storage adapter compares the latest indexed local commit with the single inherited base when opening a Session and validating a stable write. For a new root prompt, the Worker accepts the first environment observation in the same Pi transaction as the Run and Agent configuration. [ADR-0338](adr/0338-initial-world-and-run-binding.md).
+
 Under [ADR-0337](adr/0337-native-usage-and-chat-presentation.md) the presentation selector excludes native system context before allocating a page or frozen frame. Mixed batches keep their visible Entries and Task events. Native context and Forks still resolve the original system Entries. The Session API reads each Conversation’s unkeyed `pi.usage` through its current document and address index. Model charging uses its own request evidence.
 
 Frozen history paging fixes a bounded set of visible positions before resolving

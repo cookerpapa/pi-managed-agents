@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { defineDoc, type Harness, type ConversationId } from "@earendil-works/pi-durable";
+import { defineDoc, type Harness, type ConversationId, type Tx } from "@earendil-works/pi-durable";
 import type { JsonValue } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { SystemMessage } from "@earendil-works/pi-ai";
@@ -204,6 +204,21 @@ export class PiSessionWorldStateController {
       continuity,
       runtimeWorldState(state?.state),
     );
+  }
+
+  /** The first observation has no previous environment to describe to the model. */
+  async withInitialObservation<T>(
+    bind: (write: (tx: Tx) => Promise<void>) => Promise<T>,
+  ): Promise<T> {
+    if (this.#previous !== undefined) throw new Error("Initial environment already observed");
+    const current = this.#current();
+    const result = await bind(async (tx) => {
+      const doc = await tx.doc(WorldState, this.#conversationId);
+      if (doc.state !== null) throw new Error("Initial environment already stored");
+      doc.state = JSON.parse(JSON.stringify(current)) as JsonValue;
+    });
+    this.#previous = current;
+    return result;
   }
 
   async capture(): Promise<

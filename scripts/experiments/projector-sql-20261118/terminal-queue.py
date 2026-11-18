@@ -139,19 +139,24 @@ def adjacent_bootstrap(partitions, readers):
     # Kafka transaction markers can leave integer offsets between successive
     # delivered records. Rank the reader's actual deliveries instead.
     names = ("conversation", "document.create", "document.create+document.change")
+    combined = "document.create+document.create+document.change"
     positions = defaultdict(dict)
     for partition, records in partitions.items():
         ranks = {key: i for i, key in enumerate(sorted(k for k in readers if k[0] == partition))}
         for r in records:
-            if r["category"] in names:
+            if r["category"] in names or r["category"] == combined:
                 session = positions[r["sessionId"]]
                 assert r["category"] not in session
                 session[r["category"]] = ranks[partition, r["offset"]]
-    assert all(set(session) == set(names) for session in positions.values())
-    ordered = [[r[name] for name in names] for r in positions.values()]
+    joined = [r for r in positions.values() if combined in r]
+    separate = [r for r in positions.values() if combined not in r]
+    assert all(set(r) == {names[0], combined} and r[names[0]] < r[combined] for r in joined)
+    assert all(set(r) == set(names) for r in separate)
+    ordered = [[r[name] for name in names] for r in separate]
     assert all(a < b < c for a, b, c in ordered)
     return {
-        "sessions": len(ordered),
+        "sessions": len(positions),
+        "combinedWorldAndRun": len(joined),
         "adjacentWorldAndRun": sum(c == b + 1 for _, b, c in ordered),
         "adjacentRootWorldRun": sum(c == a + 2 for a, _, c in ordered),
     }

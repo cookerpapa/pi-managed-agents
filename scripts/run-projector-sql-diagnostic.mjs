@@ -3,6 +3,7 @@ import {
   nativeProjectionSources,
   sessionApiProjectionDiagnostic,
   workerProjectionDiagnostic,
+  workerStartupSources,
 } from "./lib/projector-diagnostic-readers.mjs";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
@@ -34,6 +35,8 @@ const directory = resolve(process.argv[2] ?? ".cache/projector-sql-" + Date.now(
 const poolSize = process.argv[3] === undefined ? 12 : Number(process.argv[3]);
 const candidateReader = process.argv.slice(4).includes("reader-candidate");
 const candidateProjection = process.argv.slice(4).includes("projection-candidate");
+const candidateStartup = process.argv.slice(4).includes("startup-candidate");
+assert(!candidateStartup || candidateProjection, "Match Worker startup with its storage candidate");
 const clean = process.argv.slice(4).includes("clean");
 const liveBurst = process.argv.slice(4).includes("live-burst");
 const tailLoad = process.argv.slice(4).includes("tail-load");
@@ -65,6 +68,7 @@ assert(
       [
         "reader-candidate",
         "projection-candidate",
+        "startup-candidate",
         "clean",
         "tail-load",
         "live-burst",
@@ -138,7 +142,11 @@ if (candidateProjection) sources.push(...projectionSources);
 const deployment = JSON.parse(await readFile(runtimeDirectory + "/k3s/deployment.json", "utf8"));
 const baselineRevision = deployment.components["session-runtime"].sourceRevision;
 const worker = candidateProjection
-  ? workerProjectionDiagnostic(name, deployment.components["supervisor-host"].sourceRevision)
+  ? workerProjectionDiagnostic(
+      name,
+      deployment.components["supervisor-host"].sourceRevision,
+      candidateStartup ? workerStartupSources : [],
+    )
   : undefined;
 const api = candidateProjection
   ? sessionApiProjectionDiagnostic(name, deployment.components["session-api"].sourceRevision)
@@ -185,6 +193,17 @@ for (const path of sources) {
   data[path.split("/").at(-1)] = source;
 }
 const plainProjector = data["session-projector.ts"];
+if (candidateStartup) {
+  for (const path of workerStartupSources) {
+    const file = path.split("/").at(-1);
+    assert(!Object.hasOwn(data, file));
+    const source = sourceRevision
+      ? execFileSync("git", ["show", sourceRevision + ":" + path], { encoding: "utf8" })
+      : await readFile(path, "utf8");
+    await transform(source, { loader: "ts", format: "esm" });
+    data[file] = source;
+  }
+}
 const replace = (text, from, to) => {
   assert.equal(text.split(from).length, 2, "Diagnostic source anchor changed");
   return text.replace(from, to);
@@ -352,6 +371,7 @@ const receipt = {
   poolSize,
   candidateReader,
   candidateProjection,
+  candidateStartup,
   clean,
   repetitions,
   replicas,
@@ -615,6 +635,7 @@ try {
       {
         ...process.env,
         PI_CLOUD_RUNTIME_LOAD_CHECK: "1",
+        ...(candidateStartup ? { PI_CLOUD_LOAD_CHECK_INITIAL_WORLD: "1" } : {}),
         ...(apiUrl ? { PI_CLOUD_LOAD_API_URL: apiUrl } : {}),
       },
     );

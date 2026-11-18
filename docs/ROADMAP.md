@@ -6,6 +6,8 @@
 
 ## Ordered Session projection under load
 
+The [storage review and bottom-up comparison](reports/projector-pg-review-20261118.md) records the bounded native head and the [initial binding repair](adr/0338-initial-world-and-run-binding.md).
+
 [Terminal queue attribution](reports/terminal-projector-queue-20261118.md) separates contention in short bursts from a native lookup whose cost grows with the Session's receipt history.
 
 [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) has a

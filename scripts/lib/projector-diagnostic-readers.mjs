@@ -17,6 +17,11 @@ export const historyPresentationSources = [
   "packages/runtime-core/src/native-transcript-presentation.ts",
   "packages/runtime-core/src/frozen-history.ts",
 ];
+export const workerStartupSources = [
+  "packages/sandbox-supervisor/src/pi-cloud-turn-runner.ts",
+  "packages/sandbox-supervisor/src/pi-sandbox-continuity.ts",
+  "packages/sandbox-supervisor/src/durable/agent-session.ts",
+];
 
 function templateWithSources(service, containerName, name, revision, paths) {
   const target = workload(service);
@@ -56,13 +61,13 @@ function templateWithSources(service, containerName, name, revision, paths) {
 }
 
 /** Match the Worker's storage/flush contract under the operator lock. */
-export function workerProjectionDiagnostic(name, revision) {
+export function workerProjectionDiagnostic(name, revision, extraSources = []) {
   const { target, original, modified } = templateWithSources(
     "pi-workers",
     "pi-worker",
     name,
     revision,
-    nativeProjectionSources,
+    [...nativeProjectionSources, ...extraSources],
   );
   let attempted = false;
   const change = async (from, to) => {

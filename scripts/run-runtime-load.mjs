@@ -594,6 +594,22 @@ async function verifyTextStorage(sessions) {
     database,
   );
   assert.equal(layout.usage_docs, sessions.length);
+  if (process.env.PI_CLOUD_LOAD_CHECK_INITIAL_WORLD === "1") {
+    const {
+      rows: [joined],
+    } = await sql`select count(*)::int as n from pi_durable_owned_records w
+      join pi_durable_owned_records r using(tenant_id,session_id,created_seq)
+      where w.tenant_id=${tenant.tenantId}::uuid and w.kind='document' and r.kind='document'
+      and w.fields->>'nativeKind'='"pi-cloud.runtime_world_state"' and r.fields->>'nativeKind'='"pi-cloud.run"'`.execute(
+      database,
+    );
+    assert.equal(
+      joined.n,
+      sessions.length,
+      "Each fresh root must commit world and Run configuration together",
+    );
+    layout.initialWorldWithRun = joined.n;
+  }
   assert.equal(layout.native_system_entries, sessions.length);
   // Both sides of an A/B run verify their own public API against the raw
   // provider counters in the corresponding immutable native assistant Entry.

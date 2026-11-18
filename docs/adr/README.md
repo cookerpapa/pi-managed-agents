@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0338](0338-initial-world-and-run-binding.md) binds a fresh root’s initial environment and Run configuration in one Pi transaction.
+
 [ADR-0337](0337-native-usage-and-chat-presentation.md) sets the native usage retention and chat presentation boundary.
 
 [ADR-0336](0336-kafka-live-progress.md) moves ordinary in-flight Pi document progress onto the ordered Kafka projection path.

@@ -70,6 +70,7 @@ it.each([
       }),
     );
     const recordSequences = new Map<number, number>();
+    const createdDocuments = new Map<string, number>();
     const storage = new (class extends MemoryStorage {
       // The fixture storage spans the seed handle and the independently opened Runner.
       override async close() {}
@@ -82,11 +83,13 @@ it.each([
           const confirmed = await textDisplay.compile(this, prepared.writes, prepared.seq);
           const seq = prepared.apply();
           confirmed();
-          for (const write of writes)
+          for (const write of writes) {
+            if (write.type === "document.create") createdDocuments.set(write.record.kind, seq);
             recordSequences.set(
               "value" in write ? write.value.id : "record" in write ? write.record.id : write.id,
               seq,
             );
+          }
           return seq;
         });
       }
@@ -539,6 +542,12 @@ it.each([
         return;
       }
       expect((await executing).stopReason).toBe("stop");
+      if (mode === "complete") {
+        const world = createdDocuments.get("pi-cloud.runtime_world_state");
+        expect(world).toBeDefined();
+        expect(world).toBe(createdDocuments.get("pi-cloud.run"));
+        expect(world!).toBeGreaterThan(createdDocuments.get("pi.agent")!);
+      }
       if (mode === "environment_recovery") {
         expect(recoveryBindings).toHaveLength(2);
         expect(new Set(recoveryBindings).size).toBe(1);

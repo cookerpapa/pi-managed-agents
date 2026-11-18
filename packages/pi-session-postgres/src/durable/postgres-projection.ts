@@ -187,6 +187,14 @@ export class DurablePostgresProjection {
     return sql<boolean>`${sql.ref(`${alias}.tenant_id`)}=${this.scope.tenantId}::uuid
       and ${sql.ref(`${alias}.session_id`)}=${this.scope.sessionId}`;
   }
+  #latestPosition(): RawBuilder<unknown> {
+    // Read at most one local receipt before comparing it with the single inherited base.
+    return sql`select seq,next_id from (
+      (select seq,next_id from pi_durable_commits c where ${this.scoped("c")}
+        order by c.seq desc limit 1)
+      union all select through_seq,next_id from pi_durable_bases c where ${this.scoped("c")}
+    ) positions order by seq desc limit 1`;
+  }
   async assertComplete(): Promise<void> {
     const pending = await sql`select 1 from pi_durable_current c where ${this.scoped("c")}
       and c.replay_offset is not null limit 1`.execute(this.database);
@@ -204,12 +212,9 @@ export class DurablePostgresProjection {
       where ${this.scoped("live")} and live.replay_offset is not null)`
         : sql`false`
     } as incomplete
-      from (select 1) seed left join lateral (
-        select seq,next_id from (
-          select seq,next_id from pi_durable_commits c where ${this.scoped("c")}
-          union all select through_seq,next_id from pi_durable_bases c where ${this.scoped("c")}
-        ) positions order by seq desc limit 1
-      ) h on true`.execute(this.database);
+      from (select 1) seed left join lateral (${this.#latestPosition()}) h on true`.execute(
+      this.database,
+    );
     const row = result.rows[0]!;
     if (row.incomplete)
       throw new Error("Native live state requires ordered Kafka recovery before cold open");
@@ -544,12 +549,7 @@ export class DurablePostgresProjection {
           from pi_durable_commits c where ${this.scoped("c")} and c.seq=${batch.seq}) as prior,
         coalesce((select json_agg(json_build_object('id',r.id::text,'fields',r.fields))
           from pi_durable_owned_records r where ${this.scoped("r")} and r.id=any(${parentIds}::bigint[])),'[]'::json) as origins
-      from (select 1) seed left join lateral (
-        select seq,next_id from (
-          select seq,next_id from pi_durable_commits c where ${this.scoped("c")}
-          union all select through_seq,next_id from pi_durable_bases c where ${this.scoped("c")}
-        ) positions order by seq desc limit 1
-      ) h on true left join lateral (
+      from (select 1) seed left join lateral (${this.#latestPosition()}) h on true left join lateral (
         select json_agg(row) as inputs from (
           select ${CURRENT_SOURCE_COLUMNS}
           from pi_durable_owned_records r left join pi_durable_current c using(tenant_id,session_id,id)

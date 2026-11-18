@@ -433,6 +433,10 @@ export class PiCloudTurnRunner {
         options.openSession(command, readLifetime.signal),
       );
       const owner = handle;
+      const freshRootPrompt =
+        p.input.kind === "prompt" &&
+        p.piSession.conversationId === 1 &&
+        owner.committedSequence() === 0;
       const accounting = new DurableModelAccounting(command);
       owner.prepareModelEvidence((commit) => accounting.prepare(commit));
       text = new DurableTextPresentation({
@@ -528,7 +532,7 @@ export class PiCloudTurnRunner {
           p.piSession.conversationId as ConversationId,
           options.sandboxContinuity,
         );
-        await world.capture();
+        if (!freshRootPrompt) await world.capture();
         return world;
       });
       let sampling = new DurableSampling();
@@ -922,7 +926,11 @@ export class PiCloudTurnRunner {
           : {}),
       };
       const conversation = await prepare("conversation_bind", () =>
-        runtime.bind(binding, p.input.kind === "resume" ? "reattach" : "initialize"),
+        freshRootPrompt
+          ? world.withInitialObservation((writeWorld) =>
+              runtime.bind(binding, "initialize", writeWorld),
+            )
+          : runtime.bind(binding, p.input.kind === "resume" ? "reattach" : "initialize"),
       );
       this.#compact = async (request) => {
         combined.throwIfAborted();

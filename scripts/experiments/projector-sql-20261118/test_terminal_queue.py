@@ -26,6 +26,8 @@ class QueueIntervals(unittest.TestCase):
         self.assertEqual(analysis["adjacent_bootstrap"](records, readers)["adjacentRootWorldRun"], 1)
         readers[1, 14] = {}  # Another delivered record really was in the way.
         self.assertEqual(analysis["adjacent_bootstrap"](records, readers)["adjacentWorldAndRun"], 0)
+        combined = {1: [row("conversation", 10), row("document.create+document.create+document.change", 16)]}
+        self.assertEqual(analysis["adjacent_bootstrap"](combined, readers)["combinedWorldAndRun"], 1)
 
     def test_server_matching_counts_outer_queries_and_leaves_ambiguous_events_unassigned(self):
         with tempfile.TemporaryDirectory() as tmp:

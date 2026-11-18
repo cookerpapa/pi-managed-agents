@@ -123,3 +123,25 @@ python3 -B scripts/experiments/projector-sql-20261118/test_terminal_queue.py
 ```
 
 Run the server analyzer on each directory with a duration log. The queue analyzer also accepts older inner-projection-only observations. It intersects each terminal wait with earlier handlers on the same partition, clips partially covered SQL and pool intervals, and records overlap separately. Its population is the 192 measured Sessions. The latest-receipt experiment generates the actual native SELECT and uses connection-local temporary copies of the four tables and their indexes. It rolls back the fixtures.
+
+## Projector schema and incremental feature costs
+
+The native head plan captures the candidate directly from stable projection and cold opening. Its historical control removes the inner latest-receipt bound. It compares whole result rows, the inherited base and ID watermark before measuring plans.
+
+Add `startup-candidate` to `projection-candidate` to mount the matched Worker startup files. The 192-Run load verifies that every new root stored the initial observation and Run document at the same sequence. Compare the old revision, the head-only candidate and both repairs with `12 projection-candidate clean live-burst`. A counted `live-burst server-duration` from the combined candidate supplies the SQL inventory. Use `clean fault-load` for failure acceptance and `PI_CLOUD_PROJECTION_TAIL_STAGE=arrivals-20` with `clean tail-load` for fixed arrivals.
+
+Run the following experiments serially against a development installation. Set `PI_CLOUD_RUNTIME_DIRECTORY` to the verified runtime directory when working from a separate checkout, and place outputs in a private directory.
+
+```sh
+export PI_CLOUD_PROJECTOR_SQL_DIAGNOSTIC=1
+node --import tsx scripts/experiments/projector-sql-20261118/projection-feature-cost.mjs /private/smoke.json smoke
+node --import tsx scripts/experiments/projector-sql-20261118/projection-feature-cost.mjs /private/stages.json
+node --import tsx scripts/experiments/projector-sql-20261118/projection-feature-cost.mjs /private/transport.json transport
+node --import tsx scripts/experiments/projector-sql-20261118/projection-feature-cost.mjs /private/pages.json paging
+node --import tsx scripts/experiments/projector-sql-20261118/projection-read-cost.mjs /private/index-reads.json
+node scripts/experiments/projector-sql-20261118/projection-catalog.mjs /private/counted-burst /private/catalog.json
+```
+
+The feature experiment requires the development database role to be able to create a disposable database on the same server. It migrates a uniquely named seed database, initializes real native predecessor state and clones it for each measured stage. The write paths use ordinary logged tables and commit before returning. All 27 measured clones are dropped. Query counters include transaction commands. Table counters and growth come from that clone. WAL is a cluster-wide interval. Page comparison uses the live and frozen readers on the identical settled turn. The separate RF3 raw sink uses the maintained Worker producer and Kafka consumer with its own topic, group and scratch database. It verifies the stored bytes and removes its resources.
+
+The catalog reader uses a read-only connection. It joins PostgreSQL catalog definitions to observed query shapes derived from the measured synthetic Sessions. It includes columns, index definitions and predicates, foreign-key users, triggers and ordinary views. Bind values, records and identities are excluded. [Review and experimental results](../../../docs/reports/projector-pg-review-20261118.md).
