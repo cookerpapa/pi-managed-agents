@@ -1,5 +1,10 @@
 # Maintained backlog
 
+## Minimal Session storage feasibility
+
+- [x] Measure Run admission/claim, completed messages, native Inbox changes and separate ordered completion using real Kafka, PostgreSQL and Pi. Verify placement, late input, notification contention, peak/drained lag and whole-document write amplification. [Controlled report](reports/minimal-session-storage-load-20261119.md).
+- [ ] Evaluate coalesced wake-ups against mixed production admissions with durable queue rediscovery, and single-statement one-row projections independently of any native recovery redesign. [Issue #48](https://github.com/cookerpapa/pi-managed-agents/issues/48).
+
 ## Projection queue and native head lookup
 
 - [x] Attribute waiting on previous Sessions, SQL callbacks, pool checkouts and ordinary control records in the synchronized 192-Run workload. Compare 12, 32 and 12 projection connections. [Queue diagnosis](reports/terminal-projector-queue-20261118.md).

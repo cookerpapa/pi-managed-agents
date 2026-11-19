@@ -51,6 +51,8 @@ work from remaining proposals and unverified limits.
 
 ## Decisions and evidence
 
+[Minimal Session lifecycle load](reports/minimal-session-storage-load-20261119.md) measures the proposed storage boundary with real Pi, Kafka and PostgreSQL.
+
 [Projector storage review](reports/projector-pg-review-20261118.md) covers the bounded latest receipt, atomic cold binding and the read/write cost of each projection layer.
 
 [Projector terminal queue and native head lookup](reports/terminal-projector-queue-20261118.md) records the controlled pool comparison and long-history query plans.

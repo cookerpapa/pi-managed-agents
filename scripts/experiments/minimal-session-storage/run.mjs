@@ -1,0 +1,854 @@
+/** Isolated test of the two-table lifecycle. Run through the maintained development cluster. */
+import assert from "node:assert/strict";
+import { answer, claimSql } from "./fixture.mjs";
+import { randomUUID, createHash } from "node:crypto";
+import { spawn, execFileSync } from "node:child_process";
+import { createInterface } from "node:readline";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { performance } from "node:perf_hooks";
+import { setTimeout as delay } from "node:timers/promises";
+import pg from "pg";
+import { build } from "esbuild";
+import { runLoad, distribution } from "../../lib/runtime-load-scheduler.mjs";
+import {
+  runtimeDirectory,
+  serviceAddress,
+  kubectl,
+  namespace,
+  kubeconfig,
+  podFor,
+  workload,
+} from "../../lib/production-kubernetes.mjs";
+import { serializeRelease } from "../../lib/release-lock.mjs";
+
+assert.equal(process.env.PI_CLOUD_RUNTIME_LOAD_CHECK, "1");
+const [output, mode = "matrix"] = process.argv.slice(2);
+assert(
+  output &&
+    ["smoke", "matrix", "inbox", "capacity", "diagnose", "intake", "boundary"].includes(mode),
+);
+serializeRelease(runtimeDirectory);
+process.umask(0o077);
+const out = resolve(output);
+await mkdir(out, { mode: 0o700 });
+const token = randomUUID().replaceAll("-", "").slice(0, 16),
+  name = "pma_sessbench_" + token,
+  topic = "pma-session-bench-" + token,
+  tenant = randomUUID();
+const u = new URL((await readFile(runtimeDirectory + "/secrets/database-url", "utf8")).trim());
+u.hostname = serviceAddress("postgres");
+const admin = new pg.Pool({
+  connectionString: u.toString(),
+  max: 1,
+  application_name: "pma-session-bench-operator",
+});
+const scratch = new URL(u);
+scratch.pathname = "/" + name;
+const db = new pg.Pool({
+  connectionString: scratch.toString(),
+  max: 12,
+  application_name: "bench-intake",
+  connectionTimeoutMillis: 15000,
+});
+const statsDb = new pg.Pool({
+  connectionString: scratch.toString(),
+  max: 1,
+  application_name: "bench-observer",
+});
+const source = Object.fromEntries(
+  await Promise.all(
+    ["worker", "projector"].map(async (role) => {
+      const path = fileURLToPath(new URL(role + ".mjs", import.meta.url));
+      const bundle = await build({
+        entryPoints: [path],
+        bundle: true,
+        packages: "external",
+        minify: false,
+        platform: "node",
+        target: "node24",
+        format: "esm",
+        write: false,
+      });
+      return [role, bundle.outputFiles[0].text];
+    }),
+  ),
+);
+const sha = (x) => createHash("sha256").update(x).digest("hex");
+const failure = Promise.withResolvers();
+void failure.promise.catch(() => {});
+const abort = new AbortController();
+let fatalError,
+  created = false,
+  actorCleanup = false;
+function fatal(error) {
+  if (!fatalError) {
+    fatalError = error instanceof Error ? error : new Error(String(error));
+    abort.abort(fatalError);
+    failure.reject(fatalError);
+  }
+}
+async function limit(job, ms, title) {
+  let timer;
+  try {
+    return await Promise.race([
+      job,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(title + " timed out")), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+const guard = (job, ms = 120000) =>
+  limit(Promise.race([job, failure.promise]), ms, "Benchmark operation");
+process.on("SIGINT", () => fatal(new Error("Interrupted")));
+process.on("SIGTERM", () => fatal(new Error("Terminated")));
+const actors = [],
+  workers = [],
+  entries = new Map();
+let projector, fixture;
+function receive(a, m) {
+  if (m.kind === "fixture") {
+    fixture ??= { source: m.source, batches: m.batches };
+    return;
+  }
+  if (m.kind === "failure") {
+    fatal(new Error(a.id + ": " + m.message));
+    return;
+  }
+  if (m.kind === "cleaned") {
+    actorCleanup = m.topicAndGroupRemoved;
+    return;
+  }
+  const k = m.kind + (m.stage ?? m.n ?? "");
+  const wait = a.waiters.get(k);
+  if (wait) {
+    a.waiters.delete(k);
+    wait.resolve(m);
+    return;
+  }
+  if (!m.id) return;
+  const e = entries.get(m.id);
+  if (!e) {
+    fatal(new Error("Unknown trial run"));
+    return;
+  }
+  if (m.kind === "claim") {
+    e.worker = a;
+    return;
+  }
+  if (m.kind === "workerDone") {
+    e.work = m;
+    e.workerDone.resolve();
+    return;
+  }
+  if (m.kind === "settled") {
+    e.terminal = m;
+    e.projected.resolve();
+    return;
+  }
+  if (m.kind === "confirmed") {
+    assert(e.worker);
+    e.worker.write({ kind: "confirmed", id: m.id, seq: m.seq, at: m.at });
+    if (m.placed && m.depth === 0) e.placed = true;
+  }
+  if (m.kind === "answerCommitted") e.answerCommitted = true;
+  if (m.kind === "finishHeld") e.finishHeld = true;
+  if (e.finishHeld && e.answerCommitted && !e.holdCheck) {
+    e.holdCheck = true;
+    void (async () => {
+      const {
+        rows: [r],
+      } = await statsDb.query(
+        "select r.state,jsonb_array_length(i.items) depth from runs r join inboxes i on i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id where r.id=$1",
+        [e.id],
+      );
+      assert.equal(r.state, "running");
+      assert.equal(r.depth, 0);
+      e.checked = true;
+      e.worker.write({ kind: "checked", id: e.id });
+    })().catch(fatal);
+  }
+  if (m.kind === "secondModel") e.secondModel = true;
+  if (e.placed && e.secondModel && !e.checking) {
+    e.checking = true;
+    void (async () => {
+      const {
+        rows: [state],
+      } = await statsDb.query(
+        "select r.state,jsonb_array_length(i.items) depth from runs r join inboxes i on i.pi_session_id=r.session_id and i.tenant_id=r.tenant_id where r.id=$1",
+        [m.id],
+      );
+      assert.equal(state.state, "running");
+      assert.equal(state.depth, 0);
+      e.checked = true;
+      e.worker.write({ kind: "checked", id: m.id });
+    })().catch(fatal);
+  }
+}
+async function startActor(role, id, pod) {
+  const binary = process.env.PI_CLOUD_KUBECTL_BIN ?? "/usr/local/bin/k3s";
+  const args = [
+    ...(process.env.PI_CLOUD_KUBECTL_BIN ? [] : ["kubectl"]),
+    "--kubeconfig",
+    kubeconfig,
+    "-n",
+    namespace,
+    "exec",
+    "-i",
+    pod,
+    "--",
+    "node",
+    "--import",
+    "tsx",
+    "--input-type=module",
+    "-e",
+    source[role],
+    name,
+    topic,
+    id,
+  ];
+  const child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] });
+  const a = {
+    id,
+    child,
+    waiters: new Map(),
+    closing: false,
+    stderr: "",
+    write: (m) => child.stdin.write(JSON.stringify(m) + "\n"),
+  };
+  a.wait = (key) => {
+    assert(!a.waiters.has(key));
+    const p = Promise.withResolvers();
+    a.waiters.set(key, p);
+    return p.promise;
+  };
+  const ready = a.wait("ready");
+  createInterface({ input: child.stdout }).on("line", (line) => {
+    if (line.startsWith("SESSION_BENCH "))
+      try {
+        receive(a, JSON.parse(line.slice(14)));
+      } catch (e) {
+        fatal(e);
+      }
+  });
+  child.stderr.on("data", (b) => {
+    a.stderr = (a.stderr + b.toString()).slice(-1800);
+  });
+  child.stdin.on("error", (e) => {
+    if (!a.closing) fatal(e);
+  });
+  a.exit = new Promise((resolveExit) => {
+    child.once("error", (e) => {
+      fatal(e);
+      resolveExit(1);
+    });
+    child.once("close", (code) => {
+      if (!a.closing) fatal(new Error(id + " exited " + code + " " + a.stderr));
+      resolveExit(code);
+    });
+  });
+  actors.push(a);
+  await guard(ready, 90000);
+  return a;
+}
+async function configure(sc) {
+  const options = { ...sc, kind: "stage", stage: sc.label, ...(sc.replay ? { fixture } : {}) };
+  if (sc.replay) assert(fixture);
+  await Promise.all(
+    actors.map(async (a) => {
+      const response = a.wait("configured" + sc.label);
+      a.write(options);
+      await guard(response, 15000);
+    }),
+  );
+}
+const intakeSql = `with admitted as (insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state)
+ select $1,$2,$3,1+coalesce((select mailbox_position from runs where tenant_id=$2 and session_id=$3 order by mailbox_position desc limit 1),0),$4,$5,'local-load','queued'
+ on conflict(tenant_id,session_id,idempotency_key) do update set idempotency_key=excluded.idempotency_key
+ where runs.initial_input=excluded.initial_input returning id) select id,pg_notify('session_bench_work','') from admitted`;
+const quietIntake = intakeSql.replace(",pg_notify('session_bench_work','')", "");
+let notifyJob,
+  notifyGeneration = 0,
+  wakeCount = 0;
+function notifyBatch() {
+  notifyGeneration++;
+  if (notifyJob) return;
+  notifyJob = (async () => {
+    let sent;
+    do {
+      await delay(5);
+      sent = notifyGeneration;
+      await db.query("select pg_notify('session_bench_work','')");
+      wakeCount++;
+    } while (sent !== notifyGeneration);
+  })().finally(() => {
+    notifyJob = undefined;
+  });
+  void notifyJob.catch(fatal);
+}
+async function intake(e, sc = {}) {
+  for (let i = 0; ; i++)
+    try {
+      const started = performance.now(),
+        client = await db.connect();
+      const acquired = performance.now();
+      let rows;
+      try {
+        ({ rows } = await client.query(sc.omitNotify ? quietIntake : intakeSql, [
+          e.id,
+          tenant,
+          e.session,
+          e.key,
+          e.text,
+        ]));
+      } finally {
+        client.release();
+      }
+      e.admissionPoolMs = acquired - started;
+      e.admissionSqlMs = performance.now() - acquired;
+      assert.equal(rows.length, 1, "Changed idempotent input");
+      if (!sc.omitNotify) wakeCount++;
+      if (sc.wakeMode === "relay") for (const worker of workers) worker.write({ kind: "wake" });
+      if (sc.wakeMode === "coalesced") notifyBatch();
+      return rows[0].id;
+    } catch (error) {
+      if (
+        error.code !== "23505" ||
+        error.constraint !== "runs_tenant_id_session_id_mailbox_position_key" ||
+        i >= 3
+      )
+        throw error;
+    }
+}
+let sampleId = 0,
+  calibratedAt = 0;
+const calibrationBlock = Buffer.alloc(1024 * 1024, 103);
+async function sample(lockSamples) {
+  const n = ++sampleId,
+    got = projector.wait("sample" + n);
+  projector.write({ kind: "sample", n });
+  const [k, p] = await guard(
+    Promise.all([
+      got,
+      statsDb.query(
+        `select count(*) filter(where state='queued')::int queued,count(*) filter(where state='running')::int running from runs where state<>'completed'`,
+      ),
+    ]),
+    12000,
+  );
+  const waits = lockSamples
+    ? (
+        await statsDb.query(`select a.state,a.wait_event_type,a.wait_event,l.locktype,l.mode,l.classid::regclass::text as class,l.objid,count(*)::int n
+     from pg_stat_activity a left join pg_locks l on l.pid=a.pid and not l.granted
+     where a.datname=current_database() and a.application_name='bench-intake' and a.state<>'idle'
+     group by a.state,a.wait_event_type,a.wait_event,l.locktype,l.mode,l.classid,l.objid`)
+      ).rows
+    : undefined;
+  let calibrationMs;
+  if (mode === "boundary" && Date.now() - calibratedAt >= 900) {
+    calibratedAt = Date.now();
+    const t = performance.now();
+    for (let i = 0; i < 4; i++) createHash("sha256").update(calibrationBlock).digest();
+    calibrationMs = performance.now() - t;
+  }
+  return {
+    at: Date.now(),
+    calibrationMs,
+    waits,
+    lag: k.lag,
+    partitionLag: k.partitionLagMax,
+    localQueue: k.queued,
+    poolWaiting: k.poolWaiting,
+    ...p.rows[0],
+  };
+}
+function d(xs) {
+  const dist = distribution(xs);
+  dist.min = xs.length ? Math.min(...xs) : null;
+  return Object.fromEntries(
+    Object.entries(dist).map(([k, v]) => [k, v === null ? null : Math.round(v * 100) / 100]),
+  );
+}
+function milliseconds(row) {
+  return row.settled_at - row.created_at;
+}
+async function verify(sc, records) {
+  const ids = records.map((r) => r.id);
+  const rr = (await db.query("select * from runs where id=any($1::uuid[])", [ids])).rows;
+  const msgs = (
+    await db.query(
+      "select run_id,role,entry_id,source_input_id,content,commit_seq,ordinal from messages where run_id=any($1::uuid[]) order by run_id,commit_seq,ordinal",
+      [ids],
+    )
+  ).rows;
+  const queues = (
+    await db.query(
+      "select count(*)::int n,count(*) filter(where jsonb_array_length(items)<>0)::int pending from inboxes where pi_session_id=any($1::uuid[])",
+      [records.map((r) => r.session)],
+    )
+  ).rows[0];
+  assert.equal(rr.length, records.length);
+  assert(rr.every((r) => r.state === "completed" && r.lease_id && r.settled_at >= r.started_at));
+  const byRun = Map.groupBy(msgs, (m) => m.run_id);
+  if (sc.sink === "terminal-only") {
+    assert.equal(msgs.length, 0);
+    assert.equal(queues.n, 0);
+  } else {
+    assert.equal(queues.n, records.length);
+    assert.equal(queues.pending, 0);
+    for (const r of records) {
+      const history = byRun.get(r.id) ?? [],
+        users = history.filter((m) => m.role === "user"),
+        answers = history.filter((m) => m.role === "assistant");
+      const extras = r.work.inputs.filter((i) => !i.withdrawn);
+      assert.deepEqual(
+        users.map((m) => m.source_input_id),
+        [r.id, ...extras.map((i) => i.id)],
+      );
+      assert.deepEqual(
+        users.flatMap((m) => JSON.parse(m.content).model[0].content.map((c) => c.text)),
+        [r.text, ...extras.map((i) => i.text)],
+      );
+      assert.equal(answers.length, sc.scene === "plain" ? 1 : 2);
+      if (sc.scene === "steer") {
+        assert.deepEqual(
+          history.map((m) => m.role),
+          ["user", "assistant", "toolResult", "user", "assistant"],
+        );
+      } else if (extras.length) {
+        assert(BigInt(answers[0].entry_id) < BigInt(users[1].entry_id));
+      }
+      const body = JSON.parse(history.at(-1).content).model[0];
+      assert.equal(body.stopReason, "stop");
+      assert.equal(body.content[0].text, answer(r.id, sc.scene === "plain" ? 1 : 2));
+      if (sc.scene === "follow" || sc.scene === "late")
+        assert.equal(JSON.parse(answers[0].content).model[0].content[0].text, answer(r.id, 1));
+      if (sc.scene === "steer") {
+        const call = JSON.parse(answers[0].content).model[0].content.find(
+          (c) => c.type === "toolCall",
+        );
+        assert.equal(JSON.parse(history[2].content).model[0].toolCallId, call.id);
+      }
+      assert.equal(body.content[0].text.length, 4096);
+      assert(
+        body.content[0].text.startsWith(r.id + " answer " + (sc.scene === "plain" ? 1 : 2) + " "),
+      );
+      if (sc.inspect || sc.holdFinish) assert(r.checked);
+    }
+  }
+  return {
+    messages: msgs.length,
+    inboxes: queues.n,
+    nonemptyInboxes: queues.pending,
+    sequenceVerified: true,
+    queueMs: d(rr.map((r) => r.started_at - r.created_at)),
+    pgLifecycleMs: d(rr.map(milliseconds)),
+  };
+}
+const report = {
+  format: 1,
+  at: new Date().toISOString(),
+  mode,
+  revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  actorHashes: Object.fromEntries(Object.entries(source).map(([k, s]) => [k, sha(s)])),
+  tests: [],
+  cleaned: false,
+};
+const save = () => writeFile(resolve(out, "report.json"), JSON.stringify(report, null, 2) + "\n");
+async function wave(spec) {
+  const sc = {
+    scene: "plain",
+    modelDelayMs: 0,
+    sink: "full",
+    slots: 96,
+    inputBytes: 96,
+    concurrency: 64,
+    count: 192,
+    ...spec,
+  };
+  entries.clear();
+  wakeCount = 0;
+  await configure(sc);
+  let sampling = true;
+  const samples = [];
+  const observing = (async () => {
+    while (sampling) {
+      samples.push(await sample(sc.lockSamples));
+      if (sampling) await delay(sc.lockSamples ? 100 : 250);
+    }
+  })();
+  void observing.catch(fatal);
+  const start = Date.now();
+  let load;
+  try {
+    load = await runLoad({
+      mode: sc.rate ? "arrival" : "closed",
+      concurrency: sc.concurrency,
+      count: sc.count,
+      rate: sc.rate,
+      signal: abort.signal,
+      work: async () => {
+        if (fatalError) throw fatalError;
+        const id = randomUUID(),
+          e = {
+            id,
+            session: randomUUID(),
+            key: randomUUID(),
+            text: "Check the fixture " + id,
+            workerDone: Promise.withResolvers(),
+            projected: Promise.withResolvers(),
+          };
+        entries.set(id, e);
+        e.sentAt = Date.now();
+        const accepted = await intake(e, sc);
+        assert.equal(accepted, id);
+        e.acceptedAt = Date.now();
+        if (sc.idempotency) {
+          const again = await intake({ ...e, id: randomUUID() }, sc);
+          assert.equal(again, id);
+        }
+        await guard(e.projected.promise, 90000);
+        return {
+          id,
+          success: true,
+          observedAt: e.terminal.at,
+          settlementMs: e.terminal.at - e.sentAt,
+        };
+      },
+    });
+    if (fatalError) throw fatalError;
+    const bad = load.results.filter((r) => !r.success);
+    assert.equal(bad.length, 0, bad[0]?.error);
+    await guard(Promise.all([...entries.values()].map((e) => e.workerDone.promise)));
+  } finally {
+    sampling = false;
+    await observing;
+  }
+  await notifyJob;
+  const request = projector.wait("results" + sc.label);
+  projector.write({ kind: "results", stage: sc.label });
+  const projection = await guard(request, 40000);
+  assert.equal(projection.lag, 0);
+  if (sc.redeliver) {
+    assert.equal(projection.stats.stale, 2 * sc.count);
+    assert.equal(projection.stats.duplicate, 2 * sc.count);
+  }
+  const items = [...entries.values()],
+    verified = await verify(sc, items),
+    complete = items.filter((i) => i.terminal).length;
+  assert.equal(complete, load.results.length);
+  const workerResources = await Promise.all(
+    workers.map(async (a) => {
+      const n = ++sampleId,
+        got = a.wait("metrics" + n);
+      a.write({ kind: "metrics", n });
+      const { cpu, loop } = await guard(got);
+      return { worker: a.id, cpu, loop };
+    }),
+  );
+  const peak = (key) => Math.max(0, ...samples.map((s) => s[key]));
+  const closest = (at) =>
+    samples.reduce(
+      (best, s) => (Math.abs(s.at - at) < Math.abs(best.at - at) ? s : best),
+      samples[0],
+    );
+  const offerEnd = sc.rate ? start + ((sc.count - 1) * 1000) / sc.rate : start;
+  const elapsed = load.elapsedMs;
+  const result = {
+    ...sc,
+    completed: complete,
+    dropped: load.dropped.length,
+    elapsedMs: Math.round(elapsed),
+    runsPerSecond: Math.round((complete / elapsed) * 100000) / 100,
+    maxInFlight: load.maximumInFlight,
+    submitToTerminalMs: d(items.map((i) => i.terminal.at - i.sentAt)),
+    admitMs: d(items.map((i) => i.acceptedAt - i.sentAt)),
+    claimCallMs: d(items.map((i) => i.work.claimMs)),
+    claimedWorkMs: d(items.map((i) => i.work.workMs)),
+    nativeKafkaAckSumMs: d(items.map((i) => i.work.ackMs)),
+    nativeRecordsPerRun: d(items.map((i) => i.work.seq)),
+    finishProducerAckMs: d(items.map((i) => i.work.finishAckMs)),
+    finishToHandlerMs: d(items.map((i) => i.terminal.finishTransitMs)),
+    finishPgMs: d(items.map((i) => i.terminal.finishHandlerMs)),
+    answerCommitToRunCommitMs: d(items.map((i) => i.terminal.terminalSinceAnswerMs)),
+    extraInputConfirmedMs: d(items.flatMap((i) => i.work.inputAcks)),
+    inputClientWaitMs: d(items.map((i) => i.work.clientAckWaitMs)),
+    workerResources,
+    wakeCount,
+    admissionPoolMs: d(items.map((e) => e.admissionPoolMs)),
+    admissionSqlMs: d(items.map((e) => e.admissionSqlMs)),
+    serialAckWorkFraction:
+      sc.replay === "pipelined"
+        ? null
+        : items.reduce((n, e) => n + e.work.ackMs, 0) /
+          items.reduce((n, e) => n + e.work.workMs, 0),
+    claimDistribution: Object.fromEntries(
+      workers.map((w) => [w.id, items.filter((i) => i.work.actor === w.id).length]),
+    ),
+    idleRechecks: items.reduce((a, i) => a + i.work.rechecks, 0),
+    generatorDelayMs: d(load.results.map((r) => r.generatorDelayMs)),
+    modelCalls: items.reduce((a, i) => a + i.work.modelCalls, 0),
+    bytesToKafka: items.reduce((a, i) => a + i.work.bytes, 0),
+    peakKafkaLag: peak("lag"),
+    peakQueuedRuns: peak("queued"),
+    peakRunningRuns: peak("running"),
+    peakLocalQueue: peak("localQueue"),
+    peakPoolWaiting: peak("poolWaiting"),
+    endKafkaLag: projection.lag,
+    samples: samples.map((s) => ({ ...s, at: s.at - start })),
+    endOfOffer: sc.rate ? closest(offerEnd) : undefined,
+    drainAfterOfferMs: sc.rate
+      ? Math.round(Math.max(0, Math.max(...items.map((i) => i.terminal.at)) - offerEnd))
+      : undefined,
+    projection: projection.stats,
+    verified,
+  };
+  if (result.endOfOffer)
+    result.endOfOffer = { ...result.endOfOffer, at: Math.round(result.endOfOffer.at - start) };
+  report.tests.push(result);
+  await save();
+  console.log(
+    JSON.stringify({
+      stage: sc.label,
+      completed: complete,
+      dropped: result.dropped,
+      runsPerSecond: result.runsPerSecond,
+      p95: result.submitToTerminalMs.p95,
+      lag: result.peakKafkaLag,
+      drained: result.endKafkaLag,
+      queue: result.peakQueuedRuns,
+    }),
+  );
+  return result;
+}
+async function stopActors(list) {
+  const cleanup = await Promise.allSettled(
+    list.map(async (a) => {
+      if (!a) return;
+      a.closing = true;
+      if (a.child.exitCode == null) {
+        a.write({ kind: "stop" });
+        a.child.stdin.end();
+      }
+      const code = await limit(a.exit, 45000, a.id + " cleanup");
+      assert.equal(code, 0);
+    }),
+  );
+  const e = cleanup.find((r) => r.status === "rejected");
+  if (e) throw e.reason;
+}
+try {
+  const {
+    rows: [state],
+  } = await admin.query(
+    "select count(*) filter(where state not in ('completed','cancelled','failed','timed_out') or recovery_requested_at is not null)::int active from runs",
+  );
+  assert.equal(state.active, 0, "Other active work prevents a serial development benchmark");
+  assert.match(name, /^pma_sessbench_[a-f0-9]{16}$/);
+  await admin.query("create database " + name + " template template0");
+  created = true;
+  assert.equal((await db.query("select current_database() n")).rows[0].n, name);
+  await db.query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
+  report.settings = (
+    await db.query(
+      "select current_setting('server_version') postgres,current_setting('synchronous_commit') synchronous_commit,current_setting('fsync') fsync",
+    )
+  ).rows[0];
+  // Two claimants meet two pending Runs in one Session. A locked or active predecessor must win.
+  const keys = [randomUUID(), randomUUID()],
+    session = randomUUID();
+  for (const [i, id] of keys.entries())
+    await intake({ id, session, key: id, text: "ordered fixture " + i });
+  await assert.rejects(
+    intake({ id: randomUUID(), session, key: keys[0], text: "different owned input" }),
+    /Changed idempotent input/,
+  );
+  const c = await db.connect(),
+    other = await db.connect();
+  try {
+    await c.query("begin");
+    assert.equal((await c.query(claimSql)).rows[0].id, keys[0]);
+    assert.equal((await other.query(claimSql)).rowCount, 0);
+    await c.query("commit");
+    assert.equal((await other.query(claimSql)).rowCount, 0);
+    await c.query("update runs set state='completed' where id=$1", [keys[0]]);
+    assert.equal((await other.query(claimSql)).rows[0].id, keys[1]);
+    report.sameSessionClaimOrder = true;
+  } finally {
+    await c.query("rollback");
+    c.release();
+    other.release();
+  }
+  await db.query("delete from runs where id=any($1::uuid[])", [keys]);
+  projector = await startActor("projector", "projector", podFor("session-runtime"));
+  const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
+  const selector = Object.entries(sts.spec.selector.matchLabels)
+    .map(([k, v]) => k + "=" + v)
+    .join(",");
+  const pods = JSON.parse(kubectl(["get", "pods", "-l", selector, "-o", "json"]))
+    .items.filter(
+      (p) =>
+        !p.metadata.deletionTimestamp &&
+        p.status.conditions.some((c) => c.type === "Ready" && c.status === "True"),
+    )
+    .map((p) => p.metadata.name)
+    .sort();
+  assert(pods.length >= 2);
+  for (let i = 0; i < 2; i++) workers.push(await startActor("worker", "w" + i, pods[i]));
+  await wave({ label: "warmup", count: 12, concurrency: 12 });
+  await wave({ label: "correct-redelivery", count: 2, concurrency: 2, redeliver: true });
+  await wave({ label: "correct-finish-held", count: 2, concurrency: 2, holdFinish: true });
+  for (const scene of ["follow", "steer", "late"])
+    await wave({
+      label: "correct-" + scene,
+      scene,
+      inspect: true,
+      count: 2,
+      concurrency: 2,
+      idempotency: true,
+    });
+  await wave({
+    label: "correct-edit-withdraw",
+    scene: "follow",
+    mutate: true,
+    depth: 3,
+    inspect: true,
+    count: 1,
+    concurrency: 1,
+  });
+  if (mode === "smoke")
+    await wave({ label: "quiet-admission", count: 4, concurrency: 2, omitNotify: true });
+  if (mode === "matrix" || mode === "smoke") {
+    const n = mode === "smoke" ? 8 : 192;
+    if (mode === "matrix") {
+      await wave({ label: "serial", count: 12, concurrency: 1 });
+      await wave({ label: "plain-16", count: 192, concurrency: 16 });
+    }
+    await wave({ label: "plain-64-a", count: n, concurrency: Math.min(n, 64) });
+    if (mode === "matrix") {
+      await wave({ label: "burst-192", count: 192, concurrency: 192 });
+      await wave({ label: "plain-terminal-control", sink: "terminal-only", count: 192 });
+      await wave({ label: "plain-64-b", count: 192 });
+      await wave({ label: "follow-64", scene: "follow", count: 192 });
+      await wave({ label: "steer-64", scene: "steer", count: 192 });
+      await wave({ label: "plain-64-c", count: 192 });
+      await wave({ label: "model-wait-10s", modelDelayMs: 10000, count: 192, concurrency: 192 });
+    }
+  }
+  if (mode === "inbox") {
+    for (const size of [1, 16, 64, 128])
+      await wave({
+        label: "depth-" + size,
+        scene: "follow",
+        depth: size,
+        inputBytes: 512,
+        count: 6,
+        concurrency: 2,
+      });
+  }
+  if (mode === "capacity") {
+    const rates = (process.env.PI_CLOUD_SESSION_BENCH_RATES ?? "20,40,80,120")
+      .split(",")
+      .map(Number);
+    for (const rate of rates) {
+      assert(Number.isInteger(rate) && rate > 0 && rate <= 400);
+      const r = await wave({ label: "offered-" + rate, rate, count: rate * 30, concurrency: 384 });
+      if (r.dropped > 0 || r.drainAfterOfferMs > 8000) break;
+    }
+  }
+  if (mode === "boundary") {
+    await wave({ label: "repeat-90", rate: 90, count: 90 * 60, concurrency: 384 });
+    await wave({ label: "repeat-120", rate: 120, count: 120 * 30, concurrency: 384 });
+    for (const [i, sink] of ["full", "single", "terminal-only", "single", "full"].entries())
+      await wave({
+        label: "fixed120-" + sink + "-" + i,
+        rate: 120,
+        count: 120 * 20,
+        concurrency: 384,
+        omitNotify: true,
+        wakeMode: "coalesced",
+        sink,
+      });
+  }
+  if (mode === "intake") {
+    const cases = [
+      { wakeMode: "relay" },
+      { wakeMode: "relay", omitNotify: true },
+      { wakeMode: "relay", omitNotify: true },
+      { wakeMode: "relay" },
+      { wakeMode: "coalesced", omitNotify: true },
+      {},
+    ];
+    for (const [i, c] of cases.entries())
+      await wave({ label: "intake-" + i, ...c, count: 768, lockSamples: true });
+    for (const rate of [120, 180, 240]) {
+      const r = await wave({
+        label: "coalesced-offer-" + rate,
+        rate,
+        count: rate * 20,
+        concurrency: 384,
+        omitNotify: true,
+        wakeMode: "coalesced",
+        lockSamples: true,
+      });
+      if (r.dropped > 0 || r.drainAfterOfferMs > 5000) break;
+    }
+  }
+  if (mode === "diagnose") {
+    await wave({
+      label: "single-correct",
+      sink: "single",
+      scene: "follow",
+      depth: 2,
+      count: 4,
+      concurrency: 2,
+      inspect: true,
+    });
+    for (const variant of [
+      {},
+      { sink: "single" },
+      { replay: "serial" },
+      { replay: "pipelined" },
+      { sink: "terminal-only" },
+      { replay: "pipelined", sink: "terminal-only" },
+      { sink: "single" },
+      {},
+    ])
+      await wave({ label: "trace-" + report.tests.length, ...variant, count: 384 });
+  }
+} catch (error) {
+  report.error = String(error.stack ?? error).slice(0, 2600);
+  throw error;
+} finally {
+  const cleanErrors = [];
+  try {
+    await stopActors(actors.filter((a) => a !== projector));
+  } catch (e) {
+    cleanErrors.push(e);
+  }
+  try {
+    await stopActors(projector ? [projector] : []);
+  } catch (e) {
+    cleanErrors.push(e);
+  }
+  try {
+    await db.end();
+    await statsDb.end();
+    if (created) {
+      await admin.query("drop database " + name);
+      assert(!(await admin.query("select 1 from pg_database where datname=$1", [name])).rowCount);
+    }
+  } catch (e) {
+    cleanErrors.push(e);
+  }
+  await admin.end();
+  report.cleaned = !cleanErrors.length && actorCleanup;
+  await save();
+  if (cleanErrors.length) throw new AggregateError(cleanErrors, "Benchmark cleanup");
+}
+assert(report.cleaned);
+console.log("Verified topic, group and scratch database cleanup.");
