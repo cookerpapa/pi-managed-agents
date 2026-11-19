@@ -29,15 +29,17 @@ export async function openPool(max) {
 }
 export function listen(commands, cleanup) {
   let stopping;
+  const lines = createInterface({ input: process.stdin });
   const stop = () =>
     (stopping ??= Promise.resolve()
-      .then(cleanup)
+      .then(async () => {
+        lines.close();
+        process.stdin.pause();
+        await cleanup();
+        process.off("SIGTERM", stop);
+      })
       .then(
-        () =>
-          process.stdout.write(
-            "SESSION_BENCH " + JSON.stringify({ kind: "stopped", actor }) + "\n",
-            () => process.exit(0),
-          ),
+        () => send("stopped", { actor }),
         (error) =>
           process.stdout.write(
             "SESSION_BENCH " +
@@ -46,7 +48,6 @@ export function listen(commands, cleanup) {
             () => process.exit(1),
           ),
       ));
-  const lines = createInterface({ input: process.stdin });
   lines.on("line", (line) => {
     let msg;
     try {

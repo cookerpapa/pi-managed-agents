@@ -16,9 +16,12 @@ export const claimBatchSql = `with candidate as materialized (
 export const claimSql = claimBatchSql.replace("limit $1", "limit 1");
 
 // A hint can promote one eligible row. Remaining slots consider the original FIFO index.
-export const claimHintedBatchSql = `with preferred as materialized (
- ${eligible} and r.tenant_id=$2 and r.id=$3 for update of r skip locked
+export function hintedClaimSql(extraEligibility = "") {
+  return `with preferred as materialized (
+ ${eligible} and r.tenant_id=$2 and r.id=$3 ${extraEligibility} for update of r skip locked
 ), ordinary as materialized (
  ${eligible} and not exists (select 1 from preferred p where p.id=r.id)
  ${fifo} limit ($1::integer - (select count(*) from preferred))
 ), candidate as (select id from preferred union all select id from ordinary) ${take}`;
+}
+export const claimHintedBatchSql = hintedClaimSql();

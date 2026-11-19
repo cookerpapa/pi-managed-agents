@@ -11,6 +11,7 @@ import {
 import { applyImmutableBatches } from "@earendil-works/chord/delta";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
+import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 
 const pool = await openPool(12),
   group = topic + "-projector",
@@ -133,11 +134,36 @@ async function processRecord({ fact: f, partition, offset }) {
       taken = performance.now();
     let result;
     try {
+      let head;
+      if (stage?.integrated) {
+        assert.equal(f.baseSequence, s.baseSeq);
+        assert(s.inboxId && s.value.items.length === 0, "Run finished before Inbox settlement");
+        if (s.floorChanged) {
+          const {
+            rows: [covered],
+          } = await c.query(
+            `select count(*)::int n,coalesce(sum(octet_length(content)),0)::bigint bytes
+            from messages where tenant_id=$1 and pi_session_id=$2 and conversation_id=1 and entry_id>=$3`,
+            [tenantId, piSessionId, s.floor],
+          );
+          metrics.queries++;
+          s.count = covered.n;
+          s.bytes = Number(covered.bytes);
+        }
+        head = {
+          version: f.factId,
+          seq: s.seq,
+          nextId: s.nextId,
+          floor: s.floor,
+          count: s.count,
+          bytes: s.bytes,
+        };
+      }
       metrics.queries++;
       result = await c.query(
-        `update runs set state='completed',settled_at=clock_timestamp()
+        `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=$5::jsonb" : ""}
      where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running' returning id`,
-        [tenantId, piSessionId, runId, writerId],
+        [tenantId, piSessionId, runId, writerId, ...(head ? [JSON.stringify(head)] : [])],
       );
     } finally {
       c.release();
@@ -166,20 +192,49 @@ async function processRecord({ fact: f, partition, offset }) {
   if (!s) {
     // If the final record already retired the view, an old Kafka delivery must
     // not re-open it. An active replacement needs native recovery beyond this assay.
+    let prior = EMPTY_HEAD,
+      inboxId = null,
+      items = [];
     if (batch.seq !== 1) {
-      const prior = await pool.query(
-        "select state,lease_id from runs where tenant_id=$1 and session_id=$2 and id=$3",
-        [tenantId, piSessionId, runId],
-      );
-      metrics.queries++;
-      if (prior.rows[0]?.state !== "running" || prior.rows[0]?.lease_id !== writerId) {
-        metrics.stale++;
-        measure("obsolete");
-        return;
+      if (stage?.integrated) {
+        const {
+          rows: [row],
+        } = await pool.query(openingHead, [runId, tenantId, piSessionId]);
+        metrics.queries++;
+        if (row?.state !== "running" || row.lease_id !== writerId) {
+          metrics.stale++;
+          measure("obsolete");
+          return;
+        }
+        prior = priorState(row);
+        inboxId = Number(row.inbox_id);
+        items = row.inbox_items;
+      } else {
+        const prior = await pool.query(
+          "select state,lease_id from runs where tenant_id=$1 and session_id=$2 and id=$3",
+          [tenantId, piSessionId, runId],
+        );
+        metrics.queries++;
+        if (prior.rows[0]?.state !== "running" || prior.rows[0]?.lease_id !== writerId) {
+          metrics.stale++;
+          measure("obsolete");
+          return;
+        }
+        throw new Error("Active native suffix requires recovery before projection");
       }
-      throw new Error("Active native suffix requires recovery before projection");
     }
-    s = { writer: writerId, seq: 0, inboxId: null, value: { items: [] }, lastFact: null };
+    s = {
+      writer: writerId,
+      seq: prior.seq,
+      baseSeq: prior.seq,
+      count: prior.count,
+      bytes: prior.bytes,
+      nextId: prior.nextId,
+      floor: prior.floor,
+      inboxId,
+      value: { items },
+      lastFact: null,
+    };
   }
   if (s.writer !== writerId) {
     metrics.stale++;
@@ -217,15 +272,20 @@ async function processRecord({ fact: f, partition, offset }) {
     }
     if (w.type === "entry") {
       const role = w.value.model?.[0]?.role;
-      if (["user", "assistant", "toolResult"].includes(role))
+      if (stage?.integrated || ["user", "assistant", "toolResult"].includes(role))
         messages.push({
           id: w.value.id,
           conversation: w.value.conversationId,
-          role,
+          role: role ?? w.value.kind,
           content: JSON.stringify(w.value),
           input: inputs.get(w.value.id) ?? null,
           ordinal,
         });
+      if (stage?.integrated && w.value.head !== undefined && (s.markerId ?? 0) < w.value.id) {
+        s.markerId = w.value.id;
+        s.floor = w.value.head;
+        s.floorChanged = true;
+      }
     }
   }
   const lastAssistant = messages.some((m) => m.role === "assistant");
@@ -330,6 +390,11 @@ async function processRecord({ fact: f, partition, offset }) {
     pgMs = performance.now() - q;
   } else metrics.skipped++;
   s.seq = batch.seq;
+  if (stage?.integrated) {
+    s.nextId = batch.nextId;
+    s.count += messages.length;
+    for (const m of messages) s.bytes += Buffer.byteLength(m.content);
+  }
   s.lastFact = f.factId;
   s.lastBatch = batch;
   s.value = value;

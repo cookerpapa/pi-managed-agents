@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import { answer, claimSql, claimBatchSql, claimHintedBatchSql } from "./fixture.mjs";
 import { runWakeTrials, waitForWakeState, wakeNetwork } from "./wake-trials.mjs";
 import { measureClaimPreference, runSizingTrials } from "./wake-sizing.mjs";
+import {
+  runLocality,
+  seedCohort,
+  resetCohortHead,
+  verifyModelHistory,
+  forkSeed,
+  sessionForArrival,
+  checkPreferredClaim,
+} from "./locality-load.mjs";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { spawn, execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -26,7 +35,7 @@ import {
 import { serializeRelease } from "../../lib/release-lock.mjs";
 
 assert.equal(process.env.PI_CLOUD_RUNTIME_LOAD_CHECK, "1");
-const [output, mode = "matrix"] = process.argv.slice(2);
+const [output, mode = "matrix", suite = "smoke"] = process.argv.slice(2);
 assert(
   output &&
     [
@@ -40,6 +49,7 @@ assert(
       "wake",
       "wake-fleet",
       "wake-sizing",
+      "wake-throughput",
     ].includes(mode),
 );
 serializeRelease(runtimeDirectory);
@@ -126,6 +136,10 @@ const actors = [],
   entries = new Map();
 let projector, fixture, router, network, wakeUrl, wakeStage, transition;
 function receive(a, m) {
+  if (m.kind === "stopped") {
+    a.ackStopped = true;
+    return;
+  }
   if (m.kind === "publishBursts") {
     void publishWakeBursts(m)
       .then((measurement) => a.write({ kind: "published", measurement }))
@@ -367,11 +381,20 @@ const intakeSql = `with admitted as (insert into runs(id,tenant_id,session_id,ma
  on conflict(tenant_id,session_id,idempotency_key) do update set idempotency_key=excluded.idempotency_key
  where runs.initial_input=excluded.initial_input returning id) select id,pg_notify('session_bench_work','') from admitted`;
 const quietIntake = intakeSql.replace(",pg_notify('session_bench_work','')", "");
+const localityIntake = `with prior as materialized (select mailbox_position,history_head from runs where
+ tenant_id=$2 and session_id=$3 order by mailbox_position desc limit 1), admitted as
+ (insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state)
+ select $1,$2,$3,coalesce((select mailbox_position from prior),0)+1,$4,$5,$6,'queued'
+ on conflict(tenant_id,session_id,idempotency_key) do update set idempotency_key=excluded.idempotency_key
+ where runs.initial_input=excluded.initial_input and runs.model_ref=excluded.model_ref returning id,mailbox_position)
+ select a.id,p.history_head from admitted a left join prior p on a.mailbox_position=p.mailbox_position+1`;
 let notifyJob,
   notifyGeneration = 0,
-  wakeCount = 0;
-function notifyBatch(directedStage) {
+  wakeCount = 0,
+  pendingTargets = [];
+function notifyBatch(directedStage, hint) {
   notifyGeneration++;
+  if (hint && pendingTargets.length < 32) pendingTargets.push(hint);
   if (notifyJob) return;
   let previous = notifyGeneration - 1;
   notifyJob = (async () => {
@@ -380,9 +403,15 @@ function notifyBatch(directedStage) {
       do {
         await delay(directedStage?.windowMs ?? 5);
         sent = notifyGeneration;
+        const hints = pendingTargets;
+        pendingTargets = [];
         if (directedStage)
           await db.query("select pg_notify('session_bench_directed',$1)", [
-            JSON.stringify({ label: directedStage.label, count: sent - previous }),
+            JSON.stringify({
+              label: directedStage.label,
+              count: sent - previous,
+              ...(hints.length ? { hints } : {}),
+            }),
           ]);
         else await db.query("select pg_notify('session_bench_work','')");
         previous = sent;
@@ -402,13 +431,17 @@ async function intake(e, sc = {}) {
       const acquired = performance.now();
       let rows;
       try {
-        ({ rows } = await client.query(sc.omitNotify ? quietIntake : intakeSql, [
-          e.id,
-          tenant,
-          e.session,
-          e.key,
-          e.text,
-        ]));
+        ({ rows } = await client.query(
+          sc.integrated ? localityIntake : sc.omitNotify ? quietIntake : intakeSql,
+          [
+            e.id,
+            tenant,
+            e.session,
+            e.key,
+            e.text,
+            ...(sc.integrated ? [e.modelRef ?? "local-load"] : []),
+          ],
+        ));
       } finally {
         client.release();
       }
@@ -418,7 +451,14 @@ async function intake(e, sc = {}) {
       if (!sc.omitNotify) wakeCount++;
       if (sc.wakeMode === "relay") for (const worker of workers) worker.write({ kind: "wake" });
       if (sc.wakeMode === "coalesced") notifyBatch();
-      if (sc === wakeStage) notifyBatch(sc);
+      if (sc === wakeStage) {
+        const h = rows[0].history_head;
+        const hint =
+          sc.cacheMode === "prefer" && h?.bytes >= (sc.minCacheBytes ?? 256 * 1024)
+            ? [tenant, e.session, rows[0].id, h.version]
+            : undefined;
+        notifyBatch(sc, hint);
+      }
       return rows[0].id;
     } catch (error) {
       if (
@@ -454,7 +494,7 @@ async function sample(lockSamples) {
       ).rows
     : undefined;
   let calibrationMs;
-  if (mode === "boundary" && Date.now() - calibratedAt >= 900) {
+  if ((mode === "boundary" || mode === "wake-throughput") && Date.now() - calibratedAt >= 900) {
     calibratedAt = Date.now();
     const t = performance.now();
     for (let i = 0; i < 4; i++) createHash("sha256").update(calibrationBlock).digest();
@@ -481,7 +521,7 @@ function d(xs) {
 function milliseconds(row) {
   return row.settled_at - row.created_at;
 }
-async function verify(sc, records) {
+async function verify(sc, records, cohort) {
   const ids = records.map((r) => r.id);
   const rr = (await db.query("select * from runs where id=any($1::uuid[])", [ids])).rows;
   const msgs = (
@@ -503,10 +543,12 @@ async function verify(sc, records) {
     assert.equal(msgs.length, 0);
     assert.equal(queues.n, 0);
   } else {
-    assert.equal(queues.n, records.length);
+    assert.equal(queues.n, new Set(records.map((r) => r.session)).size);
     assert.equal(queues.pending, 0);
     for (const r of records) {
-      const history = byRun.get(r.id) ?? [],
+      const history = (byRun.get(r.id) ?? []).filter((m) =>
+          ["user", "assistant", "toolResult"].includes(m.role),
+        ),
         users = history.filter((m) => m.role === "user"),
         answers = history.filter((m) => m.role === "assistant");
       const extras = r.work.inputs.filter((i) => !i.withdrawn);
@@ -528,6 +570,7 @@ async function verify(sc, records) {
         assert(BigInt(answers[0].entry_id) < BigInt(users[1].entry_id));
       }
       const body = JSON.parse(history.at(-1).content).model[0];
+      if (sc.integrated) assert.equal(body.model, r.modelRef ?? "local-load");
       assert.equal(body.stopReason, "stop");
       assert.equal(body.content[0].text, answer(r.id, sc.scene === "plain" ? 1 : 2));
       if (sc.scene === "follow" || sc.scene === "late")
@@ -545,6 +588,7 @@ async function verify(sc, records) {
       if (sc.inspect || sc.holdFinish) assert(r.checked);
     }
   }
+  if (sc.integrated) verifyModelHistory(sc, rr, records, cohort, byRun);
   return {
     messages: msgs.length,
     inboxes: queues.n,
@@ -558,6 +602,7 @@ const report = {
   format: 1,
   at: new Date().toISOString(),
   mode,
+  ...(mode === "wake-throughput" ? { suite } : {}),
   revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
   actorHashes: Object.fromEntries(Object.entries(source).map(([k, s]) => [k, sha(s)])),
   tests: [],
@@ -576,6 +621,7 @@ async function wave(spec) {
     ...spec,
   };
   entries.clear();
+  const cohort = sc.integrated ? await seedCohort(db, tenant, sc) : [];
   wakeCount = 0;
   await configure(sc);
   let sampling = true;
@@ -596,14 +642,19 @@ async function wave(spec) {
       count: sc.count,
       rate: sc.rate,
       signal: abort.signal,
-      work: async () => {
+      work: async (index) => {
         if (fatalError) throw fatalError;
+        if (sc.forkAt === index) cohort.push(await forkSeed(db, tenant, cohort[0]));
         const id = randomUUID(),
           e = {
             id,
-            session: randomUUID(),
+            session: sessionForArrival(cohort, sc, index),
+            index,
             key: randomUUID(),
             text: "Check the fixture " + id,
+            ...(sc.changeModelAt !== undefined && index >= sc.changeModelAt
+              ? { modelRef: "local-alternate" }
+              : {}),
             workerDone: Promise.withResolvers(),
             projected: Promise.withResolvers(),
           };
@@ -612,6 +663,15 @@ async function wave(spec) {
           e.text = randomBytes(Math.ceil(sc.initialBytes / 2))
             .toString("hex")
             .slice(0, sc.initialBytes);
+        if (sc.resetAt === index) e.resetText = await resetCohortHead(db, tenant, e.session);
+        if (sc.switchAt === index) {
+          const n = ++sampleId,
+            stopped = workers[0].wait("draining" + n);
+          workers[0].write({ kind: "drain", n });
+          await guard(stopped);
+          workers[1].write({ kind: "join" });
+          await waitForWakeState(routerState, (s) => s.online === 1 && s.waiting === 1);
+        }
         e.sentAt = Date.now();
         const accepted = await intake(e, sc);
         assert.equal(accepted, id);
@@ -671,7 +731,7 @@ async function wave(spec) {
     assert.equal(projection.stats.duplicate, 2 * sc.count);
   }
   const items = [...entries.values()],
-    verified = await verify(sc, items),
+    verified = await verify(sc, items, cohort),
     complete = items.filter((i) => i.terminal).length;
   assert.equal(complete, load.results.length);
   const workerResources = await Promise.all(
@@ -679,8 +739,8 @@ async function wave(spec) {
       const n = ++sampleId,
         got = a.wait("metrics" + n);
       a.write({ kind: "metrics", n });
-      const { cpu, loop, claimStats, residence } = await guard(got);
-      return { worker: a.id, cpu, loop, claimStats, residence };
+      const { cpu, loop, claimStats, residence, cacheBytes } = await guard(got);
+      return { worker: a.id, cpu, loop, claimStats, residence, cacheBytes };
     }),
   );
   const peak = (key) => Math.max(0, ...samples.map((s) => s[key]));
@@ -695,6 +755,26 @@ async function wave(spec) {
     ...sc,
     completed: complete,
     dropped: load.dropped.length,
+    ...(sc.integrated
+      ? {
+          dropReasons: Object.fromEntries(
+            Object.entries(Object.groupBy(load.dropped, (r) => r.reason)).map(([k, v]) => [
+              k,
+              v.length,
+            ]),
+          ),
+          ...(sc.rate
+            ? {
+                secondHalfMs: d(
+                  items
+                    .filter((i) => i.sentAt >= start + (offerEnd - start) / 2)
+                    .map((i) => i.terminal.at - i.sentAt),
+                ),
+                completedByOfferEnd: items.filter((i) => i.terminal.at <= offerEnd).length,
+              }
+            : {}),
+        }
+      : {}),
     elapsedMs: Math.round(elapsed),
     runsPerSecond: Math.round((complete / elapsed) * 100000) / 100,
     maxInFlight: load.maximumInFlight,
@@ -704,7 +784,7 @@ async function wave(spec) {
     claimCallMs: d(items.map((i) => i.work.claimMs)),
     claimedWorkMs: d(items.map((i) => i.work.workMs)),
     nativeKafkaAckSumMs: d(items.map((i) => i.work.ackMs)),
-    nativeRecordsPerRun: d(items.map((i) => i.work.seq)),
+    nativeRecordsPerRun: d(items.map((i) => i.work.seq - (i.work.baseSeq ?? 0))),
     finishProducerAckMs: d(items.map((i) => i.work.finishAckMs)),
     finishToHandlerMs: d(items.map((i) => i.terminal.finishTransitMs)),
     finishPgMs: d(items.map((i) => i.terminal.finishHandlerMs)),
@@ -712,6 +792,19 @@ async function wave(spec) {
     extraInputConfirmedMs: d(items.flatMap((i) => i.work.inputAcks)),
     inputClientWaitMs: d(items.map((i) => i.work.clientAckWaitMs)),
     workerResources,
+    ...(sc.integrated
+      ? {
+          locality: {
+            hits: items.filter((i) => i.work.prefixStatus === "hit").length,
+            cold: items.filter((i) => i.work.prefixStatus === "cold").length,
+            fresh: items.filter((i) => i.work.prefixStatus === "new").length,
+            pgReadBytes: items.reduce((n, i) => n + i.work.readBytes, 0),
+            firstModelMs: d(items.map((i) => i.work.firstModelAt - i.sentAt)),
+            prefixReadMs: d(items.map((i) => i.work.restoredMs)),
+            ...(sc.verifyFull ? { path: items.map((e) => e.work.prefixStatus) } : {}),
+          },
+        }
+      : {}),
     ...(wakeStage ? { router: await routerState() } : {}),
     wakeCount,
     admissionPoolMs: d(items.map((e) => e.admissionPoolMs)),
@@ -789,7 +882,12 @@ async function stopActors(list) {
         a.child.stdin.end();
       }
       const code = await limit(a.exit, 45000, a.id + " cleanup");
-      assert.equal(code, 0);
+      assert.equal(
+        code,
+        0,
+        a.id + " cleanup exited " + code + " (acknowledged=" + !!a.ackStopped + "): " + a.stderr,
+      );
+      assert(a.ackStopped, a.id + " exited without confirming cleanup");
     }),
   );
   const e = cleanup.find((r) => r.status === "rejected");
@@ -845,6 +943,7 @@ try {
     other.release();
   }
   await db.query("delete from runs where id=any($1::uuid[])", [keys]);
+  if (mode === "wake-throughput" && suite === "smoke") await checkPreferredClaim(db, tenant);
   if (mode === "wake-sizing") {
     const { measureWarmPrefix } = await import("./warm-prefix.mjs");
     report.claimPreference = await measureClaimPreference(db);
@@ -994,6 +1093,7 @@ try {
       network = wakeNetwork(pod, pods.slice(0, 2), router.ready.port, token);
       wakeUrl = network.address + "/" + topic;
       if (mode === "wake-sizing") await runSizingTrials(wave);
+      else if (mode === "wake-throughput") await runLocality(wave, suite);
       else await runWakeTrials(wave);
     } else {
       await stopActors(workers);
@@ -1042,6 +1142,8 @@ try {
   }
   await admin.end();
   report.cleaned = !cleanErrors.length && actorCleanup;
+  if (cleanErrors.length)
+    report.cleanupErrors = cleanErrors.map((e) => String(e.message).slice(0, 500));
   await save();
   if (cleanErrors.length) throw new AggregateError(cleanErrors, "Benchmark cleanup");
 }

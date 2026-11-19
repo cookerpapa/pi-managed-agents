@@ -2,7 +2,7 @@
 
 This experiment measures the proposed Run queue, immutable messages and one current Pi Inbox per Conversation. It runs the actual pinned Pi Harness on two Worker Pods with a deterministic local model, using the maintained RF3 producer and partition-ordered consumer. A separate Projector process inside the Session runtime Pod uses a private topic and a disposable logged PostgreSQL database. Each role is invoked through kubectl exec. Source changes to these experiment files do not replace any application image.
 
-The measured scope is a fresh physical Session with one root Run. The input driver uses direct SQL and an experiment channel for post-commit confirmations. Cloud scheduling metadata, HTTP/SSE, charging, tool sandboxes and restoration of the complete native Harness are additional costs of the maintained runtime. The benchmark's only tool returns a fixed observation. Each worker applies its in-memory native batch only after Kafka acknowledgement. Steer and follow-up pass through Pi's actual busy submission and placement. Only the explicitly labelled replay controls read a previously captured plain trace.
+The original storage controls use fresh physical Sessions. The `wake-throughput` suites also run successive roots in the same Sessions. The input driver uses direct SQL and an experiment channel for post-commit confirmations. HTTP/SSE, charging, tool sandboxes and restoration of in-flight native Tasks are additional costs of the maintained runtime. The benchmark's only tool returns a fixed observation. Each worker applies its in-memory native batch after Kafka acknowledgement. Steer and follow-up pass through Pi's actual busy submission and placement. Only the explicitly labelled replay controls read a previously captured plain trace.
 
 ## Run serially
 
@@ -51,6 +51,25 @@ Acceptance covers lost admission, wait and wake signals, reconnect, joining afte
 The `wake` mode uses an experimental WebSocket endpoint in the Session runtime Pod and two real Pi processes in different Worker Pods. Two temporary additive network policies cover the randomly allocated port between the selected roles. The driver checks their removal. Production roles and their management protocol are untouched. Stage setup starts the loss-test timer after registration so each fault is injected before the first backup tick. Under the bounded recovery variant, when the waiting set is empty the runtime rotates one connected socket on the same tick. A saturated Worker discards that frame locally.
 
 The `wake-fleet` mode stops the two experimental Pi Workers after the storage smoke checks. The runtime actor then opens 1,000 loopback WebSockets multiplexed over one process with a bounded PG pool. An independent process commits groups of seven isolated Runs and sends real PG notifications at a scheduled 171 groups/s. The broadcast control changes only how many connected clients receive the arrival frame. A lightweight PG update completes each claimed Run. The bootstrap scans of the 1,000 connections are excluded from measured groups. Per-claim SQL counts exclude job inserts, completion updates, the observer and PostgreSQL notification commands. The 30-second directed run is a queue-only sustained sample. [Measurements](../../../docs/reports/directed-worker-wake-20261119.md).
+
+## Successive root Runs and session locality
+
+The throughput candidate uses 32-row claims, 128 root slots per Worker, 5 ms admission coalescing and the 200 ms directed backup wake. Each successor opens a fresh native Harness under a fresh PG claim. Its detached history prefix is usable only with the tenant, physical Session, Conversation and exact version of the predecessor PG settled. Pending inputs stay in the existing Inbox current-value row. Normal FIFO admission remains open while a warm connection is preferred. A bounded cache and advisory connection directory retain neither Tasks nor model credentials.
+
+Acceptance measures true submit-to-terminal throughput for fresh Sessions and repeated conversations, model-visible history, PG eligibility and Kafka lag through drain. Cold, local-cache and cache-aware routing controls use the same storage and workload. Failures include stale versions, missing cached bodies, eviction and absent Workers. This extends the successful foreground text lifecycle of the prototype. Full production recovery and provider traffic have their existing separate acceptance suites.
+
+```sh
+export PI_CLOUD_RUNTIME_LOAD_CHECK=1
+node --test scripts/experiments/minimal-session-storage/session-prefix.test.mjs
+node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/continuation-smoke wake-throughput smoke
+PI_CLOUD_SESSION_BENCH_PROJECTION=single PI_CLOUD_SESSION_BENCH_RATES=90,140 \
+  PI_CLOUD_SESSION_BENCH_SECONDS=60 node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/continuation-mixed wake-throughput mixed
+node scripts/experiments/minimal-session-storage/summarize-throughput.mjs /private/summary.json /private/continuation-smoke /private/continuation-mixed
+```
+
+Use `fresh`, `history` or `mixed` for independent timed arrivals. Returning Sessions begin with 512 KiB of unique synthetic text and accrue genuine user and assistant Entries. The mixed workload alternates fresh and returning Sessions. `confirm` fixes the rate and duration of four foreground estimates, including 100/s for two minutes and 116/s for one minute. `burst` compares fixed client concurrency, `interactive` compares cache policies at a fixed 40 Run/s, and `large` starts each returning Session with 4 MiB. `busy` exercises a follow-up or a real native test Tool and steer per Run. `projection` alternates guarded single-statement projection with explicit transactions at the same offered rate. Every run needs a new output directory. The underlying Inbox upsert is identical in both projection variants. The candidate default, `single`, combines the owner check and one-row mutation in one PG statement. Multi-row changes remain atomic. [Measurements](../../../docs/reports/session-continuation-throughput-20261119.md).
+
+The terminal update records a fresh UUID and the native sequence, next ID, cutoff and count/bytes of covered Entries. Cache candidates can be prepared after Kafka acknowledges the terminal, and become usable only when the next PG claim returns that exact version. A hit restores detached entries under their original commit positions. The new input, current Inbox and model selection come from the new claim. Expired or evicted cache records withdraw their advertisements. Up to 32 small candidate addresses fit in one coalesced PG notification, regardless of how many admissions it represents. A ready cache holder may promote one eligible Run within a batch, with no reservation or follow-up delay on the ordinary FIFO path. Quiescent head replacement and a new fork scope are exercised with isolated maintenance fixtures.
 
 ## Boundaries and evidence
 

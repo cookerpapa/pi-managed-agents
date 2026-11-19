@@ -1,5 +1,18 @@
 import { answer, extraText, claimSql, claimBatchSql } from "./fixture.mjs";
 import { connectClaimWorker } from "./wake-channel.mjs";
+import {
+  PrefixCache,
+  EMPTY_HEAD,
+  priorState,
+  readPrefix,
+  restoreSettled,
+  scopeKey,
+  claimWithHead,
+  claimPreferredWithHead,
+  modelWitness,
+  toolEvidence,
+  record,
+} from "./session-prefix.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { performance, monitorEventLoopDelay } from "node:perf_hooks";
@@ -43,7 +56,9 @@ let capacity = 0,
   stage,
   directed,
   directedConfig,
-  residence;
+  residence,
+  prefixCache,
+  expiryTimer;
 
 function startResidence() {
   const initial = process.memoryUsage(),
@@ -124,6 +139,16 @@ async function execute(row, claimMs, claimReason) {
   const started = performance.now(),
     sc = stage,
     id = row.id;
+  send("claim", { id, actor, at: Date.now() });
+  const head = sc.integrated ? priorState(row) : EMPTY_HEAD;
+  const previous = sc.integrated ? await readPrefix(pool, row, head, prefixCache) : undefined;
+  const additions = [];
+  let allocation = head.nextId,
+    observed,
+    observedTools,
+    toolExecutions = 0,
+    firstModelAt;
+  const restoredMs = performance.now() - started;
   const scope = {
     tenantId: row.tenant_id,
     sessionId: row.session_id,
@@ -131,7 +156,7 @@ async function execute(row, claimMs, claimReason) {
     runId: id,
     turnId: id,
     writerId: row.lease_id,
-    fencingToken: 1,
+    fencingToken: sc.integrated ? Number(row.mailbox_position) : 1,
   };
   const partition = kafkaProducerLane(row.session_id, 32),
     gate = Promise.withResolvers(),
@@ -139,7 +164,7 @@ async function execute(row, claimMs, claimReason) {
     inspectRelease = Promise.withResolvers();
   let ackMs = 0,
     finishAckMs = 0,
-    seq = 0,
+    seq = head.seq,
     records = 0,
     bytes = 0,
     version = 0,
@@ -183,7 +208,6 @@ async function execute(row, claimMs, claimReason) {
     }
   }
   active.set(id, { confirm, inspectRelease });
-  send("claim", { id, actor, at: Date.now() });
   async function publish(fact) {
     if (fact.kind === "durable_commit") {
       lastNative = fact;
@@ -212,7 +236,7 @@ async function execute(row, claimMs, claimReason) {
       factId: randomUUID(),
       scope,
       agentId: "root",
-      baseSequence: 0,
+      baseSequence: head.seq,
       nativeSequence: seq,
       terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
       occurredAt: new Date().toISOString(),
@@ -226,6 +250,25 @@ async function execute(row, claimMs, claimReason) {
       });
     }
     await publish(terminal);
+    if (prefixCache && previous) {
+      const records = previous.records.concat(additions);
+      const marker = additions
+        .filter((r) => r.entry.head !== undefined)
+        .sort((a, b) => b.entry.id - a.entry.id)[0];
+      const floor = marker?.entry.head ?? head.floor;
+      const covered = marker ? records.filter((r) => r.entry.id >= floor) : records;
+      const key = scopeKey(row.tenant_id, row.session_id);
+      if (
+        floor >= head.floor &&
+        prefixCache.put(
+          key,
+          terminal.factId,
+          covered,
+          covered.reduce((n, r) => n + r.bytes, 0),
+        )
+      )
+        directed?.advertise(row.tenant_id, row.session_id, terminal.factId);
+    }
     if (sc.redeliver) {
       await publish(terminal);
       await publish(lastNative);
@@ -240,6 +283,18 @@ async function execute(row, claimMs, claimReason) {
       ackMs,
       finishAckMs,
       seq,
+      ...(previous
+        ? {
+            prefixStatus: previous.status,
+            readBytes: previous.readBytes,
+            restoredMs,
+            observed,
+            observedTools,
+            toolExecutions,
+            firstModelAt,
+            baseSeq: head.seq,
+          }
+        : {}),
       records,
       bytes,
       modelCalls,
@@ -286,9 +341,16 @@ async function execute(row, claimMs, claimReason) {
     }
   }
   class PublishedMemory extends MemoryStorage {
+    async mintId() {
+      return sc.integrated ? allocation++ : super.mintId();
+    }
     async commit(writes) {
       const ready = this.prepareCommit(writes);
-      const batch = { seq: ready.seq, nextId: this.nextId, writes: ready.writes };
+      const batch = {
+        seq: ready.seq,
+        nextId: sc.integrated ? allocation : this.nextId,
+        writes: ready.writes,
+      };
       await publish({
         kind: "durable_commit",
         scope,
@@ -303,6 +365,8 @@ async function execute(row, claimMs, claimReason) {
         cancellations: [],
       });
       seq = ready.apply();
+      if (prefixCache)
+        for (const w of ready.writes) if (w.type === "entry") additions.push(record(w.value, seq));
       for (const w of writes)
         if (w.type === "submission" && w.value.requestId && !inputSeq.has(w.value.requestId))
           inputSeq.set(w.value.requestId, seq);
@@ -314,9 +378,10 @@ async function execute(row, claimMs, claimReason) {
     fake = fauxProvider({
       tokensPerSecond: 0,
       tokenSize: { min: 256, max: 256 },
-      models: [{ id: "local-load" }],
+      models: [{ id: row.model_ref }],
     });
   models.setProvider(fake.provider);
+  if (previous) restoreSettled(store, row, head, previous.records);
   const registry = createRegistry();
   if (sc.scene === "steer")
     registry.install(
@@ -328,6 +393,7 @@ async function execute(row, claimMs, claimReason) {
             description: "Local synthetic observation",
             parameters: Type.Object({}),
             execute: async () => {
+              toolExecutions++;
               gate.resolve();
               await release.promise;
               return { content: [{ type: "text", text: "checked" }] };
@@ -341,6 +407,11 @@ async function execute(row, claimMs, claimReason) {
     steer = sc.scene === "steer";
   const first = async (context) => {
     modelCalls++;
+    if (sc.integrated) {
+      firstModelAt = Date.now();
+      observed = modelWitness(context.messages, sc.verifyFull);
+      if (sc.verifyFull && sc.scene === "steer") observedTools = toolEvidence(context.messages);
+    }
     if (residence) await residence.wait(context);
     if (sc.modelDelayMs) await delay(sc.modelDelayMs);
     if (steer) return fauxAssistantMessage(fauxToolCall("check", {}), { stopReason: "toolUse" });
@@ -388,6 +459,8 @@ async function execute(row, claimMs, claimReason) {
       root = await harness.root(ctx, {
         agent: { model: { provider: model.provider, modelId: model.id } },
       });
+    if (head.version)
+      await root.configure({ model: { provider: model.provider, modelId: model.id } }, ctx);
     const initial = await root.submit(
       { type: "input", content: [{ type: "text", text: row.initial_input }], requestId: id },
       ctx,
@@ -493,7 +566,20 @@ function joinDirected() {
     id: actor,
     stage: directedConfig,
     slots: directedConfig.slots,
-    claim: async (limit) => (await pool.query(claimBatchSql, [limit])).rows,
+    onRegistered: () => {
+      prefixCache?.expire();
+      if (prefixCache && directedConfig.cacheMode === "prefer")
+        for (const [key, item] of prefixCache.items) {
+          const [tenant, session] = key.split("/");
+          directed.advertise(tenant, session, item.version);
+        }
+    },
+    claim: async (limit, hint) => {
+      if (!directedConfig.integrated) return (await pool.query(claimBatchSql, [limit])).rows;
+      if (hint && prefixCache?.get(scopeKey(hint[0], hint[1]), hint[3]))
+        return (await pool.query(claimPreferredWithHead, [limit, hint[0], hint[2], hint[3]])).rows;
+      return (await pool.query(claimWithHead, [limit])).rows;
+    },
     execute,
     fail,
   });
@@ -509,6 +595,20 @@ listen(
       const previous = directedConfig;
       directedConfig = msg.wakeUrl ? msg : undefined;
       stage = msg;
+      clearInterval(expiryTimer);
+      prefixCache =
+        msg.integrated && msg.cacheMode !== "off"
+          ? new PrefixCache({
+              minBytes: msg.minCacheBytes,
+              maxBytes: msg.cacheBudget,
+              ttlMs: msg.cacheTtlMs,
+              onEvict: (key, version) => {
+                const [tenant, session] = key.split("/");
+                directed?.advertise(tenant, session, version, "drop");
+              },
+            })
+          : undefined;
+      if (prefixCache) expiryTimer = setInterval(() => prefixCache.expire(), 30000).unref();
       residence?.stop();
       residence = msg.residentMs && !msg.offline?.includes(actor) ? startResidence() : undefined;
       cpuAt = process.cpuUsage();
@@ -532,6 +632,7 @@ listen(
       send("metrics", {
         n: msg.n,
         claimStats: directed?.stats,
+        cacheBytes: prefixCache?.bytes,
         residence: residence?.snapshot(),
         cpu: process.cpuUsage(cpuAt),
         loop: performance.eventLoopUtilization(eluAt),
@@ -542,10 +643,16 @@ listen(
   },
   async () => {
     closed = true;
+    clearInterval(expiryTimer);
     residence?.stop();
     directed?.close();
     clearInterval(poll);
     for (const state of active.values()) state.inspectRelease.resolve();
+    const deadline = Date.now() + 20000;
+    while (claims || running || directed?.busy || active.size) {
+      assert(Date.now() < deadline, "Experimental Worker did not drain before producer shutdown");
+      await delay(10);
+    }
     await producer.close();
     notifications.release();
     await pool.end();

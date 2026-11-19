@@ -75,3 +75,40 @@ test("a claim already issued before drain settles its committed rows within the 
   assert.equal(worker.stats.queries, 1);
   assert.deepEqual(errors, []);
 });
+
+test("only an available connection with the advertised scoped version gets a preferred wake", async (t) => {
+  const router = await openWakeRouter("127.0.0.1", "/work", assert.fail);
+  t.after(() => router.close());
+  router.configure({ ...stage, cacheMode: "prefer" });
+  async function join(id) {
+    const socket = new WebSocket("ws://127.0.0.1:" + router.port + "/work?stage=unit&id=" + id);
+    await once(socket, "message");
+    return socket;
+  }
+  const ordinary = await join("ordinary"),
+    warm = await join("warm");
+  ordinary.send("ready");
+  await waitFor(() => router.snapshot().waiting === 1);
+  warm.send(JSON.stringify(["T", "S", "v1"]));
+  warm.send("ready");
+  await waitFor(() => router.snapshot().waiting === 2);
+  const hint = ["T", "S", "run", "v1"];
+  const response = once(warm, "message", { signal: AbortSignal.timeout(2000) });
+  router.notify("unit", 1, [hint]);
+  assert.deepEqual(JSON.parse(String((await response)[0])), hint);
+  const fallback = once(ordinary, "message", { signal: AbortSignal.timeout(2000) });
+  router.notify("unit", 1, [hint]);
+  assert.equal(String((await fallback)[0]), "arrival");
+  warm.send("ready");
+  await waitFor(() => router.snapshot().waiting === 1);
+  const stale = once(warm, "message", { signal: AbortSignal.timeout(2000) });
+  router.notify("unit", 1, [["T", "S", "run", "old"]]);
+  assert.equal(String((await stale)[0]), "arrival");
+  warm.send(JSON.stringify(["T", "S", "v1", "drop"]));
+  warm.send("ready");
+  await waitFor(() => router.snapshot().waiting === 1);
+  const evicted = once(warm, "message", { signal: AbortSignal.timeout(2000) });
+  router.notify("unit", 1, [hint]);
+  assert.equal(String((await evicted)[0]), "arrival");
+  assert.equal(router.snapshot().preferred, 1);
+});

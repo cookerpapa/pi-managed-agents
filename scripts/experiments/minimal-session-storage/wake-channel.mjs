@@ -8,7 +8,8 @@ export async function openWakeRouter(host, path, fail, port = 0) {
   await once(server, "listening");
   server.on("error", fail);
   const connections = new Map(),
-    waiting = new Set();
+    waiting = new Set(),
+    directory = new Map();
   let stage, timer, pendingHint, armedFault, stats;
   function drop(fault) {
     if (armedFault !== fault) return false;
@@ -16,12 +17,12 @@ export async function openWakeRouter(host, path, fail, port = 0) {
     stats.faults++;
     return true;
   }
-  function signal(socket, reason) {
+  function signal(socket, reason, hint) {
     waiting.delete(socket);
     if (reason === "arrival" && drop("disconnect")) return socket.terminate();
     if (reason === "arrival" && drop("lost-wake")) return;
     stats[reason]++;
-    socket.send(reason);
+    socket.send(hint ? JSON.stringify(hint) : reason);
   }
   function signalWaiting(count, reason) {
     let sent = 0;
@@ -41,7 +42,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
     stats.unlistedTicks++;
     signal(socket, "tick");
   }
-  function notify(label, count) {
+  function notify(label, count, hints = []) {
     if (!stage || stage.label !== label || !(count > 0)) return;
     stats.notifications++;
     if (drop("lost-notification")) return;
@@ -50,7 +51,23 @@ export async function openWakeRouter(host, path, fail, port = 0) {
       return;
     }
     const needed = Math.ceil(count / stage.batch);
-    pendingHint = signalWaiting(needed, "arrival") < needed;
+    let targeted = 0;
+    if (stage.cacheMode === "prefer")
+      for (const hint of hints) {
+        const key = hint[0] + "/" + hint[1];
+        const known = directory.get(key);
+        if (!known) continue;
+        if (known.expires <= Date.now() || connections.get(known.id) !== known.socket) {
+          directory.delete(key);
+          continue;
+        }
+        if (known.version !== hint[3] || !waiting.has(known.socket)) continue;
+        signal(known.socket, "arrival", hint);
+        stats.preferred++;
+        targeted++;
+      }
+    const remaining = Math.max(0, needed - targeted);
+    pendingHint = remaining > 0 && signalWaiting(remaining, "arrival") < remaining;
   }
   server.on("connection", (socket, request) => {
     const url = new URL(request.url, "http://localhost");
@@ -72,7 +89,27 @@ export async function openWakeRouter(host, path, fail, port = 0) {
       if (connections.get(id) === socket) connections.delete(id);
     });
     socket.on("message", (raw) => {
-      if (connections.get(id) !== socket || raw.toString() !== "ready") return;
+      if (connections.get(id) !== socket) return;
+      const frame = raw.toString();
+      if (frame.startsWith("[") && stage.cacheMode === "prefer") {
+        const [tenant, session, version, action] = JSON.parse(frame);
+        const key = tenant + "/" + session;
+        if (action === "drop") {
+          const held = directory.get(key);
+          if (held?.socket === socket && held.version === version) directory.delete(key);
+          return;
+        }
+        directory.delete(key);
+        if (directory.size >= 4096) directory.delete(directory.keys().next().value);
+        directory.set(key, {
+          id,
+          socket,
+          version,
+          expires: Date.now() + (stage.cacheTtlMs ?? 300000),
+        });
+        return;
+      }
+      if (frame !== "ready") return;
       stats.offers++;
       if (drop("lost-ready")) return;
       waiting.add(socket);
@@ -88,6 +125,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
     for (const socket of connections.values()) socket.terminate();
     connections.clear();
     waiting.clear();
+    directory.clear();
     pendingHint = false;
     stage = undefined;
   }
@@ -110,6 +148,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
         unlistedTicks: 0,
         notifications: 0,
         faults: 0,
+        preferred: 0,
       };
       if (!stage.fault) startTimer();
     },
@@ -124,7 +163,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
 
 // One pending PG claim reserves its complete batch. Committed rows finish even
 // if the management socket disappears while the SQL request is in flight.
-export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail }) {
+export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail, onRegistered }) {
   const address = new URL(url);
   address.searchParams.set("stage", stage.label);
   address.searchParams.set("id", id);
@@ -140,6 +179,8 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
     registrations: 0,
     bootstrap: 0,
     fullHints: 0,
+    hintedClaims: 0,
+    targetedRows: 0,
   };
   let socket,
     reconnect,
@@ -159,10 +200,10 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
     const timeout = (stage.reofferMs ?? 4000) * (0.8 + 0.4 * Math.random());
     renew = setTimeout(offer, timeout);
   }
-  function request(reason) {
+  function request(reason, hint) {
     if (stopped || !online || running >= slots) return;
     if (checking) {
-      checkingAgain = reason;
+      if (!checkingAgain?.hint || hint) checkingAgain = { reason, hint };
       return;
     }
     clearTimeout(renew);
@@ -173,7 +214,9 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
     const start = performance.now();
     stats.queries++;
     void (async () => {
-      const rows = await claim(limit);
+      if (hint) stats.hintedClaims++;
+      const rows = await claim(limit, hint);
+      if (hint && rows.some((r) => r.id === hint[2])) stats.targetedRows++;
       const elapsed = performance.now() - start;
       if (rows.length > limit) throw new Error("Claim exceeded reserved slots");
       if (!rows.length) stats.empty++;
@@ -191,7 +234,8 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
           });
       }
       checking = false;
-      if (checkingAgain || rows.length === limit) request(checkingAgain ?? "drain");
+      if (checkingAgain || rows.length === limit)
+        request(checkingAgain?.reason ?? "drain", checkingAgain?.hint);
       else offer();
     })().catch((error) => {
       checking = false;
@@ -205,16 +249,19 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
     current.on("error", () => current.terminate());
     current.on("message", (raw) => {
       if (stopped || socket !== current) return;
-      const message = raw.toString();
+      const frame = raw.toString(),
+        hint = frame.startsWith("[") ? JSON.parse(frame) : undefined;
+      const message = hint ? "arrival" : frame;
       if (message === "registered") {
         online = true;
+        onRegistered?.();
         stats.registrations++;
         stats.bootstrap++;
       } else if (message === "arrival" || message === "tick") {
         stats[message]++;
         if (running >= slots) stats.fullHints++;
       } else return fail(new Error("Unexpected prototype wake frame"));
-      request(message === "registered" ? "bootstrap" : message);
+      request(message === "registered" ? "bootstrap" : message, hint);
     });
     current.on("close", () => {
       if (socket !== current) return;
@@ -227,6 +274,12 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
   connect();
   return {
     stats,
+    advertise(tenant, session, version, action) {
+      if (online && !stopped && stage.cacheMode === "prefer")
+        socket.send(
+          JSON.stringify(action ? [tenant, session, version, action] : [tenant, session, version]),
+        );
+    },
     get busy() {
       return running > 0 || checking;
     },

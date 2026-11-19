@@ -1,5 +1,7 @@
 # Runtime capacity evaluation
 
+The [successive Run benchmark](reports/session-continuation-throughput-20261119.md) measures end-to-end PG settlement with bounded Worker history reuse across fresh native harnesses.
+
 The [Worker sizing study](reports/worker-claim-sizing-20261119.md) measures batch admission, active root Sessions per Worker and the tradeoff between preferred claiming and a reusable history prefix.
 
 The isolated [minimal Session lifecycle workload](../scripts/experiments/minimal-session-storage/README.md) exercises two tables, one Inbox per Conversation and the ordered end marker. [Measurement](reports/minimal-session-storage-load-20261119.md).

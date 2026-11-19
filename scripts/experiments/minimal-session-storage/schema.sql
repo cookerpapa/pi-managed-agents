@@ -3,7 +3,7 @@ create table runs (
   mailbox_position bigint not null, idempotency_key uuid not null, initial_input text not null,
   model_ref text not null, state text not null check (state in ('queued','running','completed')),
   lease_id uuid, created_at timestamptz not null default clock_timestamp(),
-  started_at timestamptz, settled_at timestamptz,
+  started_at timestamptz, settled_at timestamptz, history_head jsonb,
   unique (tenant_id,session_id,mailbox_position), unique (tenant_id,session_id,idempotency_key)
 );
 create index runs_ready on runs (created_at,id) where state='queued';

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Integrate 32-row claims and version-checked readable history on successive root Runs. Compare complete native throughput, cold fallback, cache-aware wake-up and projection transaction cost with independent arrivals and fixed-concurrency loads. [Throughput report](reports/session-continuation-throughput-20261119.md).
+
 - [x] Compare 8–64 row claims and 64–256 resident root Sessions. Measure the separate costs of preferring one Run and reusing immutable text history across fresh Harness instances. [Prototype results](reports/worker-claim-sizing-20261119.md).
 
 - [x] Compare waiting Worker connections, batched PG claims and a 200 ms safety wake with broadcast delivery. Verify lost hints, connection replacement, admission before joining and draining with actual Pi Workers and exercise 1,000 lightweight connections separately. [Prototype evidence](reports/directed-worker-wake-20261119.md).

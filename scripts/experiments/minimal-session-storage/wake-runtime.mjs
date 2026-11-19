@@ -12,8 +12,8 @@ const router = await openWakeRouter(
 );
 listener.on("notification", ({ payload }) => {
   try {
-    const { label, count } = JSON.parse(payload);
-    router.notify(label, count);
+    const { label, count, hints } = JSON.parse(payload);
+    router.notify(label, count, hints);
   } catch (error) {
     fail(error);
   }
