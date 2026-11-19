@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import pg from "pg";
+import { verifyCommitClients, isGroupStudy } from "./pg-group-commit.mjs";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { wall } from "./pg-path-replay.mjs";
 
@@ -55,7 +56,7 @@ export class PgPathMeasure {
       for (const c of clients) c.release();
     }
   }
-  async start(start, diagnostics) {
+  async start(start, diagnostics, commitSetting) {
     this.tag = this.token + "_" + ++this.round;
     this.startAt = start;
     this.bySecond = new Map();
@@ -71,6 +72,9 @@ export class PgPathMeasure {
       this.connected = true;
     }
     await this.withClients(async (clients) => {
+      this.commitSetting = commitSetting
+        ? await verifyCommitClients(clients, commitSetting)
+        : undefined;
       // pg-pool checks out its most recently returned idle connection first.
       const c = clients.at(-1);
       this.pid = c.processID;
@@ -108,7 +112,7 @@ export class PgPathMeasure {
           processCpuUs: usage.user + usage.system - processCpu.user - processCpu.system,
           throttledUs: now[1] - cpu[1],
           cpuPressureUs: now[2] - cpu[2],
-          ...(["cpu", "cpu-smoke"].includes(process.argv[8])
+          ...(["cpu", "cpu-smoke"].includes(process.argv[8]) || isGroupStudy(process.argv[8])
             ? {
                 allowed: readFileSync("/sys/fs/cgroup/cpuset.cpus.effective", "utf8").trim(),
               }
@@ -205,6 +209,7 @@ export class PgPathMeasure {
       tag: this.tag,
       pid: this.pid,
       diagnostics: this.diagnostics,
+      ...(this.commitSetting ? { commitSetting: this.commitSetting } : {}),
       started: this.startAt,
       ended: end,
       spans: this.spans,

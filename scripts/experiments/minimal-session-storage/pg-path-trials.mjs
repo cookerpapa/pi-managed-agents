@@ -5,6 +5,12 @@ import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { kubeconfig, namespace, podFor } from "../../lib/production-kubernetes.mjs";
+import {
+  groupController,
+  groupLiveCases,
+  groupReplayCases,
+  isGroupStudy,
+} from "./pg-group-commit.mjs";
 
 // Ordered protocol durations for one warmed backend. Only timing, PID and our
 // own begin/end markers leave the log follower. No statement/parameter logging.
@@ -139,7 +145,9 @@ const buffer = Buffer.alloc(1024 * 1024);
 async function observe(pool, logs, work) {
   const sample = [],
     before = (await pool.query(walSql)).rows[0];
-  const timing = ["timing", "cpu", "cpu-smoke"].includes(process.env.PI_CLOUD_PG_PATH_PROFILE);
+  const timing =
+    ["timing", "cpu", "cpu-smoke"].includes(process.env.PI_CLOUD_PG_PATH_PROFILE) ||
+    isGroupStudy(process.env.PI_CLOUD_PG_PATH_PROFILE);
   const witnesses = new Map();
   let stop = false,
     calibratedAt = 0;
@@ -239,10 +247,12 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
-  assert(["smoke", "full", "timing", "cpu", "cpu-smoke"].includes(profile));
-  const smoke = profile === "smoke" || profile === "cpu-smoke",
+  const grouping = isGroupStudy(profile);
+  const confirm = profile === "group-confirm";
+  assert(["smoke", "full", "timing", "cpu", "cpu-smoke"].includes(profile) || grouping);
+  const smoke = profile === "smoke" || profile === "cpu-smoke" || profile === "group-smoke",
     timing = profile === "timing";
-  const count = smoke ? (cpuFixture ? 520 : 320) : timing ? 4160 : 6240;
+  const count = smoke ? (cpuFixture ? 520 : 320) : timing || confirm ? 4160 : 6240;
   const call = async (actor, command, response, args = {}) => {
     const done = actor.wait(response);
     actor.write({ kind: command, ...args });
@@ -261,7 +271,7 @@ export async function runPgPaths({
     sink: "single",
     concurrency: 384,
   };
-  const runLive = async (label, mode, rate, n, diagnostics) => {
+  const runLive = async (label, mode, rate, n, diagnostics, commitSetting) => {
     const result = await wave({
       ...live,
       label,
@@ -269,6 +279,7 @@ export async function runPgPaths({
       count: n,
       pgPath: mode,
       pathDiagnostics: diagnostics,
+      ...(commitSetting ? { commitSetting } : {}),
     });
     return {
       label,
@@ -285,6 +296,7 @@ export async function runPgPaths({
   };
   const logs = followPg(token, cpuFixture?.pg);
   report.pgPaths = { live: [], pairs: [] };
+  let controller;
   const reverse = cpuFixture && process.env.PI_CLOUD_CPU_REVERSE === "1";
   if (cpuFixture)
     report.pgPaths.cpu = {
@@ -317,8 +329,12 @@ export async function runPgPaths({
     };
   };
   try {
+    if (grouping) {
+      controller = await groupController(observer, cpuFixture);
+      report.pgPaths.groupCommit = { initial: controller.start, confirm };
+    }
     const capture = await observe(observer, logs, () =>
-      runLive("path-capture", "capture", 116, count, true),
+      runLive("path-capture", "capture", 116, count, true, grouping ? "default" : undefined),
     );
     assert.equal(capture.completed, count);
     report.pgPaths.live.push(capture);
@@ -329,7 +345,9 @@ export async function runPgPaths({
     assert.equal((await call(emitter, "loadPathFrames", "pathSourceReady")).frames, tape.frames);
     await save();
     const cases = cpuFixture
-      ? cpuReplayCases(smoke, reverse)
+      ? grouping
+        ? groupReplayCases(smoke, confirm)
+        : cpuReplayCases(smoke, reverse)
       : smoke
         ? [
             [260, "direct"],
@@ -362,12 +380,14 @@ export async function runPgPaths({
               [260, "direct", false],
               [260, "projector", false],
             ];
-    for (const [rate, path, diagnostics = true, layout] of cases) {
+    for (const [rate, path, diagnostics = true, layout, commitSetting] of cases) {
       const placement = cpuFixture ? await cpuFixture.pin(layout) : undefined;
+      if (controller) await controller.apply(commitSetting);
       const { start } = await call(projector, "preparePaths", "pathReady", {
         path,
         rate,
         diagnostics,
+        commitSetting,
       });
       const result = await observe(observer, logs, async () => {
         const pending = call(projector, "runPaths", "pathResult", { path });
@@ -377,7 +397,14 @@ export async function runPgPaths({
             ? call(emitter, "emitPathFrames", "pathEmitted", { start, rate })
             : undefined,
         ]);
-        return { rate, path, diagnostics, source: emitted?.source ?? r.source, ...r.result };
+        return {
+          rate,
+          path,
+          diagnostics,
+          commitSetting,
+          source: emitted?.source ?? r.source,
+          ...r.result,
+        };
       });
       assert.equal(result.source.frames, tape.frames);
       verifyPlacement(result, placement);
@@ -387,6 +414,7 @@ export async function runPgPaths({
         JSON.stringify({
           path,
           layout,
+          commitSetting,
           rate,
           diagnostics,
           done: tape.runs,
@@ -397,30 +425,49 @@ export async function runPgPaths({
         }),
       );
     }
-    const liveLayouts = cpuFixture
-      ? smoke
-        ? ["ab"]
-        : reverse
-          ? ["ba", "shared", "shared", "ab"]
-          : ["shared", "ab", "ba", "shared"]
-      : undefined;
+    const liveSettings = grouping ? groupLiveCases(smoke, confirm) : undefined;
+    const liveLayouts = liveSettings
+      ? liveSettings.map(() => "open")
+      : cpuFixture
+        ? smoke
+          ? ["ab"]
+          : reverse
+            ? ["ba", "shared", "shared", "ab"]
+            : ["shared", "ab", "ba", "shared"]
+        : undefined;
     for (const i of liveLayouts ? liveLayouts.keys() : smoke ? [0] : timing ? [0, 1] : [0, 1, 2]) {
       const placement = liveLayouts ? await cpuFixture.pin(liveLayouts[i]) : undefined;
+      const [rate, commitSetting] = liveSettings?.[i] ?? [260, undefined];
+      if (controller) await controller.apply(commitSetting);
       const result = await observe(observer, logs, () =>
         runLive(
           "path-full-" + i,
           "full",
-          260,
-          smoke ? (cpuFixture ? 520 : 320) : timing || cpuFixture ? 10400 : 6500,
+          rate,
+          smoke
+            ? cpuFixture
+              ? 520
+              : 320
+            : rate === 10
+              ? 200
+              : timing || cpuFixture
+                ? 10400
+                : 6500,
           !!cpuFixture || i !== 2,
+          commitSetting,
         ),
       );
       verifyPlacement(result, placement);
+      if (grouping) result.commitSetting = commitSetting;
       report.pgPaths.live.push(result);
       await save();
     }
   } finally {
-    await logs.close();
+    try {
+      if (controller) report.pgPaths.groupCommit.restored = await controller.restore();
+    } finally {
+      await logs.close();
+    }
   }
 }
 

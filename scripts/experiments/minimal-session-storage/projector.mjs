@@ -15,6 +15,7 @@ import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 import { installTailProbe } from "./tail-probe.mjs";
 import { PgPathStudy } from "./pg-path-study.mjs";
+import { isGroupStudy } from "./pg-group-commit.mjs";
 
 const pool = await openPool(
     Number(process.argv[7] ?? 12),
@@ -31,7 +32,7 @@ const pathStudy = __PG_PATH_STUDY__
   ? new PgPathStudy(
       pool,
       topic.slice(-16),
-      ["timing", "cpu", "cpu-smoke"].includes(process.argv[8]),
+      ["timing", "cpu", "cpu-smoke"].includes(process.argv[8]) || isGroupStudy(process.argv[8]),
     )
   : undefined;
 const sessions = new Map(),
@@ -532,14 +533,14 @@ try {
         eluAt = performance.eventLoopUtilization();
         metrics = blank();
         if (tailProbe) await tailProbe.configure(m, pool);
-        if (m.pgPath) await pathStudy.live(m.pgPath, m.pathDiagnostics);
+        if (m.pgPath) await pathStudy.live(m.pgPath, m.pathDiagnostics, m.commitSetting);
         send("configured", { stage: m.stage });
       },
       sample: async (m) => send("sample", { n: m.n, ...(await lag()) }),
       freezePaths: async () => send("pathTape", { tape: await pathStudy.freeze() }),
       preparePaths: async (m) => {
         stage = { integrated: true, scene: "plain", sink: "single" };
-        const start = await pathStudy.prepare(m.path, m.rate, m.diagnostics);
+        const start = await pathStudy.prepare(m.path, m.rate, m.diagnostics, m.commitSetting);
         send("pathReady", { start });
       },
       runPaths: async (m) => {

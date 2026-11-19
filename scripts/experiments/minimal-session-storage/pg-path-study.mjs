@@ -12,10 +12,10 @@ export class PgPathStudy {
     this.frames = new Map();
     this.wire = new Map();
   }
-  async live(mode, diagnostics = true) {
+  async live(mode, diagnostics = true, commitSetting) {
     assert(!this.mode);
     this.mode = mode;
-    await this.measure.start(wall(), diagnostics);
+    await this.measure.start(wall(), diagnostics, commitSetting);
   }
   decoded(f, value) {
     if (this.mode === "capture") this.wire.set(f.factId, value.toString());
@@ -169,7 +169,7 @@ export class PgPathStudy {
       recordsPerPartition: this.lanes.map((l) => l.length),
     };
   }
-  async prepare(mode, rate, diagnostics) {
+  async prepare(mode, rate, diagnostics, commitSetting) {
     assert(!this.mode && ["direct", "projector"].includes(mode));
     await this.pool.query("truncate table messages,inboxes,runs");
     await this.pool
@@ -184,7 +184,7 @@ export class PgPathStudy {
     this.terminals = [];
     this.recordQueueMs = [];
     this.start = wall() + 1200;
-    await this.measure.start(this.start, diagnostics);
+    await this.measure.start(this.start, diagnostics, commitSetting);
     assert(this.start > wall(), "Timed start elapsed during pool preparation");
     return this.start;
   }

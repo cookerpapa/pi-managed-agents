@@ -50,6 +50,10 @@ The [CPU placement study](reports/projector-cpu-placement-20261119.md) repeats
 the comparison with shared and disjoint CPU sets on disposable, matched-image
 PG and Projector Pods and reports full-Run acceptance separately.
 
+The [native PostgreSQL group-commit study](reports/pg-native-group-commit-20261119.md)
+compares WAL sync count, projection backlog and full-Run tails under different
+leader waits, keeping all twelve projection connections synchronous.
+
 For isolated cache/live-view memory checks (mock PG authority, no service changes):
 
 ```sh
