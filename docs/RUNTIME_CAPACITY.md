@@ -42,6 +42,10 @@ and compares its single-record and bounded batch reads against identical preload
 offsets. The [Session Projector measurements](reports/session-projector-batch-read-20261119.md)
 also cover complete Runs, PG contention and tool dispatch confirmation.
 
+The [direct PostgreSQL baseline](reports/projector-pg-path-baseline-20261119.md)
+compares the same recorded Worker facts and bound writes through the database
+and the real Projector, including per-query server and client timings.
+
 For isolated cache/live-view memory checks (mock PG authority, no service changes):
 
 ```sh

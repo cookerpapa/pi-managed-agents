@@ -101,6 +101,30 @@ PI_CLOUD_READER_DIAGNOSTIC=1 node --import tsx \
 The second command consumes identical preloaded offsets four times in alternating
 reader modes. [Measurements and limits](../../../docs/reports/session-projector-batch-read-20261119.md).
 
+### Direct PG and Projector comparison
+
+With the same development runtime and load opt-in as above, run each command
+serially against a new private output directory:
+
+```sh
+node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/pg-pair wake-throughput pg-paths
+PI_CLOUD_PG_PATH_PROFILE=timing node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/pg-idle wake-throughput pg-paths
+node scripts/experiments/minimal-session-storage/summarize-pg-paths.mjs /private/pg-summary.json /private/pg-pair/report.json /private/pg-idle/report.json
+```
+
+`PI_CLOUD_PG_PATH_PROFILE=smoke` is the 320-Run correctness check. The full
+profile captures actual Worker facts and every write's SQL and bound values.
+Both replay arms start from the same already-claimed owners. Each maintains 32
+ordered partitions with 12 warmed projection connections. The direct arm executes
+the captured commands in the same Pod and process. The Projector arm republishes
+the captured bytes from another Pod using the real producer, reader and projection
+handler. Compare due records to settled records and verify the three tables after
+every trial. The timing profile matches an observed PG idle transition by an
+opaque SQL comment on one sampled backend. Only that extra probe can distinguish
+server transaction settlement from the final response interval for matched writes.
+The raw timing file is private. The summarizer exports aggregate evidence.
+[Results](../../../docs/reports/projector-pg-path-baseline-20261119.md).
+
 The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load and an already queued burst. One Worker holds 64, 128 or 256 distinct physical Sessions at the real Pi model boundary. The driver records concurrent waiters, process RSS and event-loop delay. Separately it measures a bounded, tenant-scoped preference for one Run ID and exercises fresh native context assembly with the same frozen entries fetched from PG or already in memory. The individual experiments stop short of routing successive production Runs to a retained cache. [Results](../../../docs/reports/worker-claim-sizing-20261119.md).
 
 `schema.sql` defines the three physical tables and constraints. An independent client request is durably registered before success. Two concurrent SQL claimers cannot skip an active predecessor in the same Session. Inbox removal and the `user` Entry are committed together. The separately delivered `work_finished` updates the admitted Run under its claim identity. The experiment does not reconstruct an in-flight Pi Task after Worker death. That requires the additional stored state and recovery contract in the full runtime.

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Replay identical ordered records and SQL bindings directly into PG and through the real Projector. Match query, implicit transaction and client-return timing in fast/slow windows, then validate the full Run lifecycle with admission and Workers. [PG baseline and timing](reports/projector-pg-path-baseline-20261119.md).
+
 - [x] Batch immediately available Session-log records while bounding admitted buffers, preserving offset confirmation and measuring full-Run latency. Compare PG connection counts separately. [Batch-read measurements](reports/session-projector-batch-read-20261119.md).
 - [ ] For #48, measure how much same-partition stable projection can reduce connection hold time under backlog. Preserve post-commit input acknowledgement, atomic Inbox placement and the pre-dispatch offset boundary in any write-batching experiment.
 

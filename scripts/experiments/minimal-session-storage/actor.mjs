@@ -13,7 +13,7 @@ export const send = (kind, body = {}) =>
   process.stdout.write("SESSION_BENCH " + JSON.stringify({ kind, ...body }) + "\n");
 export const fail = (error) =>
   send("failure", { message: String(error.stack ?? error).slice(0, 2000) });
-export async function openPool(max) {
+export async function openPool(max, { idleTimeoutMillis } = {}) {
   const url = new URL((await readFile(process.env.DATABASE_URL_FILE, "utf8")).trim());
   url.pathname = "/" + name;
   const pool = new pg.Pool({
@@ -22,6 +22,7 @@ export async function openPool(max) {
     application_name: "session-bench-" + actor,
     connectionTimeoutMillis: 15000,
     statement_timeout: 20000,
+    ...(idleTimeoutMillis === undefined ? {} : { idleTimeoutMillis }),
   });
   pool.on("error", fail);
   assert.equal((await pool.query("select current_database() as n")).rows[0].n, name);

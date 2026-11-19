@@ -94,6 +94,7 @@ const source = Object.fromEntries(
           entryPoints: [path],
           bundle: true,
           packages: "external",
+          define: { __PG_PATH_STUDY__: String(mode === "wake-throughput" && suite === "pg-paths") },
           minify: false,
           platform: "node",
           target: "node24",
@@ -851,6 +852,7 @@ async function wave(spec) {
       ? Math.round(Math.max(0, Math.max(...items.map((i) => i.terminal.at)) - offerEnd))
       : undefined,
     projection: projection.stats,
+    ...(projection.pgPath ? { pgPath: projection.pgPath, offeredAt: start } : {}),
     ...(sc.tail ? { tail: { ...projection.tail, phases: summarizeTerminal(items) } } : {}),
     verified,
   };
@@ -966,6 +968,7 @@ try {
     mode === "wake-throughput" && suite.startsWith("tail") ? "tail" : "ordinary",
     readerMode,
     String(projectorConnections),
+    ...(suite === "pg-paths" ? [process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full"] : []),
   );
   const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
   const selector = Object.entries(sts.spec.selector.matchLabels)
@@ -1109,7 +1112,23 @@ try {
       network = wakeNetwork(pod, pods.slice(0, 2), router.ready.port, token);
       wakeUrl = network.address + "/" + topic;
       if (mode === "wake-sizing") await runSizingTrials(wave);
-      else if (mode === "wake-throughput") await runLocality(wave, suite);
+      else if (mode === "wake-throughput" && suite === "pg-paths") {
+        assert.equal(projectorConnections, 12);
+        assert.equal(readerMode, "batch");
+        const { runPgPaths } = await import("./pg-path-trials.mjs");
+        await runPgPaths({
+          projector,
+          emitter: workers[0],
+          wave,
+          configure,
+          guard,
+          observer: statsDb,
+          report,
+          save,
+          out,
+          token,
+        });
+      } else if (mode === "wake-throughput") await runLocality(wave, suite);
       else await runWakeTrials(wave);
     } else {
       await stopActors(workers);

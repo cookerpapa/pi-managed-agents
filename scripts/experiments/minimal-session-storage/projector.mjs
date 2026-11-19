@@ -14,8 +14,12 @@ import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 import { installTailProbe } from "./tail-probe.mjs";
+import { PgPathStudy } from "./pg-path-study.mjs";
 
-const pool = await openPool(Number(process.argv[7] ?? 12)),
+const pool = await openPool(
+    Number(process.argv[7] ?? 12),
+    __PG_PATH_STUDY__ ? { idleTimeoutMillis: 0 } : {},
+  ),
   group = topic + "-projector",
   startedAt = performance.now();
 const admin = new native.KafkaJS.Kafka({
@@ -23,6 +27,9 @@ const admin = new native.KafkaJS.Kafka({
 }).admin();
 await admin.connect();
 const tailProbe = process.argv[5] === "tail" ? installTailProbe(native, group, topic) : undefined;
+const pathStudy = __PG_PATH_STUDY__
+  ? new PgPathStudy(pool, topic.slice(-16), process.argv[8] === "timing")
+  : undefined;
 const sessions = new Map(),
   nextOffsets = new Map();
 let cpuAt = process.cpuUsage(),
@@ -135,7 +142,7 @@ async function processRecord({ fact: f, partition, offset }) {
     assert.equal(f.nativeSequence, s.seq);
     assert(s.lastAnswerCommit !== undefined, "Completion lacks a preceding complete answer");
     const sqlStart = performance.now(),
-      c = await pool.connect(),
+      c = await (pathStudy?.mode ? pathStudy.acquire(f) : pool.connect()),
       taken = performance.now();
     let result;
     try {
@@ -188,14 +195,15 @@ async function processRecord({ fact: f, partition, offset }) {
 
     sessions.delete(runId);
     metrics.lastCommit = at;
-    send("settled", {
-      id: runId,
-      at,
-      terminalSinceAnswerMs: end - s.lastAnswerCommit,
-      finishTransitMs: wireMs,
-      finishHandlerMs: end - t,
-      ...(trace ? { tail: trace.terminal } : {}),
-    });
+    if (pathStudy?.mode !== "projector")
+      send("settled", {
+        id: runId,
+        at,
+        terminalSinceAnswerMs: end - s.lastAnswerCommit,
+        finishTransitMs: wireMs,
+        finishHandlerMs: end - t,
+        ...(trace ? { tail: trace.terminal } : {}),
+      });
     return;
   }
   assert.equal(f.kind, "durable_commit");
@@ -317,7 +325,7 @@ async function processRecord({ fact: f, partition, offset }) {
   if ((inboxOrdinal >= 0 || messages.length) && stage?.sink !== "terminal-only") {
     metrics.peakWaiting = Math.max(metrics.peakWaiting, pool.waitingCount);
     const acq = performance.now(),
-      c = await pool.connect(),
+      c = await (pathStudy?.mode ? pathStudy.acquire(f) : pool.connect()),
       q = performance.now();
     poolMs = q - acq;
     const query = (...args) => {
@@ -438,10 +446,16 @@ const reader = new KafkaLogConsumer({
   groupRecovery: true,
   batchRead: process.argv[6] !== "single",
   replayOffsets: async (bounds) => new Map(bounds.map((b) => [b.partition, b.low])),
-  decode: (v) => decodeSessionLogFact(v).fact,
+  decode: (v) => {
+    const f = decodeSessionLogFact(v).fact;
+    pathStudy?.decoded(f, v);
+    return f;
+  },
   handler: async (record) => {
     try {
+      if (pathStudy?.mode) pathStudy.before(record);
       await processRecord(record);
+      if (pathStudy?.mode) pathStudy.applied(record.fact);
     } catch (e) {
       fail(e);
       throw e;
@@ -486,6 +500,7 @@ async function cleanup() {
       send("cleaned", { actor, topicAndGroupRemoved: created });
     } finally {
       await admin.disconnect();
+      await pathStudy?.measure.close();
       await pool.end();
     }
   }
@@ -513,9 +528,20 @@ try {
         eluAt = performance.eventLoopUtilization();
         metrics = blank();
         if (tailProbe) await tailProbe.configure(m, pool);
+        if (m.pgPath) await pathStudy.live(m.pgPath, m.pathDiagnostics);
         send("configured", { stage: m.stage });
       },
       sample: async (m) => send("sample", { n: m.n, ...(await lag()) }),
+      freezePaths: async () => send("pathTape", { tape: await pathStudy.freeze() }),
+      preparePaths: async (m) => {
+        stage = { integrated: true, scene: "plain", sink: "single" };
+        const start = await pathStudy.prepare(m.path, m.rate, m.diagnostics);
+        send("pathReady", { start });
+      },
+      runPaths: async (m) => {
+        const source = m.path === "direct" ? await pathStudy.direct() : undefined;
+        send("pathResult", { source, result: await pathStudy.result() });
+      },
       results: async (m) => {
         const ends = await reader.captureEndOffsets();
         await reader.waitUntilInitialReplay(ends, 30000);
@@ -524,6 +550,7 @@ try {
           stage: m.stage,
           stats: summary(),
           tail: tailProbe?.results(),
+          ...(pathStudy?.mode ? { pgPath: await pathStudy.endLive() } : {}),
           ...(await lag()),
         });
       },

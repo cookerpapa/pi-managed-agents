@@ -39,6 +39,7 @@ import {
   kafkaProducerLane,
 } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
+import { emitFrames } from "./pg-path-replay.mjs";
 
 const pool = await openPool(5),
   notifications = await pool.connect(),
@@ -59,6 +60,7 @@ let capacity = 0,
   residence,
   prefixCache,
   expiryTimer;
+let pathFrames;
 
 function startResidence() {
   const initial = process.memoryUsage(),
@@ -628,6 +630,17 @@ listen(
       send("configured", { stage: msg.stage });
     },
     join: () => joinDirected(),
+    loadPathFrames: async () => {
+      assert.equal(active.size, 0);
+      pathFrames = (
+        await pool.query("select partition,id,session,value from path_frames order by idx")
+      ).rows;
+      send("pathSourceReady", { frames: pathFrames.length });
+    },
+    emitPathFrames: async (m) => {
+      const source = await emitFrames(pathFrames, producer, m.rate * 7, m.start);
+      send("pathEmitted", { source });
+    },
     drain: (m) => {
       directed?.close();
       send("draining", { n: m.n });

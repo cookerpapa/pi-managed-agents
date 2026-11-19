@@ -1,0 +1,2748 @@
+{
+  "sets": [
+    {
+      "capturedRuns": 6240,
+      "frames": 43680,
+      "writes": 24960,
+      "sha256": "be07850a2272ee53ef1ae7631a840f7acfb5b9f926f4a4cef0ad94cb30be914d",
+      "rows": {
+        "completed": 6240,
+        "message_rows": 12480,
+        "inbox_rows": 6240,
+        "heads": "299b7cfbab90975684f9a6ca8600a869",
+        "messages": "32df1f9f5f476ac345b27c9d05dc8e47",
+        "inboxes": "5d121f963d9b802f46e29f956493d6fb"
+      },
+      "pgSettings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "actorHashes": {
+        "worker": "1483dc8e367987098616e9999b3e3da7a66d5985b57df777c741ef0ffbf7a46d",
+        "projector": "3d54e14889040ab0486494d89f610159b5e5df65d448c58d59f5fdf431b1b8a3",
+        "wake-runtime": "4e00c69a616804b4fe38116396ae4b01ad95fa40ca7804a8176d741055316b57"
+      },
+      "cleanup": true,
+      "paths": [
+        {
+          "path": "direct",
+          "rate": 116,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 115.85,
+          "p95Ms": 104.32,
+          "p99Ms": 211.48,
+          "peakBacklog": 18,
+          "drainMs": 68.69,
+          "sourceLateP95Ms": 1.28,
+          "avgCheckoutMs": 0.01,
+          "avgHoldMs": 5.61,
+          "avgQueryMs": 5.61,
+          "holdByWrite": {
+            "inbox": 5.43,
+            "user": 5.7,
+            "assistant": 6.1,
+            "finish": 5.23
+          },
+          "pgTiming": {
+            "n": 3147,
+            "client": {
+              "n": 3147,
+              "mean": 5.79,
+              "p50": 5.77,
+              "p95": 8.55
+            },
+            "protocol": {
+              "n": 3147,
+              "mean": 0.83,
+              "p50": 0.79,
+              "p95": 1.61
+            },
+            "executeLogToClient": {
+              "n": 3147,
+              "mean": 5.18,
+              "p50": 4.97,
+              "p95": 7.84
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2631,
+          "walWriteLockPct": 44.36,
+          "walSyncPct": 36.64,
+          "heavyweightLockPct": 0,
+          "runnablePct": 16.31,
+          "walSyncs": 17434,
+          "walSyncMsPerSync": 2.75,
+          "walMiB": 47.22,
+          "readOnlyPingMs": {
+            "n": 90,
+            "mean": 0.36,
+            "p50": 0.35,
+            "p95": 0.51
+          },
+          "hashMs": 2.44,
+          "loopBusy": 0.12,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.11,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 116,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 115.97,
+          "p95Ms": 125.72,
+          "p99Ms": 227.11,
+          "peakBacklog": 35,
+          "drainMs": 16.69,
+          "sourceLateP95Ms": 1.16,
+          "avgCheckoutMs": 0.04,
+          "avgHoldMs": 6.95,
+          "avgQueryMs": 6.9,
+          "holdByWrite": {
+            "inbox": 6.64,
+            "user": 7.11,
+            "assistant": 7.85,
+            "finish": 6.17
+          },
+          "pgTiming": {
+            "n": 2469,
+            "client": {
+              "n": 2469,
+              "mean": 7.12,
+              "p50": 6.62,
+              "p95": 11.6
+            },
+            "protocol": {
+              "n": 2469,
+              "mean": 1.33,
+              "p50": 0.99,
+              "p95": 3.13
+            },
+            "executeLogToClient": {
+              "n": 2469,
+              "mean": 5.91,
+              "p50": 5.58,
+              "p95": 9.24
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3214,
+          "walWriteLockPct": 46.55,
+          "walSyncPct": 28.69,
+          "heavyweightLockPct": 0,
+          "runnablePct": 20.82,
+          "walSyncs": 15379,
+          "walSyncMsPerSync": 3.01,
+          "walMiB": 47.04,
+          "readOnlyPingMs": {
+            "n": 92,
+            "mean": 0.63,
+            "p50": 0.5,
+            "p95": 1.74
+          },
+          "hashMs": 4.2,
+          "loopBusy": 0.33,
+          "loopDelayP95OfQuarterSecondP99Ms": 12.42,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 259.65,
+          "p95Ms": 73.71,
+          "p99Ms": 111.59,
+          "peakBacklog": 118,
+          "drainMs": 33.09,
+          "sourceLateP95Ms": 1.11,
+          "avgCheckoutMs": 0.05,
+          "avgHoldMs": 6.13,
+          "avgQueryMs": 6.1,
+          "holdByWrite": {
+            "inbox": 6.09,
+            "user": 6.14,
+            "assistant": 6.43,
+            "finish": 5.87
+          },
+          "pgTiming": {
+            "n": 2104,
+            "client": {
+              "n": 2104,
+              "mean": 6.2,
+              "p50": 5.9,
+              "p95": 8.55
+            },
+            "protocol": {
+              "n": 2104,
+              "mean": 0.77,
+              "p50": 0.75,
+              "p95": 1.33
+            },
+            "executeLogToClient": {
+              "n": 2104,
+              "mean": 5.73,
+              "p50": 5.45,
+              "p95": 7.97
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2739,
+          "walWriteLockPct": 66.74,
+          "walSyncPct": 16.58,
+          "heavyweightLockPct": 0,
+          "runnablePct": 13.87,
+          "walSyncs": 7889,
+          "walSyncMsPerSync": 2.87,
+          "walMiB": 47.13,
+          "readOnlyPingMs": {
+            "n": 43,
+            "mean": 0.38,
+            "p50": 0.32,
+            "p95": 0.66
+          },
+          "hashMs": 2.06,
+          "loopBusy": 0.36,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.66,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 259.45,
+          "p95Ms": 58.43,
+          "p99Ms": 98.9,
+          "peakBacklog": 83,
+          "drainMs": 51.69,
+          "sourceLateP95Ms": 1.32,
+          "avgCheckoutMs": 0.02,
+          "avgHoldMs": 5.56,
+          "avgQueryMs": 5.55,
+          "holdByWrite": {
+            "inbox": 5.49,
+            "user": 5.6,
+            "assistant": 5.77,
+            "finish": 5.4
+          },
+          "pgTiming": {
+            "n": 2140,
+            "client": {
+              "n": 2140,
+              "mean": 5.67,
+              "p50": 5.35,
+              "p95": 8.03
+            },
+            "protocol": {
+              "n": 2140,
+              "mean": 0.71,
+              "p50": 0.69,
+              "p95": 1.21
+            },
+            "executeLogToClient": {
+              "n": 2140,
+              "mean": 5.24,
+              "p50": 5.07,
+              "p95": 7.55
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2636,
+          "walWriteLockPct": 67.22,
+          "walSyncPct": 17.6,
+          "heavyweightLockPct": 0,
+          "runnablePct": 13.66,
+          "walSyncs": 8769,
+          "walSyncMsPerSync": 2.63,
+          "walMiB": 46.86,
+          "readOnlyPingMs": {
+            "n": 41,
+            "mean": 0.34,
+            "p50": 0.34,
+            "p95": 0.47
+          },
+          "hashMs": 2.06,
+          "loopBusy": 0.18,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.29,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 259.06,
+          "p95Ms": 84.29,
+          "p99Ms": 203.81,
+          "peakBacklog": 419,
+          "drainMs": 87.4,
+          "sourceLateP95Ms": 1.4,
+          "avgCheckoutMs": 0.25,
+          "avgHoldMs": 7.01,
+          "avgQueryMs": 7,
+          "holdByWrite": {
+            "inbox": 7.04,
+            "user": 6.91,
+            "assistant": 7.66,
+            "finish": 6.42
+          },
+          "pgTiming": {
+            "n": 1760,
+            "client": {
+              "n": 1760,
+              "mean": 7.27,
+              "p50": 6.39,
+              "p95": 10.21
+            },
+            "protocol": {
+              "n": 1760,
+              "mean": 1.2,
+              "p50": 1.17,
+              "p95": 2.15
+            },
+            "executeLogToClient": {
+              "n": 1760,
+              "mean": 6.17,
+              "p50": 5.59,
+              "p95": 8.71
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3182,
+          "walWriteLockPct": 63.54,
+          "walSyncPct": 14.46,
+          "heavyweightLockPct": 0,
+          "runnablePct": 18.2,
+          "walSyncs": 7525,
+          "walSyncMsPerSync": 3.04,
+          "walMiB": 47.4,
+          "readOnlyPingMs": {
+            "n": 40,
+            "mean": 0.55,
+            "p50": 0.46,
+            "p95": 1
+          },
+          "hashMs": 3.64,
+          "loopBusy": 0.26,
+          "loopDelayP95OfQuarterSecondP99Ms": 12.67,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 230.21,
+          "p95Ms": 4135.49,
+          "p99Ms": 6799.89,
+          "peakBacklog": 5802,
+          "drainMs": 3106.03,
+          "sourceLateP95Ms": 1.41,
+          "avgCheckoutMs": 15.89,
+          "avgHoldMs": 12.42,
+          "avgQueryMs": 12.31,
+          "holdByWrite": {
+            "inbox": 11.93,
+            "user": 12.87,
+            "assistant": 13.96,
+            "finish": 10.92
+          },
+          "pgTiming": {
+            "n": 1937,
+            "client": {
+              "n": 1937,
+              "mean": 12.98,
+              "p50": 12.24,
+              "p95": 20.12
+            },
+            "protocol": {
+              "n": 1937,
+              "mean": 2.59,
+              "p50": 2.45,
+              "p95": 4.76
+            },
+            "executeLogToClient": {
+              "n": 1937,
+              "mean": 10.18,
+              "p50": 9.37,
+              "p95": 16.44
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 4479,
+          "walWriteLockPct": 60.33,
+          "walSyncPct": 11.39,
+          "heavyweightLockPct": 0,
+          "runnablePct": 23.55,
+          "walSyncs": 6876,
+          "walSyncMsPerSync": 3.65,
+          "walMiB": 46.91,
+          "readOnlyPingMs": {
+            "n": 51,
+            "mean": 3.89,
+            "p50": 3.77,
+            "p95": 8.14
+          },
+          "hashMs": 6.99,
+          "loopBusy": 0.83,
+          "loopDelayP95OfQuarterSecondP99Ms": 21.45,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0,
+          "timeline": [
+            {
+              "point": "early",
+              "second": 1,
+              "backlog": 257,
+              "poolWaiting": 4,
+              "operations": 982,
+              "avgHoldMs": 12.23,
+              "avgCheckoutMs": 6.71,
+              "calibrationMs": 7.34,
+              "loopUtilization": 0.98,
+              "activeSamples": 164,
+              "walWriteLockPct": 58.54,
+              "walSyncPct": 10.37,
+              "heavyweightLockPct": 0,
+              "runnablePct": 29.88,
+              "server": {
+                "n": 78,
+                "client": {
+                  "n": 78,
+                  "mean": 12.64,
+                  "p50": 12.43,
+                  "p95": 17.26
+                },
+                "protocol": {
+                  "n": 78,
+                  "mean": 2.92,
+                  "p50": 2.87,
+                  "p95": 5.1
+                },
+                "executeLogToClient": {
+                  "n": 78,
+                  "mean": 9.44,
+                  "p50": 9.3,
+                  "p95": 12.87
+                },
+                "idleWitness": null
+              }
+            },
+            {
+              "point": "oneSecondOfArrivals",
+              "second": 6,
+              "backlog": 1832,
+              "poolWaiting": 20,
+              "operations": 753,
+              "avgHoldMs": 15.91,
+              "avgCheckoutMs": 24.85,
+              "calibrationMs": 7.93,
+              "loopUtilization": 0.99,
+              "activeSamples": 141,
+              "walWriteLockPct": 52.48,
+              "walSyncPct": 11.35,
+              "heavyweightLockPct": 0,
+              "runnablePct": 31.91,
+              "server": {
+                "n": 61,
+                "client": {
+                  "n": 61,
+                  "mean": 16.21,
+                  "p50": 15.45,
+                  "p95": 21.05
+                },
+                "protocol": {
+                  "n": 61,
+                  "mean": 3.33,
+                  "p50": 3.38,
+                  "p95": 5.19
+                },
+                "executeLogToClient": {
+                  "n": 61,
+                  "mean": 12.46,
+                  "p50": 12.14,
+                  "p95": 16.55
+                },
+                "idleWitness": null
+              }
+            },
+            {
+              "point": "peak",
+              "second": 23,
+              "backlog": 5802,
+              "poolWaiting": 16,
+              "operations": 1003,
+              "avgHoldMs": 11.82,
+              "avgCheckoutMs": 14.08,
+              "calibrationMs": 5.89,
+              "loopUtilization": 0.88,
+              "activeSamples": 184,
+              "walWriteLockPct": 60.87,
+              "walSyncPct": 10.87,
+              "heavyweightLockPct": 0,
+              "runnablePct": 24.46,
+              "server": {
+                "n": 79,
+                "client": {
+                  "n": 79,
+                  "mean": 12.53,
+                  "p50": 12.16,
+                  "p95": 19.77
+                },
+                "protocol": {
+                  "n": 79,
+                  "mean": 2.71,
+                  "p50": 2.79,
+                  "p95": 4.33
+                },
+                "executeLogToClient": {
+                  "n": 79,
+                  "mean": 9.61,
+                  "p50": 9.05,
+                  "p95": 16.42
+                },
+                "idleWitness": null
+              }
+            },
+            {
+              "point": "last",
+              "second": 27,
+              "backlog": 0,
+              "poolWaiting": 0,
+              "operations": 26,
+              "avgHoldMs": 4.02,
+              "avgCheckoutMs": 0.01,
+              "calibrationMs": null,
+              "loopUtilization": 0.1,
+              "activeSamples": 2,
+              "walWriteLockPct": 0,
+              "walSyncPct": 0,
+              "heavyweightLockPct": 0,
+              "runnablePct": 100,
+              "server": {
+                "n": 0,
+                "client": null,
+                "protocol": null,
+                "executeLogToClient": null,
+                "idleWitness": null
+              }
+            }
+          ]
+        },
+        {
+          "path": "direct",
+          "rate": 390,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 388.54,
+          "p95Ms": 249.19,
+          "p99Ms": 424.22,
+          "peakBacklog": 637,
+          "drainMs": 60.64,
+          "sourceLateP95Ms": 1.44,
+          "avgCheckoutMs": 3.14,
+          "avgHoldMs": 6.96,
+          "avgQueryMs": 6.95,
+          "holdByWrite": {
+            "inbox": 6.78,
+            "user": 7,
+            "assistant": 7.65,
+            "finish": 6.41
+          },
+          "pgTiming": {
+            "n": 1976,
+            "client": {
+              "n": 1976,
+              "mean": 7.18,
+              "p50": 6.52,
+              "p95": 10.16
+            },
+            "protocol": {
+              "n": 1976,
+              "mean": 1.04,
+              "p50": 0.9,
+              "p95": 2.12
+            },
+            "executeLogToClient": {
+              "n": 1976,
+              "mean": 6.3,
+              "p50": 5.75,
+              "p95": 9.12
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3044,
+          "walWriteLockPct": 70.7,
+          "walSyncPct": 9.95,
+          "heavyweightLockPct": 0,
+          "runnablePct": 16.43,
+          "walSyncs": 5063,
+          "walSyncMsPerSync": 3.03,
+          "walMiB": 46.82,
+          "readOnlyPingMs": {
+            "n": 27,
+            "mean": 0.72,
+            "p50": 0.55,
+            "p95": 1.94
+          },
+          "hashMs": 3.82,
+          "loopBusy": 0.32,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.62,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 390,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 388.64,
+          "p95Ms": 146.77,
+          "p99Ms": 248.73,
+          "peakBacklog": 411,
+          "drainMs": 56.49,
+          "sourceLateP95Ms": 1.13,
+          "avgCheckoutMs": 1.29,
+          "avgHoldMs": 6.68,
+          "avgQueryMs": 6.65,
+          "holdByWrite": {
+            "inbox": 6.58,
+            "user": 6.71,
+            "assistant": 7.25,
+            "finish": 6.19
+          },
+          "pgTiming": {
+            "n": 2026,
+            "client": {
+              "n": 2026,
+              "mean": 6.75,
+              "p50": 6.23,
+              "p95": 9.23
+            },
+            "protocol": {
+              "n": 2026,
+              "mean": 0.82,
+              "p50": 0.76,
+              "p95": 1.58
+            },
+            "executeLogToClient": {
+              "n": 2026,
+              "mean": 6.21,
+              "p50": 5.82,
+              "p95": 8.44
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2884,
+          "walWriteLockPct": 72.26,
+          "walSyncPct": 10.68,
+          "heavyweightLockPct": 0.07,
+          "runnablePct": 13.18,
+          "walSyncs": 5146,
+          "walSyncMsPerSync": 2.96,
+          "walMiB": 47.12,
+          "readOnlyPingMs": {
+            "n": 28,
+            "mean": 1.01,
+            "p50": 0.59,
+            "p95": 4.05
+          },
+          "hashMs": 2.2,
+          "loopBusy": 0.52,
+          "loopDelayP95OfQuarterSecondP99Ms": 13.37,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 390,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 388.93,
+          "p95Ms": 112.16,
+          "p99Ms": 204.84,
+          "peakBacklog": 391,
+          "drainMs": 44.19,
+          "sourceLateP95Ms": 1.12,
+          "avgCheckoutMs": 0.76,
+          "avgHoldMs": 6.46,
+          "avgQueryMs": 6.43,
+          "holdByWrite": {
+            "inbox": 6.41,
+            "user": 6.5,
+            "assistant": 6.89,
+            "finish": 6.05
+          },
+          "pgTiming": {
+            "n": 2106,
+            "client": {
+              "n": 2106,
+              "mean": 6.55,
+              "p50": 6.08,
+              "p95": 9.04
+            },
+            "protocol": {
+              "n": 2106,
+              "mean": 0.83,
+              "p50": 0.78,
+              "p95": 1.52
+            },
+            "executeLogToClient": {
+              "n": 2106,
+              "mean": 6,
+              "p50": 5.65,
+              "p95": 8.25
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2775,
+          "walWriteLockPct": 72.65,
+          "walSyncPct": 11.06,
+          "heavyweightLockPct": 0,
+          "runnablePct": 12.4,
+          "walSyncs": 5192,
+          "walSyncMsPerSync": 2.94,
+          "walMiB": 50.44,
+          "readOnlyPingMs": {
+            "n": 27,
+            "mean": 0.8,
+            "p50": 0.48,
+            "p95": 2.76
+          },
+          "hashMs": 2.11,
+          "loopBusy": 0.48,
+          "loopDelayP95OfQuarterSecondP99Ms": 13.22,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 390,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 366.19,
+          "p95Ms": 1019.84,
+          "p99Ms": 1382.43,
+          "peakBacklog": 2050,
+          "drainMs": 1040.83,
+          "sourceLateP95Ms": 1.41,
+          "avgCheckoutMs": 4.19,
+          "avgHoldMs": 6.8,
+          "avgQueryMs": 6.79,
+          "holdByWrite": {
+            "inbox": 6.65,
+            "user": 6.91,
+            "assistant": 7.37,
+            "finish": 6.25
+          },
+          "pgTiming": {
+            "n": 2137,
+            "client": {
+              "n": 2137,
+              "mean": 6.86,
+              "p50": 6,
+              "p95": 11.08
+            },
+            "protocol": {
+              "n": 2137,
+              "mean": 0.98,
+              "p50": 0.8,
+              "p95": 2.43
+            },
+            "executeLogToClient": {
+              "n": 2137,
+              "mean": 6.09,
+              "p50": 5.53,
+              "p95": 9.3
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3029,
+          "walWriteLockPct": 70.55,
+          "walSyncPct": 10.76,
+          "heavyweightLockPct": 0.03,
+          "runnablePct": 16.38,
+          "walSyncs": 5549,
+          "walSyncMsPerSync": 2.92,
+          "walMiB": 46.86,
+          "readOnlyPingMs": {
+            "n": 29,
+            "mean": 0.51,
+            "p50": 0.38,
+            "p95": 1.18
+          },
+          "hashMs": 2.14,
+          "loopBusy": 0.3,
+          "loopDelayP95OfQuarterSecondP99Ms": 12.12,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 262.65,
+          "p95Ms": 13716.02,
+          "p99Ms": 15176.34,
+          "peakBacklog": 26588,
+          "drainMs": 11758.03,
+          "sourceLateP95Ms": 1.57,
+          "avgCheckoutMs": 9.57,
+          "avgHoldMs": 10.75,
+          "avgQueryMs": 10.67,
+          "holdByWrite": {
+            "inbox": 10.25,
+            "user": 11.07,
+            "assistant": 12.12,
+            "finish": 9.56
+          },
+          "pgTiming": {
+            "n": 1910,
+            "client": {
+              "n": 1910,
+              "mean": 11.14,
+              "p50": 9.52,
+              "p95": 19.13
+            },
+            "protocol": {
+              "n": 1910,
+              "mean": 1.89,
+              "p50": 1.53,
+              "p95": 4.48
+            },
+            "executeLogToClient": {
+              "n": 1910,
+              "mean": 9.16,
+              "p50": 7.92,
+              "p95": 15.47
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3986,
+          "walWriteLockPct": 59.98,
+          "walSyncPct": 11.14,
+          "heavyweightLockPct": 0,
+          "runnablePct": 23.06,
+          "walSyncs": 6279,
+          "walSyncMsPerSync": 3.5,
+          "walMiB": 47.08,
+          "readOnlyPingMs": {
+            "n": 46,
+            "mean": 3.26,
+            "p50": 1.73,
+            "p95": 9.8
+          },
+          "hashMs": 6.84,
+          "loopBusy": 0.75,
+          "loopDelayP95OfQuarterSecondP99Ms": 23.79,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 520,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 399.32,
+          "p95Ms": 3700.66,
+          "p99Ms": 4157.93,
+          "peakBacklog": 9200,
+          "drainMs": 3626.95,
+          "sourceLateP95Ms": 1.52,
+          "avgCheckoutMs": 11.03,
+          "avgHoldMs": 7.39,
+          "avgQueryMs": 7.38,
+          "holdByWrite": {
+            "inbox": 6.89,
+            "user": 7.57,
+            "assistant": 8.51,
+            "finish": 6.59
+          },
+          "pgTiming": {
+            "n": 2040,
+            "client": {
+              "n": 2040,
+              "mean": 7.55,
+              "p50": 6.89,
+              "p95": 10.43
+            },
+            "protocol": {
+              "n": 2040,
+              "mean": 1.22,
+              "p50": 1.22,
+              "p95": 2.13
+            },
+            "executeLogToClient": {
+              "n": 2040,
+              "mean": 6.44,
+              "p50": 6.03,
+              "p95": 8.96
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3225,
+          "walWriteLockPct": 67.63,
+          "walSyncPct": 8.93,
+          "heavyweightLockPct": 0,
+          "runnablePct": 19.5,
+          "walSyncs": 4753,
+          "walSyncMsPerSync": 3.1,
+          "walMiB": 46.84,
+          "readOnlyPingMs": {
+            "n": 28,
+            "mean": 0.75,
+            "p50": 0.53,
+            "p95": 1.49
+          },
+          "hashMs": 4.64,
+          "loopBusy": 0.39,
+          "loopDelayP95OfQuarterSecondP99Ms": 12,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 116,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 115.95,
+          "p95Ms": 123.44,
+          "p99Ms": 220.97,
+          "peakBacklog": 84,
+          "drainMs": 26.53,
+          "sourceLateP95Ms": 1.12,
+          "avgCheckoutMs": 0.04,
+          "avgHoldMs": 5.94,
+          "avgQueryMs": 5.9,
+          "holdByWrite": {
+            "inbox": 5.79,
+            "user": 6.08,
+            "assistant": 6.53,
+            "finish": 5.35
+          },
+          "pgTiming": {
+            "n": 3278,
+            "client": {
+              "n": 3278,
+              "mean": 6.11,
+              "p50": 5.72,
+              "p95": 9.6
+            },
+            "protocol": {
+              "n": 3278,
+              "mean": 1.01,
+              "p50": 0.86,
+              "p95": 2.29
+            },
+            "executeLogToClient": {
+              "n": 3278,
+              "mean": 5.31,
+              "p50": 5.07,
+              "p95": 8.19
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2807,
+          "walWriteLockPct": 45.46,
+          "walSyncPct": 32.81,
+          "heavyweightLockPct": 0,
+          "runnablePct": 17.31,
+          "walSyncs": 16485,
+          "walSyncMsPerSync": 2.79,
+          "walMiB": 47.12,
+          "readOnlyPingMs": {
+            "n": 94,
+            "mean": 0.49,
+            "p50": 0.4,
+            "p95": 1.07
+          },
+          "hashMs": 2.03,
+          "loopBusy": 0.26,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.96,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 116,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 115.88,
+          "p95Ms": 104.45,
+          "p99Ms": 214.16,
+          "peakBacklog": 26,
+          "drainMs": 55.64,
+          "sourceLateP95Ms": 1.32,
+          "avgCheckoutMs": 0.01,
+          "avgHoldMs": 5.62,
+          "avgQueryMs": 5.62,
+          "holdByWrite": {
+            "inbox": 5.5,
+            "user": 5.7,
+            "assistant": 6.07,
+            "finish": 5.22
+          },
+          "pgTiming": {
+            "n": 1986,
+            "client": {
+              "n": 1986,
+              "mean": 5.63,
+              "p50": 5.49,
+              "p95": 8.47
+            },
+            "protocol": {
+              "n": 1986,
+              "mean": 0.85,
+              "p50": 0.8,
+              "p95": 1.64
+            },
+            "executeLogToClient": {
+              "n": 1986,
+              "mean": 5.04,
+              "p50": 4.77,
+              "p95": 7.75
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2603,
+          "walWriteLockPct": 43.76,
+          "walSyncPct": 37.07,
+          "heavyweightLockPct": 0,
+          "runnablePct": 16.71,
+          "walSyncs": 17451,
+          "walSyncMsPerSync": 2.77,
+          "walMiB": 47.15,
+          "readOnlyPingMs": {
+            "n": 89,
+            "mean": 0.36,
+            "p50": 0.33,
+            "p95": 0.58
+          },
+          "hashMs": 2.95,
+          "loopBusy": 0.12,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.19,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 260,
+          "diagnostics": false,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 259.24,
+          "p95Ms": 65.95,
+          "p99Ms": 108.74,
+          "peakBacklog": 69,
+          "drainMs": 71.3,
+          "sourceLateP95Ms": 1.31,
+          "avgCheckoutMs": 0.04,
+          "avgHoldMs": 6.49,
+          "avgQueryMs": 6.48,
+          "holdByWrite": {
+            "inbox": 6.41,
+            "user": 6.46,
+            "assistant": 6.86,
+            "finish": 6.23
+          },
+          "pgTiming": {
+            "n": 0,
+            "client": null,
+            "protocol": null,
+            "executeLogToClient": null,
+            "idleWitness": null
+          },
+          "activeSamples": 2945,
+          "walWriteLockPct": 64.11,
+          "walSyncPct": 15.62,
+          "heavyweightLockPct": 0,
+          "runnablePct": 17.39,
+          "walSyncs": 7528,
+          "walSyncMsPerSync": null,
+          "walMiB": 47.02,
+          "readOnlyPingMs": null,
+          "hashMs": 3.36,
+          "loopBusy": 0.23,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.72,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "diagnostics": false,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 259.63,
+          "p95Ms": 126.45,
+          "p99Ms": 172.76,
+          "peakBacklog": 179,
+          "drainMs": 35.04,
+          "sourceLateP95Ms": 1.15,
+          "avgCheckoutMs": 0.26,
+          "avgHoldMs": 6.98,
+          "avgQueryMs": 6.94,
+          "holdByWrite": {
+            "inbox": 6.74,
+            "user": 7.13,
+            "assistant": 7.59,
+            "finish": 6.46
+          },
+          "pgTiming": {
+            "n": 0,
+            "client": null,
+            "protocol": null,
+            "executeLogToClient": null,
+            "idleWitness": null
+          },
+          "activeSamples": 2996,
+          "walWriteLockPct": 63.05,
+          "walSyncPct": 15.32,
+          "heavyweightLockPct": 0.13,
+          "runnablePct": 17.59,
+          "walSyncs": 7750,
+          "walSyncMsPerSync": null,
+          "walMiB": 47.06,
+          "readOnlyPingMs": null,
+          "hashMs": 2.11,
+          "loopBusy": 0.45,
+          "loopDelayP95OfQuarterSecondP99Ms": 13.8,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        }
+      ],
+      "live": [
+        {
+          "path": "path-capture",
+          "rate": 116,
+          "diagnostics": true,
+          "completed": 6240,
+          "dropped": 0,
+          "writes": 24960,
+          "runsPerSecond": 115.87,
+          "p95Ms": 168,
+          "p99Ms": 277,
+          "peakBacklog": 34,
+          "drainMs": 66,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 0.07,
+          "avgHoldMs": 7.3,
+          "avgQueryMs": 7.24,
+          "holdByWrite": {
+            "inbox": 7.02,
+            "user": 7.45,
+            "assistant": 8.17,
+            "finish": 6.57
+          },
+          "pgTiming": {
+            "n": 1928,
+            "client": {
+              "n": 1928,
+              "mean": 7.23,
+              "p50": 6,
+              "p95": 13.75
+            },
+            "protocol": {
+              "n": 1928,
+              "mean": 1.09,
+              "p50": 0.8,
+              "p95": 3.43
+            },
+            "executeLogToClient": {
+              "n": 1928,
+              "mean": 6.3,
+              "p50": 5.69,
+              "p95": 10.79
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 3260,
+          "walWriteLockPct": 57.7,
+          "walSyncPct": 20,
+          "heavyweightLockPct": 0.03,
+          "runnablePct": 17.98,
+          "walSyncs": 16459,
+          "walSyncMsPerSync": 1.93,
+          "walMiB": 58.23,
+          "readOnlyPingMs": {
+            "n": 92,
+            "mean": 0.73,
+            "p50": 0.4,
+            "p95": 1.86
+          },
+          "hashMs": 2.19,
+          "loopBusy": 0.33,
+          "loopDelayP95OfQuarterSecondP99Ms": 14.05,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "path-full-0",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 6500,
+          "dropped": 0,
+          "writes": 26000,
+          "runsPerSecond": 259.36,
+          "p95Ms": 96,
+          "p99Ms": 108,
+          "peakBacklog": 38,
+          "drainMs": 64,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 0.05,
+          "avgHoldMs": 6.39,
+          "avgQueryMs": 6.34,
+          "holdByWrite": {
+            "inbox": 6.26,
+            "user": 6.43,
+            "assistant": 6.93,
+            "finish": 5.96
+          },
+          "pgTiming": {
+            "n": 2199,
+            "client": {
+              "n": 2199,
+              "mean": 6.43,
+              "p50": 6.1,
+              "p95": 8.85
+            },
+            "protocol": {
+              "n": 2199,
+              "mean": 0.87,
+              "p50": 0.85,
+              "p95": 1.53
+            },
+            "executeLogToClient": {
+              "n": 2199,
+              "mean": 5.82,
+              "p50": 5.6,
+              "p95": 8.08
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2952,
+          "walWriteLockPct": 69.88,
+          "walSyncPct": 10.77,
+          "heavyweightLockPct": 0,
+          "runnablePct": 14.43,
+          "walSyncs": 8268,
+          "walSyncMsPerSync": 1.8,
+          "walMiB": 56.91,
+          "readOnlyPingMs": {
+            "n": 42,
+            "mean": 0.57,
+            "p50": 0.38,
+            "p95": 1.35
+          },
+          "hashMs": 2.15,
+          "loopBusy": 0.4,
+          "loopDelayP95OfQuarterSecondP99Ms": 13.26,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0,
+          "timeline": []
+        },
+        {
+          "path": "path-full-1",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 6500,
+          "dropped": 0,
+          "writes": 26000,
+          "runsPerSecond": 259.2,
+          "p95Ms": 96,
+          "p99Ms": 114,
+          "peakBacklog": 47,
+          "drainMs": 80,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 0.06,
+          "avgHoldMs": 6.46,
+          "avgQueryMs": 6.4,
+          "holdByWrite": {
+            "inbox": 6.29,
+            "user": 6.5,
+            "assistant": 7.04,
+            "finish": 6.01
+          },
+          "pgTiming": {
+            "n": 2354,
+            "client": {
+              "n": 2354,
+              "mean": 6.48,
+              "p50": 6.14,
+              "p95": 8.92
+            },
+            "protocol": {
+              "n": 2354,
+              "mean": 0.86,
+              "p50": 0.83,
+              "p95": 1.6
+            },
+            "executeLogToClient": {
+              "n": 2354,
+              "mean": 5.89,
+              "p50": 5.64,
+              "p95": 8.2
+            },
+            "idleWitness": null
+          },
+          "activeSamples": 2987,
+          "walWriteLockPct": 70.57,
+          "walSyncPct": 9.81,
+          "heavyweightLockPct": 0,
+          "runnablePct": 15.2,
+          "walSyncs": 8079,
+          "walSyncMsPerSync": 1.86,
+          "walMiB": 57.88,
+          "readOnlyPingMs": {
+            "n": 42,
+            "mean": 0.59,
+            "p50": 0.43,
+            "p95": 1.2
+          },
+          "hashMs": 2.28,
+          "loopBusy": 0.42,
+          "loopDelayP95OfQuarterSecondP99Ms": 12.19,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "path-full-2",
+          "rate": 260,
+          "diagnostics": false,
+          "completed": 6500,
+          "dropped": 0,
+          "writes": 26000,
+          "runsPerSecond": 249.95,
+          "p95Ms": 827,
+          "p99Ms": 1351,
+          "peakBacklog": 854,
+          "drainMs": 1007,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 1.21,
+          "avgHoldMs": 7.21,
+          "avgQueryMs": 7.14,
+          "holdByWrite": {
+            "inbox": 7.09,
+            "user": 7.37,
+            "assistant": 7.82,
+            "finish": 6.54
+          },
+          "pgTiming": {
+            "n": 0,
+            "client": null,
+            "protocol": null,
+            "executeLogToClient": null,
+            "idleWitness": null
+          },
+          "activeSamples": 3140,
+          "walWriteLockPct": 70.67,
+          "walSyncPct": 10.03,
+          "heavyweightLockPct": 0.03,
+          "runnablePct": 15.38,
+          "walSyncs": 7936,
+          "walSyncMsPerSync": null,
+          "walMiB": 69.42,
+          "readOnlyPingMs": null,
+          "hashMs": 2.38,
+          "loopBusy": 0.46,
+          "loopDelayP95OfQuarterSecondP99Ms": 16.79,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        }
+      ]
+    },
+    {
+      "capturedRuns": 4160,
+      "frames": 29120,
+      "writes": 16640,
+      "sha256": "eeac771cacd0a4c7b47437237de46fc79e1891364b083ce600e0af5e080854cd",
+      "rows": {
+        "completed": 4160,
+        "message_rows": 8320,
+        "inbox_rows": 4160,
+        "heads": "45e2574267457c2d2c3b9e5d8badf03c",
+        "messages": "0988538ee32971cbaecc6466b2512493",
+        "inboxes": "ce2fa113d55def98984445849b743ade"
+      },
+      "pgSettings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "actorHashes": {
+        "worker": "1483dc8e367987098616e9999b3e3da7a66d5985b57df777c741ef0ffbf7a46d",
+        "projector": "6cfae3ec757f257a0401161a88ac3cf6c084b1e3c240fc5b3410c45046588c34",
+        "wake-runtime": "4e00c69a616804b4fe38116396ae4b01ad95fa40ca7804a8176d741055316b57"
+      },
+      "cleanup": true,
+      "paths": [
+        {
+          "path": "direct",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 259.54,
+          "p95Ms": 43.62,
+          "p99Ms": 141.35,
+          "peakBacklog": 26,
+          "drainMs": 28.88,
+          "sourceLateP95Ms": 1.29,
+          "avgCheckoutMs": 0.01,
+          "avgHoldMs": 5.31,
+          "avgQueryMs": 5.3,
+          "holdByWrite": {
+            "inbox": 5.17,
+            "user": 5.34,
+            "assistant": 5.49,
+            "finish": 5.23
+          },
+          "pgTiming": {
+            "n": 1144,
+            "client": {
+              "n": 1144,
+              "mean": 5.42,
+              "p50": 5.12,
+              "p95": 7.72
+            },
+            "protocol": {
+              "n": 1144,
+              "mean": 0.63,
+              "p50": 0.64,
+              "p95": 1.12
+            },
+            "executeLogToClient": {
+              "n": 1144,
+              "mean": 5.08,
+              "p50": 5.02,
+              "p95": 7.26
+            },
+            "idleWitness": {
+              "n": 60,
+              "client": {
+                "n": 60,
+                "mean": 5.43,
+                "p50": 5.06,
+                "p95": 7.38
+              },
+              "sentToServerIdle": {
+                "n": 60,
+                "mean": 5.18,
+                "p50": 4.82,
+                "p95": 7.02
+              },
+              "executeLogToServerIdle": {
+                "n": 60,
+                "mean": 5.14,
+                "p50": 4.9,
+                "p95": 6.97
+              },
+              "serverIdleToClient": {
+                "n": 60,
+                "mean": 0.25,
+                "p50": 0.16,
+                "p95": 0.62
+              }
+            }
+          },
+          "activeSamples": 1664,
+          "walWriteLockPct": 65.26,
+          "walSyncPct": 18.51,
+          "heavyweightLockPct": 0,
+          "runnablePct": 14.12,
+          "walSyncs": 6122,
+          "walSyncMsPerSync": 2.52,
+          "walMiB": 31.51,
+          "readOnlyPingMs": {
+            "n": 27,
+            "mean": 0.36,
+            "p50": 0.3,
+            "p95": 0.76
+          },
+          "hashMs": 2.02,
+          "loopBusy": 0.17,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.23,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 259.41,
+          "p95Ms": 62.68,
+          "p99Ms": 157.3,
+          "peakBacklog": 64,
+          "drainMs": 37.12,
+          "sourceLateP95Ms": 1.11,
+          "avgCheckoutMs": 0.04,
+          "avgHoldMs": 6.08,
+          "avgQueryMs": 6.06,
+          "holdByWrite": {
+            "inbox": 5.98,
+            "user": 6.08,
+            "assistant": 6.42,
+            "finish": 5.86
+          },
+          "pgTiming": {
+            "n": 1396,
+            "client": {
+              "n": 1396,
+              "mean": 6.27,
+              "p50": 5.97,
+              "p95": 8.71
+            },
+            "protocol": {
+              "n": 1396,
+              "mean": 0.82,
+              "p50": 0.8,
+              "p95": 1.44
+            },
+            "executeLogToClient": {
+              "n": 1396,
+              "mean": 5.69,
+              "p50": 5.43,
+              "p95": 7.96
+            },
+            "idleWitness": {
+              "n": 95,
+              "client": {
+                "n": 95,
+                "mean": 6.08,
+                "p50": 5.92,
+                "p95": 8.42
+              },
+              "sentToServerIdle": {
+                "n": 95,
+                "mean": 5.59,
+                "p50": 5.42,
+                "p95": 7.35
+              },
+              "executeLogToServerIdle": {
+                "n": 95,
+                "mean": 5.23,
+                "p50": 5.11,
+                "p95": 6.93
+              },
+              "serverIdleToClient": {
+                "n": 95,
+                "mean": 0.49,
+                "p50": 0.29,
+                "p95": 1.36
+              }
+            }
+          },
+          "activeSamples": 1808,
+          "walWriteLockPct": 68.25,
+          "walSyncPct": 17.04,
+          "heavyweightLockPct": 0,
+          "runnablePct": 13.5,
+          "walSyncs": 5327,
+          "walSyncMsPerSync": 2.89,
+          "walMiB": 31.27,
+          "readOnlyPingMs": {
+            "n": 27,
+            "mean": 0.47,
+            "p50": 0.35,
+            "p95": 1.18
+          },
+          "hashMs": 2.27,
+          "loopBusy": 0.37,
+          "loopDelayP95OfQuarterSecondP99Ms": 13.91,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 238.83,
+          "p95Ms": 2609.17,
+          "p99Ms": 3239.02,
+          "peakBacklog": 3264,
+          "drainMs": 1418.46,
+          "sourceLateP95Ms": 1.37,
+          "avgCheckoutMs": 14.55,
+          "avgHoldMs": 11.47,
+          "avgQueryMs": 11.37,
+          "holdByWrite": {
+            "inbox": 11.08,
+            "user": 11.84,
+            "assistant": 12.73,
+            "finish": 10.22
+          },
+          "pgTiming": {
+            "n": 1404,
+            "client": {
+              "n": 1404,
+              "mean": 11.37,
+              "p50": 11.55,
+              "p95": 17.45
+            },
+            "protocol": {
+              "n": 1404,
+              "mean": 2.04,
+              "p50": 1.85,
+              "p95": 4.14
+            },
+            "executeLogToClient": {
+              "n": 1404,
+              "mean": 9.24,
+              "p50": 9.09,
+              "p95": 14.07
+            },
+            "idleWitness": {
+              "n": 84,
+              "client": {
+                "n": 84,
+                "mean": 12.29,
+                "p50": 12.15,
+                "p95": 19.44
+              },
+              "sentToServerIdle": {
+                "n": 84,
+                "mean": 9.25,
+                "p50": 8.7,
+                "p95": 13.27
+              },
+              "executeLogToServerIdle": {
+                "n": 84,
+                "mean": 7.07,
+                "p50": 6.23,
+                "p95": 10.33
+              },
+              "serverIdleToClient": {
+                "n": 84,
+                "mean": 3.03,
+                "p50": 2.77,
+                "p95": 6.96
+              }
+            }
+          },
+          "activeSamples": 2910,
+          "walWriteLockPct": 59.31,
+          "walSyncPct": 11.17,
+          "heavyweightLockPct": 0,
+          "runnablePct": 24.36,
+          "walSyncs": 4397,
+          "walSyncMsPerSync": 3.72,
+          "walMiB": 31.41,
+          "readOnlyPingMs": {
+            "n": 33,
+            "mean": 3.41,
+            "p50": 3.66,
+            "p95": 7.02
+          },
+          "hashMs": 8.09,
+          "loopBusy": 0.79,
+          "loopDelayP95OfQuarterSecondP99Ms": 17.92,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0,
+          "timeline": [
+            {
+              "point": "early",
+              "second": 1,
+              "backlog": 25,
+              "poolWaiting": 0,
+              "operations": 1041,
+              "avgHoldMs": 5.96,
+              "avgCheckoutMs": 0.02,
+              "calibrationMs": 2.37,
+              "loopUtilization": 0.38,
+              "activeSamples": 106,
+              "walWriteLockPct": 61.32,
+              "walSyncPct": 16.98,
+              "heavyweightLockPct": 0,
+              "runnablePct": 14.15,
+              "server": {
+                "n": 90,
+                "client": {
+                  "n": 90,
+                  "mean": 5.99,
+                  "p50": 5.74,
+                  "p95": 7.89
+                },
+                "protocol": {
+                  "n": 90,
+                  "mean": 0.74,
+                  "p50": 0.75,
+                  "p95": 1.2
+                },
+                "executeLogToClient": {
+                  "n": 90,
+                  "mean": 5.53,
+                  "p50": 5.44,
+                  "p95": 7.36
+                },
+                "idleWitness": {
+                  "n": 6,
+                  "client": {
+                    "n": 6,
+                    "mean": 6.58,
+                    "p50": 6.1,
+                    "p95": 8.18
+                  },
+                  "sentToServerIdle": {
+                    "n": 6,
+                    "mean": 5.82,
+                    "p50": 5.73,
+                    "p95": 7.01
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 6,
+                    "mean": 5.31,
+                    "p50": 5.39,
+                    "p95": 6.61
+                  },
+                  "serverIdleToClient": {
+                    "n": 6,
+                    "mean": 0.76,
+                    "p50": 0.79,
+                    "p95": 1.31
+                  }
+                }
+              }
+            },
+            {
+              "point": "oneSecondOfArrivals",
+              "second": 9,
+              "backlog": 1883,
+              "poolWaiting": 20,
+              "operations": 794,
+              "avgHoldMs": 15.06,
+              "avgCheckoutMs": 22.65,
+              "calibrationMs": 9.32,
+              "loopUtilization": 0.96,
+              "activeSamples": 159,
+              "walWriteLockPct": 47.8,
+              "walSyncPct": 11.95,
+              "heavyweightLockPct": 0,
+              "runnablePct": 33.33,
+              "server": {
+                "n": 66,
+                "client": {
+                  "n": 66,
+                  "mean": 15.07,
+                  "p50": 15.08,
+                  "p95": 19.13
+                },
+                "protocol": {
+                  "n": 66,
+                  "mean": 2.94,
+                  "p50": 3.06,
+                  "p95": 4.74
+                },
+                "executeLogToClient": {
+                  "n": 66,
+                  "mean": 11.78,
+                  "p50": 11.51,
+                  "p95": 16.62
+                },
+                "idleWitness": {
+                  "n": 10,
+                  "client": {
+                    "n": 10,
+                    "mean": 15.11,
+                    "p50": 15.14,
+                    "p95": 18.23
+                  },
+                  "sentToServerIdle": {
+                    "n": 10,
+                    "mean": 10.74,
+                    "p50": 10.65,
+                    "p95": 13.22
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 10,
+                    "mean": 6.72,
+                    "p50": 6.45,
+                    "p95": 9.17
+                  },
+                  "serverIdleToClient": {
+                    "n": 10,
+                    "mean": 4.38,
+                    "p50": 3.78,
+                    "p95": 6.95
+                  }
+                }
+              }
+            },
+            {
+              "point": "peak",
+              "second": 15,
+              "backlog": 3264,
+              "poolWaiting": 20,
+              "operations": 925,
+              "avgHoldMs": 12.91,
+              "avgCheckoutMs": 20.99,
+              "calibrationMs": 7.73,
+              "loopUtilization": 0.79,
+              "activeSamples": 187,
+              "walWriteLockPct": 60.96,
+              "walSyncPct": 10.16,
+              "heavyweightLockPct": 0,
+              "runnablePct": 23.53,
+              "server": {
+                "n": 77,
+                "client": {
+                  "n": 77,
+                  "mean": 12.76,
+                  "p50": 12.61,
+                  "p95": 17.78
+                },
+                "protocol": {
+                  "n": 77,
+                  "mean": 2.09,
+                  "p50": 2.04,
+                  "p95": 3.75
+                },
+                "executeLogToClient": {
+                  "n": 77,
+                  "mean": 10.54,
+                  "p50": 10.42,
+                  "p95": 14.97
+                },
+                "idleWitness": {
+                  "n": 2,
+                  "client": {
+                    "n": 2,
+                    "mean": 10.63,
+                    "p50": 9.15,
+                    "p95": 12.11
+                  },
+                  "sentToServerIdle": {
+                    "n": 2,
+                    "mean": 7.56,
+                    "p50": 5.78,
+                    "p95": 9.33
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 2,
+                    "mean": 6.42,
+                    "p50": 5.47,
+                    "p95": 7.36
+                  },
+                  "serverIdleToClient": {
+                    "n": 2,
+                    "mean": 3.07,
+                    "p50": 2.77,
+                    "p95": 3.36
+                  }
+                }
+              }
+            },
+            {
+              "point": "last",
+              "second": 17,
+              "backlog": 0,
+              "poolWaiting": 0,
+              "operations": 354,
+              "avgHoldMs": 6.9,
+              "avgCheckoutMs": 0.12,
+              "calibrationMs": null,
+              "loopUtilization": 0.31,
+              "activeSamples": 41,
+              "walWriteLockPct": 58.54,
+              "walSyncPct": 19.51,
+              "heavyweightLockPct": 0,
+              "runnablePct": 19.51,
+              "server": {
+                "n": 42,
+                "client": {
+                  "n": 42,
+                  "mean": 6.93,
+                  "p50": 6.44,
+                  "p95": 9.04
+                },
+                "protocol": {
+                  "n": 42,
+                  "mean": 1.08,
+                  "p50": 1.07,
+                  "p95": 1.73
+                },
+                "executeLogToClient": {
+                  "n": 42,
+                  "mean": 5.94,
+                  "p50": 5.86,
+                  "p95": 7.98
+                },
+                "idleWitness": {
+                  "n": 1,
+                  "client": {
+                    "n": 1,
+                    "mean": 5.94,
+                    "p50": 5.94,
+                    "p95": 5.94
+                  },
+                  "sentToServerIdle": {
+                    "n": 1,
+                    "mean": 5.77,
+                    "p50": 5.77,
+                    "p95": 5.77
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 1,
+                    "mean": 5.98,
+                    "p50": 5.98,
+                    "p95": 5.98
+                  },
+                  "serverIdleToClient": {
+                    "n": 1,
+                    "mean": 0.17,
+                    "p50": 0.17,
+                    "p95": 0.17
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "path": "direct",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 259.24,
+          "p95Ms": 53.32,
+          "p99Ms": 147.34,
+          "peakBacklog": 57,
+          "drainMs": 47.59,
+          "sourceLateP95Ms": 1.37,
+          "avgCheckoutMs": 0.02,
+          "avgHoldMs": 6.41,
+          "avgQueryMs": 6.4,
+          "holdByWrite": {
+            "inbox": 6.3,
+            "user": 6.38,
+            "assistant": 6.79,
+            "finish": 6.18
+          },
+          "pgTiming": {
+            "n": 1555,
+            "client": {
+              "n": 1555,
+              "mean": 6.51,
+              "p50": 6.13,
+              "p95": 8.69
+            },
+            "protocol": {
+              "n": 1555,
+              "mean": 1.08,
+              "p50": 1.09,
+              "p95": 1.75
+            },
+            "executeLogToClient": {
+              "n": 1555,
+              "mean": 5.63,
+              "p50": 5.34,
+              "p95": 7.59
+            },
+            "idleWitness": {
+              "n": 69,
+              "client": {
+                "n": 69,
+                "mean": 6.32,
+                "p50": 6.08,
+                "p95": 8.64
+              },
+              "sentToServerIdle": {
+                "n": 69,
+                "mean": 5.94,
+                "p50": 5.71,
+                "p95": 7.72
+              },
+              "executeLogToServerIdle": {
+                "n": 69,
+                "mean": 5.45,
+                "p50": 5.56,
+                "p95": 7.05
+              },
+              "serverIdleToClient": {
+                "n": 69,
+                "mean": 0.38,
+                "p50": 0.32,
+                "p95": 0.89
+              }
+            }
+          },
+          "activeSamples": 1963,
+          "walWriteLockPct": 64.14,
+          "walSyncPct": 15.44,
+          "heavyweightLockPct": 0,
+          "runnablePct": 17.63,
+          "walSyncs": 5136,
+          "walSyncMsPerSync": 2.99,
+          "walMiB": 31.29,
+          "readOnlyPingMs": {
+            "n": 27,
+            "mean": 0.42,
+            "p50": 0.39,
+            "p95": 0.63
+          },
+          "hashMs": 3.56,
+          "loopBusy": 0.23,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.17,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "direct",
+          "rate": 520,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 393.02,
+          "p95Ms": 2683.69,
+          "p99Ms": 3088.99,
+          "peakBacklog": 6028,
+          "drainMs": 2584.85,
+          "sourceLateP95Ms": 1.56,
+          "avgCheckoutMs": 10.59,
+          "avgHoldMs": 7.45,
+          "avgQueryMs": 7.44,
+          "holdByWrite": {
+            "inbox": 7.07,
+            "user": 7.66,
+            "assistant": 8.4,
+            "finish": 6.66
+          },
+          "pgTiming": {
+            "n": 1342,
+            "client": {
+              "n": 1342,
+              "mean": 7.64,
+              "p50": 6.77,
+              "p95": 12.09
+            },
+            "protocol": {
+              "n": 1342,
+              "mean": 1.41,
+              "p50": 1.26,
+              "p95": 2.98
+            },
+            "executeLogToClient": {
+              "n": 1342,
+              "mean": 6.31,
+              "p50": 5.93,
+              "p95": 9.09
+            },
+            "idleWitness": {
+              "n": 32,
+              "client": {
+                "n": 32,
+                "mean": 10.47,
+                "p50": 8.16,
+                "p95": 16.08
+              },
+              "sentToServerIdle": {
+                "n": 32,
+                "mean": 7.63,
+                "p50": 6.92,
+                "p95": 13.39
+              },
+              "executeLogToServerIdle": {
+                "n": 32,
+                "mean": 5.96,
+                "p50": 5.54,
+                "p95": 11.83
+              },
+              "serverIdleToClient": {
+                "n": 32,
+                "mean": 2.84,
+                "p50": 0.78,
+                "p95": 1.9
+              }
+            }
+          },
+          "activeSamples": 2120,
+          "walWriteLockPct": 64.43,
+          "walSyncPct": 9.29,
+          "heavyweightLockPct": 0,
+          "runnablePct": 23.02,
+          "walSyncs": 3244,
+          "walSyncMsPerSync": 3.09,
+          "walMiB": 31.29,
+          "readOnlyPingMs": {
+            "n": 20,
+            "mean": 0.99,
+            "p50": 0.74,
+            "p95": 1.91
+          },
+          "hashMs": 4.24,
+          "loopBusy": 0.4,
+          "loopDelayP95OfQuarterSecondP99Ms": 13,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 300.93,
+          "p95Ms": 6979.12,
+          "p99Ms": 7368.13,
+          "peakBacklog": 14481,
+          "drainMs": 5823.97,
+          "sourceLateP95Ms": 1.42,
+          "avgCheckoutMs": 9.04,
+          "avgHoldMs": 9.46,
+          "avgQueryMs": 9.39,
+          "holdByWrite": {
+            "inbox": 9.09,
+            "user": 9.83,
+            "assistant": 10.5,
+            "finish": 8.42
+          },
+          "pgTiming": {
+            "n": 1307,
+            "client": {
+              "n": 1307,
+              "mean": 9.82,
+              "p50": 9.03,
+              "p95": 15.5
+            },
+            "protocol": {
+              "n": 1307,
+              "mean": 1.73,
+              "p50": 1.53,
+              "p95": 3.55
+            },
+            "executeLogToClient": {
+              "n": 1307,
+              "mean": 8.1,
+              "p50": 7.46,
+              "p95": 12.81
+            },
+            "idleWitness": {
+              "n": 53,
+              "client": {
+                "n": 53,
+                "mean": 11.47,
+                "p50": 10.73,
+                "p95": 23.08
+              },
+              "sentToServerIdle": {
+                "n": 53,
+                "mean": 8.61,
+                "p50": 8.31,
+                "p95": 12.61
+              },
+              "executeLogToServerIdle": {
+                "n": 53,
+                "mean": 6.71,
+                "p50": 6.18,
+                "p95": 8.84
+              },
+              "serverIdleToClient": {
+                "n": 53,
+                "mean": 2.86,
+                "p50": 2.09,
+                "p95": 6.7
+              }
+            }
+          },
+          "activeSamples": 2500,
+          "walWriteLockPct": 63.92,
+          "walSyncPct": 10.76,
+          "heavyweightLockPct": 0,
+          "runnablePct": 21.2,
+          "walSyncs": 3834,
+          "walSyncMsPerSync": 3.42,
+          "walMiB": 31.68,
+          "readOnlyPingMs": {
+            "n": 26,
+            "mean": 2.09,
+            "p50": 1.41,
+            "p95": 5.22
+          },
+          "hashMs": 6.09,
+          "loopBusy": 0.7,
+          "loopDelayP95OfQuarterSecondP99Ms": 18.96,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        }
+      ],
+      "live": [
+        {
+          "path": "path-capture",
+          "rate": 116,
+          "diagnostics": true,
+          "completed": 4160,
+          "dropped": 0,
+          "writes": 16640,
+          "runsPerSecond": 115.83,
+          "p95Ms": 82,
+          "p99Ms": 299,
+          "peakBacklog": 27,
+          "drainMs": 61,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 0.07,
+          "avgHoldMs": 5.86,
+          "avgQueryMs": 5.84,
+          "holdByWrite": {
+            "inbox": 5.66,
+            "user": 6.02,
+            "assistant": 6.29,
+            "finish": 5.49
+          },
+          "pgTiming": {
+            "n": 2442,
+            "client": {
+              "n": 2442,
+              "mean": 6.04,
+              "p50": 5.7,
+              "p95": 8.56
+            },
+            "protocol": {
+              "n": 2442,
+              "mean": 0.72,
+              "p50": 0.73,
+              "p95": 1.22
+            },
+            "executeLogToClient": {
+              "n": 2442,
+              "mean": 5.59,
+              "p50": 5.23,
+              "p95": 8.21
+            },
+            "idleWitness": {
+              "n": 256,
+              "client": {
+                "n": 256,
+                "mean": 5.92,
+                "p50": 5.75,
+                "p95": 8.43
+              },
+              "sentToServerIdle": {
+                "n": 256,
+                "mean": 5.59,
+                "p50": 5.37,
+                "p95": 7.85
+              },
+              "executeLogToServerIdle": {
+                "n": 256,
+                "mean": 5.25,
+                "p50": 5.03,
+                "p95": 7.96
+              },
+              "serverIdleToClient": {
+                "n": 256,
+                "mean": 0.32,
+                "p50": 0.23,
+                "p95": 0.85
+              }
+            }
+          },
+          "activeSamples": 1777,
+          "walWriteLockPct": 59.48,
+          "walSyncPct": 24.2,
+          "heavyweightLockPct": 0,
+          "runnablePct": 13.84,
+          "walSyncs": 11873,
+          "walSyncMsPerSync": 1.73,
+          "walMiB": 36.62,
+          "readOnlyPingMs": {
+            "n": 62,
+            "mean": 0.37,
+            "p50": 0.29,
+            "p95": 0.79
+          },
+          "hashMs": 2.25,
+          "loopBusy": 0.23,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.67,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        },
+        {
+          "path": "path-full-0",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 9988,
+          "dropped": 412,
+          "writes": 39952,
+          "runsPerSecond": 249.32,
+          "p95Ms": 2187,
+          "p99Ms": 3389,
+          "peakBacklog": 2231,
+          "drainMs": 64,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 5.64,
+          "avgHoldMs": 8.37,
+          "avgQueryMs": 8.31,
+          "holdByWrite": {
+            "inbox": 8.15,
+            "user": 8.52,
+            "assistant": 9.12,
+            "finish": 7.7
+          },
+          "pgTiming": {
+            "n": 3231,
+            "client": {
+              "n": 3231,
+              "mean": 8.44,
+              "p50": 6.41,
+              "p95": 17.09
+            },
+            "protocol": {
+              "n": 3231,
+              "mean": 1.22,
+              "p50": 0.88,
+              "p95": 3.91
+            },
+            "executeLogToClient": {
+              "n": 3231,
+              "mean": 7.35,
+              "p50": 6.05,
+              "p95": 13.81
+            },
+            "idleWitness": {
+              "n": 254,
+              "client": {
+                "n": 254,
+                "mean": 9.17,
+                "p50": 6.53,
+                "p95": 18.22
+              },
+              "sentToServerIdle": {
+                "n": 254,
+                "mean": 7.03,
+                "p50": 5.78,
+                "p95": 12.78
+              },
+              "executeLogToServerIdle": {
+                "n": 254,
+                "mean": 6.01,
+                "p50": 5.68,
+                "p95": 9.57
+              },
+              "serverIdleToClient": {
+                "n": 254,
+                "mean": 2.14,
+                "p50": 0.6,
+                "p95": 6.47
+              }
+            }
+          },
+          "activeSamples": 5391,
+          "walWriteLockPct": 70.21,
+          "walSyncPct": 9.42,
+          "heavyweightLockPct": 0.02,
+          "runnablePct": 16.45,
+          "walSyncs": 11850,
+          "walSyncMsPerSync": 2.07,
+          "walMiB": 87.41,
+          "readOnlyPingMs": {
+            "n": 71,
+            "mean": 2.15,
+            "p50": 0.66,
+            "p95": 7.78
+          },
+          "hashMs": 2.22,
+          "loopBusy": 0.56,
+          "loopDelayP95OfQuarterSecondP99Ms": 18.09,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0,
+          "timeline": [
+            {
+              "point": "early",
+              "second": 1,
+              "backlog": 260,
+              "poolWaiting": 15,
+              "operations": 746,
+              "avgHoldMs": 16.02,
+              "avgCheckoutMs": 15.2,
+              "calibrationMs": 7.23,
+              "loopUtilization": 0.96,
+              "activeSamples": 169,
+              "walWriteLockPct": 60.36,
+              "walSyncPct": 7.69,
+              "heavyweightLockPct": 0,
+              "runnablePct": 24.85,
+              "server": {
+                "n": 64,
+                "client": {
+                  "n": 64,
+                  "mean": 15.61,
+                  "p50": 15.32,
+                  "p95": 21.63
+                },
+                "protocol": {
+                  "n": 64,
+                  "mean": 2.9,
+                  "p50": 2.77,
+                  "p95": 5.24
+                },
+                "executeLogToClient": {
+                  "n": 64,
+                  "mean": 12.37,
+                  "p50": 12.28,
+                  "p95": 18.13
+                },
+                "idleWitness": {
+                  "n": 5,
+                  "client": {
+                    "n": 5,
+                    "mean": 15.11,
+                    "p50": 13.58,
+                    "p95": 21.63
+                  },
+                  "sentToServerIdle": {
+                    "n": 5,
+                    "mean": 9.55,
+                    "p50": 9.01,
+                    "p95": 12.79
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 5,
+                    "mean": 7.35,
+                    "p50": 7.43,
+                    "p95": 10.31
+                  },
+                  "serverIdleToClient": {
+                    "n": 5,
+                    "mean": 5.56,
+                    "p50": 4.68,
+                    "p95": 8.84
+                  }
+                }
+              }
+            },
+            {
+              "point": "oneSecondOfArrivals",
+              "second": 5,
+              "backlog": 1868,
+              "poolWaiting": 20,
+              "operations": 782,
+              "avgHoldMs": 15.3,
+              "avgCheckoutMs": 24.7,
+              "calibrationMs": 7.9,
+              "loopUtilization": 0.93,
+              "activeSamples": 177,
+              "walWriteLockPct": 59.32,
+              "walSyncPct": 7.91,
+              "heavyweightLockPct": 0,
+              "runnablePct": 22.6,
+              "server": {
+                "n": 62,
+                "client": {
+                  "n": 62,
+                  "mean": 15.78,
+                  "p50": 15.19,
+                  "p95": 21.34
+                },
+                "protocol": {
+                  "n": 62,
+                  "mean": 2.99,
+                  "p50": 3.15,
+                  "p95": 4.64
+                },
+                "executeLogToClient": {
+                  "n": 62,
+                  "mean": 12.26,
+                  "p50": 11.67,
+                  "p95": 16.62
+                },
+                "idleWitness": {
+                  "n": 7,
+                  "client": {
+                    "n": 7,
+                    "mean": 16.18,
+                    "p50": 15.94,
+                    "p95": 18.85
+                  },
+                  "sentToServerIdle": {
+                    "n": 7,
+                    "mean": 11.12,
+                    "p50": 11.3,
+                    "p95": 12.95
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 7,
+                    "mean": 7.14,
+                    "p50": 7.56,
+                    "p95": 9.16
+                  },
+                  "serverIdleToClient": {
+                    "n": 7,
+                    "mean": 5.06,
+                    "p50": 5.3,
+                    "p95": 6.96
+                  }
+                }
+              }
+            },
+            {
+              "point": "peak",
+              "second": 12,
+              "backlog": 2231,
+              "poolWaiting": 17,
+              "operations": 1397,
+              "avgHoldMs": 8.58,
+              "avgCheckoutMs": 12.25,
+              "calibrationMs": 8.54,
+              "loopUtilization": 0.72,
+              "activeSamples": 197,
+              "walWriteLockPct": 71.07,
+              "walSyncPct": 8.12,
+              "heavyweightLockPct": 0,
+              "runnablePct": 15.23,
+              "server": {
+                "n": 114,
+                "client": {
+                  "n": 114,
+                  "mean": 8.65,
+                  "p50": 6.56,
+                  "p95": 17.04
+                },
+                "protocol": {
+                  "n": 114,
+                  "mean": 1.08,
+                  "p50": 0.85,
+                  "p95": 3.46
+                },
+                "executeLogToClient": {
+                  "n": 114,
+                  "mean": 7.73,
+                  "p50": 6.14,
+                  "p95": 13.43
+                },
+                "idleWitness": {
+                  "n": 5,
+                  "client": {
+                    "n": 5,
+                    "mean": 8.06,
+                    "p50": 6.08,
+                    "p95": 16.4
+                  },
+                  "sentToServerIdle": {
+                    "n": 5,
+                    "mean": 6.06,
+                    "p50": 4.98,
+                    "p95": 13.3
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 5,
+                    "mean": 4.23,
+                    "p50": 4.4,
+                    "p95": 5.93
+                  },
+                  "serverIdleToClient": {
+                    "n": 5,
+                    "mean": 2.01,
+                    "p50": 1.21,
+                    "p95": 3.44
+                  }
+                }
+              }
+            },
+            {
+              "point": "last",
+              "second": 40,
+              "backlog": 9,
+              "poolWaiting": 0,
+              "operations": 130,
+              "avgHoldMs": 5.99,
+              "avgCheckoutMs": 0.03,
+              "calibrationMs": 2.14,
+              "loopUtilization": 0.43,
+              "activeSamples": 21,
+              "walWriteLockPct": 57.14,
+              "walSyncPct": 9.52,
+              "heavyweightLockPct": 0,
+              "runnablePct": 33.33,
+              "server": {
+                "n": 17,
+                "client": {
+                  "n": 17,
+                  "mean": 6.04,
+                  "p50": 5.92,
+                  "p95": 6.85
+                },
+                "protocol": {
+                  "n": 17,
+                  "mean": 0.84,
+                  "p50": 0.86,
+                  "p95": 1.36
+                },
+                "executeLogToClient": {
+                  "n": 17,
+                  "mean": 5.52,
+                  "p50": 5.46,
+                  "p95": 7.14
+                },
+                "idleWitness": {
+                  "n": 2,
+                  "client": {
+                    "n": 2,
+                    "mean": 6.17,
+                    "p50": 5.72,
+                    "p95": 6.62
+                  },
+                  "sentToServerIdle": {
+                    "n": 2,
+                    "mean": 5.55,
+                    "p50": 5.54,
+                    "p95": 5.55
+                  },
+                  "executeLogToServerIdle": {
+                    "n": 2,
+                    "mean": 5.99,
+                    "p50": 5.93,
+                    "p95": 6.06
+                  },
+                  "serverIdleToClient": {
+                    "n": 2,
+                    "mean": 0.63,
+                    "p50": 0.17,
+                    "p95": 1.08
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "path": "path-full-1",
+          "rate": 260,
+          "diagnostics": true,
+          "completed": 10400,
+          "dropped": 0,
+          "writes": 41600,
+          "runsPerSecond": 259.59,
+          "p95Ms": 91,
+          "p99Ms": 106,
+          "peakBacklog": 43,
+          "drainMs": 66,
+          "sourceLateP95Ms": null,
+          "avgCheckoutMs": 0.04,
+          "avgHoldMs": 6.29,
+          "avgQueryMs": 6.24,
+          "holdByWrite": {
+            "inbox": 6.12,
+            "user": 6.31,
+            "assistant": 6.77,
+            "finish": 5.95
+          },
+          "pgTiming": {
+            "n": 3634,
+            "client": {
+              "n": 3634,
+              "mean": 6.35,
+              "p50": 6.03,
+              "p95": 8.59
+            },
+            "protocol": {
+              "n": 3634,
+              "mean": 0.82,
+              "p50": 0.83,
+              "p95": 1.39
+            },
+            "executeLogToClient": {
+              "n": 3634,
+              "mean": 5.79,
+              "p50": 5.57,
+              "p95": 8.03
+            },
+            "idleWitness": {
+              "n": 280,
+              "client": {
+                "n": 280,
+                "mean": 6.34,
+                "p50": 6.09,
+                "p95": 8.36
+              },
+              "sentToServerIdle": {
+                "n": 280,
+                "mean": 5.85,
+                "p50": 5.59,
+                "p95": 7.87
+              },
+              "executeLogToServerIdle": {
+                "n": 280,
+                "mean": 5.36,
+                "p50": 5.2,
+                "p95": 7.51
+              },
+              "serverIdleToClient": {
+                "n": 280,
+                "mean": 0.49,
+                "p50": 0.42,
+                "p95": 1.13
+              }
+            }
+          },
+          "activeSamples": 4752,
+          "walWriteLockPct": 74.54,
+          "walSyncPct": 10.44,
+          "heavyweightLockPct": 0,
+          "runnablePct": 12.16,
+          "walSyncs": 13020,
+          "walSyncMsPerSync": 1.79,
+          "walMiB": 92.18,
+          "readOnlyPingMs": {
+            "n": 65,
+            "mean": 0.45,
+            "p50": 0.34,
+            "p95": 0.87
+          },
+          "hashMs": 2.27,
+          "loopBusy": 0.38,
+          "loopDelayP95OfQuarterSecondP99Ms": 11.72,
+          "projectorThrottledUs": 0,
+          "pgThrottledUs": 0
+        }
+      ]
+    }
+  ]
+}
