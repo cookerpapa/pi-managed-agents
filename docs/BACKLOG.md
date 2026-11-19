@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare shared and disjoint guest cores for PG and the Session Projector under a fixed total budget, verify the granted CPU sets during load, and repeat both trace replay and the full Run lifecycle in reversed order. [CPU placement study](reports/projector-cpu-placement-20261119.md).
+
 - [x] Replay identical ordered records and SQL bindings directly into PG and through the real Projector. Match query, implicit transaction and client-return timing in fast/slow windows, then validate the full Run lifecycle with admission and Workers. [PG baseline and timing](reports/projector-pg-path-baseline-20261119.md).
 
 - [x] Batch immediately available Session-log records while bounding admitted buffers, preserving offset confirmation and measuring full-Run latency. Compare PG connection counts separately. [Batch-read measurements](reports/session-projector-batch-read-20261119.md).

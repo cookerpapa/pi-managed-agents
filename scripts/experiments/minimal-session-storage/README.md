@@ -125,6 +125,28 @@ server transaction settlement from the final response interval for matched write
 The raw timing file is private. The summarizer exports aggregate evidence.
 [Results](../../../docs/reports/projector-pg-path-baseline-20261119.md).
 
+### Compare shared and disjoint CPUs
+
+The development-node fixture creates a disposable PG Pod using the deployed
+image and a disk-backed volume, a separate Projector Pod, and a support Pod for
+two Worker processes and their wake router. It uses a temporary database
+credential, the existing RF3 Kafka cluster and the same release lock. Its local
+driver requires `taskset` and the existing K3s `crictl` access to update only
+the three verified study container IDs. Each measurement checks the granted
+CPU lists before and during load. Complete SMT sibling groups stay together.
+
+```sh
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/cpu-first cpu
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/cpu-reverse cpu-confirm
+node scripts/experiments/minimal-session-storage/summarize-cpu-placement.mjs /private/cpu-summary.json /private/cpu-first /private/cpu-reverse
+```
+
+Use `cpu-smoke` for the short affinity and cleanup check. The primary comparison
+shares eight guest cores or assigns four per role and reverses which four. The
+independent confirmation reverses the order of the live trials. Results include
+the recorded-tape digest, per-round affinity checks, host calibration and
+verification of fixture cleanup. [CPU placement results](../../../docs/reports/projector-cpu-placement-20261119.md).
+
 The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load and an already queued burst. One Worker holds 64, 128 or 256 distinct physical Sessions at the real Pi model boundary. The driver records concurrent waiters, process RSS and event-loop delay. Separately it measures a bounded, tenant-scoped preference for one Run ID and exercises fresh native context assembly with the same frozen entries fetched from PG or already in memory. The individual experiments stop short of routing successive production Runs to a retained cache. [Results](../../../docs/reports/worker-claim-sizing-20261119.md).
 
 `schema.sql` defines the three physical tables and constraints. An independent client request is durably registered before success. Two concurrent SQL claimers cannot skip an active predecessor in the same Session. Inbox removal and the `user` Entry are committed together. The separately delivered `work_finished` updates the admitted Run under its claim identity. The experiment does not reconstruct an in-flight Pi Task after Worker death. That requires the additional stored state and recovery contract in the full runtime.

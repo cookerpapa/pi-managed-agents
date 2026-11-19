@@ -38,7 +38,7 @@ export function attachIdleWitness(row, span, idle) {
   row.executeToIdle = Math.max(0, idle - executeEnd);
   row.afterIdle = Math.max(0, returned - idle);
 }
-function followPg(token) {
+function followPg(token, pod = podFor("postgres")) {
   const binary = process.env.PI_CLOUD_KUBECTL_BIN ?? "/usr/local/bin/k3s";
   const prefix = [
     ...(process.env.PI_CLOUD_KUBECTL_BIN ? [] : ["kubectl"]),
@@ -47,7 +47,6 @@ function followPg(token) {
     "-n",
     namespace,
   ];
-  const pod = podFor("postgres");
   const open = new Map(),
     blocks = new Map(),
     pgCpu = [];
@@ -91,12 +90,15 @@ function followPg(token) {
       "-c",
       `while IFS= read -r tick; do
     awk '/^usage_usec /{u=$2} /^throttled_usec /{t=$2} END{printf "%s %s ",u,t+0}' /sys/fs/cgroup/cpu.stat
-    awk '/^some /{sub(/.*total=/,""); print; exit}' /sys/fs/cgroup/cpu.pressure
+    awk '/^some /{sub(/.*total=/,""); printf "%s ",$0; exit}' /sys/fs/cgroup/cpu.pressure
+    cat /sys/fs/cgroup/cpuset.cpus.effective
   done`,
     ],
     (line) => {
-      if (/^\d+ \d+ \d+$/.test(line))
-        pgCpu.push({ at: Date.now(), values: line.split(" ").map(Number) });
+      if (/^\d+ \d+ \d+ [0-9,-]+$/.test(line)) {
+        const parts = line.split(" ");
+        pgCpu.push({ at: Date.now(), values: parts.slice(0, 3).map(Number), allowed: parts[3] });
+      }
     },
     true,
   );
@@ -137,7 +139,7 @@ const buffer = Buffer.alloc(1024 * 1024);
 async function observe(pool, logs, work) {
   const sample = [],
     before = (await pool.query(walSql)).rows[0];
-  const timing = process.env.PI_CLOUD_PG_PATH_PROFILE === "timing";
+  const timing = ["timing", "cpu", "cpu-smoke"].includes(process.env.PI_CLOUD_PG_PATH_PROFILE);
   const witnesses = new Map();
   let stop = false,
     calibratedAt = 0;
@@ -234,12 +236,13 @@ export async function runPgPaths({
   report,
   save,
   token,
+  cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
-  assert(["smoke", "full", "timing"].includes(profile));
-  const smoke = profile === "smoke",
+  assert(["smoke", "full", "timing", "cpu", "cpu-smoke"].includes(profile));
+  const smoke = profile === "smoke" || profile === "cpu-smoke",
     timing = profile === "timing";
-  const count = smoke ? 320 : timing ? 4160 : 6240;
+  const count = smoke ? (cpuFixture ? 520 : 320) : timing ? 4160 : 6240;
   const call = async (actor, command, response, args = {}) => {
     const done = actor.wait(response);
     actor.write({ kind: command, ...args });
@@ -280,8 +283,39 @@ export async function runPgPaths({
       drainMs: result.drainAfterOfferMs,
     };
   };
-  const logs = followPg(token);
+  const logs = followPg(token, cpuFixture?.pg);
   report.pgPaths = { live: [], pairs: [] };
+  const reverse = cpuFixture && process.env.PI_CLOUD_CPU_REVERSE === "1";
+  if (cpuFixture)
+    report.pgPaths.cpu = {
+      plan: cpuFixture.plan,
+      images: cpuFixture.images,
+      environment: cpuFixture.environment,
+      reverse,
+    };
+  const verifyPlacement = (result, placement) => {
+    if (!placement) return;
+    const m = result.measurement;
+    const pgMasks = result.observations.pgCpu
+      .filter((s) => s.at >= m.started && s.at <= m.ended)
+      .map((s) => s.allowed);
+    const projectorMasks = m.samples.map((s) => s.allowed);
+    assert.deepEqual(
+      [...new Set(pgMasks)],
+      [placement.pg.effective],
+      "PG cpuset changed during trial",
+    );
+    assert.deepEqual(
+      [...new Set(projectorMasks)],
+      [placement.projector.effective],
+      "Projector cpuset changed during trial",
+    );
+    result.placement = {
+      ...placement,
+      pgSamples: pgMasks.length,
+      projectorSamples: projectorMasks.length,
+    };
+  };
   try {
     const capture = await observe(observer, logs, () =>
       runLive("path-capture", "capture", 116, count, true),
@@ -294,39 +328,42 @@ export async function runPgPaths({
     assert.equal(tape.runs, count);
     assert.equal((await call(emitter, "loadPathFrames", "pathSourceReady")).frames, tape.frames);
     await save();
-    const cases = smoke
-      ? [
-          [260, "direct"],
-          [260, "projector"],
-        ]
-      : timing
+    const cases = cpuFixture
+      ? cpuReplayCases(smoke, reverse)
+      : smoke
         ? [
             [260, "direct"],
             [260, "projector"],
-            [260, "projector"],
-            [260, "direct"],
-            [520, "direct"],
-            [520, "projector"],
           ]
-        : [
-            [116, "direct"],
-            [116, "projector"],
-            [260, "projector"],
-            [260, "direct"],
-            [260, "direct"],
-            [260, "projector"],
-            [390, "direct"],
-            [390, "projector"],
-            [390, "projector"],
-            [390, "direct"],
-            [520, "projector"],
-            [520, "direct"],
-            [116, "projector"],
-            [116, "direct"],
-            [260, "direct", false],
-            [260, "projector", false],
-          ];
-    for (const [rate, path, diagnostics = true] of cases) {
+        : timing
+          ? [
+              [260, "direct"],
+              [260, "projector"],
+              [260, "projector"],
+              [260, "direct"],
+              [520, "direct"],
+              [520, "projector"],
+            ]
+          : [
+              [116, "direct"],
+              [116, "projector"],
+              [260, "projector"],
+              [260, "direct"],
+              [260, "direct"],
+              [260, "projector"],
+              [390, "direct"],
+              [390, "projector"],
+              [390, "projector"],
+              [390, "direct"],
+              [520, "projector"],
+              [520, "direct"],
+              [116, "projector"],
+              [116, "direct"],
+              [260, "direct", false],
+              [260, "projector", false],
+            ];
+    for (const [rate, path, diagnostics = true, layout] of cases) {
+      const placement = cpuFixture ? await cpuFixture.pin(layout) : undefined;
       const { start } = await call(projector, "preparePaths", "pathReady", {
         path,
         rate,
@@ -343,11 +380,13 @@ export async function runPgPaths({
         return { rate, path, diagnostics, source: emitted?.source ?? r.source, ...r.result };
       });
       assert.equal(result.source.frames, tape.frames);
+      verifyPlacement(result, placement);
       report.pgPaths.pairs.push(result);
       await save();
       console.log(
         JSON.stringify({
           path,
+          layout,
           rate,
           diagnostics,
           done: tape.runs,
@@ -358,14 +397,53 @@ export async function runPgPaths({
         }),
       );
     }
-    for (const i of smoke ? [0] : timing ? [0, 1] : [0, 1, 2]) {
+    const liveLayouts = cpuFixture
+      ? smoke
+        ? ["ab"]
+        : reverse
+          ? ["ba", "shared", "shared", "ab"]
+          : ["shared", "ab", "ba", "shared"]
+      : undefined;
+    for (const i of liveLayouts ? liveLayouts.keys() : smoke ? [0] : timing ? [0, 1] : [0, 1, 2]) {
+      const placement = liveLayouts ? await cpuFixture.pin(liveLayouts[i]) : undefined;
       const result = await observe(observer, logs, () =>
-        runLive("path-full-" + i, "full", 260, smoke ? 320 : timing ? 10400 : 6500, i !== 2),
+        runLive(
+          "path-full-" + i,
+          "full",
+          260,
+          smoke ? (cpuFixture ? 520 : 320) : timing || cpuFixture ? 10400 : 6500,
+          !!cpuFixture || i !== 2,
+        ),
       );
+      verifyPlacement(result, placement);
       report.pgPaths.live.push(result);
       await save();
     }
   } finally {
     await logs.close();
   }
+}
+
+export function cpuReplayCases(smoke, reverse = false) {
+  const cases = (rate, path, layouts) => layouts.map((layout) => [rate, path, true, layout]);
+  if (smoke) return cases(260, "projector", ["shared", "ab", "ba"]);
+  if (reverse)
+    return cases(260, "projector", [
+      "open",
+      "ab",
+      "shared",
+      "shared",
+      "ba",
+      "shared",
+      "ba",
+      "ab",
+      "shared",
+      "open",
+    ]);
+  return [
+    ...cases(260, "projector", ["shared", "ab", "ba", "shared", "ba", "shared", "shared", "ab"]),
+    ...cases(260, "direct", ["shared", "ab", "ba", "shared"]),
+    ...cases(390, "projector", ["shared", "ba", "ab", "shared"]),
+    ...cases(260, "projector", ["overlapA", "ab", "ba", "overlapB"]),
+  ];
 }

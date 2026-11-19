@@ -65,8 +65,17 @@ const token = randomUUID().replaceAll("-", "").slice(0, 16),
   name = "pma_sessbench_" + token,
   topic = "pma-session-bench-" + token,
   tenant = randomUUID();
-const u = new URL((await readFile(runtimeDirectory + "/secrets/database-url", "utf8")).trim());
-u.hostname = serviceAddress("postgres");
+const cpuProfile =
+  mode === "wake-throughput" &&
+  suite === "pg-paths" &&
+  ["cpu", "cpu-smoke"].includes(process.env.PI_CLOUD_PG_PATH_PROFILE);
+const cpuFixture = cpuProfile
+  ? (await import("./cpu-placement-fixture.mjs")).attachFixture(process.env.PI_CLOUD_CPU_FIXTURE)
+  : undefined;
+const u =
+  cpuFixture?.url ??
+  new URL((await readFile(runtimeDirectory + "/secrets/database-url", "utf8")).trim());
+if (!cpuFixture) u.hostname = serviceAddress("postgres");
 const admin = new pg.Pool({
   connectionString: u.toString(),
   max: 1,
@@ -905,12 +914,22 @@ async function stopActors(list) {
   if (e) throw e.reason;
 }
 try {
-  const {
-    rows: [state],
-  } = await admin.query(
-    "select count(*) filter(where state not in ('completed','cancelled','failed','timed_out') or recovery_requested_at is not null)::int active from runs",
-  );
-  assert.equal(state.active, 0, "Other active work prevents a serial development benchmark");
+  if (cpuFixture) {
+    // The CPU driver checked the serving DB under the same release lock.
+    // This connection is to the new, empty PG instance.
+    const {
+      rows: [identity],
+    } = await admin.query("select current_user as role,to_regclass('public.runs') as serving_runs");
+    assert.deepEqual(identity, { role: "bench", serving_runs: null });
+    await cpuFixture.pin("shared");
+  } else {
+    const {
+      rows: [state],
+    } = await admin.query(
+      "select count(*) filter(where state not in ('completed','cancelled','failed','timed_out') or recovery_requested_at is not null)::int active from runs",
+    );
+    assert.equal(state.active, 0, "Other active work prevents a serial development benchmark");
+  }
   assert.match(name, /^pma_sessbench_[a-f0-9]{16}$/);
   await admin.query("create database " + name + " template template0");
   created = true;
@@ -964,24 +983,28 @@ try {
   projector = await startActor(
     "projector",
     "projector",
-    podFor("session-runtime"),
+    cpuFixture?.projector ?? podFor("session-runtime"),
     mode === "wake-throughput" && suite.startsWith("tail") ? "tail" : "ordinary",
     readerMode,
     String(projectorConnections),
     ...(suite === "pg-paths" ? [process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full"] : []),
   );
-  const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
-  const selector = Object.entries(sts.spec.selector.matchLabels)
-    .map(([k, v]) => k + "=" + v)
-    .join(",");
-  const pods = JSON.parse(kubectl(["get", "pods", "-l", selector, "-o", "json"]))
-    .items.filter(
-      (p) =>
-        !p.metadata.deletionTimestamp &&
-        p.status.conditions.some((c) => c.type === "Ready" && c.status === "True"),
-    )
-    .map((p) => p.metadata.name)
-    .sort();
+  const pods = cpuFixture
+    ? [cpuFixture.support, cpuFixture.support]
+    : (() => {
+        const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
+        const selector = Object.entries(sts.spec.selector.matchLabels)
+          .map(([k, v]) => k + "=" + v)
+          .join(",");
+        return JSON.parse(kubectl(["get", "pods", "-l", selector, "-o", "json"]))
+          .items.filter(
+            (p) =>
+              !p.metadata.deletionTimestamp &&
+              p.status.conditions.some((c) => c.type === "Ready" && c.status === "True"),
+          )
+          .map((p) => p.metadata.name)
+          .sort();
+      })();
   assert(pods.length >= 2);
   for (let i = 0; i < 2; i++) workers.push(await startActor("worker", "w" + i, pods[i]));
   await wave({ label: "warmup", count: 12, concurrency: 12 });
@@ -1106,11 +1129,14 @@ try {
       await wave({ label: "trace-" + report.tests.length, ...variant, count: 384 });
   }
   if (mode.startsWith("wake")) {
-    const pod = podFor("session-runtime");
+    const pod = cpuFixture?.support ?? podFor("session-runtime");
     router = await startActor("wake-runtime", "wake-runtime", pod);
     if (mode !== "wake-fleet") {
-      network = wakeNetwork(pod, pods.slice(0, 2), router.ready.port, token);
-      wakeUrl = network.address + "/" + topic;
+      if (cpuFixture) wakeUrl = "ws://127.0.0.1:" + router.ready.port + "/" + topic;
+      else {
+        network = wakeNetwork(pod, pods.slice(0, 2), router.ready.port, token);
+        wakeUrl = network.address + "/" + topic;
+      }
       if (mode === "wake-sizing") await runSizingTrials(wave);
       else if (mode === "wake-throughput" && suite === "pg-paths") {
         assert.equal(projectorConnections, 12);
@@ -1127,6 +1153,7 @@ try {
           save,
           out,
           token,
+          cpuFixture,
         });
       } else if (mode === "wake-throughput") await runLocality(wave, suite);
       else await runWakeTrials(wave);

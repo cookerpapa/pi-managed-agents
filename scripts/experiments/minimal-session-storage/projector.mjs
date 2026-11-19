@@ -28,7 +28,11 @@ const admin = new native.KafkaJS.Kafka({
 await admin.connect();
 const tailProbe = process.argv[5] === "tail" ? installTailProbe(native, group, topic) : undefined;
 const pathStudy = __PG_PATH_STUDY__
-  ? new PgPathStudy(pool, topic.slice(-16), process.argv[8] === "timing")
+  ? new PgPathStudy(
+      pool,
+      topic.slice(-16),
+      ["timing", "cpu", "cpu-smoke"].includes(process.argv[8]),
+    )
   : undefined;
 const sessions = new Map(),
   nextOffsets = new Map();

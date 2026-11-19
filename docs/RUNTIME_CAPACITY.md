@@ -46,6 +46,10 @@ The [direct PostgreSQL baseline](reports/projector-pg-path-baseline-20261119.md)
 compares the same recorded Worker facts and bound writes through the database
 and the real Projector, including per-query server and client timings.
 
+The [CPU placement study](reports/projector-cpu-placement-20261119.md) repeats
+the comparison with shared and disjoint CPU sets on disposable, matched-image
+PG and Projector Pods and reports full-Run acceptance separately.
+
 For isolated cache/live-view memory checks (mock PG authority, no service changes):
 
 ```sh
