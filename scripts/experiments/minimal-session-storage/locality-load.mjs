@@ -248,6 +248,71 @@ export async function runLocality(wave, suite) {
   const sink = process.env.PI_CLOUD_SESSION_BENCH_PROJECTION ?? opts.sink;
   assert(["full", "single"].includes(sink));
   const run = (label, spec) => wave({ ...opts, sink, label, ...spec });
+  if (suite === "tail-history") {
+    for (const [rate, seconds] of [
+      [140, 60],
+      [220, 24],
+    ])
+      await run("returning-" + rate, {
+        tail: true,
+        pollSize: 1,
+        sink: "single",
+        cohort: 128,
+        seedBytes: 512 * 1024,
+        rate,
+        count: rate * seconds,
+        concurrency: 384,
+      });
+    return;
+  }
+  if (suite === "tail-reference") {
+    await run("reference-160", {
+      tail: true,
+      sampleServer: true,
+      pollSize: 1,
+      sink: "single",
+      rate: 160,
+      count: 160 * 90,
+      concurrency: 384,
+    });
+    return;
+  }
+  if (suite === "tail-switch") {
+    await run("alternating-poll", {
+      tail: true,
+      sampleServer: true,
+      switchMs: 4000,
+      sink: "single",
+      rate: 260,
+      count: 260 * 64,
+      concurrency: 384,
+    });
+    return;
+  }
+  if (suite === "tail" || suite === "tail-stress") {
+    const rate = suite === "tail" ? 160 : 260;
+    for (const [i, [pollSize, sink]] of [
+      [1, "single"],
+      [32, "single"],
+      [32, "terminal-only"],
+      [1, "terminal-only"],
+      [1, "terminal-only"],
+      [32, "terminal-only"],
+      [32, "single"],
+      [1, "single"],
+    ].entries()) {
+      await run("tail-" + i, {
+        tail: true,
+        sampleServer: true,
+        pollSize,
+        sink,
+        rate,
+        concurrency: 384,
+        count: rate * (i === 0 && suite === "tail" ? 50 : 16),
+      });
+    }
+    return;
+  }
   if (suite === "smoke") {
     const common = {
       cohort: 1,

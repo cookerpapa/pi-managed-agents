@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Attribute terminal delay before and after native Kafka delivery and measure predecessor PG work on the same partition. Verify the actual minimal projection statements and distinguish fresh admission from chained Session waits. [Attribution](reports/session-tail-attribution-20261119.md).
+
 - [x] Integrate 32-row claims and version-checked readable history on successive root Runs. Compare complete native throughput, cold fallback, cache-aware wake-up and projection transaction cost with independent arrivals and fixed-concurrency loads. [Throughput report](reports/session-continuation-throughput-20261119.md).
 
 - [x] Compare 8–64 row claims and 64–256 resident root Sessions. Measure the separate costs of preferring one Run and reusing immutable text history across fresh Harness instances. [Prototype results](reports/worker-claim-sizing-20261119.md).

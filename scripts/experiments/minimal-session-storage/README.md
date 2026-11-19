@@ -73,6 +73,17 @@ The terminal update records a fresh UUID and the native sequence, next ID, cutof
 
 ## Boundaries and evidence
 
+The `wake-throughput tail` diagnostic timestamps native poll delivery and partition handler entry for each private-topic offset. It compares the normal one-record poll with a multi-record poll and separately removes message/Inbox writes in a terminal-only control. Compare the same accepted Run across creation, producer acknowledgement, native callback, handler entry and PG completion. A sampled projector PG connection records server durations with text and parameters disabled. These are attribution experiments in disposable actors, not a release change.
+
+Use `tail-reference` for the 90-second, 160/s observed repeat, `tail-stress` for 260/s controls, `tail-switch` for four-second windows in the same process, and `tail-history` for successor eligibility. Each suite uses a new directory. To capture content-free PG durations, run a PostgreSQL Pod log follower alongside the experiment and pipe its stdout through `python3 -u scripts/experiments/minimal-session-storage/pg-duration-lines.py` into a private TSV. After all workloads finish, stop the follower.
+
+```sh
+node --import tsx scripts/experiments/minimal-session-storage/verify-tail-sql.mjs /private/observed/report.json docs/reports/session-projector-statements-20261119.sql > /private/plans.json
+python3 scripts/experiments/minimal-session-storage/summarize-tail.py /private/tail.json /private/original-single-fresh --plans /private/plans.json --case /private/observed /private/durations.tsv --case /private/returning -
+```
+
+The SQL verifier requires the development runtime setting and the same opt-in load flag, and uses temporary relations in a rolled-back transaction. [Tail attribution](../../../docs/reports/session-tail-attribution-20261119.md) and [the SQL templates](../../../docs/reports/session-projector-statements-20261119.sql) document the results.
+
 The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load and an already queued burst. One Worker holds 64, 128 or 256 distinct physical Sessions at the real Pi model boundary. The driver records concurrent waiters, process RSS and event-loop delay. Separately it measures a bounded, tenant-scoped preference for one Run ID and exercises fresh native context assembly with the same frozen entries fetched from PG or already in memory. The individual experiments stop short of routing successive production Runs to a retained cache. [Results](../../../docs/reports/worker-claim-sizing-20261119.md).
 
 `schema.sql` defines the three physical tables and constraints. An independent client request is durably registered before success. Two concurrent SQL claimers cannot skip an active predecessor in the same Session. Inbox removal and the `user` Entry are committed together. The separately delivered `work_finished` updates the admitted Run under its claim identity. The experiment does not reconstruct an in-flight Pi Task after Worker death. That requires the additional stored state and recovery contract in the full runtime.

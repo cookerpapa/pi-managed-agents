@@ -23,6 +23,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import { build } from "esbuild";
 import { runLoad, distribution } from "../../lib/runtime-load-scheduler.mjs";
+import { summarizeTerminal, precedingRunDelay } from "./tail-probe.mjs";
 import {
   runtimeDirectory,
   serviceAddress,
@@ -596,6 +597,7 @@ async function verify(sc, records, cohort) {
     sequenceVerified: true,
     queueMs: d(rr.map((r) => r.started_at - r.created_at)),
     pgLifecycleMs: d(rr.map(milliseconds)),
+    ...(sc.tail && sc.cohort ? { predecessor: precedingRunDelay(rr, records) } : {}),
   };
 }
 const report = {
@@ -843,6 +845,7 @@ async function wave(spec) {
       ? Math.round(Math.max(0, Math.max(...items.map((i) => i.terminal.at)) - offerEnd))
       : undefined,
     projection: projection.stats,
+    ...(sc.tail ? { tail: { ...projection.tail, phases: summarizeTerminal(items) } } : {}),
     verified,
   };
   if (wakeStage) {
@@ -950,7 +953,12 @@ try {
     report.warmPrefix = await measureWarmPrefix(db);
     await save();
   }
-  projector = await startActor("projector", "projector", podFor("session-runtime"));
+  projector = await startActor(
+    "projector",
+    "projector",
+    podFor("session-runtime"),
+    ...(mode === "wake-throughput" && suite.startsWith("tail") ? ["tail"] : []),
+  );
   const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
   const selector = Object.entries(sts.spec.selector.matchLabels)
     .map(([k, v]) => k + "=" + v)

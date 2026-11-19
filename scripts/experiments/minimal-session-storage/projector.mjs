@@ -12,6 +12,7 @@ import { applyImmutableBatches } from "@earendil-works/chord/delta";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
+import { installTailProbe } from "./tail-probe.mjs";
 
 const pool = await openPool(12),
   group = topic + "-projector",
@@ -20,6 +21,7 @@ const admin = new native.KafkaJS.Kafka({
   kafkaJS: { brokers, clientId: topic, logLevel: native.KafkaJS.logLevel.NOTHING },
 }).admin();
 await admin.connect();
+const tailProbe = process.argv[5] === "tail" ? installTailProbe(native, group, topic) : undefined;
 const sessions = new Map(),
   nextOffsets = new Map();
 let cpuAt = process.cpuUsage(),
@@ -94,7 +96,9 @@ async function processRecord({ fact: f, partition, offset }) {
     { tenantId, piSessionId, runId, writerId } = f.scope;
   assert.equal(kafkaProducerLane(piSessionId, 32), partition);
   let s = sessions.get(runId);
-  const measure = (kind, poolMs = 0, pgMs = 0) => {
+  const trace = tailProbe?.begin(partition, offset, f);
+  const measure = (kind, poolMs = 0, pgMs = 0, io) => {
+    trace?.complete(io);
     account(kind, t, poolMs, pgMs, wireMs);
     metrics.byPartition[partition]++;
     nextOffsets.set(partition, offset + 1n);
@@ -170,7 +174,12 @@ async function processRecord({ fact: f, partition, offset }) {
     }
     const end = performance.now(),
       at = Date.now();
-    measure("work_finished", taken - sqlStart, end - taken);
+    measure(
+      "work_finished",
+      taken - sqlStart,
+      end - taken,
+      trace ? [sqlStart, taken, end].map((v) => performance.timeOrigin + v) : undefined,
+    );
     if (result.rowCount === 0) {
       metrics.duplicate++;
       return;
@@ -184,6 +193,7 @@ async function processRecord({ fact: f, partition, offset }) {
       terminalSinceAnswerMs: end - s.lastAnswerCommit,
       finishTransitMs: wireMs,
       finishHandlerMs: end - t,
+      ...(trace ? { tail: trace.terminal } : {}),
     });
     return;
   }
@@ -302,6 +312,7 @@ async function processRecord({ fact: f, partition, offset }) {
             : "native-memory";
   let poolMs = 0,
     pgMs = 0;
+  let io;
   if ((inboxOrdinal >= 0 || messages.length) && stage?.sink !== "terminal-only") {
     metrics.peakWaiting = Math.max(metrics.peakWaiting, pool.waitingCount);
     const acq = performance.now(),
@@ -388,6 +399,7 @@ async function processRecord({ fact: f, partition, offset }) {
       c.release();
     }
     pgMs = performance.now() - q;
+    if (trace) io = [acq, q, q + pgMs].map((v) => performance.timeOrigin + v);
   } else metrics.skipped++;
   s.seq = batch.seq;
   if (stage?.integrated) {
@@ -402,7 +414,7 @@ async function processRecord({ fact: f, partition, offset }) {
   if (lastAssistant) s.lastAnswerCommit = performance.now();
   sessions.set(runId, s);
   if (lastAssistant && stage?.holdFinish) send("answerCommitted", { id: runId });
-  measure(kind, poolMs, pgMs);
+  measure(kind, poolMs, pgMs, io);
   if (
     stage?.scene !== "plain" &&
     (inboxOrdinal >= 0 || messages.some((m) => m.role === "user" && m.input !== runId))
@@ -492,12 +504,13 @@ try {
   await reader.waitUntilAssigned(45000);
   listen(
     {
-      stage: (m) => {
+      stage: async (m) => {
         assert.equal(sessions.size, 0);
         stage = m;
         cpuAt = process.cpuUsage();
         eluAt = performance.eventLoopUtilization();
         metrics = blank();
+        if (tailProbe) await tailProbe.configure(m, pool);
         send("configured", { stage: m.stage });
       },
       sample: async (m) => send("sample", { n: m.n, ...(await lag()) }),
@@ -505,7 +518,12 @@ try {
         const ends = await reader.captureEndOffsets();
         await reader.waitUntilInitialReplay(ends, 30000);
         assert.equal(sessions.size, 0);
-        send("results", { stage: m.stage, stats: summary(), ...(await lag()) });
+        send("results", {
+          stage: m.stage,
+          stats: summary(),
+          tail: tailProbe?.results(),
+          ...(await lag()),
+        });
       },
     },
     cleanup,

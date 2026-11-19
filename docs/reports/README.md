@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Where a prototype Run waits](session-tail-attribution-20261119.md) traces a single terminal record through native delivery, ordered handling and PostgreSQL, with captured SQL.
+
 - [Successive Run throughput](session-continuation-throughput-20261119.md) compares new Sessions, returning Sessions and mixed arrivals with integrated Worker locality.
 
 - [Worker batch size, residence and Session locality](worker-claim-sizing-20261119.md) compares 8–64 row claims, 64–256 simultaneous model waits and the cost of targeting a warm Session.

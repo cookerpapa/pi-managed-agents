@@ -163,6 +163,7 @@ async function execute(row, claimMs, claimReason) {
     release = Promise.withResolvers(),
     inspectRelease = Promise.withResolvers();
   let ackMs = 0,
+    finishAckAt,
     finishAckMs = 0,
     seq = head.seq,
     records = 0,
@@ -223,8 +224,10 @@ async function execute(row, claimMs, claimReason) {
     });
     const elapsed = performance.now() - start;
     records++;
-    if (fact.kind === "work_finished") finishAckMs = elapsed;
-    else ackMs += elapsed;
+    if (fact.kind === "work_finished") {
+      finishAckMs = elapsed;
+      finishAckAt = Date.now();
+    } else ackMs += elapsed;
   }
   async function finish() {
     if (sc.holdFinish) {
@@ -282,6 +285,7 @@ async function execute(row, claimMs, claimReason) {
       workMs: performance.now() - started,
       ackMs,
       finishAckMs,
+      ...(sc.tail ? { finishAckAt } : {}),
       seq,
       ...(previous
         ? {
