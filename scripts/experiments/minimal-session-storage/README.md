@@ -21,6 +21,7 @@ node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/b
 node --test scripts/experiments/minimal-session-storage/wake-channel.test.mjs
 node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/wake-pods wake
 node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/wake-fleet wake-fleet
+node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/wake-sizing wake-sizing
 node scripts/experiments/minimal-session-storage/summarize-wake.mjs /private/wake-pods /private/wake-fleet /private/wake-summary.json
 ```
 
@@ -52,6 +53,8 @@ The `wake` mode uses an experimental WebSocket endpoint in the Session runtime P
 The `wake-fleet` mode stops the two experimental Pi Workers after the storage smoke checks. The runtime actor then opens 1,000 loopback WebSockets multiplexed over one process with a bounded PG pool. An independent process commits groups of seven isolated Runs and sends real PG notifications at a scheduled 171 groups/s. The broadcast control changes only how many connected clients receive the arrival frame. A lightweight PG update completes each claimed Run. The bootstrap scans of the 1,000 connections are excluded from measured groups. Per-claim SQL counts exclude job inserts, completion updates, the observer and PostgreSQL notification commands. The 30-second directed run is a queue-only sustained sample. [Measurements](../../../docs/reports/directed-worker-wake-20261119.md).
 
 ## Boundaries and evidence
+
+The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load and an already queued burst. One Worker holds 64, 128 or 256 distinct physical Sessions at the real Pi model boundary. The driver records concurrent waiters, process RSS and event-loop delay. Separately it measures a bounded, tenant-scoped preference for one Run ID and exercises fresh native context assembly with the same frozen entries fetched from PG or already in memory. The individual experiments stop short of routing successive production Runs to a retained cache. [Results](../../../docs/reports/worker-claim-sizing-20261119.md).
 
 `schema.sql` defines the three physical tables and constraints. An independent client request is durably registered before success. Two concurrent SQL claimers cannot skip an active predecessor in the same Session. Inbox removal and the `user` Entry are committed together. The separately delivered `work_finished` updates the admitted Run under its claim identity. The experiment does not reconstruct an in-flight Pi Task after Worker death. That requires the additional stored state and recovery contract in the full runtime.
 

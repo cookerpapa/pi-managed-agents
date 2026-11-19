@@ -1,5 +1,7 @@
 # Runtime capacity evaluation
 
+The [Worker sizing study](reports/worker-claim-sizing-20261119.md) measures batch admission, active root Sessions per Worker and the tradeoff between preferred claiming and a reusable history prefix.
+
 The isolated [minimal Session lifecycle workload](../scripts/experiments/minimal-session-storage/README.md) exercises two tables, one Inbox per Conversation and the ordered end marker. [Measurement](reports/minimal-session-storage-load-20261119.md).
 
 The [directed Worker wake experiment](reports/directed-worker-wake-20261119.md) compares PG claim queries, empty checks, queue delay and lost notifications. It distinguishes the two-Pod native execution measurements from the 1,000-connection queue load.

@@ -1,0 +1,1130 @@
+{
+  "baseRevision": "563c733840a9b8b44b851bbcf78a5228683dc558",
+  "sourceSha256": {
+    "fixture.mjs": "af2278de9aa92a5167173f318602dd61193b1dc9c42ed0ef98a55571bb8f0621",
+    "worker.mjs": "2d833fe3ee2033cbf10770525b604a829c30b82fda6daaf970472e5a8caa2531",
+    "wake-sizing.mjs": "120f6709d722f8cba727805712c6de47d70a73fefd4d57d27160ff701f15570e",
+    "warm-prefix.mjs": "341b1c7b74870e4e65e0f0c39718a6e1e74462923363f63d51f02b45fb8f4cac",
+    "run.mjs": "62ecc6cf8323fa3404e6294305478a5def3283c9cec27ffd880070ee9e9a8323",
+    "wake-channel.mjs": "5cc46c4b203240269e3a10d0ad7d7578eeb8fef191deb124935568fcd062874e"
+  },
+  "actorBundleSha256": {
+    "worker": "13ab9d0f2d243123315be6eeb6f97db859426b3c6160bdfc74fa7844f7ff0f99",
+    "projector": "03fc2f2119ec9451d059b9408e455080d4b7abfc1931ab2483716428d9896a6d",
+    "wake-runtime": "6fe733282e3b2382f00f4c3ff87e1e7f7378cbc78c62b73df7e68ae50d3935d0"
+  },
+  "database": {
+    "postgres": "17.6",
+    "synchronous_commit": "on",
+    "fsync": "on"
+  },
+  "scope": {
+    "workerPods": 2,
+    "residentWorkerPods": 1,
+    "realModel": false,
+    "partitions": 32,
+    "replicationFactor": 3,
+    "minimumInSyncReplicas": 2,
+    "managedWorkerPodRequests": {
+      "cpu": "250m",
+      "memory": "384Mi"
+    },
+    "managedWorkerPodHardLimits": null,
+    "sameWorkerRoutingInProduction": false
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "batches": {
+        "columns": [
+          "stage",
+          "batch_limit",
+          "completed",
+          "claim_statements",
+          "nonempty_claims",
+          "largest_actual_batch",
+          "max_simultaneous_by_worker",
+          "runs_by_worker",
+          "pg_queue_p95_ms",
+          "submit_to_claim_p95_ms",
+          "submit_to_terminal_p95_ms",
+          "throughput_runs_per_s"
+        ],
+        "rows": [
+          [
+            "arriving-0",
+            8,
+            512,
+            160,
+            136,
+            8,
+            [
+              56,
+              72
+            ],
+            [
+              235,
+              277
+            ],
+            67,
+            119,
+            655,
+            279.93
+          ],
+          [
+            "backlog-0",
+            8,
+            256,
+            39,
+            32,
+            8,
+            [
+              96,
+              80
+            ],
+            [
+              128,
+              128
+            ],
+            233,
+            391,
+            907,
+            274.11
+          ],
+          [
+            "arriving-1",
+            16,
+            512,
+            154,
+            126,
+            16,
+            [
+              64,
+              64
+            ],
+            [
+              249,
+              263
+            ],
+            51,
+            95,
+            535,
+            307.12
+          ],
+          [
+            "backlog-1",
+            16,
+            256,
+            23,
+            16,
+            16,
+            [
+              120,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            130,
+            272,
+            831,
+            288.27
+          ],
+          [
+            "arriving-2",
+            32,
+            512,
+            138,
+            111,
+            32,
+            [
+              64,
+              64
+            ],
+            [
+              263,
+              249
+            ],
+            47,
+            75,
+            480,
+            341.17
+          ],
+          [
+            "backlog-2",
+            32,
+            256,
+            15,
+            8,
+            32,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            165,
+            236,
+            864,
+            277.85
+          ],
+          [
+            "arriving-3",
+            64,
+            512,
+            149,
+            121,
+            64,
+            [
+              64,
+              64
+            ],
+            [
+              250,
+              262
+            ],
+            67,
+            92,
+            523,
+            321.4
+          ],
+          [
+            "backlog-3",
+            64,
+            256,
+            11,
+            4,
+            64,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            129,
+            167,
+            862,
+            283.4
+          ],
+          [
+            "arriving-4",
+            64,
+            512,
+            139,
+            117,
+            64,
+            [
+              60,
+              68
+            ],
+            [
+              235,
+              277
+            ],
+            62,
+            86,
+            555,
+            315.68
+          ],
+          [
+            "backlog-4",
+            64,
+            256,
+            11,
+            4,
+            64,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            120,
+            155,
+            854,
+            285.6
+          ],
+          [
+            "arriving-5",
+            32,
+            512,
+            139,
+            117,
+            32,
+            [
+              64,
+              64
+            ],
+            [
+              225,
+              287
+            ],
+            49,
+            82,
+            561,
+            318.12
+          ],
+          [
+            "backlog-5",
+            32,
+            256,
+            15,
+            8,
+            32,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            115,
+            173,
+            843,
+            283.82
+          ],
+          [
+            "arriving-6",
+            16,
+            512,
+            145,
+            126,
+            16,
+            [
+              48,
+              80
+            ],
+            [
+              240,
+              272
+            ],
+            51,
+            101,
+            519,
+            319.13
+          ],
+          [
+            "backlog-6",
+            16,
+            256,
+            23,
+            16,
+            16,
+            [
+              123,
+              113
+            ],
+            [
+              128,
+              128
+            ],
+            129,
+            275,
+            857,
+            284.48
+          ],
+          [
+            "arriving-7",
+            8,
+            512,
+            159,
+            131,
+            8,
+            [
+              64,
+              62
+            ],
+            [
+              260,
+              252
+            ],
+            70,
+            119,
+            478,
+            318.7
+          ],
+          [
+            "backlog-7",
+            8,
+            256,
+            42,
+            32,
+            8,
+            [
+              85,
+              87
+            ],
+            [
+              128,
+              128
+            ],
+            277,
+            429,
+            1771,
+            138.47
+          ]
+        ]
+      },
+      "residence": [
+        {
+          "slots": 64,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 64,
+          "rssBeforeMiB": 350.26,
+          "rssAtBarrierMiB": 355.01,
+          "peakMeasuredRssMiB": 355.51,
+          "eventLoopDelayP99Ms": 14.43
+        },
+        {
+          "slots": 128,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 128,
+          "rssBeforeMiB": 355.51,
+          "rssAtBarrierMiB": 359.51,
+          "peakMeasuredRssMiB": 369.01,
+          "eventLoopDelayP99Ms": 19.58
+        },
+        {
+          "slots": 256,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 10000,
+          "simultaneous": 256,
+          "rssBeforeMiB": 369.01,
+          "rssAtBarrierMiB": 370.76,
+          "peakMeasuredRssMiB": 371.01,
+          "eventLoopDelayP99Ms": 27.77
+        },
+        {
+          "slots": 256,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 10000,
+          "simultaneous": 256,
+          "rssBeforeMiB": 371.01,
+          "rssAtBarrierMiB": 371.26,
+          "peakMeasuredRssMiB": 374.51,
+          "eventLoopDelayP99Ms": 22.51
+        },
+        {
+          "slots": 128,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 128,
+          "rssBeforeMiB": 374.16,
+          "rssAtBarrierMiB": 375.66,
+          "peakMeasuredRssMiB": 375.66,
+          "eventLoopDelayP99Ms": 25.76
+        },
+        {
+          "slots": 64,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 64,
+          "rssBeforeMiB": 375.66,
+          "rssAtBarrierMiB": 376.41,
+          "peakMeasuredRssMiB": 376.41,
+          "eventLoopDelayP99Ms": 14.34
+        }
+      ],
+      "claimPreference": [
+        {
+          "variant": "fifo",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            6.74,
+            10.1,
+            11.42
+          ],
+          "indexes": [
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key",
+            "runs_pkey"
+          ]
+        },
+        {
+          "variant": "hit",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            9.0,
+            12.61,
+            14.03
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "miss",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            8.61,
+            11.02,
+            11.8
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "miss",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            8.87,
+            10.56,
+            11.06
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "hit",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            8.74,
+            12.05,
+            14.91
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "fifo",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            6.23,
+            12.28,
+            15.81
+          ],
+          "indexes": [
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key",
+            "runs_pkey"
+          ]
+        }
+      ],
+      "contextReads": [],
+      "completedNativeRuns": 7040,
+      "verifiedCleanup": true
+    },
+    {
+      "trial": 2,
+      "batches": {
+        "columns": [
+          "stage",
+          "batch_limit",
+          "completed",
+          "claim_statements",
+          "nonempty_claims",
+          "largest_actual_batch",
+          "max_simultaneous_by_worker",
+          "runs_by_worker",
+          "pg_queue_p95_ms",
+          "submit_to_claim_p95_ms",
+          "submit_to_terminal_p95_ms",
+          "throughput_runs_per_s"
+        ],
+        "rows": [
+          [
+            "arriving-0",
+            8,
+            512,
+            258,
+            195,
+            8,
+            [
+              64,
+              64
+            ],
+            [
+              250,
+              262
+            ],
+            104,
+            167,
+            1424,
+            126.88
+          ],
+          [
+            "backlog-0",
+            8,
+            256,
+            39,
+            32,
+            8,
+            [
+              71,
+              69
+            ],
+            [
+              120,
+              136
+            ],
+            238,
+            370,
+            859,
+            271.3
+          ],
+          [
+            "arriving-1",
+            16,
+            512,
+            144,
+            119,
+            16,
+            [
+              64,
+              64
+            ],
+            [
+              250,
+              262
+            ],
+            53,
+            103,
+            495,
+            329.24
+          ],
+          [
+            "backlog-1",
+            16,
+            256,
+            23,
+            16,
+            16,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            128,
+            223,
+            876,
+            273.88
+          ],
+          [
+            "arriving-2",
+            32,
+            512,
+            133,
+            113,
+            32,
+            [
+              64,
+              64
+            ],
+            [
+              249,
+              263
+            ],
+            41,
+            74,
+            462,
+            352.28
+          ],
+          [
+            "backlog-2",
+            32,
+            256,
+            15,
+            8,
+            32,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            138,
+            201,
+            837,
+            295.19
+          ],
+          [
+            "arriving-3",
+            64,
+            512,
+            138,
+            120,
+            64,
+            [
+              64,
+              64
+            ],
+            [
+              227,
+              285
+            ],
+            50,
+            74,
+            513,
+            314.54
+          ],
+          [
+            "backlog-3",
+            64,
+            256,
+            11,
+            4,
+            64,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            117,
+            162,
+            805,
+            311.06
+          ],
+          [
+            "arriving-4",
+            64,
+            512,
+            133,
+            118,
+            64,
+            [
+              64,
+              64
+            ],
+            [
+              255,
+              257
+            ],
+            43,
+            68,
+            463,
+            350.93
+          ],
+          [
+            "backlog-4",
+            64,
+            256,
+            11,
+            4,
+            64,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            139,
+            178,
+            806,
+            310.46
+          ],
+          [
+            "arriving-5",
+            32,
+            512,
+            142,
+            114,
+            32,
+            [
+              64,
+              64
+            ],
+            [
+              243,
+              269
+            ],
+            54,
+            87,
+            538,
+            324.67
+          ],
+          [
+            "backlog-5",
+            32,
+            256,
+            15,
+            8,
+            32,
+            [
+              128,
+              128
+            ],
+            [
+              128,
+              128
+            ],
+            129,
+            192,
+            801,
+            309.43
+          ],
+          [
+            "arriving-6",
+            16,
+            512,
+            138,
+            115,
+            16,
+            [
+              64,
+              64
+            ],
+            [
+              269,
+              243
+            ],
+            50,
+            101,
+            442,
+            339.56
+          ],
+          [
+            "backlog-6",
+            16,
+            256,
+            23,
+            16,
+            16,
+            [
+              126,
+              127
+            ],
+            [
+              128,
+              128
+            ],
+            115,
+            228,
+            852,
+            276.65
+          ],
+          [
+            "arriving-7",
+            8,
+            512,
+            159,
+            136,
+            8,
+            [
+              64,
+              60
+            ],
+            [
+              257,
+              255
+            ],
+            64,
+            121,
+            486,
+            329.69
+          ],
+          [
+            "backlog-7",
+            8,
+            256,
+            39,
+            32,
+            8,
+            [
+              78,
+              78
+            ],
+            [
+              128,
+              128
+            ],
+            196,
+            315,
+            799,
+            304.87
+          ]
+        ]
+      },
+      "residence": [
+        {
+          "slots": 64,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 64,
+          "rssBeforeMiB": 367.3,
+          "rssAtBarrierMiB": 377.3,
+          "peakMeasuredRssMiB": 377.3,
+          "eventLoopDelayP99Ms": 12.72
+        },
+        {
+          "slots": 128,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 128,
+          "rssBeforeMiB": 377.3,
+          "rssAtBarrierMiB": 388.05,
+          "peakMeasuredRssMiB": 388.55,
+          "eventLoopDelayP99Ms": 13.76
+        },
+        {
+          "slots": 256,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 10000,
+          "simultaneous": 256,
+          "rssBeforeMiB": 388.55,
+          "rssAtBarrierMiB": 397.05,
+          "peakMeasuredRssMiB": 403.3,
+          "eventLoopDelayP99Ms": 12.31
+        },
+        {
+          "slots": 256,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 10000,
+          "simultaneous": 256,
+          "rssBeforeMiB": 402.69,
+          "rssAtBarrierMiB": 403.48,
+          "peakMeasuredRssMiB": 405.19,
+          "eventLoopDelayP99Ms": 12.18
+        },
+        {
+          "slots": 128,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 128,
+          "rssBeforeMiB": 401.68,
+          "rssAtBarrierMiB": 403.68,
+          "peakMeasuredRssMiB": 407.18,
+          "eventLoopDelayP99Ms": 12.03
+        },
+        {
+          "slots": 64,
+          "inputBytes": 32768,
+          "allModelsHeldMs": 2000,
+          "simultaneous": 64,
+          "rssBeforeMiB": 407.18,
+          "rssAtBarrierMiB": 407.18,
+          "peakMeasuredRssMiB": 407.43,
+          "eventLoopDelayP99Ms": 10.76
+        }
+      ],
+      "claimPreference": [
+        {
+          "variant": "fifo",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            8.99,
+            13.27,
+            16.38
+          ],
+          "indexes": [
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key",
+            "runs_pkey"
+          ]
+        },
+        {
+          "variant": "hit",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            14.58,
+            21.53,
+            24.34
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "miss",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            12.65,
+            17.71,
+            20.92
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "miss",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            12.19,
+            15.24,
+            17.38
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "hit",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            11.98,
+            14.12,
+            15.75
+          ],
+          "indexes": [
+            "runs_pkey",
+            "runs_tenant_id_session_id_idempotency_key_key",
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key"
+          ]
+        },
+        {
+          "variant": "fifo",
+          "queuedRows": 8192,
+          "batch": 16,
+          "concurrency": 8,
+          "statements": 192,
+          "p50_p95_p99_ms": [
+            8.58,
+            11.05,
+            12.61
+          ],
+          "indexes": [
+            "runs_ready",
+            "runs_tenant_id_session_id_mailbox_position_key",
+            "runs_pkey"
+          ]
+        }
+      ],
+      "contextReads": [
+        {
+          "variant": "cold",
+          "entries": 128,
+          "textBytes": 65536,
+          "samples": 12,
+          "headAndRead_p50_p95_p99_ms": [
+            2.19,
+            3.35,
+            3.35
+          ],
+          "throughContext_p50_p95_p99_ms": [
+            3.13,
+            4.47,
+            4.47
+          ]
+        },
+        {
+          "variant": "hit",
+          "entries": 128,
+          "textBytes": 65536,
+          "samples": 12,
+          "headAndRead_p50_p95_p99_ms": [
+            0.92,
+            1.42,
+            1.42
+          ],
+          "throughContext_p50_p95_p99_ms": [
+            1.6,
+            2.48,
+            2.48
+          ]
+        },
+        {
+          "variant": "cold",
+          "entries": 128,
+          "textBytes": 4194304,
+          "samples": 12,
+          "headAndRead_p50_p95_p99_ms": [
+            40.58,
+            50.01,
+            50.01
+          ],
+          "throughContext_p50_p95_p99_ms": [
+            41.79,
+            50.78,
+            50.78
+          ]
+        },
+        {
+          "variant": "hit",
+          "entries": 128,
+          "textBytes": 4194304,
+          "samples": 12,
+          "headAndRead_p50_p95_p99_ms": [
+            1.03,
+            6.65,
+            6.65
+          ],
+          "throughContext_p50_p95_p99_ms": [
+            1.96,
+            7.68,
+            7.68
+          ]
+        }
+      ],
+      "completedNativeRuns": 7040,
+      "verifiedCleanup": true
+    }
+  ]
+}

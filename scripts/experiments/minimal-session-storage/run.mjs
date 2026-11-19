@@ -1,8 +1,9 @@
 /** Isolated test of the two-table lifecycle. Run through the maintained development cluster. */
 import assert from "node:assert/strict";
-import { answer, claimSql, claimBatchSql } from "./fixture.mjs";
+import { answer, claimSql, claimBatchSql, claimHintedBatchSql } from "./fixture.mjs";
 import { runWakeTrials, waitForWakeState, wakeNetwork } from "./wake-trials.mjs";
-import { randomUUID, createHash } from "node:crypto";
+import { measureClaimPreference, runSizingTrials } from "./wake-sizing.mjs";
+import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { spawn, execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -38,6 +39,7 @@ assert(
       "boundary",
       "wake",
       "wake-fleet",
+      "wake-sizing",
     ].includes(mode),
 );
 serializeRelease(runtimeDirectory);
@@ -606,6 +608,10 @@ async function wave(spec) {
             projected: Promise.withResolvers(),
           };
         entries.set(id, e);
+        if (sc.initialBytes)
+          e.text = randomBytes(Math.ceil(sc.initialBytes / 2))
+            .toString("hex")
+            .slice(0, sc.initialBytes);
         e.sentAt = Date.now();
         const accepted = await intake(e, sc);
         assert.equal(accepted, id);
@@ -628,7 +634,8 @@ async function wave(spec) {
               return;
             }
             await waitForWakeState(routerState, (s) => s.notifications > 0 && s.online === 0);
-            workers[1].write({ kind: "join" });
+            for (const worker of sc.joinBoth ? workers : [workers[1]])
+              worker.write({ kind: "join" });
           })();
           void transition.catch(fatal);
         }
@@ -672,8 +679,8 @@ async function wave(spec) {
       const n = ++sampleId,
         got = a.wait("metrics" + n);
       a.write({ kind: "metrics", n });
-      const { cpu, loop, claimStats } = await guard(got);
-      return { worker: a.id, cpu, loop, claimStats };
+      const { cpu, loop, claimStats, residence } = await guard(got);
+      return { worker: a.id, cpu, loop, claimStats, residence };
     }),
   );
   const peak = (key) => Math.max(0, ...samples.map((s) => s[key]));
@@ -823,8 +830,12 @@ try {
       [keys[0]],
     );
     assert.equal((await other.query(claimBatchSql, [8])).rowCount, 0);
+    if (mode === "wake-sizing")
+      assert.equal((await other.query(claimHintedBatchSql, [16, tenant, keys[1]])).rowCount, 0);
     await c.query("commit");
     assert.equal((await other.query(claimSql)).rowCount, 0);
+    if (mode === "wake-sizing")
+      assert.equal((await other.query(claimHintedBatchSql, [16, tenant, keys[1]])).rowCount, 0);
     await c.query("update runs set state='completed' where id=$1", [keys[0]]);
     assert.equal((await other.query(claimSql)).rows[0].id, keys[1]);
     report.sameSessionClaimOrder = true;
@@ -834,6 +845,12 @@ try {
     other.release();
   }
   await db.query("delete from runs where id=any($1::uuid[])", [keys]);
+  if (mode === "wake-sizing") {
+    const { measureWarmPrefix } = await import("./warm-prefix.mjs");
+    report.claimPreference = await measureClaimPreference(db);
+    report.warmPrefix = await measureWarmPrefix(db);
+    await save();
+  }
   projector = await startActor("projector", "projector", podFor("session-runtime"));
   const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
   const selector = Object.entries(sts.spec.selector.matchLabels)
@@ -973,10 +990,11 @@ try {
   if (mode.startsWith("wake")) {
     const pod = podFor("session-runtime");
     router = await startActor("wake-runtime", "wake-runtime", pod);
-    if (mode === "wake") {
+    if (mode !== "wake-fleet") {
       network = wakeNetwork(pod, pods.slice(0, 2), router.ready.port, token);
       wakeUrl = network.address + "/" + topic;
-      await runWakeTrials(wave);
+      if (mode === "wake-sizing") await runSizingTrials(wave);
+      else await runWakeTrials(wave);
     } else {
       await stopActors(workers);
       report.population = {};

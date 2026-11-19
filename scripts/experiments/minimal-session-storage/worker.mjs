@@ -2,7 +2,7 @@ import { answer, extraText, claimSql, claimBatchSql } from "./fixture.mjs";
 import { connectClaimWorker } from "./wake-channel.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { performance } from "node:perf_hooks";
+import { performance, monitorEventLoopDelay } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   Harness,
@@ -42,7 +42,41 @@ let capacity = 0,
   closed = false,
   stage,
   directed,
-  directedConfig;
+  directedConfig,
+  residence;
+
+function startResidence() {
+  const initial = process.memoryUsage(),
+    histogram = monitorEventLoopDelay({ resolution: 10 });
+  const profile = { initial, peakRss: initial.rss, simultaneousModelCalls: 0 };
+  const gate = Promise.withResolvers();
+  const sampling = setInterval(() => {
+    profile.peakRss = Math.max(profile.peakRss, process.memoryUsage.rss());
+  }, 50);
+  histogram.enable();
+  return {
+    async wait(context) {
+      const last = context.messages.findLast((message) => message.role === "user");
+      const text = typeof last?.content === "string" ? last.content : last?.content?.[0]?.text;
+      assert.equal(text?.length, stage.initialBytes);
+      profile.simultaneousModelCalls++;
+      if (profile.simultaneousModelCalls === stage.slots) {
+        profile.atBarrier = process.memoryUsage();
+        profile.peakRss = Math.max(profile.peakRss, profile.atBarrier.rss);
+        setTimeout(gate.resolve, stage.residentMs);
+      }
+      await gate.promise;
+    },
+    snapshot() {
+      return { ...profile, eventLoopP99Ms: histogram.percentile(99) / 1e6 };
+    },
+    stop() {
+      clearInterval(sampling);
+      histogram.disable();
+      gate.resolve();
+    },
+  };
+}
 function wake() {
   awake++;
   sleeping = false;
@@ -305,8 +339,9 @@ async function execute(row, claimMs, claimReason) {
   const mixed = sc.scene !== "plain",
     late = sc.scene === "late",
     steer = sc.scene === "steer";
-  const first = async () => {
+  const first = async (context) => {
     modelCalls++;
+    if (residence) await residence.wait(context);
     if (sc.modelDelayMs) await delay(sc.modelDelayMs);
     if (steer) return fauxAssistantMessage(fauxToolCall("check", {}), { stopReason: "toolUse" });
     if (mixed && !late) {
@@ -474,6 +509,8 @@ listen(
       const previous = directedConfig;
       directedConfig = msg.wakeUrl ? msg : undefined;
       stage = msg;
+      residence?.stop();
+      residence = msg.residentMs && !msg.offline?.includes(actor) ? startResidence() : undefined;
       cpuAt = process.cpuUsage();
       eluAt = performance.eventLoopUtilization();
       if (directedConfig) {
@@ -495,6 +532,7 @@ listen(
       send("metrics", {
         n: msg.n,
         claimStats: directed?.stats,
+        residence: residence?.snapshot(),
         cpu: process.cpuUsage(cpuAt),
         loop: performance.eventLoopUtilization(eluAt),
       }),
@@ -504,6 +542,7 @@ listen(
   },
   async () => {
     closed = true;
+    residence?.stop();
     directed?.close();
     clearInterval(poll);
     for (const state of active.values()) state.inspectRelease.resolve();

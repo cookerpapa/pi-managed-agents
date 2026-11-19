@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare 8–64 row claims and 64–256 resident root Sessions. Measure the separate costs of preferring one Run and reusing immutable text history across fresh Harness instances. [Prototype results](reports/worker-claim-sizing-20261119.md).
+
 - [x] Compare waiting Worker connections, batched PG claims and a 200 ms safety wake with broadcast delivery. Verify lost hints, connection replacement, admission before joining and draining with actual Pi Workers and exercise 1,000 lightweight connections separately. [Prototype evidence](reports/directed-worker-wake-20261119.md).
 
 - [x] Measure Run admission/claim, completed messages, native Inbox changes and separate ordered completion using real Kafka, PostgreSQL and Pi. Verify placement, late input, notification contention, peak/drained lag and whole-document write amplification. [Controlled report](reports/minimal-session-storage-load-20261119.md).

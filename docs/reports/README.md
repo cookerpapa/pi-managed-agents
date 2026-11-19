@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Worker batch size, residence and Session locality](worker-claim-sizing-20261119.md) compares 8–64 row claims, 64–256 simultaneous model waits and the cost of targeting a warm Session.
+
 - [Directed Worker wake and batched claims](directed-worker-wake-20261119.md) measures the two-Pod Pi path and a 1,000-connection queue, including lost readiness and scale transitions.
 
 - [Minimal Session lifecycle load](minimal-session-storage-load-20261119.md) compares two business tables and Pi Inbox, independent completion, queue depth and the PG wake-up lock.
