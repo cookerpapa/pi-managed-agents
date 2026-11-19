@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 import { sql } from "kysely";
 import { createDatabase } from "../packages/database/src/index.ts";
 import { kubectl, podFor, runtimeDirectory, serviceAddress } from "./lib/production-kubernetes.mjs";
@@ -13,6 +15,8 @@ assert.equal(
 );
 serializeRelease(runtimeDirectory);
 const output = resolve(process.argv[2] ?? ".cache/projector-reader-diagnostic.json");
+const mode = process.argv[3] ?? "deployed";
+assert(["deployed", "batch"].includes(mode));
 const url = new URL(
   (await readFile(resolve(runtimeDirectory, "secrets/database-url"), "utf8")).trim(),
 );
@@ -27,12 +31,44 @@ try {
 } finally {
   await database.destroy();
 }
-const source = await readFile(
-  new URL("./lib/projector-reader-benchmark.mjs", import.meta.url),
-  "utf8",
-);
+const actor = new URL("./lib/projector-reader-benchmark.mjs", import.meta.url);
+// Keep the original deployed-image diagnostic. Batch comparisons must execute the checkout.
+let source = await readFile(actor, "utf8");
+if (mode === "batch") {
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  const bundle = await build({
+    entryPoints: [fileURLToPath(actor)],
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    packages: "external",
+    write: false,
+    plugins: [
+      {
+        name: "checkout-packages",
+        setup(b) {
+          b.onResolve({ filter: /^\/app\/packages\// }, ({ path }) => ({
+            path: resolve(root, path.slice("/app/".length)),
+          }));
+        },
+      },
+    ],
+  });
+  source = bundle.outputFiles[0].text;
+}
 const stdout = kubectl(
-  ["exec", "-i", podFor("tool-host"), "--", "node", "--import", "tsx", "--input-type=module"],
+  [
+    "exec",
+    "-i",
+    podFor("tool-host"),
+    "--",
+    "node",
+    "--import",
+    "tsx",
+    "--input-type=module",
+    "-",
+    mode,
+  ],
   { input: source, timeout: 420000, maxBuffer: 4 * 1024 ** 2 },
 );
 const result = stdout

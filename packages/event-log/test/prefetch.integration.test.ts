@@ -59,6 +59,7 @@ it.skipIf(!brokers)(
         clientId: topic,
         groupId: topic,
         topic,
+        batchRead: true,
         logger: {
           error: (error: unknown) => errors.push(error),
         } as unknown as native.KafkaJS.Logger,
@@ -116,6 +117,8 @@ it.skipIf(!brokers)(
       entered = Promise.withResolvers<void>();
     const seen: string[] = [],
       attempts = new Map<string, number>();
+    const queuedTools = 300;
+    const retryId = "a" + (queuedTools - 2);
     const reader = new KafkaLogConsumer<{ id: string }>({
       brokers: brokers!,
       topic,
@@ -123,6 +126,7 @@ it.skipIf(!brokers)(
       clientId: topic,
       groupRecovery: true,
       orderedEffects: true,
+      batchRead: true,
       decode: (value) => JSON.parse(value.toString()),
       replayOffsets: async (bounds) => new Map(bounds.map((b) => [b.partition, b.low])),
       handler: async (record, current, commit) => {
@@ -132,7 +136,7 @@ it.skipIf(!brokers)(
           entered.resolve();
           await release.promise;
         }
-        if (id === "a1" && attempts.get(id) === 1) throw new Error("owned retry before effect");
+        if (id === retryId && attempts.get(id) === 1) throw new Error("owned retry before effect");
         if (current?.() && (await commit!())) seen.push(id);
       },
     });
@@ -142,7 +146,7 @@ it.skipIf(!brokers)(
         topics: [
           {
             topic,
-            numPartitions: 2,
+            numPartitions: 32,
             replicationFactor: 3,
             configEntries: [{ name: "min.insync.replicas", value: "2" }],
           },
@@ -152,20 +156,33 @@ it.skipIf(!brokers)(
       await aborter.connect();
       await reader.start();
       await reader.waitUntilAssigned(30000);
+      await producer.send({ topic, messages: [{ partition: 0, key: "a", value: '{"id":"a0"}' }] });
+      await entered.promise;
       await producer.send({
         topic,
         messages: [
-          ...Array.from({ length: 40 }, (_, i) => ({
+          ...Array.from({ length: queuedTools - 1 }, (_, i) => ({
             partition: 0,
             key: "a",
-            value: JSON.stringify({ id: `a${i}` }),
+            value: JSON.stringify({ id: `a${i + 1}` }),
           })),
-          { partition: 1, key: "b", value: '{"id":"healthy"}' },
+          ...Array.from({ length: 31 }, (_, i) => ({
+            partition: i + 1,
+            key: "b",
+            value: JSON.stringify({ id: "healthy-" + (i + 1) }),
+          })),
         ],
       });
-      await entered.promise;
-      await vi.waitFor(() => expect(seen).toContain("healthy"), { timeout: 10000 });
-      await vi.waitFor(() => expect(reader.statistics().queuedRecords).toBeGreaterThan(10), {
+      await vi.waitFor(() => expect(seen.length).toBe(31), { timeout: 10000 });
+      const [saved] = await admin.fetchOffsets({ groupId: topic, topics: [topic] });
+      for (let p = 1; p < 32; p++) {
+        expect(seen).toContain("healthy-" + p);
+        expect(Number(saved!.partitions.find((offset) => offset.partition === p)?.offset)).toBe(1);
+      }
+      expect(
+        Number(saved!.partitions.find((offset) => offset.partition === 0)?.offset ?? -1),
+      ).toBeLessThan(1);
+      await vi.waitFor(() => expect(reader.statistics().pausedPartitions).toBe(1), {
         timeout: 10000,
       });
       const tx = await aborter.transaction();
@@ -181,9 +198,9 @@ it.skipIf(!brokers)(
       release.resolve();
       await catchup;
       expect(seen.filter((id) => id.startsWith("a"))).toEqual(
-        Array.from({ length: 40 }, (_, i) => `a${i}`),
+        Array.from({ length: queuedTools }, (_, i) => `a${i}`),
       );
-      expect(attempts.get("a1")).toBe(2);
+      expect(attempts.get(retryId)).toBe(2);
       expect(seen).not.toContain("aborted");
       expect(reader.statistics().records).toBe(0);
       reader.checkHealth();

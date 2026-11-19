@@ -3,7 +3,8 @@ import { performance } from "node:perf_hooks";
 import { isDeepStrictEqual } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import native from "@confluentinc/kafka-javascript";
-import { KafkaLogConsumer } from "@pi-cloud/event-log";
+// Bundle the candidate reader from this checkout into the isolated actor.
+import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-consumer.ts";
 import {
   decodeSessionLogFact,
   kafkaProducerLane,
@@ -14,7 +15,7 @@ import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 import { installTailProbe } from "./tail-probe.mjs";
 
-const pool = await openPool(12),
+const pool = await openPool(Number(process.argv[7] ?? 12)),
   group = topic + "-projector",
   startedAt = performance.now();
 const admin = new native.KafkaJS.Kafka({
@@ -435,6 +436,7 @@ const reader = new KafkaLogConsumer({
   groupId: group,
   clientId: group,
   groupRecovery: true,
+  batchRead: process.argv[6] !== "single",
   replayOffsets: async (bounds) => new Map(bounds.map((b) => [b.partition, b.low])),
   decode: (v) => decodeSessionLogFact(v).fact,
   handler: async (record) => {

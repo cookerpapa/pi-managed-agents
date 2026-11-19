@@ -37,6 +37,11 @@ PI_CLOUD_READER_DIAGNOSTIC=1 node --import tsx \
 This is a consumer microbenchmark. Its buffered control does not implement the
 production EOF, recovery or effect-dispatch contract and is not a rollout option.
 
+With the final argument `batch`, the same diagnostic bundles the current checkout
+and compares its single-record and bounded batch reads against identical preloaded
+offsets. The [Session Projector measurements](reports/session-projector-batch-read-20261119.md)
+also cover complete Runs, PG contention and tool dispatch confirmation.
+
 For isolated cache/live-view memory checks (mock PG authority, no service changes):
 
 ```sh

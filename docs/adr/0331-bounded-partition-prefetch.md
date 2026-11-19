@@ -45,6 +45,29 @@ November 18 SQL investigation adds deterministic and RF3 coverage of this edge.
 The correction is deployed as `projector-idle-eof-20261118-r1`; all thirty-two
 partitions passed idle initial-snapshot acceptance after Projector restart.
 
+### Session Projector batch-read candidate, November 19
+
+When idle, a blocking native poll takes one record and hands it to the handler.
+Then zero-timeout polls drain up to 32 ready records each. A short read switches
+back to waiting for one. Both operations use the pinned public consume API.
+Opt in the Session Projector,
+whose publishers bound each encoded fact at 900 KiB. At most one transient
+native callback batch is outstanding, in addition to the existing queues.
+Other consumers keep their current single-record poll.
+
+Keep the existing count and byte budgets for admitted records. If a returned
+batch crosses a watermark, remember only the first unadmitted offset in each
+affected partition. Pause that partition, let its admitted prefix settle, and
+seek back to that offset. A deliberate seek or assignment change supersedes
+that bookmark. Suppress EOF for the unadmitted suffix. Ordinary projection
+and Tool dispatch keep their existing per-partition order and commit rules.
+
+Acceptance requires sparse delivery, exact replay across pressure/seek and
+rebalance, and broker-confirmed Tool dispatch. Compare single and batch reads
+using the same complete Run workload on RF3, including delay after delivery,
+pool waiting and outstanding Kafka records. This candidate is scoped to the
+performance branch until the storage and rollout decision.
+
 ## Offset confirmation
 
 Ordinary completed progress is coalesced by the existing periodic committer,

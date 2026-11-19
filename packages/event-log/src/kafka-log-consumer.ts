@@ -21,6 +21,8 @@ export type KafkaLogConsumerOptions<T> = {
   groupId: string;
   topic: string;
   commitMessages?: boolean;
+  /** Drain immediately available native records in one bounded callback. */
+  batchRead?: boolean;
   /** Boot-local callback delivery only; never a durable projection recovery cursor. */
   resumeFromMemory?: boolean;
   /** Include completed delivery as well as the durable projection recovery floor. */
@@ -203,6 +205,7 @@ export class KafkaLogConsumer<T> {
         clientId: this.#options.clientId,
         groupId: this.#options.groupId,
         topic: this.#options.topic,
+        batchRead: this.#options.batchRead === true,
         logger,
         onPosition: (partition, offset) => {
           if (

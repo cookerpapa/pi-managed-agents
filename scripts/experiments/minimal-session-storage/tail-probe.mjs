@@ -62,7 +62,7 @@ export function installTailProbe(native, group, topic) {
       if (!this.traced) return super.consume(n, callback);
       const bucket = slice(),
         size = bucket?.size ?? stage?.pollSize ?? n;
-      if (size !== 1) this.setDefaultIsTimeoutOnlyForFirstMessage(true);
+      if (size !== n && size !== 1) this.setDefaultIsTimeoutOnlyForFirstMessage(true);
       const start = performance.now(),
         between = previousPollEnd === undefined ? 0 : start - previousPollEnd;
       return super.consume(size, (err, values) => {

@@ -444,8 +444,8 @@ export async function runLocality(wave, suite) {
       });
     return;
   }
-  assert(["fresh", "history", "mixed"].includes(suite));
-  const history = suite !== "fresh",
+  assert(["fresh", "history", "mixed", "tail-reader"].includes(suite));
+  const history = suite === "history" || suite === "mixed",
     spec = history ? { cohort: 128, seedBytes: 512 * 1024, halfFresh: suite === "mixed" } : {};
   const rates = (
     process.env.PI_CLOUD_SESSION_BENCH_RATES ??
@@ -459,10 +459,11 @@ export async function runLocality(wave, suite) {
     assert(Number.isInteger(rate) && rate > 0 && rate <= 500);
     const r = await run(suite + "-" + rate + "-" + seconds, {
       ...spec,
+      ...(suite === "tail-reader" ? { tail: true } : {}),
       rate,
       count: rate * seconds,
       concurrency: 384,
     });
-    if (r.dropped || r.drainAfterOfferMs > 5000) break;
+    if (suite !== "tail-reader" && (r.dropped || r.drainAfterOfferMs > 5000)) break;
   }
 }

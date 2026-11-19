@@ -24,6 +24,7 @@ it.skipIf(!brokers)(
         clientId: name,
         groupRecovery: true,
         orderedEffects: true,
+        batchRead: true,
         decode: (b) => JSON.parse(b.toString()),
         replayOffsets: async (bounds) => new Map(bounds.map((b) => [b.partition, b.low])),
         handler: async (record, current, commit) => {

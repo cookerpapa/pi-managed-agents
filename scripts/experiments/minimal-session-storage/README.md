@@ -84,6 +84,23 @@ python3 scripts/experiments/minimal-session-storage/summarize-tail.py /private/t
 
 The SQL verifier requires the development runtime setting and the same opt-in load flag, and uses temporary relations in a rolled-back transaction. [Tail attribution](../../../docs/reports/session-tail-attribution-20261119.md) and [the SQL templates](../../../docs/reports/session-projector-statements-20261119.sql) document the results.
 
+The `tail-reader` suite bundles the reader from this checkout, observes its real
+callbacks and supports independent arrival rates. Compare `single` and `batch`
+in alternating runs with separate output directories. Change only
+`PI_CLOUD_SESSION_BENCH_PROJECTOR_CONNECTIONS` (12 or 24) to test the separate
+database-pool question. Actual Session Projector settings stay untouched by the experiment.
+
+```sh
+PI_CLOUD_SESSION_BENCH_READER=batch PI_CLOUD_SESSION_BENCH_RATES=160,260 \
+  PI_CLOUD_SESSION_BENCH_SECONDS=25 node --import tsx \
+  scripts/experiments/minimal-session-storage/run.mjs /private/batch-run wake-throughput tail-reader
+PI_CLOUD_READER_DIAGNOSTIC=1 node --import tsx \
+  scripts/run-projector-reader-diagnostic.mjs /private/batch-backlog.json batch
+```
+
+The second command consumes identical preloaded offsets four times in alternating
+reader modes. [Measurements and limits](../../../docs/reports/session-projector-batch-read-20261119.md).
+
 The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load and an already queued burst. One Worker holds 64, 128 or 256 distinct physical Sessions at the real Pi model boundary. The driver records concurrent waiters, process RSS and event-loop delay. Separately it measures a bounded, tenant-scoped preference for one Run ID and exercises fresh native context assembly with the same frozen entries fetched from PG or already in memory. The individual experiments stop short of routing successive production Runs to a retained cache. [Results](../../../docs/reports/worker-claim-sizing-20261119.md).
 
 `schema.sql` defines the three physical tables and constraints. An independent client request is durably registered before success. Two concurrent SQL claimers cannot skip an active predecessor in the same Session. Inbox removal and the `user` Entry are committed together. The separately delivered `work_finished` updates the admitted Run under its claim identity. The experiment does not reconstruct an in-flight Pi Task after Worker death. That requires the additional stored state and recovery contract in the full runtime.

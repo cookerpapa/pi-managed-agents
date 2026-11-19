@@ -8,10 +8,11 @@ import native from "@confluentinc/kafka-javascript";
 import { KafkaPartitionReader } from "/app/packages/event-log/src/kafka-partition-reader.ts";
 import { KafkaWorkerProducer } from "/app/packages/event-log/src/kafka-worker-producer.ts";
 const brokers = process.env.PI_CLOUD_KAFKA_BROKERS.split(",");
+const compareBatch = process.argv[2] === "batch";
 const id = randomUUID(),
   topic = "pma-reader-diagnosis-" + id,
   partitions = 32,
-  perPartition = 64,
+  perPartition = compareBatch ? 256 : 64,
   total = partitions * perPartition;
 const admin = new native.KafkaJS.Kafka({
   kafkaJS: { brokers, clientId: "diag-" + id, logLevel: native.KafkaJS.logLevel.NOTHING },
@@ -49,7 +50,7 @@ const stats = (seen, started, first, cpu) => {
     cpuMs: (used.user + used.system) / 1000,
   };
 };
-async function maintained(waitMs) {
+async function maintained(waitMs, batchRead = false) {
   const groupId = "diag-maintained-" + randomUUID();
   groups.push(groupId);
   let seen = 0,
@@ -64,6 +65,7 @@ async function maintained(waitMs) {
     clientId: groupId,
     groupId,
     topic,
+    batchRead,
     logger,
     onStatistics: (value) => {
       nativeStatistics = value;
@@ -103,6 +105,7 @@ async function maintained(waitMs) {
     await delay(1100); // Capture a final native counter sample outside the timed interval.
     return {
       kind: "maintained",
+      batchRead,
       waitMs,
       ...measurement,
       nativeStatistics,
@@ -234,29 +237,35 @@ try {
   await delay(1200);
   await producer.start();
   const padding = "x".repeat(2048);
-  await Promise.all(
-    Array.from({ length: total }, (_, i) => {
-      const partition = i % partitions,
-        n = Math.floor(i / partitions);
-      return producer.append(partition, {
-        factId: randomUUID(),
-        sessionId: "partition-" + partition,
-        value: JSON.stringify({ n, padding }),
-      });
-    }),
-  );
-  const actual = await maintained(10);
-  report.results.push(actual);
-  console.log(JSON.stringify(actual));
-  for (const [pauseEach, ms] of [
-    [true, 10],
-    [false, 10],
-    [false, 50],
-    [true, 50],
-  ]) {
-    const r = await controlled(pauseEach, ms);
-    report.results.push(r);
-    console.log(JSON.stringify(r));
+  for (let base = 0; base < total; base += 2048) {
+    await Promise.all(
+      Array.from({ length: Math.min(2048, total - base) }, (_, j) => {
+        const i = base + j;
+        const partition = i % partitions,
+          n = Math.floor(i / partitions);
+        return producer.append(partition, {
+          factId: randomUUID(),
+          sessionId: "partition-" + partition,
+          value: JSON.stringify({ n, padding }),
+        });
+      }),
+    );
+  }
+  if (compareBatch) {
+    // The same preloaded offsets, partition ordering checks and zero-delay handler in every pass.
+    for (const batchRead of [false, true, true, false]) {
+      report.results.push(await maintained(0, batchRead));
+    }
+  } else {
+    report.results.push(await maintained(10));
+    for (const [pauseEach, ms] of [
+      [true, 10],
+      [false, 10],
+      [false, 50],
+      [true, 50],
+    ]) {
+      report.results.push(await controlled(pauseEach, ms));
+    }
   }
 } finally {
   await producer.close();
@@ -268,8 +277,13 @@ try {
       await delay(250);
     }
   }
-  if (typeof admin.deleteGroups === "function")
-    for (const g of groups) await admin.deleteGroups([g]).catch(() => {});
+  if (created) {
+    const ownedGroups = async () =>
+      (await admin.listGroups()).groups.map((g) => g.groupId).filter((id) => groups.includes(id));
+    const present = await ownedGroups();
+    if (present.length) await admin.deleteGroups(present);
+    assert.equal((await ownedGroups()).length, 0, "Owned groups remain after cleanup");
+  }
   await admin.disconnect();
   console.log(JSON.stringify({ report, cleanupConfirmed: created }));
 }

@@ -37,6 +37,10 @@ import { serializeRelease } from "../../lib/release-lock.mjs";
 
 assert.equal(process.env.PI_CLOUD_RUNTIME_LOAD_CHECK, "1");
 const [output, mode = "matrix", suite = "smoke"] = process.argv.slice(2);
+const readerMode = process.env.PI_CLOUD_SESSION_BENCH_READER ?? "batch";
+assert(["single", "batch"].includes(readerMode));
+const projectorConnections = Number(process.env.PI_CLOUD_SESSION_BENCH_PROJECTOR_CONNECTIONS ?? 12);
+assert([12, 24].includes(projectorConnections));
 assert(
   output &&
     [
@@ -605,6 +609,8 @@ const report = {
   at: new Date().toISOString(),
   mode,
   ...(mode === "wake-throughput" ? { suite } : {}),
+  readerMode,
+  projectorConnections,
   revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
   actorHashes: Object.fromEntries(Object.entries(source).map(([k, s]) => [k, sha(s)])),
   tests: [],
@@ -957,7 +963,9 @@ try {
     "projector",
     "projector",
     podFor("session-runtime"),
-    ...(mode === "wake-throughput" && suite.startsWith("tail") ? ["tail"] : []),
+    mode === "wake-throughput" && suite.startsWith("tail") ? "tail" : "ordinary",
+    readerMode,
+    String(projectorConnections),
   );
   const sts = JSON.parse(kubectl(["get", workload("pi-workers"), "-o", "json"]));
   const selector = Object.entries(sts.spec.selector.matchLabels)

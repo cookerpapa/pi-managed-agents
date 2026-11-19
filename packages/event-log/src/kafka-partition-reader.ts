@@ -11,6 +11,7 @@ import type {
 type Assignment = { topic: string; partition: number; offset?: number };
 export type PartitionReaderOptions = {
   prefetch?: PrefetchLimits;
+  batchRead?: boolean;
   /** Optional diagnostics only; observer failure cannot change delivery. */
   onStatistics?(statistics: {
     receivedRecords: number;
@@ -45,6 +46,8 @@ export class KafkaPartitionReader {
   readonly #paused = new Set<number>();
   readonly #nativePaused = new Set<number>();
   readonly #seeking = new Map<number, { epoch: number; ready: boolean }>();
+  /** First offset returned by native consume but outside the admitted queue budget. */
+  readonly #deferredOffsets = new Map<number, number>();
   readonly #prefetch: PartitionPrefetch;
   readonly #epochs = new Map<number, number>();
   readonly #eof = new Map<number, { offset: bigint; epoch: number }>();
@@ -111,6 +114,7 @@ export class KafkaPartitionReader {
         this.#paused.clear();
         this.#nativePaused.clear();
         this.#seeking.clear();
+        this.#deferredOffsets.clear();
         this.#prefetch.clearQueued();
         const generation = this.#generation;
         void options
@@ -226,6 +230,7 @@ export class KafkaPartitionReader {
       this.#active.has(partition) ||
       this.#prefetch.queued(partition) ||
       this.#seeking.has(partition) ||
+      this.#deferredOffsets.has(partition) ||
       this.#paused.has(partition) ||
       this.#failed !== undefined ||
       !eof ||
@@ -263,6 +268,7 @@ export class KafkaPartitionReader {
   }
 
   async #poll(): Promise<void> {
+    let draining = false;
     while (!this.#closing && this.#failed === undefined) {
       this.#finishSeeks();
       const generation = this.#generation;
@@ -274,27 +280,33 @@ export class KafkaPartitionReader {
       );
       const epochs = this.#pollEpochs;
       this.#polling = true;
+      const count: number = draining ? 32 : 1;
       let messages: Message[];
       try {
         messages = await new Promise<Message[]>((resolve, reject) =>
-          this.#client.consume(1, (error, values) => (error ? reject(error) : resolve(values))),
+          this.#client.consume(count, (error, values) => (error ? reject(error) : resolve(values))),
         );
       } finally {
         this.#polling = false;
       }
       if (!this.#closing && this.#failed === undefined && generation === this.#generation) {
+        const delivered = new Set<number>();
+        const rewind = new Set<number>();
         for (const message of messages) {
-          if (epochs.get(message.partition) !== this.#epoch(message.partition)) {
-            const offset = this.#starts.get(message.partition);
-            if (offset !== undefined && this.#assigned.has(message.partition))
-              this.seek({
-                topic: message.topic,
-                partition: message.partition,
-                offset: String(offset),
-              });
+          const partition = message.partition;
+          if (!this.#assigned.has(partition)) continue;
+          if (epochs.get(partition) !== this.#epoch(partition)) {
+            rewind.add(partition);
             continue;
           }
-          this.#enqueue(message);
+          delivered.add(partition);
+          if (this.#deferredOffsets.has(partition)) continue;
+          if (this.#prefetch.paused(partition)) {
+            this.#deferredOffsets.set(partition, message.offset);
+            this.#eof.delete(partition);
+            continue;
+          }
+          this.#prefetch.push(message, generation, this.#epoch(partition));
         }
         // Async assignment can finish inside a poll of the same generation.
         // An EOF-only result then has no message to trigger the rewind above.
@@ -302,11 +314,12 @@ export class KafkaPartitionReader {
         // until new data arrives, leaving an otherwise idle partition unready.
         for (const [partition, offset] of this.#starts)
           if (
-            !epochs.has(partition) &&
             this.#assigned.has(partition) &&
-            !this.#seeking.has(partition)
+            (rewind.has(partition) || (!epochs.has(partition) && !this.#seeking.has(partition)))
           )
             this.seek({ topic: this.#options.topic, partition, offset: String(offset) });
+        if (delivered.size) this.#updatePauses();
+        for (const partition of delivered) this.#drain(partition);
         for (const partition of this.#eof.keys()) this.#advance(partition);
       } else if (!this.#closing && this.#failed === undefined) {
         // A poll can span assignment. No new-generation record has been delivered
@@ -315,15 +328,14 @@ export class KafkaPartitionReader {
         for (const [partition, offset] of this.#starts)
           this.seek({ topic: this.#options.topic, partition, offset: String(offset) });
       }
-      if (!messages.length) await new Promise<void>((resolve) => setTimeout(resolve, 5));
+      // A blocking poll waits for one record only. Drain ready records with
+      // public zero-timeout polls until a short read returns us to idle mode.
+      const nextDrain = this.#options.batchRead === true && messages.length === count;
+      if (nextDrain !== draining) this.#client.setDefaultConsumeTimeout(nextDrain ? 0 : 25);
+      draining = nextDrain;
+      if (!messages.length && count === 1)
+        await new Promise<void>((resolve) => setTimeout(resolve, 5));
     }
-  }
-
-  #enqueue(message: Message): void {
-    if (!this.#assigned.has(message.partition) || this.#failed !== undefined) return;
-    this.#prefetch.push(message, this.#generation, this.#epoch(message.partition));
-    this.#updatePauses();
-    this.#drain(message.partition);
   }
 
   #drain(partition: number): void {
@@ -338,6 +350,11 @@ export class KafkaPartitionReader {
       return;
     const buffered = this.#prefetch.take(partition);
     if (!buffered) {
+      const deferred = this.#deferredOffsets.get(partition);
+      if (deferred !== undefined) {
+        this.seek({ topic: this.#options.topic, partition, offset: String(deferred) });
+        return;
+      }
       this.#advance(partition);
       return;
     }
@@ -425,6 +442,7 @@ export class KafkaPartitionReader {
       const paused =
         this.#paused.has(partition) ||
         this.#seeking.has(partition) ||
+        this.#deferredOffsets.has(partition) ||
         this.#prefetch.paused(partition);
       if (paused === this.#nativePaused.has(partition)) continue;
       const target = [{ topic: this.#options.topic, partition }];
@@ -448,6 +466,7 @@ export class KafkaPartitionReader {
   }
 
   seek(position: K.TopicPartitionOffset): void {
+    this.#deferredOffsets.delete(position.partition);
     this.#epochs.set(position.partition, this.#epoch(position.partition) + 1);
     const epoch = this.#epoch(position.partition),
       generation = this.#generation;

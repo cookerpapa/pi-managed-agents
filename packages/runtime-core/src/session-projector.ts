@@ -147,6 +147,7 @@ export class SessionProjector {
         PREFIX + Buffer.from(new URL(options.advertisedBaseUrl).toString()).toString("base64url"),
       groupRecovery: true,
       orderedEffects: true,
+      batchRead: true,
       decode: decodeSessionLogFact,
       replayOffsets: async (bounds) => {
         // Kafka bounds were captured before PG. Read the routing snapshot AFTER

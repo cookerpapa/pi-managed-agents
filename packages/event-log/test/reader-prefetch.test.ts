@@ -16,11 +16,16 @@ vi.mock("@confluentinc/kafka-javascript", async () => {
         stores: any[] = [];
         seeks: any[] = [];
         automaticCommits = true;
+        timeoutMs = 0;
+        polls: { count: number; timeoutMs: number }[] = [];
+        returnedCounts: number[] = [];
         constructor(readonly options: any) {
           super();
           fixture.client = this;
         }
-        setDefaultConsumeTimeout() {}
+        setDefaultConsumeTimeout(timeoutMs: number) {
+          this.timeoutMs = timeoutMs;
+        }
         connect(_options: unknown, done: () => void) {
           done();
           this.options.rebalance_cb({ code: 1 }, [
@@ -60,20 +65,21 @@ vi.mock("@confluentinc/kafka-javascript", async () => {
           this.history.push(frame);
           this.frames.push(frame);
         }
-        consume(_count: number, done: (e: unknown, values: Message[]) => void) {
+        consume(count: number, done: (e: unknown, values: Message[]) => void) {
+          this.polls.push({ count, timeoutMs: this.timeoutMs });
           setTimeout(() => {
-            const at = this.frames.findIndex(
-              (m) => this.assigned.has(m.partition) && !this.paused.has(m.partition),
-            );
-            if (at < 0) {
-              done(null, []);
-              return;
+            const records = [];
+            while (records.length < count) {
+              const at = this.frames.findIndex(
+                (m) => this.assigned.has(m.partition) && !this.paused.has(m.partition),
+              );
+              if (at < 0) break;
+              const [m] = this.frames.splice(at, 1);
+              if (m.eof) this.emit("partition.eof", m);
+              else records.push(m);
             }
-            const [m] = this.frames.splice(at, 1);
-            if (m.eof) {
-              this.emit("partition.eof", m);
-              done(null, []);
-            } else done(null, [m]);
+            this.returnedCounts.push(records.length);
+            done(null, records);
           }, 1);
         }
         offsetsStore(values: any[]) {
@@ -117,6 +123,7 @@ async function create(handler: KafkaJS.EachBatchHandler, prefetch?: PrefetchLimi
     clientId: "prefetch",
     groupId: "prefetch",
     topic: "prefetch",
+    batchRead: true,
     ...(prefetch ? { prefetch } : {}),
     logger: { error: (e: unknown) => errors.push(e) } as unknown as KafkaJS.Logger,
     rebalance: async (_e, a, f) => f.assign(a),
@@ -143,6 +150,7 @@ it("re-observes an EOF-only tail when asynchronous assignment finishes inside a 
     clientId: "late-assignment",
     groupId: "late-assignment",
     topic: "prefetch",
+    batchRead: true,
     logger: { error() {} } as unknown as KafkaJS.Logger,
     rebalance: async (_error, assignments, functions) => {
       await install.promise;
@@ -240,25 +248,66 @@ it("pauses only a full partition and preserves other partition progress", async 
   }
 });
 
+it("refetches only the first unadmitted suffix per partition and holds its EOF behind it", async () => {
+  const held = Promise.withResolvers<void>();
+  const seen: string[] = [];
+  const { reader, native, positions } = await create(
+    async ({ batch, resolveOffset }) => {
+      const offset = batch.messages[0]!.offset;
+      if (batch.partition === 0 && offset === "0") await held.promise;
+      seen.push(batch.partition + ":" + offset);
+      resolveOffset(offset);
+    },
+    { maximumRecords: 20, maximumBytes: 100000, partitionRecords: 2, partitionBytes: 50000 },
+  );
+  try {
+    for (let i = 0; i < 6; i++) native.add(0, i);
+    native.add(0, 9, "", true);
+    native.add(1, 0);
+    await vi.waitFor(() => expect(seen).toEqual(["1:0"]));
+    expect(native.polls).toContainEqual({ count: 1, timeoutMs: 25 });
+    expect(native.polls).toContainEqual({ count: 32, timeoutMs: 0 });
+    expect(
+      native.polls.some(
+        (p: { count: number; timeoutMs: number }) => p.count > 1 && p.timeoutMs !== 0,
+      ),
+    ).toBe(false);
+    expect(native.returnedCounts).toContain(6);
+    expect(reader.statistics().records).toBe(2);
+    expect(positions).not.toContainEqual([0, 9n]);
+    held.resolve();
+    await vi.waitFor(() => expect(positions).toContainEqual([0, 9n]));
+    expect(seen).toEqual(["1:0", "0:0", "0:1", "0:2", "0:3", "0:4", "0:5"]);
+    // Offset 2 is the first blocking read after rewind. It settles before the
+    // next drain accepts 3 and 4, so the first remaining offset is 5.
+    expect(native.seeks.map((s: { offset: number }) => s.offset)).toEqual([2, 5]);
+  } finally {
+    held.resolve();
+  }
+});
+
 it("retains one oversized record without discarding it or admitting an unbounded batch", async () => {
   const release = Promise.withResolvers<void>();
   let count = 0;
   const { reader, native } = await create(
-    async () => {
-      if (count === 0) await release.promise;
+    async ({ batch }) => {
+      if (batch.partition === 0) await release.promise;
       count++;
     },
     { maximumRecords: 4, maximumBytes: 1024, partitionRecords: 4, partitionBytes: 1024 },
   );
   try {
-    native.add(0, 0, "x".repeat(4096));
     native.add(1, 0);
-    await vi.waitFor(() => expect(reader.statistics().records).toBe(1));
-    expect(reader.statistics().estimatedBytes).toBeGreaterThan(4096);
+    native.add(0, 0, "x".repeat(4096));
+    native.add(1, 1);
+    await vi.waitFor(() => expect(reader.statistics().estimatedBytes).toBeGreaterThan(4096));
+    expect(reader.statistics().records).toBe(1);
+    expect(native.returnedCounts).toContain(2);
     expect(reader.statistics().pausedPartitions).toBe(2);
     release.resolve();
-    await vi.waitFor(() => expect(count).toBe(2));
+    await vi.waitFor(() => expect(count).toBe(3));
     expect(reader.statistics().records).toBe(0);
+    expect(reader.statistics().peakRecords).toBe(1);
   } finally {
     release.resolve();
   }
@@ -280,11 +329,14 @@ it("drops queued old-epoch records on seek and resumes exactly at the requested 
         resolveOffset(m.offset);
       }
     },
+    { maximumRecords: 10, maximumBytes: 100000, partitionRecords: 3, partitionBytes: 50000 },
   );
   try {
     native.add(0, 0);
     native.add(0, 1);
     native.add(0, 2);
+    native.add(0, 3);
+    native.add(0, 4);
     native.add(0, 9, "", true);
     await entered.promise;
     await vi.waitFor(() => expect(reader.statistics().queuedRecords).toBe(2));
@@ -295,7 +347,7 @@ it("drops queued old-epoch records on seek and resumes exactly at the requested 
     expect(positions).not.toContainEqual([0, 9n]);
     reader.resume([{ topic: "prefetch", partitions: [0] }]);
     await vi.waitFor(() => expect(positions).toContainEqual([0, 9n]));
-    expect(seen).toEqual(["1", "2"]);
+    expect(seen).toEqual(["1", "2", "3", "4"]);
     expect(errors).toEqual([]);
   } finally {
     release.resolve();
@@ -306,23 +358,26 @@ it("replays queued data in a new assignment without allowing an old completion t
   const release = Promise.withResolvers<void>(),
     entered = Promise.withResolvers<void>();
   const seen: string[] = [];
-  const { reader, native, errors } = await create(async ({ batch, isStale, resolveOffset }) => {
-    const m = batch.messages[0]!;
-    if (m.offset === "0") {
-      entered.resolve();
-      await release.promise;
-    }
-    if (!isStale()) {
-      seen.push(m.offset);
-      resolveOffset(m.offset);
-    }
-  });
+  const { reader, native, errors } = await create(
+    async ({ batch, isStale, resolveOffset }) => {
+      const m = batch.messages[0]!;
+      if (m.offset === "0") {
+        entered.resolve();
+        await release.promise;
+      }
+      if (!isStale()) {
+        seen.push(m.offset);
+        resolveOffset(m.offset);
+      }
+    },
+    { maximumRecords: 10, maximumBytes: 100000, partitionRecords: 2, partitionBytes: 50000 },
+  );
   try {
     native.add(0, 0);
     native.add(0, 1);
     native.add(0, 2);
     await entered.promise;
-    await vi.waitFor(() => expect(reader.statistics().queuedRecords).toBe(2));
+    await vi.waitFor(() => expect(reader.statistics().queuedRecords).toBe(1));
     native.options.rebalance_cb({ code: 1 }, [{ topic: "prefetch", partition: 0, offset: 1 }]);
     release.resolve();
     await vi.waitFor(() => expect(seen).toEqual(["1", "2"]));

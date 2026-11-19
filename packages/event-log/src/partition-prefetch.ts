@@ -22,7 +22,7 @@ export type BufferedRecord = Readonly<{
 }>;
 
 /** Volatile delivery only. Counts include active handlers until release().
- * The single-record poll may exceed a byte watermark by one valid record. */
+ * The last admitted record may exceed a byte watermark by its own size. */
 export class PartitionPrefetch {
   readonly #parts = new Map<
     number,

@@ -2,6 +2,9 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Batch immediately available Session-log records while bounding admitted buffers, preserving offset confirmation and measuring full-Run latency. Compare PG connection counts separately. [Batch-read measurements](reports/session-projector-batch-read-20261119.md).
+- [ ] For #48, measure how much same-partition stable projection can reduce connection hold time under backlog. Preserve post-commit input acknowledgement, atomic Inbox placement and the pre-dispatch offset boundary in any write-batching experiment.
+
 - [x] Attribute terminal delay before and after native Kafka delivery and measure predecessor PG work on the same partition. Verify the actual minimal projection statements and distinguish fresh admission from chained Session waits. [Attribution](reports/session-tail-attribution-20261119.md).
 
 - [x] Integrate 32-row claims and version-checked readable history on successive root Runs. Compare complete native throughput, cold fallback, cache-aware wake-up and projection transaction cost with independent arrivals and fixed-concurrency loads. [Throughput report](reports/session-continuation-throughput-20261119.md).
