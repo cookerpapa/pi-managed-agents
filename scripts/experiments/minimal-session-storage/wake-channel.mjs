@@ -1,0 +1,241 @@
+import { once } from "node:events";
+import { WebSocket, WebSocketServer } from "ws";
+
+// Only live transports and one outstanding arrival hint survive between events.
+// The router neither reads runs nor decides who owns one.
+export async function openWakeRouter(host, path, fail, port = 0) {
+  const server = new WebSocketServer({ host, port, perMessageDeflate: false, maxPayload: 256 });
+  await once(server, "listening");
+  server.on("error", fail);
+  const connections = new Map(),
+    waiting = new Set();
+  let stage, timer, pendingHint, armedFault, stats;
+  function drop(fault) {
+    if (armedFault !== fault) return false;
+    armedFault = undefined;
+    stats.faults++;
+    return true;
+  }
+  function signal(socket, reason) {
+    waiting.delete(socket);
+    if (reason === "arrival" && drop("disconnect")) return socket.terminate();
+    if (reason === "arrival" && drop("lost-wake")) return;
+    stats[reason]++;
+    socket.send(reason);
+  }
+  function signalWaiting(count, reason) {
+    let sent = 0;
+    for (const socket of waiting) {
+      signal(socket, reason);
+      if (++sent >= count) break;
+    }
+    return sent;
+  }
+  function tick() {
+    if (signalWaiting(1, "tick") || !stage.probeUnlisted || !connections.size) return;
+    // A lost ready/wake can leave a live, willing Worker off the list.
+    // Rotate a single online connection; a full Worker ignores it locally.
+    const [id, socket] = connections.entries().next().value;
+    connections.delete(id);
+    connections.set(id, socket);
+    stats.unlistedTicks++;
+    signal(socket, "tick");
+  }
+  function notify(label, count) {
+    if (!stage || stage.label !== label || !(count > 0)) return;
+    stats.notifications++;
+    if (drop("lost-notification")) return;
+    if (stage.wakeMode === "broadcast") {
+      for (const socket of connections.values()) signal(socket, "arrival");
+      return;
+    }
+    const needed = Math.ceil(count / stage.batch);
+    pendingHint = signalWaiting(needed, "arrival") < needed;
+  }
+  server.on("connection", (socket, request) => {
+    const url = new URL(request.url, "http://localhost");
+    const id = url.searchParams.get("id");
+    if (!stage || url.pathname !== path || url.searchParams.get("stage") !== stage.label || !id) {
+      socket.close(1008);
+      return;
+    }
+    const previous = connections.get(id);
+    if (previous) {
+      waiting.delete(previous);
+      previous.terminate();
+    }
+    connections.set(id, socket);
+    stats.joins++;
+    socket.on("error", () => socket.terminate());
+    socket.on("close", () => {
+      waiting.delete(socket);
+      if (connections.get(id) === socket) connections.delete(id);
+    });
+    socket.on("message", (raw) => {
+      if (connections.get(id) !== socket || raw.toString() !== "ready") return;
+      stats.offers++;
+      if (drop("lost-ready")) return;
+      waiting.add(socket);
+      if (pendingHint && stage.wakeMode === "directed") {
+        pendingHint = false;
+        signalWaiting(1, "arrival");
+      }
+    });
+    socket.send("registered");
+  });
+  function reset() {
+    clearInterval(timer);
+    for (const socket of connections.values()) socket.terminate();
+    connections.clear();
+    waiting.clear();
+    pendingHint = false;
+    stage = undefined;
+  }
+  function startTimer() {
+    clearInterval(timer);
+    timer = setInterval(tick, stage.tickMs ?? 200);
+  }
+  return {
+    port: server.address().port,
+    notify,
+    configure(config) {
+      reset();
+      stage = config;
+      armedFault = config.fault;
+      stats = {
+        joins: 0,
+        offers: 0,
+        arrival: 0,
+        tick: 0,
+        unlistedTicks: 0,
+        notifications: 0,
+        faults: 0,
+      };
+      if (!stage.fault) startTimer();
+    },
+    startTimer,
+    snapshot: () => ({ ...stats, online: connections.size, waiting: waiting.size }),
+    async close() {
+      reset();
+      await new Promise((resolve) => server.close(resolve));
+    },
+  };
+}
+
+// One pending PG claim reserves its complete batch. Committed rows finish even
+// if the management socket disappears while the SQL request is in flight.
+export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail }) {
+  const address = new URL(url);
+  address.searchParams.set("stage", stage.label);
+  address.searchParams.set("id", id);
+  const stats = {
+    queries: 0,
+    empty: 0,
+    rows: 0,
+    maximumBatch: 0,
+    maximumRunning: 0,
+    arrival: 0,
+    tick: 0,
+    offers: 0,
+    registrations: 0,
+    bootstrap: 0,
+    fullHints: 0,
+  };
+  let socket,
+    reconnect,
+    renew,
+    online = false,
+    stopped = false,
+    checking = false,
+    checkingAgain,
+    offered = false,
+    running = 0;
+  function offer() {
+    if (!online || stopped || checking || running >= slots) return;
+    offered = true;
+    stats.offers++;
+    socket.send("ready");
+    clearTimeout(renew);
+    const timeout = (stage.reofferMs ?? 4000) * (0.8 + 0.4 * Math.random());
+    renew = setTimeout(offer, timeout);
+  }
+  function request(reason) {
+    if (stopped || !online || running >= slots) return;
+    if (checking) {
+      checkingAgain = reason;
+      return;
+    }
+    clearTimeout(renew);
+    offered = false;
+    checking = true;
+    checkingAgain = undefined;
+    const limit = Math.min(slots - running, stage.batch);
+    const start = performance.now();
+    stats.queries++;
+    void (async () => {
+      const rows = await claim(limit);
+      const elapsed = performance.now() - start;
+      if (rows.length > limit) throw new Error("Claim exceeded reserved slots");
+      if (!rows.length) stats.empty++;
+      stats.rows += rows.length;
+      stats.maximumBatch = Math.max(stats.maximumBatch, rows.length);
+      running += rows.length;
+      stats.maximumRunning = Math.max(stats.maximumRunning, running);
+      for (const row of rows) {
+        void execute(row, elapsed, reason)
+          .catch(fail)
+          .finally(() => {
+            const wasFull = running === slots;
+            running--;
+            if (wasFull && !offered) request("freed-slot");
+          });
+      }
+      checking = false;
+      if (checkingAgain || rows.length === limit) request(checkingAgain ?? "drain");
+      else offer();
+    })().catch((error) => {
+      checking = false;
+      fail(error);
+    });
+  }
+  function connect() {
+    if (stopped) return;
+    const current = new WebSocket(address, { perMessageDeflate: false, handshakeTimeout: 5000 });
+    socket = current;
+    current.on("error", () => current.terminate());
+    current.on("message", (raw) => {
+      if (stopped || socket !== current) return;
+      const message = raw.toString();
+      if (message === "registered") {
+        online = true;
+        stats.registrations++;
+        stats.bootstrap++;
+      } else if (message === "arrival" || message === "tick") {
+        stats[message]++;
+        if (running >= slots) stats.fullHints++;
+      } else return fail(new Error("Unexpected prototype wake frame"));
+      request(message === "registered" ? "bootstrap" : message);
+    });
+    current.on("close", () => {
+      if (socket !== current) return;
+      online = false;
+      offered = false;
+      clearTimeout(renew);
+      if (!stopped) reconnect = setTimeout(connect, 50 + Math.random() * 50);
+    });
+  }
+  connect();
+  return {
+    stats,
+    get busy() {
+      return running > 0 || checking;
+    },
+    close() {
+      stopped = true;
+      online = false;
+      clearTimeout(renew);
+      clearTimeout(reconnect);
+      socket?.terminate();
+    },
+  };
+}

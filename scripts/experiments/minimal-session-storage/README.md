@@ -18,6 +18,10 @@ PI_CLOUD_SESSION_BENCH_RATES=20,60,90,120,160,220 \
   node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/measured-capacity capacity
 node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/intake intake
 node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/boundary boundary
+node --test scripts/experiments/minimal-session-storage/wake-channel.test.mjs
+node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/wake-pods wake
+node --import tsx scripts/experiments/minimal-session-storage/run.mjs /private/wake-fleet wake-fleet
+node scripts/experiments/minimal-session-storage/summarize-wake.mjs /private/wake-pods /private/wake-fleet /private/wake-summary.json
 ```
 
 - `smoke` checks the key lifecycle races, replay, exact input acknowledgement, per-Session claim ordering, edit/withdraw and a quiet queue with polling fallback.
@@ -36,6 +40,16 @@ node --import tsx scripts/run-projector-sql-diagnostic.mjs /private/full-control
 node --import tsx scripts/experiments/minimal-session-storage/full-control.mjs /private/full-control-repeat
 node scripts/experiments/minimal-session-storage/summarize.mjs /private /private/summary.json
 ```
+
+## Directed Worker wake-up experiment
+
+This prototype compares a notification delivered to every Worker with a FIFO of waiting management connections. Admission stays in PostgreSQL. An API process coalesces committed admissions for 5 ms. A runtime process signals waiting Workers over WebSocket. A 200 ms timer signals at most one waiter per tick. A Worker offers again after a jittered timeout, checks on connection and claims at most its actual available slots. The router has no durable task, capacity or lease authority. River's [PG notification and fallback](https://github.com/riverqueue/river/blob/master/client.go) and Temporal's [waiting pollers](https://github.com/temporalio/temporal/blob/main/docs/architecture/matching-service.md) inform the comparison. The existing PG queue and Worker management connection remain the intended production boundaries.
+
+Acceptance covers lost admission, wait and wake signals, reconnect, joining after enqueue, draining, busy Workers, multi-row claim ordering, empty checks, admission-to-claim latency and full Kafka/PG settlement. A separate lightweight socket population measures fanout without representing a thousand Pi processes.
+
+The `wake` mode uses an experimental WebSocket endpoint in the Session runtime Pod and two real Pi processes in different Worker Pods. Two temporary additive network policies cover the randomly allocated port between the selected roles. The driver checks their removal. Production roles and their management protocol are untouched. Stage setup starts the loss-test timer after registration so each fault is injected before the first backup tick. Under the bounded recovery variant, when the waiting set is empty the runtime rotates one connected socket on the same tick. A saturated Worker discards that frame locally.
+
+The `wake-fleet` mode stops the two experimental Pi Workers after the storage smoke checks. The runtime actor then opens 1,000 loopback WebSockets multiplexed over one process with a bounded PG pool. An independent process commits groups of seven isolated Runs and sends real PG notifications at a scheduled 171 groups/s. The broadcast control changes only how many connected clients receive the arrival frame. A lightweight PG update completes each claimed Run. The bootstrap scans of the 1,000 connections are excluded from measured groups. Per-claim SQL counts exclude job inserts, completion updates, the observer and PostgreSQL notification commands. The 30-second directed run is a queue-only sustained sample. [Measurements](../../../docs/reports/directed-worker-wake-20261119.md).
 
 ## Boundaries and evidence
 

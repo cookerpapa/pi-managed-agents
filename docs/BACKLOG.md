@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare waiting Worker connections, batched PG claims and a 200 ms safety wake with broadcast delivery. Verify lost hints, connection replacement, admission before joining and draining with actual Pi Workers and exercise 1,000 lightweight connections separately. [Prototype evidence](reports/directed-worker-wake-20261119.md).
+
 - [x] Measure Run admission/claim, completed messages, native Inbox changes and separate ordered completion using real Kafka, PostgreSQL and Pi. Verify placement, late input, notification contention, peak/drained lag and whole-document write amplification. [Controlled report](reports/minimal-session-storage-load-20261119.md).
 - [ ] Evaluate coalesced wake-ups against mixed production admissions with durable queue rediscovery, and single-statement one-row projections independently of any native recovery redesign. [Issue #48](https://github.com/cookerpapa/pi-managed-agents/issues/48).
 

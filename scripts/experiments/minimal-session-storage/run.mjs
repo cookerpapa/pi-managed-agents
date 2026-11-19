@@ -1,6 +1,7 @@
 /** Isolated test of the two-table lifecycle. Run through the maintained development cluster. */
 import assert from "node:assert/strict";
-import { answer, claimSql } from "./fixture.mjs";
+import { answer, claimSql, claimBatchSql } from "./fixture.mjs";
+import { runWakeTrials, waitForWakeState, wakeNetwork } from "./wake-trials.mjs";
 import { randomUUID, createHash } from "node:crypto";
 import { spawn, execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -27,7 +28,17 @@ assert.equal(process.env.PI_CLOUD_RUNTIME_LOAD_CHECK, "1");
 const [output, mode = "matrix"] = process.argv.slice(2);
 assert(
   output &&
-    ["smoke", "matrix", "inbox", "capacity", "diagnose", "intake", "boundary"].includes(mode),
+    [
+      "smoke",
+      "matrix",
+      "inbox",
+      "capacity",
+      "diagnose",
+      "intake",
+      "boundary",
+      "wake",
+      "wake-fleet",
+    ].includes(mode),
 );
 serializeRelease(runtimeDirectory);
 process.umask(0o077);
@@ -59,20 +70,22 @@ const statsDb = new pg.Pool({
 });
 const source = Object.fromEntries(
   await Promise.all(
-    ["worker", "projector"].map(async (role) => {
-      const path = fileURLToPath(new URL(role + ".mjs", import.meta.url));
-      const bundle = await build({
-        entryPoints: [path],
-        bundle: true,
-        packages: "external",
-        minify: false,
-        platform: "node",
-        target: "node24",
-        format: "esm",
-        write: false,
-      });
-      return [role, bundle.outputFiles[0].text];
-    }),
+    ["worker", "projector", ...(mode.startsWith("wake") ? ["wake-runtime"] : [])].map(
+      async (role) => {
+        const path = fileURLToPath(new URL(role + ".mjs", import.meta.url));
+        const bundle = await build({
+          entryPoints: [path],
+          bundle: true,
+          packages: "external",
+          minify: false,
+          platform: "node",
+          target: "node24",
+          format: "esm",
+          write: false,
+        });
+        return [role, bundle.outputFiles[0].text];
+      },
+    ),
   ),
 );
 const sha = (x) => createHash("sha256").update(x).digest("hex");
@@ -109,8 +122,14 @@ process.on("SIGTERM", () => fatal(new Error("Terminated")));
 const actors = [],
   workers = [],
   entries = new Map();
-let projector, fixture;
+let projector, fixture, router, network, wakeUrl, wakeStage, transition;
 function receive(a, m) {
+  if (m.kind === "publishBursts") {
+    void publishWakeBursts(m)
+      .then((measurement) => a.write({ kind: "published", measurement }))
+      .catch(fatal);
+    return;
+  }
   if (m.kind === "fixture") {
     fixture ??= { source: m.source, batches: m.batches };
     return;
@@ -137,7 +156,16 @@ function receive(a, m) {
     return;
   }
   if (m.kind === "claim") {
+    assert(!e.worker, "Run claimed by two Workers");
     e.worker = a;
+    e.claimedAt = m.at;
+    if (wakeStage?.scaleWhenClaimed && !transition) {
+      const n = ++sampleId,
+        stopped = workers[0].wait("draining" + n);
+      workers[0].write({ kind: "drain", n });
+      transition = guard(stopped).then(() => workers[1].write({ kind: "join" }));
+      void transition.catch(fatal);
+    }
     return;
   }
   if (m.kind === "workerDone") {
@@ -189,7 +217,7 @@ function receive(a, m) {
     })().catch(fatal);
   }
 }
-async function startActor(role, id, pod) {
+async function startActor(role, id, pod, ...roleArgs) {
   const binary = process.env.PI_CLOUD_KUBECTL_BIN ?? "/usr/local/bin/k3s";
   const args = [
     ...(process.env.PI_CLOUD_KUBECTL_BIN ? [] : ["kubectl"]),
@@ -210,10 +238,13 @@ async function startActor(role, id, pod) {
     name,
     topic,
     id,
+    mode,
+    ...roleArgs,
   ];
   const child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] });
   const a = {
     id,
+    pod,
     child,
     waiters: new Map(),
     closing: false,
@@ -252,19 +283,82 @@ async function startActor(role, id, pod) {
     });
   });
   actors.push(a);
-  await guard(ready, 90000);
+  a.ready = await guard(ready, 90000);
   return a;
 }
 async function configure(sc) {
   const options = { ...sc, kind: "stage", stage: sc.label, ...(sc.replay ? { fixture } : {}) };
   if (sc.replay) assert(fixture);
+  wakeStage = ["directed", "broadcast"].includes(sc.wakeMode) ? sc : undefined;
+  transition = undefined;
+  if (wakeStage) await configureRouter(options);
   await Promise.all(
-    actors.map(async (a) => {
-      const response = a.wait("configured" + sc.label);
-      a.write(options);
-      await guard(response, 15000);
-    }),
+    actors
+      .filter((a) => a !== router)
+      .map(async (a) => {
+        const response = a.wait("configured" + sc.label);
+        a.write({ ...options, ...(wakeStage && workers.includes(a) ? { wakeUrl } : {}) });
+        await guard(response, 15000);
+      }),
   );
+  if (wakeStage) {
+    const online = workers.length - (sc.offline?.length ?? 0);
+    await waitForWakeState(
+      routerState,
+      (s) =>
+        s.online === online && (sc.fault === "lost-ready" ? s.faults === 1 : s.waiting === online),
+    );
+    if (sc.fault) {
+      const n = ++sampleId,
+        response = router.wait("armed" + n);
+      router.write({ kind: "armTimer", n });
+      await guard(response);
+    }
+    if (sc.restartRouter) {
+      await stopActors([router]);
+      actors.splice(actors.indexOf(router), 1);
+    }
+  }
+}
+async function configureRouter(options) {
+  const response = router.wait("configured" + options.label);
+  router.write({ ...options, kind: "stage", stage: options.label });
+  await guard(response);
+}
+async function routerState() {
+  const n = ++sampleId,
+    got = router.wait("status" + n);
+  router.write({ kind: "status", n });
+  return guard(got);
+}
+// A separate process and PG pool keep the generator independent of 1,000
+// management sockets. Each group is committed before its notification.
+async function publishWakeBursts({ label, tenant, batches }) {
+  const result = await runLoad({
+    mode: "arrival",
+    rate: 171,
+    count: batches,
+    concurrency: 128,
+    signal: abort.signal,
+    work: async () => {
+      const ids = Array.from({ length: 7 }, () => randomUUID());
+      await db.query(
+        `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state)
+       select id,$2,id,1,id,'queue-only fixture','none','queued' from unnest($1::uuid[]) as id`,
+        [ids, tenant],
+      );
+      await db.query("select pg_notify('session_bench_directed',$1)", [
+        JSON.stringify({ label, count: ids.length }),
+      ]);
+      return { success: true };
+    },
+  });
+  assert.equal(result.results.filter((x) => x.success).length, batches);
+  assert.equal(result.dropped.length, 0);
+  return {
+    elapsedMs: Math.round(result.elapsedMs),
+    launchDelayMs: d(result.results.map((r) => r.generatorDelayMs)),
+  };
 }
 const intakeSql = `with admitted as (insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state)
  select $1,$2,$3,1+coalesce((select mailbox_position from runs where tenant_id=$2 and session_id=$3 order by mailbox_position desc limit 1),0),$4,$5,'local-load','queued'
@@ -274,20 +368,28 @@ const quietIntake = intakeSql.replace(",pg_notify('session_bench_work','')", "")
 let notifyJob,
   notifyGeneration = 0,
   wakeCount = 0;
-function notifyBatch() {
+function notifyBatch(directedStage) {
   notifyGeneration++;
   if (notifyJob) return;
+  let previous = notifyGeneration - 1;
   notifyJob = (async () => {
-    let sent;
-    do {
-      await delay(5);
-      sent = notifyGeneration;
-      await db.query("select pg_notify('session_bench_work','')");
-      wakeCount++;
-    } while (sent !== notifyGeneration);
-  })().finally(() => {
-    notifyJob = undefined;
-  });
+    try {
+      let sent;
+      do {
+        await delay(directedStage?.windowMs ?? 5);
+        sent = notifyGeneration;
+        if (directedStage)
+          await db.query("select pg_notify('session_bench_directed',$1)", [
+            JSON.stringify({ label: directedStage.label, count: sent - previous }),
+          ]);
+        else await db.query("select pg_notify('session_bench_work','')");
+        previous = sent;
+        wakeCount++;
+      } while (sent !== notifyGeneration);
+    } finally {
+      notifyJob = undefined;
+    }
+  })();
   void notifyJob.catch(fatal);
 }
 async function intake(e, sc = {}) {
@@ -314,6 +416,7 @@ async function intake(e, sc = {}) {
       if (!sc.omitNotify) wakeCount++;
       if (sc.wakeMode === "relay") for (const worker of workers) worker.write({ kind: "wake" });
       if (sc.wakeMode === "coalesced") notifyBatch();
+      if (sc === wakeStage) notifyBatch(sc);
       return rows[0].id;
     } catch (error) {
       if (
@@ -507,6 +610,28 @@ async function wave(spec) {
         const accepted = await intake(e, sc);
         assert.equal(accepted, id);
         e.acceptedAt = Date.now();
+        if ((sc.joinAfterAdmission || sc.restartRouter) && !transition) {
+          transition = (async () => {
+            await waitForWakeState(
+              async () => ({ accepted: [...entries.values()].filter((r) => r.acceptedAt).length }),
+              (s) => s.accepted === sc.count,
+            );
+            await notifyJob;
+            if (sc.restartRouter) {
+              router = await startActor(
+                "wake-runtime",
+                "wake-runtime",
+                router.pod,
+                String(router.ready.port),
+              );
+              await configureRouter(sc);
+              return;
+            }
+            await waitForWakeState(routerState, (s) => s.notifications > 0 && s.online === 0);
+            workers[1].write({ kind: "join" });
+          })();
+          void transition.catch(fatal);
+        }
         if (sc.idempotency) {
           const again = await intake({ ...e, id: randomUUID() }, sc);
           assert.equal(again, id);
@@ -529,6 +654,7 @@ async function wave(spec) {
     await observing;
   }
   await notifyJob;
+  await transition;
   const request = projector.wait("results" + sc.label);
   projector.write({ kind: "results", stage: sc.label });
   const projection = await guard(request, 40000);
@@ -546,8 +672,8 @@ async function wave(spec) {
       const n = ++sampleId,
         got = a.wait("metrics" + n);
       a.write({ kind: "metrics", n });
-      const { cpu, loop } = await guard(got);
-      return { worker: a.id, cpu, loop };
+      const { cpu, loop, claimStats } = await guard(got);
+      return { worker: a.id, cpu, loop, claimStats };
     }),
   );
   const peak = (key) => Math.max(0, ...samples.map((s) => s[key]));
@@ -566,6 +692,7 @@ async function wave(spec) {
     runsPerSecond: Math.round((complete / elapsed) * 100000) / 100,
     maxInFlight: load.maximumInFlight,
     submitToTerminalMs: d(items.map((i) => i.terminal.at - i.sentAt)),
+    ...(wakeStage ? { submitToClaimMs: d(items.map((i) => i.claimedAt - i.sentAt)) } : {}),
     admitMs: d(items.map((i) => i.acceptedAt - i.sentAt)),
     claimCallMs: d(items.map((i) => i.work.claimMs)),
     claimedWorkMs: d(items.map((i) => i.work.workMs)),
@@ -578,6 +705,7 @@ async function wave(spec) {
     extraInputConfirmedMs: d(items.flatMap((i) => i.work.inputAcks)),
     inputClientWaitMs: d(items.map((i) => i.work.clientAckWaitMs)),
     workerResources,
+    ...(wakeStage ? { router: await routerState() } : {}),
     wakeCount,
     admissionPoolMs: d(items.map((e) => e.admissionPoolMs)),
     admissionSqlMs: d(items.map((e) => e.admissionSqlMs)),
@@ -589,6 +717,16 @@ async function wave(spec) {
     claimDistribution: Object.fromEntries(
       workers.map((w) => [w.id, items.filter((i) => i.work.actor === w.id).length]),
     ),
+    ...(wakeStage
+      ? {
+          claimReasons: Object.fromEntries(
+            Object.entries(Object.groupBy(items, (i) => i.work.claimReason)).map(([key, list]) => [
+              key,
+              list.length,
+            ]),
+          ),
+        }
+      : {}),
     idleRechecks: items.reduce((a, i) => a + i.work.rechecks, 0),
     generatorDelayMs: d(load.results.map((r) => r.generatorDelayMs)),
     modelCalls: items.reduce((a, i) => a + i.work.modelCalls, 0),
@@ -607,6 +745,15 @@ async function wave(spec) {
     projection: projection.stats,
     verified,
   };
+  if (wakeStage) {
+    const stats = workerResources.flatMap((r) => r.claimStats ?? []);
+    assert.equal(
+      stats.reduce((n, s) => n + s.rows, 0),
+      complete,
+    );
+    assert(stats.every((s) => s.maximumRunning <= sc.slots && s.maximumBatch <= sc.batch));
+    assert.equal(result.router.notifications, sc.restartRouter ? 0 : wakeCount);
+  }
   if (result.endOfOffer)
     result.endOfOffer = { ...result.endOfOffer, at: Math.round(result.endOfOffer.at - start) };
   report.tests.push(result);
@@ -671,8 +818,11 @@ try {
     other = await db.connect();
   try {
     await c.query("begin");
-    assert.equal((await c.query(claimSql)).rows[0].id, keys[0]);
-    assert.equal((await other.query(claimSql)).rowCount, 0);
+    assert.deepEqual(
+      (await c.query(claimBatchSql, [8])).rows.map((r) => r.id),
+      [keys[0]],
+    );
+    assert.equal((await other.query(claimBatchSql, [8])).rowCount, 0);
     await c.query("commit");
     assert.equal((await other.query(claimSql)).rowCount, 0);
     await c.query("update runs set state='completed' where id=$1", [keys[0]]);
@@ -820,6 +970,25 @@ try {
     ])
       await wave({ label: "trace-" + report.tests.length, ...variant, count: 384 });
   }
+  if (mode.startsWith("wake")) {
+    const pod = podFor("session-runtime");
+    router = await startActor("wake-runtime", "wake-runtime", pod);
+    if (mode === "wake") {
+      network = wakeNetwork(pod, pods.slice(0, 2), router.ready.port, token);
+      wakeUrl = network.address + "/" + topic;
+      await runWakeTrials(wave);
+    } else {
+      await stopActors(workers);
+      report.population = {};
+      for (const label of ["directed-pop", "broadcast-pop", "directed-repeat"]) {
+        const result = router.wait("population" + label);
+        router.write({ kind: "population", stage: label });
+        report.population[label] = (await guard(result, 240000)).result;
+        console.log(JSON.stringify({ label, results: report.population[label] }));
+        await save();
+      }
+    }
+  }
 } catch (error) {
   report.error = String(error.stack ?? error).slice(0, 2600);
   throw error;
@@ -834,6 +1003,14 @@ try {
     await stopActors(projector ? [projector] : []);
   } catch (e) {
     cleanErrors.push(e);
+  }
+  if (network) {
+    try {
+      network.close();
+      report.wakePoliciesRemoved = true;
+    } catch (error) {
+      cleanErrors.push(error);
+    }
   }
   try {
     await db.end();

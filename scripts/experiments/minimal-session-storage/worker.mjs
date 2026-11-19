@@ -1,4 +1,5 @@
-import { answer, extraText, claimSql } from "./fixture.mjs";
+import { answer, extraText, claimSql, claimBatchSql } from "./fixture.mjs";
+import { connectClaimWorker } from "./wake-channel.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
@@ -39,7 +40,9 @@ let capacity = 0,
   awake = 0,
   sleeping = true,
   closed = false,
-  stage;
+  stage,
+  directed,
+  directedConfig;
 function wake() {
   awake++;
   sleeping = false;
@@ -79,9 +82,11 @@ notifications.on("notification", () => {
   if (stage?.wakeMode !== "relay") wake();
 });
 await notifications.query("listen session_bench_work");
-const poll = setInterval(wake, 250);
+const poll = setInterval(() => {
+  if (!directedConfig) wake();
+}, 250);
 poll.unref();
-async function execute(row, claimMs) {
+async function execute(row, claimMs, claimReason) {
   const started = performance.now(),
     sc = stage,
     id = row.id;
@@ -144,7 +149,7 @@ async function execute(row, claimMs) {
     }
   }
   active.set(id, { confirm, inspectRelease });
-  send("claim", { id, actor });
+  send("claim", { id, actor, at: Date.now() });
   async function publish(fact) {
     if (fact.kind === "durable_commit") {
       lastNative = fact;
@@ -196,6 +201,7 @@ async function execute(row, claimMs) {
       id,
       actor,
       claimMs,
+      claimReason,
       workMs: performance.now() - started,
       ackMs,
       finishAckMs,
@@ -445,20 +451,50 @@ async function execute(row, claimMs) {
   }
 }
 send("ready", { actor });
+function joinDirected() {
+  assert(directedConfig && !directed);
+  directed = connectClaimWorker({
+    url: directedConfig.wakeUrl,
+    id: actor,
+    stage: directedConfig,
+    slots: directedConfig.slots,
+    claim: async (limit) => (await pool.query(claimBatchSql, [limit])).rows,
+    execute,
+    fail,
+  });
+}
 listen(
   {
-    stage: (msg) => {
+    stage: async (msg) => {
       assert.equal(active.size, 0);
+      directed?.close();
+      capacity = 0;
+      while (claims || directed?.busy) await delay(2);
+      directed = undefined;
+      const previous = directedConfig;
+      directedConfig = msg.wakeUrl ? msg : undefined;
       stage = msg;
       cpuAt = process.cpuUsage();
       eluAt = performance.eventLoopUtilization();
-      capacity = msg.slots;
-      wake();
+      if (directedConfig) {
+        if (!previous) await notifications.query("unlisten session_bench_work");
+        if (!msg.offline?.includes(actor)) joinDirected();
+      } else {
+        if (previous) await notifications.query("listen session_bench_work");
+        capacity = msg.slots;
+        wake();
+      }
       send("configured", { stage: msg.stage });
+    },
+    join: () => joinDirected(),
+    drain: (m) => {
+      directed?.close();
+      send("draining", { n: m.n });
     },
     metrics: (msg) =>
       send("metrics", {
         n: msg.n,
+        claimStats: directed?.stats,
         cpu: process.cpuUsage(cpuAt),
         loop: performance.eventLoopUtilization(eluAt),
       }),
@@ -468,6 +504,7 @@ listen(
   },
   async () => {
     closed = true;
+    directed?.close();
     clearInterval(poll);
     for (const state of active.values()) state.inspectRelease.resolve();
     await producer.close();

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Directed Worker wake and batched claims](directed-worker-wake-20261119.md) measures the two-Pod Pi path and a 1,000-connection queue, including lost readiness and scale transitions.
+
 - [Minimal Session lifecycle load](minimal-session-storage-load-20261119.md) compares two business tables and Pi Inbox, independent completion, queue depth and the PG wake-up lock.
 
 - [Projector → PostgreSQL design and cost review](projector-pg-review-20261118.md) maps schema, SQL, staged write costs, read tradeoffs and two verified repairs.

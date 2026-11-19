@@ -1,0 +1,2191 @@
+{
+  "baseRevision": "8fa8ade1e9720b3ea3ff4565a974e4aa577acb41",
+  "sourceSha256": {
+    "run.mjs": "a07fe5c1f538250b3a5a23b30bf40b11f67677b222a3e7a7d7aa72d8e7597d20",
+    "wake-trials.mjs": "09cc5b44c58dba00dce5d623e4509b2ff48c5e39c2bab876b4b1f856ea8ac370",
+    "wake-channel.mjs": "5cc46c4b203240269e3a10d0ad7d7578eeb8fef191deb124935568fcd062874e",
+    "wake-runtime.mjs": "e693ab0a3affb9cca1fbec80027774ecce3074bbbaf0e072798d888cf8e5b5e5",
+    "wake-population.mjs": "65d58bcaf098bf131610e0c382160a8957e9402c4beee11e452a0f7daa175651",
+    "worker.mjs": "d1a5058b6d3debd903debc09202508800afa40dcd8af043865fa2dbebce6dd6c",
+    "projector.mjs": "6668c327af00135c8bf7120e373040344e2ef09fe1890d526c3454ebb3dfeb11",
+    "fixture.mjs": "5ac844941cc08e7e9166dafe4f50684ee792b176ef782b33ac6ddaf3603bce70",
+    "actor.mjs": "69c69af6abc9d19662f471eea0733b3388b4319b72849cdb8ff02d91e222a194",
+    "schema.sql": "f3f3237179cab962965b38d5660f4f34cf37845b12ef218f97362e211a5fecc3"
+  },
+  "actorBundleSha256": {
+    "worker": "03bdae99044d7e789e08835352453098f7da7bbfc18bbfe009df03f98d4f378b",
+    "projector": "03fc2f2119ec9451d059b9408e455080d4b7abfc1931ab2483716428d9896a6d",
+    "wake-runtime": "aec07b9d45eab647c77aea6696f854034552747d91ae2950fc7bfca64013f9cc"
+  },
+  "postgres": {
+    "postgres": "17.6",
+    "synchronous_commit": "on",
+    "fsync": "on"
+  },
+  "managedWorkerPods": 2,
+  "kafkaPartitions": 32,
+  "replicationFactor": 3,
+  "fleet": {
+    "virtualWorkers": 1000,
+    "sockets": "loopback WebSocket",
+    "claimAndCompletionPoolMax": 12,
+    "poolConnectionsReservedForListen": 1,
+    "runArrivalPerNotification": 7,
+    "targetNotificationsPerSecond": 171,
+    "nativePiAndKafka": false
+  },
+  "managed": [
+    {
+      "label": "fault-lost-notification",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 127,
+        "joins": 1,
+        "offers": 3,
+        "arrival": 0,
+        "tick": 2,
+        "unlistedTicks": 0,
+        "notifications": 1,
+        "faults": 1,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 3,
+      "emptyClaims": 2,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "tick": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 200,
+        "p95": 200,
+        "p99": 200,
+        "max": 200,
+        "min": 200
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 204,
+        "p95": 204,
+        "p99": 204,
+        "max": 204,
+        "min": 204
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 279,
+        "p95": 279,
+        "p99": 279,
+        "max": 279,
+        "min": 279
+      },
+      "runPerSec": 3.56,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "fault-lost-wake",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 135,
+        "joins": 1,
+        "offers": 2,
+        "arrival": 0,
+        "tick": 1,
+        "unlistedTicks": 1,
+        "notifications": 1,
+        "faults": 1,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 2,
+      "emptyClaims": 1,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "tick": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 199,
+        "p95": 199,
+        "p99": 199,
+        "max": 199,
+        "min": 199
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 205,
+        "p95": 205,
+        "p99": 205,
+        "max": 205,
+        "min": 205
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 264,
+        "p95": 264,
+        "p99": 264,
+        "max": 264,
+        "min": 264
+      },
+      "runPerSec": 3.77,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "fault-lost-ready",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 143,
+        "joins": 1,
+        "offers": 3,
+        "arrival": 1,
+        "tick": 1,
+        "unlistedTicks": 1,
+        "notifications": 1,
+        "faults": 1,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 3,
+      "emptyClaims": 2,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "tick": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 198,
+        "p95": 198,
+        "p99": 198,
+        "max": 198,
+        "min": 198
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 203,
+        "p95": 203,
+        "p99": 203,
+        "max": 203,
+        "min": 203
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 259,
+        "p95": 259,
+        "p99": 259,
+        "max": 259,
+        "min": 259
+      },
+      "runPerSec": 3.82,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "fault-disconnect",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 150,
+        "joins": 2,
+        "offers": 3,
+        "arrival": 0,
+        "tick": 1,
+        "unlistedTicks": 0,
+        "notifications": 1,
+        "faults": 1,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 3,
+      "emptyClaims": 2,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "bootstrap": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 108,
+        "p95": 108,
+        "p99": 108,
+        "max": 108,
+        "min": 108
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 113,
+        "p95": 113,
+        "p99": 113,
+        "max": 113,
+        "min": 113
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 191,
+        "p95": 191,
+        "p99": 191,
+        "max": 191,
+        "min": 191
+      },
+      "runPerSec": 5.19,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "listed-only-lost-wake",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": false,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 171,
+        "joins": 1,
+        "offers": 3,
+        "arrival": 0,
+        "tick": 1,
+        "unlistedTicks": 0,
+        "notifications": 1,
+        "faults": 1,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 2,
+      "emptyClaims": 1,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "tick": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 3802,
+        "p95": 3802,
+        "p99": 3802,
+        "max": 3802,
+        "min": 3802
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 3808,
+        "p95": 3808,
+        "p99": 3808,
+        "max": 3808,
+        "min": 3808
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 3865,
+        "p95": 3865,
+        "p99": 3865,
+        "max": 3865,
+        "min": 3865
+      },
+      "runPerSec": 0.26,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "listed-only-lost-ready",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": false,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 192,
+        "joins": 1,
+        "offers": 4,
+        "arrival": 1,
+        "tick": 1,
+        "unlistedTicks": 0,
+        "notifications": 1,
+        "faults": 1,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 3,
+      "emptyClaims": 2,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "arrival": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 3698,
+        "p95": 3698,
+        "p99": 3698,
+        "max": 3698,
+        "min": 3698
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 3702,
+        "p95": 3702,
+        "p99": 3702,
+        "max": 3702,
+        "min": 3702
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 3745,
+        "p95": 3745,
+        "p99": 3745,
+        "max": 3745,
+        "min": 3745
+      },
+      "runPerSec": 0.27,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "no-check-while-full",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 1,
+      "dropped": 0,
+      "concurrency": 1,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 201,
+        "joins": 1,
+        "offers": 3,
+        "arrival": 1,
+        "tick": 5,
+        "unlistedTicks": 4,
+        "notifications": 1,
+        "faults": 0,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 4,
+      "emptyClaims": 3,
+      "maxBatch": 1,
+      "ignoredWhileFull": 4,
+      "share": {
+        "w0": 1,
+        "w1": 0
+      },
+      "claimReasons": {
+        "arrival": 1
+      },
+      "queueMs": {
+        "count": 1,
+        "p50": 11,
+        "p95": 11,
+        "p99": 11,
+        "max": 11,
+        "min": 11
+      },
+      "submitToClaimMs": {
+        "count": 1,
+        "p50": 17,
+        "p95": 17,
+        "p99": 17,
+        "max": 17,
+        "min": 17
+      },
+      "submitToTerminalMs": {
+        "count": 1,
+        "p50": 914,
+        "p95": 914,
+        "p99": 914,
+        "max": 914,
+        "min": 914
+      },
+      "runPerSec": 1.09,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "scale-after-enqueue",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 8,
+      "dropped": 0,
+      "concurrency": 8,
+      "notifications": 3,
+      "router": {
+        "kind": "status",
+        "n": 207,
+        "joins": 1,
+        "offers": 3,
+        "arrival": 1,
+        "tick": 1,
+        "unlistedTicks": 0,
+        "notifications": 3,
+        "faults": 0,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 4,
+      "emptyClaims": 3,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 0,
+        "w1": 8
+      },
+      "claimReasons": {
+        "bootstrap": 8
+      },
+      "queueMs": {
+        "count": 8,
+        "p50": 48,
+        "p95": 66,
+        "p99": 66,
+        "max": 66,
+        "min": 47
+      },
+      "submitToClaimMs": {
+        "count": 8,
+        "p50": 74,
+        "p95": 74,
+        "p99": 74,
+        "max": 74,
+        "min": 73
+      },
+      "submitToTerminalMs": {
+        "count": 8,
+        "p50": 177,
+        "p95": 199,
+        "p99": 199,
+        "max": 199,
+        "min": 154
+      },
+      "runPerSec": 39.89,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "runtime-restart",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 8,
+      "dropped": 0,
+      "concurrency": 8,
+      "notifications": 1,
+      "router": {
+        "kind": "status",
+        "n": 215,
+        "joins": 2,
+        "offers": 2,
+        "arrival": 0,
+        "tick": 0,
+        "unlistedTicks": 0,
+        "notifications": 0,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 5,
+      "emptyClaims": 4,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 8,
+        "w1": 0
+      },
+      "claimReasons": {
+        "bootstrap": 8
+      },
+      "queueMs": {
+        "count": 8,
+        "p50": 643,
+        "p95": 644,
+        "p99": 644,
+        "max": 644,
+        "min": 642
+      },
+      "submitToClaimMs": {
+        "count": 8,
+        "p50": 652,
+        "p95": 652,
+        "p99": 652,
+        "max": 652,
+        "min": 651
+      },
+      "submitToTerminalMs": {
+        "count": 8,
+        "p50": 739,
+        "p95": 749,
+        "p99": 749,
+        "max": 749,
+        "min": 722
+      },
+      "runPerSec": 10.65,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "scale-in-busy",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 16,
+      "dropped": 0,
+      "concurrency": 16,
+      "notifications": 4,
+      "router": {
+        "kind": "status",
+        "n": 228,
+        "joins": 2,
+        "offers": 4,
+        "arrival": 2,
+        "tick": 9,
+        "unlistedTicks": 8,
+        "notifications": 4,
+        "faults": 0,
+        "online": 1,
+        "waiting": 1
+      },
+      "claimQueries": 18,
+      "emptyClaims": 4,
+      "maxBatch": 2,
+      "ignoredWhileFull": 8,
+      "share": {
+        "w0": 2,
+        "w1": 14
+      },
+      "claimReasons": {
+        "arrival": 2,
+        "bootstrap": 2,
+        "freed-slot": 11,
+        "drain": 1
+      },
+      "queueMs": {
+        "count": 16,
+        "p50": 538,
+        "p95": 1523,
+        "p99": 1523,
+        "max": 1523,
+        "min": 12
+      },
+      "submitToClaimMs": {
+        "count": 16,
+        "p50": 545,
+        "p95": 1551,
+        "p99": 1551,
+        "max": 1551,
+        "min": 19
+      },
+      "submitToTerminalMs": {
+        "count": 16,
+        "p50": 832,
+        "p95": 1796,
+        "p99": 1796,
+        "max": 1796,
+        "min": 277
+      },
+      "runPerSec": 8.9,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-0",
+      "variant": "broadcast",
+      "batch": 1,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 205,
+      "router": {
+        "kind": "status",
+        "n": 246,
+        "joins": 2,
+        "offers": 74,
+        "arrival": 410,
+        "tick": 18,
+        "unlistedTicks": 13,
+        "notifications": 205,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 472,
+      "emptyClaims": 88,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 191,
+        "w1": 193
+      },
+      "claimReasons": {
+        "arrival": 271,
+        "drain": 101,
+        "tick": 12
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 21,
+        "p95": 316,
+        "p99": 394,
+        "max": 411,
+        "min": 5
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 32,
+        "p95": 339,
+        "p99": 432,
+        "max": 454,
+        "min": 12
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 545,
+        "p95": 847,
+        "p99": 971,
+        "max": 1012,
+        "min": 114
+      },
+      "runPerSec": 111.66,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-1",
+      "variant": "directed",
+      "batch": 1,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 193,
+      "router": {
+        "kind": "status",
+        "n": 264,
+        "joins": 2,
+        "offers": 101,
+        "arrival": 94,
+        "tick": 18,
+        "unlistedTicks": 13,
+        "notifications": 193,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 489,
+      "emptyClaims": 105,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 195,
+        "w1": 189
+      },
+      "claimReasons": {
+        "arrival": 64,
+        "drain": 312,
+        "tick": 8
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 20,
+        "p95": 275,
+        "p99": 332,
+        "max": 351,
+        "min": 5
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 29,
+        "p95": 294,
+        "p99": 377,
+        "max": 400,
+        "min": 13
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 527,
+        "p95": 849,
+        "p99": 1079,
+        "max": 1101,
+        "min": 105
+      },
+      "runPerSec": 113.14,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-2",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 182,
+      "router": {
+        "kind": "status",
+        "n": 280,
+        "joins": 2,
+        "offers": 191,
+        "arrival": 178,
+        "tick": 15,
+        "unlistedTicks": 4,
+        "notifications": 182,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 203,
+      "emptyClaims": 54,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 177,
+        "w1": 207
+      },
+      "claimReasons": {
+        "arrival": 323,
+        "drain": 48,
+        "tick": 13
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 16,
+        "p95": 41,
+        "p99": 44,
+        "max": 48,
+        "min": 4
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 26,
+        "p95": 67,
+        "p99": 110,
+        "max": 111,
+        "min": 11
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 448,
+        "p95": 671,
+        "p99": 741,
+        "max": 755,
+        "min": 215
+      },
+      "runPerSec": 130.95,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-3",
+      "variant": "broadcast",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 190,
+      "router": {
+        "kind": "status",
+        "n": 295,
+        "joins": 2,
+        "offers": 191,
+        "arrival": 380,
+        "tick": 15,
+        "unlistedTicks": 7,
+        "notifications": 190,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 376,
+      "emptyClaims": 164,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 188,
+        "w1": 196
+      },
+      "claimReasons": {
+        "arrival": 346,
+        "drain": 32,
+        "tick": 6
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 14,
+        "p95": 38,
+        "p99": 45,
+        "max": 47,
+        "min": 5
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 23,
+        "p95": 69,
+        "p99": 89,
+        "max": 90,
+        "min": 12
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 472,
+        "p95": 697,
+        "p99": 811,
+        "max": 850,
+        "min": 163
+      },
+      "runPerSec": 129.83,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-4",
+      "variant": "broadcast",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 184,
+      "router": {
+        "kind": "status",
+        "n": 311,
+        "joins": 2,
+        "offers": 180,
+        "arrival": 368,
+        "tick": 15,
+        "unlistedTicks": 6,
+        "notifications": 184,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 355,
+      "emptyClaims": 159,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 173,
+        "w1": 211
+      },
+      "claimReasons": {
+        "arrival": 366,
+        "drain": 16,
+        "tick": 2
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 14,
+        "p95": 35,
+        "p99": 45,
+        "max": 46,
+        "min": 5
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 24,
+        "p95": 65,
+        "p99": 79,
+        "max": 79,
+        "min": 11
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 421,
+        "p95": 652,
+        "p99": 780,
+        "max": 823,
+        "min": 149
+      },
+      "runPerSec": 139.75,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-5",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 193,
+      "router": {
+        "kind": "status",
+        "n": 328,
+        "joins": 2,
+        "offers": 211,
+        "arrival": 193,
+        "tick": 17,
+        "unlistedTicks": 1,
+        "notifications": 193,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 220,
+      "emptyClaims": 53,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 188,
+        "w1": 196
+      },
+      "claimReasons": {
+        "arrival": 330,
+        "drain": 48,
+        "tick": 6
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 16,
+        "p95": 41,
+        "p99": 45,
+        "max": 45,
+        "min": 5
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 27,
+        "p95": 68,
+        "p99": 80,
+        "max": 80,
+        "min": 12
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 481,
+        "p95": 769,
+        "p99": 878,
+        "max": 913,
+        "min": 167
+      },
+      "runPerSec": 117.36,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-6",
+      "variant": "directed",
+      "batch": 1,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 196,
+      "router": {
+        "kind": "status",
+        "n": 346,
+        "joins": 2,
+        "offers": 96,
+        "arrival": 88,
+        "tick": 18,
+        "unlistedTicks": 12,
+        "notifications": 196,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 483,
+      "emptyClaims": 99,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 195,
+        "w1": 189
+      },
+      "claimReasons": {
+        "arrival": 58,
+        "drain": 316,
+        "tick": 10
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 23,
+        "p95": 308,
+        "p99": 371,
+        "max": 410,
+        "min": 4
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 33,
+        "p95": 328,
+        "p99": 435,
+        "max": 451,
+        "min": 10
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 524,
+        "p95": 819,
+        "p99": 894,
+        "max": 913,
+        "min": 114
+      },
+      "runPerSec": 115.01,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-7",
+      "variant": "broadcast",
+      "batch": 1,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 190,
+      "router": {
+        "kind": "status",
+        "n": 361,
+        "joins": 2,
+        "offers": 50,
+        "arrival": 380,
+        "tick": 15,
+        "unlistedTicks": 8,
+        "notifications": 190,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 438,
+      "emptyClaims": 54,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 190,
+        "w1": 194
+      },
+      "claimReasons": {
+        "arrival": 283,
+        "drain": 93,
+        "tick": 8
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 32,
+        "p95": 235,
+        "p99": 273,
+        "max": 288,
+        "min": 5
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 44,
+        "p95": 249,
+        "p99": 312,
+        "max": 332,
+        "min": 14
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 436,
+        "p95": 674,
+        "p99": 803,
+        "max": 918,
+        "min": 87
+      },
+      "runPerSec": 137.57,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "steady-0",
+      "variant": "broadcast",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 90,
+      "completed": 900,
+      "dropped": 0,
+      "concurrency": 192,
+      "notifications": 894,
+      "router": {
+        "kind": "status",
+        "n": 404,
+        "joins": 2,
+        "offers": 1713,
+        "arrival": 1788,
+        "tick": 51,
+        "unlistedTicks": 14,
+        "notifications": 894,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 1837,
+      "emptyClaims": 973,
+      "maxBatch": 2,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 437,
+        "w1": 463
+      },
+      "claimReasons": {
+        "arrival": 866,
+        "tick": 34
+      },
+      "queueMs": {
+        "count": 900,
+        "p50": 12,
+        "p95": 16,
+        "p99": 19,
+        "max": 25,
+        "min": 2
+      },
+      "submitToClaimMs": {
+        "count": 900,
+        "p50": 18,
+        "p95": 26,
+        "p99": 29,
+        "max": 39,
+        "min": 5
+      },
+      "submitToTerminalMs": {
+        "count": 900,
+        "p50": 77,
+        "p95": 107,
+        "p99": 122,
+        "max": 143,
+        "min": 46
+      },
+      "runPerSec": 89.61,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "steady-1",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 90,
+      "completed": 900,
+      "dropped": 0,
+      "concurrency": 192,
+      "notifications": 892,
+      "router": {
+        "kind": "status",
+        "n": 449,
+        "joins": 2,
+        "offers": 945,
+        "arrival": 892,
+        "tick": 51,
+        "unlistedTicks": 0,
+        "notifications": 892,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 945,
+      "emptyClaims": 70,
+      "maxBatch": 2,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 450,
+        "w1": 450
+      },
+      "claimReasons": {
+        "arrival": 876,
+        "tick": 24
+      },
+      "queueMs": {
+        "count": 900,
+        "p50": 11,
+        "p95": 14,
+        "p99": 16,
+        "max": 22,
+        "min": 1
+      },
+      "submitToClaimMs": {
+        "count": 900,
+        "p50": 15,
+        "p95": 20,
+        "p99": 25,
+        "max": 30,
+        "min": 4
+      },
+      "submitToTerminalMs": {
+        "count": 900,
+        "p50": 60,
+        "p95": 74,
+        "p99": 82,
+        "max": 89,
+        "min": 45
+      },
+      "runPerSec": 89.58,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "steady-2",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 90,
+      "completed": 900,
+      "dropped": 0,
+      "concurrency": 192,
+      "notifications": 894,
+      "router": {
+        "kind": "status",
+        "n": 494,
+        "joins": 2,
+        "offers": 947,
+        "arrival": 894,
+        "tick": 51,
+        "unlistedTicks": 0,
+        "notifications": 894,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 947,
+      "emptyClaims": 68,
+      "maxBatch": 2,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 448,
+        "w1": 452
+      },
+      "claimReasons": {
+        "arrival": 871,
+        "tick": 29
+      },
+      "queueMs": {
+        "count": 900,
+        "p50": 11,
+        "p95": 14,
+        "p99": 18,
+        "max": 25,
+        "min": 3
+      },
+      "submitToClaimMs": {
+        "count": 900,
+        "p50": 17,
+        "p95": 21,
+        "p99": 25,
+        "max": 32,
+        "min": 7
+      },
+      "submitToTerminalMs": {
+        "count": 900,
+        "p50": 62,
+        "p95": 77,
+        "p99": 84,
+        "max": 92,
+        "min": 48
+      },
+      "runPerSec": 89.56,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "steady-3",
+      "variant": "broadcast",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 90,
+      "completed": 900,
+      "dropped": 0,
+      "concurrency": 192,
+      "notifications": 866,
+      "router": {
+        "kind": "status",
+        "n": 539,
+        "joins": 2,
+        "offers": 1726,
+        "arrival": 1732,
+        "tick": 51,
+        "unlistedTicks": 11,
+        "notifications": 866,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 1785,
+      "emptyClaims": 918,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 484,
+        "w1": 416
+      },
+      "claimReasons": {
+        "arrival": 869,
+        "tick": 31
+      },
+      "queueMs": {
+        "count": 900,
+        "p50": 11,
+        "p95": 15,
+        "p99": 171,
+        "max": 279,
+        "min": 2
+      },
+      "submitToClaimMs": {
+        "count": 900,
+        "p50": 17,
+        "p95": 24,
+        "p99": 199,
+        "max": 287,
+        "min": 7
+      },
+      "submitToTerminalMs": {
+        "count": 900,
+        "p50": 63,
+        "p95": 89,
+        "p99": 327,
+        "max": 390,
+        "min": 46
+      },
+      "runPerSec": 89.59,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "sparse-window-0",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 20,
+      "completed": 100,
+      "dropped": 0,
+      "concurrency": 32,
+      "notifications": 100,
+      "router": {
+        "kind": "status",
+        "n": 563,
+        "joins": 2,
+        "offers": 127,
+        "arrival": 100,
+        "tick": 25,
+        "unlistedTicks": 0,
+        "notifications": 100,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 127,
+      "emptyClaims": 27,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 50,
+        "w1": 50
+      },
+      "claimReasons": {
+        "arrival": 100
+      },
+      "queueMs": {
+        "count": 100,
+        "p50": 10,
+        "p95": 15,
+        "p99": 18,
+        "max": 20,
+        "min": 8
+      },
+      "submitToClaimMs": {
+        "count": 100,
+        "p50": 14,
+        "p95": 19,
+        "p99": 25,
+        "max": 25,
+        "min": 12
+      },
+      "submitToTerminalMs": {
+        "count": 100,
+        "p50": 56,
+        "p95": 74,
+        "p99": 82,
+        "max": 92,
+        "min": 48
+      },
+      "runPerSec": 19.98,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-window-0",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 110,
+      "router": {
+        "kind": "status",
+        "n": 573,
+        "joins": 2,
+        "offers": 119,
+        "arrival": 111,
+        "tick": 6,
+        "unlistedTicks": 0,
+        "notifications": 110,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 129,
+      "emptyClaims": 16,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 187,
+        "w1": 197
+      },
+      "claimReasons": {
+        "arrival": 329,
+        "drain": 49,
+        "tick": 6
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 10,
+        "p95": 30,
+        "p99": 31,
+        "max": 32,
+        "min": 4
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 17,
+        "p95": 54,
+        "p99": 64,
+        "max": 64,
+        "min": 10
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 171,
+        "p95": 254,
+        "p99": 286,
+        "max": 309,
+        "min": 94
+      },
+      "runPerSec": 338.54,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "sparse-window-1",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 20,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 20,
+      "completed": 100,
+      "dropped": 0,
+      "concurrency": 32,
+      "notifications": 100,
+      "router": {
+        "kind": "status",
+        "n": 598,
+        "joins": 2,
+        "offers": 127,
+        "arrival": 100,
+        "tick": 25,
+        "unlistedTicks": 0,
+        "notifications": 100,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 127,
+      "emptyClaims": 27,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 50,
+        "w1": 50
+      },
+      "claimReasons": {
+        "arrival": 100
+      },
+      "queueMs": {
+        "count": 100,
+        "p50": 25,
+        "p95": 26,
+        "p99": 28,
+        "max": 29,
+        "min": 23
+      },
+      "submitToClaimMs": {
+        "count": 100,
+        "p50": 29,
+        "p95": 33,
+        "p99": 36,
+        "max": 40,
+        "min": 26
+      },
+      "submitToTerminalMs": {
+        "count": 100,
+        "p50": 70,
+        "p95": 84,
+        "p99": 96,
+        "max": 98,
+        "min": 64
+      },
+      "runPerSec": 19.93,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-window-1",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 20,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 36,
+      "router": {
+        "kind": "status",
+        "n": 608,
+        "joins": 2,
+        "offers": 69,
+        "arrival": 61,
+        "tick": 6,
+        "unlistedTicks": 0,
+        "notifications": 36,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 93,
+      "emptyClaims": 17,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 191,
+        "w1": 193
+      },
+      "claimReasons": {
+        "arrival": 275,
+        "drain": 82,
+        "freed-slot": 1,
+        "tick": 26
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 15,
+        "p95": 31,
+        "p99": 35,
+        "max": 35,
+        "min": 4
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 23,
+        "p95": 54,
+        "p99": 64,
+        "max": 65,
+        "min": 11
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 170,
+        "p95": 244,
+        "p99": 279,
+        "max": 292,
+        "min": 100
+      },
+      "runPerSec": 341.24,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "sparse-window-2",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 20,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 20,
+      "completed": 100,
+      "dropped": 0,
+      "concurrency": 32,
+      "notifications": 100,
+      "router": {
+        "kind": "status",
+        "n": 632,
+        "joins": 2,
+        "offers": 127,
+        "arrival": 100,
+        "tick": 25,
+        "unlistedTicks": 0,
+        "notifications": 100,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 127,
+      "emptyClaims": 27,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 50,
+        "w1": 50
+      },
+      "claimReasons": {
+        "arrival": 100
+      },
+      "queueMs": {
+        "count": 100,
+        "p50": 25,
+        "p95": 27,
+        "p99": 28,
+        "max": 29,
+        "min": 24
+      },
+      "submitToClaimMs": {
+        "count": 100,
+        "p50": 29,
+        "p95": 32,
+        "p99": 34,
+        "max": 34,
+        "min": 27
+      },
+      "submitToTerminalMs": {
+        "count": 100,
+        "p50": 70,
+        "p95": 89,
+        "p99": 97,
+        "max": 98,
+        "min": 64
+      },
+      "runPerSec": 19.92,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-window-2",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 20,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 39,
+      "router": {
+        "kind": "status",
+        "n": 642,
+        "joins": 2,
+        "offers": 61,
+        "arrival": 55,
+        "tick": 6,
+        "unlistedTicks": 2,
+        "notifications": 39,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 92,
+      "emptyClaims": 16,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 208,
+        "w1": 176
+      },
+      "claimReasons": {
+        "arrival": 250,
+        "drain": 105,
+        "tick": 29
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 14,
+        "p95": 30,
+        "p99": 32,
+        "max": 33,
+        "min": 4
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 22,
+        "p95": 51,
+        "p99": 61,
+        "max": 61,
+        "min": 10
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 179,
+        "p95": 233,
+        "p99": 250,
+        "max": 265,
+        "min": 96
+      },
+      "runPerSec": 335.8,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "sparse-window-3",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": 20,
+      "completed": 100,
+      "dropped": 0,
+      "concurrency": 32,
+      "notifications": 100,
+      "router": {
+        "kind": "status",
+        "n": 667,
+        "joins": 2,
+        "offers": 127,
+        "arrival": 100,
+        "tick": 25,
+        "unlistedTicks": 0,
+        "notifications": 100,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 127,
+      "emptyClaims": 27,
+      "maxBatch": 1,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 50,
+        "w1": 50
+      },
+      "claimReasons": {
+        "arrival": 100
+      },
+      "queueMs": {
+        "count": 100,
+        "p50": 10,
+        "p95": 13,
+        "p99": 15,
+        "max": 15,
+        "min": 8
+      },
+      "submitToClaimMs": {
+        "count": 100,
+        "p50": 15,
+        "p95": 21,
+        "p99": 24,
+        "max": 26,
+        "min": 12
+      },
+      "submitToTerminalMs": {
+        "count": 100,
+        "p50": 57,
+        "p95": 81,
+        "p99": 101,
+        "max": 114,
+        "min": 50
+      },
+      "runPerSec": 19.9,
+      "endKafkaLag": 0
+    },
+    {
+      "label": "burst-window-3",
+      "variant": "directed",
+      "batch": 8,
+      "coalesceMs": 5,
+      "tickMs": 200,
+      "probeUnlisted": true,
+      "offeredRate": null,
+      "completed": 384,
+      "dropped": 0,
+      "concurrency": 64,
+      "notifications": 181,
+      "router": {
+        "kind": "status",
+        "n": 685,
+        "joins": 2,
+        "offers": 196,
+        "arrival": 179,
+        "tick": 18,
+        "unlistedTicks": 4,
+        "notifications": 181,
+        "faults": 0,
+        "online": 2,
+        "waiting": 2
+      },
+      "claimQueries": 207,
+      "emptyClaims": 53,
+      "maxBatch": 8,
+      "ignoredWhileFull": 0,
+      "share": {
+        "w0": 190,
+        "w1": 194
+      },
+      "claimReasons": {
+        "arrival": 327,
+        "drain": 48,
+        "tick": 9
+      },
+      "queueMs": {
+        "count": 384,
+        "p50": 18,
+        "p95": 41,
+        "p99": 43,
+        "max": 43,
+        "min": 7
+      },
+      "submitToClaimMs": {
+        "count": 384,
+        "p50": 29,
+        "p95": 73,
+        "p99": 87,
+        "max": 87,
+        "min": 14
+      },
+      "submitToTerminalMs": {
+        "count": 384,
+        "p50": 517,
+        "p95": 759,
+        "p99": 838,
+        "max": 944,
+        "min": 210
+      },
+      "runPerSec": 114.74,
+      "endKafkaLag": 0
+    }
+  ],
+  "population": {
+    "directed-pop": [
+      {
+        "name": "single",
+        "connections": 1000,
+        "batches": 1,
+        "claimed": 7,
+        "queries": 1,
+        "empty": 0,
+        "rows": 7,
+        "arrival": 1,
+        "tick": 0,
+        "maxPoolWait": 0,
+        "publishing": {
+          "elapsedMs": 6,
+          "launchDelayMs": {
+            "count": 1,
+            "p50": 0.01,
+            "p95": 0.01,
+            "p99": 0.01,
+            "max": 0.01,
+            "min": 0.01
+          }
+        },
+        "completeMs": 32,
+        "queueMs": {
+          "count": 7,
+          "p50": 8,
+          "p95": 8,
+          "p99": 8,
+          "max": 8
+        }
+      },
+      {
+        "name": "arrival",
+        "connections": 1000,
+        "batches": 171,
+        "claimed": 1197,
+        "queries": 219,
+        "empty": 27,
+        "rows": 1197,
+        "arrival": 171,
+        "tick": 5,
+        "maxPoolWait": 5,
+        "publishing": {
+          "elapsedMs": 1001,
+          "launchDelayMs": {
+            "count": 171,
+            "p50": 0,
+            "p95": 0.59,
+            "p99": 0.92,
+            "max": 0.96,
+            "min": 0
+          }
+        },
+        "completeMs": 1026,
+        "queueMs": {
+          "count": 1197,
+          "p50": 8,
+          "p95": 12,
+          "p99": 14,
+          "max": 15
+        }
+      }
+    ],
+    "broadcast-pop": [
+      {
+        "name": "single",
+        "connections": 1000,
+        "batches": 1,
+        "claimed": 7,
+        "queries": 1001,
+        "empty": 998,
+        "rows": 7,
+        "arrival": 1000,
+        "tick": 1,
+        "maxPoolWait": 985,
+        "publishing": {
+          "elapsedMs": 6,
+          "launchDelayMs": {
+            "count": 1,
+            "p50": 0.01,
+            "p95": 0.01,
+            "p99": 0.01,
+            "max": 0.01,
+            "min": 0.01
+          }
+        },
+        "completeMs": 311,
+        "queueMs": {
+          "count": 7,
+          "p50": 24,
+          "p95": 24,
+          "p99": 24,
+          "max": 24
+        }
+      },
+      {
+        "name": "arrival",
+        "connections": 1000,
+        "batches": 171,
+        "claimed": 1197,
+        "queries": 2005,
+        "empty": 1855,
+        "rows": 1197,
+        "arrival": 171000,
+        "tick": 10,
+        "maxPoolWait": 2038,
+        "publishing": {
+          "elapsedMs": 997,
+          "launchDelayMs": {
+            "count": 171,
+            "p50": 0,
+            "p95": 0.6,
+            "p99": 0.82,
+            "max": 0.86,
+            "min": 0
+          }
+        },
+        "completeMs": 3995,
+        "queueMs": {
+          "count": 1197,
+          "p50": 2466,
+          "p95": 2802,
+          "p99": 2830,
+          "max": 2842
+        }
+      }
+    ],
+    "directed-repeat": [
+      {
+        "name": "single",
+        "connections": 1000,
+        "batches": 1,
+        "claimed": 7,
+        "queries": 1,
+        "empty": 0,
+        "rows": 7,
+        "arrival": 1,
+        "tick": 0,
+        "maxPoolWait": 0,
+        "publishing": {
+          "elapsedMs": 5,
+          "launchDelayMs": {
+            "count": 1,
+            "p50": 0.01,
+            "p95": 0.01,
+            "p99": 0.01,
+            "max": 0.01,
+            "min": 0.01
+          }
+        },
+        "completeMs": 31,
+        "queueMs": {
+          "count": 7,
+          "p50": 6,
+          "p95": 7,
+          "p99": 7,
+          "max": 7
+        }
+      },
+      {
+        "name": "arrival",
+        "connections": 1000,
+        "batches": 171,
+        "claimed": 1197,
+        "queries": 242,
+        "empty": 36,
+        "rows": 1197,
+        "arrival": 171,
+        "tick": 5,
+        "maxPoolWait": 10,
+        "publishing": {
+          "elapsedMs": 1001,
+          "launchDelayMs": {
+            "count": 171,
+            "p50": 0,
+            "p95": 0.25,
+            "p99": 0.31,
+            "max": 0.51,
+            "min": 0
+          }
+        },
+        "completeMs": 1025,
+        "queueMs": {
+          "count": 1197,
+          "p50": 8,
+          "p95": 13,
+          "p99": 16,
+          "max": 17
+        }
+      },
+      {
+        "name": "steady-30s",
+        "connections": 1000,
+        "batches": 5130,
+        "claimed": 35910,
+        "queries": 7470,
+        "empty": 1013,
+        "rows": 35910,
+        "arrival": 5130,
+        "tick": 150,
+        "maxPoolWait": 29,
+        "publishing": {
+          "elapsedMs": 29998,
+          "launchDelayMs": {
+            "count": 5130,
+            "p50": 0,
+            "p95": 0.45,
+            "p99": 0.76,
+            "max": 1.54,
+            "min": 0
+          }
+        },
+        "completeMs": 30027,
+        "queueMs": {
+          "count": 35910,
+          "p50": 8,
+          "p95": 14,
+          "p99": 18,
+          "max": 30
+        }
+      }
+    ]
+  },
+  "cleanup": {
+    "podRun": true,
+    "fleetRun": true,
+    "temporaryPoliciesRemoved": true
+  }
+}

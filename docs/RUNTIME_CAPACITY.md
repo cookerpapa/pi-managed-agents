@@ -2,6 +2,8 @@
 
 The isolated [minimal Session lifecycle workload](../scripts/experiments/minimal-session-storage/README.md) exercises two tables, one Inbox per Conversation and the ordered end marker. [Measurement](reports/minimal-session-storage-load-20261119.md).
 
+The [directed Worker wake experiment](reports/directed-worker-wake-20261119.md) compares PG claim queries, empty checks, queue delay and lost notifications. It distinguishes the two-Pod native execution measurements from the 1,000-connection queue load.
+
 Issue #42 / [ADR-0326](adr/0326-runtime-capacity-benchmarks.md) measures the real
 Pi/Worker/CLIProxyAPI/Kafka/Projector/PG/SSE path with a deterministic provider.
 It measures this deployment's response to declared workloads, not model quality,
