@@ -6,6 +6,17 @@ The original storage controls use fresh physical Sessions. The `wake-throughput`
 
 ## Run serially
 
+### Complete messages per second
+
+The `message-rate` profile feeds the same 256 Runs to the prototype Projector and PG. Each Run contributes 100 recorded assistant tool calls and 100 corresponding tool results with 4 KiB per payload. Run opening, input, final answer and settlement also travel through the normal projection path and are excluded from the message numerator. The test compares synchronous and transaction-local asynchronous commits at fixed offered rates and while draining an already-populated Kafka partition set. Verify ordered content against the emitter's per-Run digest. This profile measures stored history and issues no sandbox commands.
+
+```sh
+export PI_CLOUD_RUNTIME_LOAD_CHECK=1
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/message-rate message-rate
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/message-confirm message-rate-confirm
+node scripts/experiments/minimal-session-storage/summarize-complete-messages.mjs /private/message-summary.json /private/message-rate /private/message-confirm
+```
+
 ### Moving recovery and transaction-local commit
 
 For the moving-checkpoint and selective-commit comparison, run the following

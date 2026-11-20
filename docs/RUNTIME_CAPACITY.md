@@ -1,5 +1,7 @@
 # Runtime capacity evaluation
 
+The [complete-message capacity study](reports/complete-message-capacity-20261120.md) measures ordered PG projection in entries per second for Runs with 100 recorded tool-call/result pairs. Paced input and consumption of a preloaded Kafka backlog are reported separately.
+
 The [moving-checkpoint experiment](reports/moving-projection-recovery-20261120.md) measures ready batches and transaction-local WAL acknowledgement separately, including a tool whose PG projection disappears after its Kafka dispatch grant.
 
 The [synchronous ready-prefix study](reports/synchronous-ready-prefix-20261120.md) compares one-record transactions and bounded ready batches with the same PG checkpoint. It reports full-Run throughput, sender delay, cold reconstruction and the independent Kafka dispatch grant.

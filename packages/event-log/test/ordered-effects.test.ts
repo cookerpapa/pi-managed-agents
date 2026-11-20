@@ -207,6 +207,41 @@ it("resumes boot-local callback progress across assignment and reader recreation
   }
 });
 
+it("opens a partition after applying its captured recovery cut even as newer records arrive", async () => {
+  f.high = "3";
+  f.committed = "3";
+  f.partitions = 2;
+  const entered = Promise.withResolvers<void>(),
+    release = Promise.withResolvers<void>();
+  const t = await fixture({
+    prepareReady: async (records) => {
+      if (records[0]!.offset === 2n) {
+        entered.resolve();
+        await release.promise;
+      }
+      return records.length;
+    },
+  });
+  try {
+    f.high = "5";
+    await t.deliver([
+      [0, false],
+      [1, false],
+    ]);
+    const tail = t.deliver([[2, false]]);
+    await entered.promise;
+    await expect(t.consumer.waitForPartition(0, 20)).rejects.toThrow("unavailable");
+    release.resolve();
+    await tail;
+    await t.consumer.waitForPartition(0, 100);
+    expect(t.projected).toEqual([0, 1, 2]);
+    await expect(t.consumer.waitForPartition(1, 20)).rejects.toThrow("unavailable");
+  } finally {
+    release.resolve();
+    await t.consumer.close();
+  }
+});
+
 it("discards a PG snapshot invalidated during assignment and rejoins at the recovered offset", async () => {
   const entered = Promise.withResolvers<void>(),
     release = Promise.withResolvers<void>();

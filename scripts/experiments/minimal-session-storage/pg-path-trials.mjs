@@ -251,6 +251,13 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
+  if (["message-rate", "message-rate-smoke", "message-rate-confirm"].includes(profile)) {
+    const { messageTrials } = await import("./complete-message-rate.mjs");
+    return messageTrials(
+      { projector, emitter, configure, guard, observer, report, save, cpuFixture, token },
+      profile,
+    );
+  }
   const prefix = isPrefixStudy(profile);
   const moving = isMovingStudy(profile);
   const commitStudy = isCommitStudy(profile);

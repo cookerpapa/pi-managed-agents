@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+const [output, ...directories] = process.argv.slice(2);
+assert(output && directories.length);
+const studies = [];
+for (const directory of directories) {
+  const read = async (file) => JSON.parse(await readFile(join(directory, file), "utf8"));
+  const report = await read("run/report.json"),
+    cleanup = await read("fixture-cleanup.json");
+  const m = report.completeMessages;
+  assert(
+    report.cleaned &&
+      !report.error &&
+      cleanup.temporaryPodsRemoved &&
+      cleanup.temporaryServiceRemoved &&
+      cleanup.temporaryAuthRemoved,
+  );
+  assert(
+    m.count === 200 * m.runs && m.settings.fsync === "on" && m.settings.synchronous_commit === "on",
+  );
+  for (const t of m.trials) {
+    assert.equal(t.verifiedEntries, m.count + 2 * m.runs);
+    assert(t.finalLag === 0 && t.maxBatch <= 16 && t.rps > 0);
+    assert.equal(
+      t.transactions,
+      t.policy === "recorded-history" ? t.asyncTransactions : t.syncTransactions,
+    );
+    assert(Math.abs((t.rps * t.elapsedMs) / 1000 - m.count) < 0.01);
+  }
+  const { placement, trials, ...measures } = m;
+  studies.push({
+    ...measures,
+    trials: trials.map(({ rate, rps, ...t }) => ({
+      input: rate === "preloaded" ? "preloaded" : "paced",
+      ...(rate === "preloaded" ? {} : { offeredMessagesPerSecond: rate }),
+      completeMessagesPerSecond: rps,
+      ...t,
+    })),
+    actorHashes: report.actorHashes,
+    cpus: {
+      pg: placement.pg.effective,
+      projector: placement.projector.effective,
+      sender: placement.support.effective,
+    },
+    cleanup,
+  });
+}
+await writeFile(output, JSON.stringify({ studies }, null, 2) + "\n");

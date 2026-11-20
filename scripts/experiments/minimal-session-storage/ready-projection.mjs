@@ -20,7 +20,15 @@ import {
 export const isPrefixStudy = (name) =>
   ["prefix-smoke", "prefix-study", "prefix-confirm"].includes(name) || isMovingStudy(name);
 export const isMovingStudy = (name) =>
-  ["moving-smoke", "moving-study", "moving-confirm", "moving-finish"].includes(name);
+  [
+    "moving-smoke",
+    "moving-study",
+    "moving-confirm",
+    "moving-finish",
+    "message-rate",
+    "message-rate-smoke",
+    "message-rate-confirm",
+  ].includes(name);
 export function recoveryConnectionError(error) {
   return (
     /^(08|57P0[123]$|ECONNRESET$|EPIPE$|ECONNREFUSED$|40001$|PZ003$)/.test(error?.code ?? "") ||
@@ -125,7 +133,9 @@ export class ReadyProjection {
   }
   configure(width, policy = "fixed") {
     assert([0, 1, 16].includes(width));
-    assert(["fixed", "moving-sync", "selective", "replay-finish"].includes(policy));
+    assert(
+      ["fixed", "moving-sync", "selective", "replay-finish", "recorded-history"].includes(policy),
+    );
     this.policy = policy;
     this.width = width;
     this.stats = {
@@ -234,7 +244,7 @@ export class ReadyProjection {
       if (this.policy !== "fixed") {
         draft.frame.strict = useSynchronousPolicy(f) || draft.barrier;
         if (
-          this.policy === "replay-finish" &&
+          (this.policy === "replay-finish" || this.policy === "recorded-history") &&
           f.kind === "work_finished" &&
           f.terminal.type === "turn.completed" &&
           draft.frame.ops.length === 1 &&
@@ -274,6 +284,21 @@ export class ReadyProjection {
           draft.views.set(f.scope.runId, view);
           draft.frame.history =
             plainAnswer(draft.frame, f) ||
+            (this.policy === "recorded-history" &&
+              !draft.frame.strict &&
+              !draft.frame.anchor &&
+              draft.frame.ops.length > 0 &&
+              draft.frame.ops.every((op) => op.kind === "message") &&
+              f.commit.writes.every(
+                (w) =>
+                  w.type === "entry" &&
+                  w.value.model?.length === 1 &&
+                  (w.value.model[0].role === "toolResult" ||
+                    (w.value.model[0].role === "assistant" &&
+                      w.value.model[0].stopReason === "toolUse" &&
+                      w.value.model[0].content.some((b) => b.type === "toolCall"))),
+              ) &&
+              !hasEffect) ||
             replayableMetadata(draft.frame, f) ||
             (registered && !draft.frame.strict && !draft.frame.anchor);
         }
@@ -307,7 +332,9 @@ export class ReadyProjection {
       try {
         if (!owned()) return kept.length;
         const relaxed =
-          (this.policy === "selective" || this.policy === "replay-finish") &&
+          (this.policy === "selective" ||
+            this.policy === "replay-finish" ||
+            this.policy === "recorded-history") &&
           !draft.frames.some((f) => f.strict) &&
           operations.every((f) => f.history);
         const moving = this.policy !== "fixed";
@@ -319,7 +346,9 @@ export class ReadyProjection {
           String(expected),
           String(next),
           JSON.stringify(draft.frames),
-          ...(moving ? [relaxed, this.policy === "replay-finish"] : []),
+          ...(moving
+            ? [relaxed, this.policy === "replay-finish" || this.policy === "recorded-history"]
+            : []),
         ]);
         outcome = row.outcome;
         if (outcome === "applied" && moving) {

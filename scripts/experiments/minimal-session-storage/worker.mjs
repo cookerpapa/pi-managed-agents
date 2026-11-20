@@ -40,6 +40,7 @@ import {
 } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { emitFrames } from "./pg-path-replay.mjs";
+import { messageTape } from "./complete-message-rate.mjs";
 
 const pool = await openPool(5),
   notifications = await pool.connect(),
@@ -630,6 +631,21 @@ listen(
       send("configured", { stage: msg.stage });
     },
     join: () => joinDirected(),
+    makeMessages: (m) => {
+      assert.equal(active.size, 0);
+      const { frames, owners } = messageTape(
+        m.tenantId,
+        m.perPartition,
+        encodeSessionLogFact,
+        kafkaProducerLane,
+      );
+      pathFrames = frames;
+      send("messageTape", { owners });
+    },
+    emitMessages: async (m) =>
+      send("messagesEmitted", {
+        source: await emitFrames(pathFrames, producer, m.frameRate, m.start),
+      }),
     loadPathFrames: async () => {
       assert.equal(active.size, 0);
       pathFrames = (

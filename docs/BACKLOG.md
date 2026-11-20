@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare synchronous and asynchronous PG projection in complete messages per second with 200 entries per Run, paced arrivals and a preloaded Kafka backlog. Count verified message rows separately from Run lifecycle records. [Throughput and recovery conditions](reports/complete-message-capacity-20261120.md).
+
 - [x] Measure moving recovery positions, single/ready-prefix transactions, and transaction-local asynchronous PG commits in the prototype. Recover an acknowledged tool intent, its original reply and a lost normal Run completion after an actual PG crash. [Measurements and fault evidence](reports/moving-projection-recovery-20261120.md).
 
 - [x] Compare synchronous and asynchronous PG acknowledgements with the same four writes per Run. Independently check acknowledged rows after a database crash. [Asynchronous commit measurements](reports/pg-async-commit-20261120.md).

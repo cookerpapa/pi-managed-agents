@@ -6,6 +6,17 @@ import {
   summarizeSingleRequestPhases,
 } from "./runtime-load-scheduler.mjs";
 
+it("summarizes long measurement windows without passing every observation as a function argument", () => {
+  const samples = Array.from({ length: 200000 }, (_, i) => 200000 - i);
+  expect(distribution([...samples, NaN])).toEqual({
+    count: 200000,
+    p50: 100000,
+    p95: 190000,
+    p99: 198000,
+    max: 200000,
+  });
+});
+
 it("keeps arrival accounting independent of slow work and distinguishes dropped inputs", async () => {
   let now = 0;
   const waits = [];

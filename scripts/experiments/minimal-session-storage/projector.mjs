@@ -13,6 +13,7 @@ import { ReadyProjection, isMovingStudy, recoveryConnectionError } from "./ready
 import { projectRecord } from "./project-record.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
+import { MessageRateMeter } from "./complete-message-rate.mjs";
 
 let resetAssignment;
 const pool = await openPool(
@@ -93,12 +94,15 @@ function summary() {
 const prefixStudy = __READY_STUDY__
   ? new ReadyProjection(pool, topic, sessions, projectionTemplates)
   : undefined;
+let messageMeter;
 const environment = {
   pool,
   sessions,
   nextOffsets,
   account,
-  send,
+  send: (kind, data) => {
+    if (!messageMeter || kind !== "settled") send(kind, data);
+  },
   pathStudy,
   tailProbe,
   partitions: 32,
@@ -125,6 +129,7 @@ const reader = new KafkaLogConsumer({
     ? {
         prepareReady: async (records, current) => {
           try {
+            if (messageMeter && messageMeter.at === undefined) await messageMeter.gate.promise;
             return await prefixStudy.apply(
               records,
               current,
@@ -152,6 +157,7 @@ const reader = new KafkaLogConsumer({
       if (pathStudy?.mode) pathStudy.before(record);
       if (!prefixStudy?.width) await processRecord(record);
       if (pathStudy?.mode) pathStudy.applied(record.fact);
+      messageMeter?.apply(record.fact);
     } catch (e) {
       fail(e);
       throw e;
@@ -186,7 +192,14 @@ async function lag() {
 }
 async function cleanup() {
   try {
-    await reader.close();
+    try {
+      if (messageMeter) {
+        messageMeter.gate.resolve();
+        await messageMeter.stop();
+      }
+    } finally {
+      await reader.close();
+    }
   } finally {
     try {
       if (created) {
@@ -247,6 +260,28 @@ try {
         send("configured", { stage: m.stage });
       },
       sample: async (m) => send("sample", { n: m.n, ...(await lag()) }),
+      prepareMessages: async (m) => {
+        assert(!sessions.size && !messageMeter);
+        stage = { integrated: true, scene: "plain", sink: "single" };
+        metrics = blank();
+        await resetPrefix(16, m.policy);
+        messageMeter = new MessageRateMeter(m.owners, m.rate, !m.rate);
+        send("messagesReady");
+      },
+      releaseMessages: (m) => {
+        messageMeter.start(m.start ?? performance.timeOrigin + performance.now(), lag);
+        send("messagesReleased");
+      },
+      finishMessages: async () => {
+        const result = await messageMeter.done.promise;
+        await messageMeter.stop();
+        result.sampledPeakLag = messageMeter.peakLag;
+        const ends = await reader.captureEndOffsets();
+        await reader.waitUntilInitialReplay(ends);
+        assert.equal(sessions.size, 0);
+        messageMeter = undefined;
+        send("messagesFinished", { result, stats: prefixStudy.stats, lag: (await lag()).lag });
+      },
       freezePaths: async () => send("pathTape", { tape: await pathStudy.freeze() }),
       preparePaths: async (m) => {
         stage = { integrated: true, scene: "plain", sink: "single" };

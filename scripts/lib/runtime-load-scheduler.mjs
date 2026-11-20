@@ -1,18 +1,23 @@
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 
-export function percentile(values, q) {
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+function rank(sorted, q) {
   return sorted.length ? sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] : null;
 }
+export function percentile(values, q) {
+  return rank(
+    values.filter(Number.isFinite).sort((a, b) => a - b),
+    q,
+  );
+}
 export function distribution(values) {
-  const finite = values.filter(Number.isFinite);
+  const finite = values.filter(Number.isFinite).sort((a, b) => a - b);
   return {
     count: finite.length,
-    p50: percentile(finite, 0.5),
-    p95: percentile(finite, 0.95),
-    p99: percentile(finite, 0.99),
-    max: finite.length ? Math.max(...finite) : null,
+    p50: rank(finite, 0.5),
+    p95: rank(finite, 0.95),
+    p99: rank(finite, 0.99),
+    max: finite.at(-1) ?? null,
   };
 }
 /** Test-driver arrivals only. No pending work is persisted or retried here. */
