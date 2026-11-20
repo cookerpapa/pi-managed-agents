@@ -123,8 +123,7 @@ and a fallback scan wake the existing admission logic; there is no second workfl
 scheduler. Manual plan deletion changes PG; a plan changed by a Tool also retains
 that Tool's normal native history. See [SCHEDULES](SCHEDULES.md).
 
-`/usage` reads committed usage and context estimates without allocating a Worker
-or VM. `/compact` creates Pi's exported CompactionTask with an idempotent receipt.
+`/status` reads the active context estimate and model window. `/usage` sums confirmed provider receipts for the selected Session on demand. Both are read-only. `/compact` creates Pi's exported CompactionTask with an idempotent receipt.
 It uses the current Run when active and a maintenance Run through existing admission
 when cold. It does not fabricate a chat message or start a sandbox.
 See [ADR-0243](adr/0243-native-input-current-state.md) and
@@ -363,7 +362,7 @@ See [ADR-0243](adr/0243-native-input-current-state.md),
 
 The storage adapter compares the latest indexed local commit with the single inherited base when opening a Session and validating a stable write. For a new root prompt, the Worker accepts the first environment observation in the same Pi transaction as the Run and Agent configuration. [ADR-0338](adr/0338-initial-world-and-run-binding.md).
 
-Under [ADR-0337](adr/0337-native-usage-and-chat-presentation.md) the presentation selector excludes native system context before allocating a page or frozen frame. Mixed batches keep their visible Entries and Task events. Native context and Forks still resolve the original system Entries. The Session API reads each Conversation’s unkeyed `pi.usage` through its current document and address index. Model charging uses its own request evidence.
+Under [ADR-0337](adr/0337-native-usage-and-chat-presentation.md) the presentation selector excludes native system context before allocating a page or frozen frame. Mixed batches keep their visible Entries and Task events. Native context and Forks still resolve the original system Entries. [ADR-0342](adr/0342-context-status-and-gateway-usage.md) uses provider receipts for the public lifetime usage total. Native `pi.usage` retains its separate storage/recovery contract; the context estimate uses the active assistant response and later messages. Model charging uses its own eligibility evidence.
 
 Frozen history paging fixes a bounded set of visible positions before resolving
 their immutable record/body IDs. Body loading does not reopen the shared history

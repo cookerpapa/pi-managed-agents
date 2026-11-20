@@ -6,6 +6,8 @@ import {
   type ConversationSearchResult,
 } from "@pi-cloud/protocol";
 import {
+  parseConversationStatusResource,
+  type ConversationStatusResource,
   parseConversationUsageResource,
   parseConversationCompactResource,
   type ConversationUsageResource,
@@ -157,6 +159,20 @@ export class SessionApi {
       ),
     );
   }
+  async getConversationStatus(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<ConversationStatusResource> {
+    return parseConversationStatusResource(
+      await request(
+        this.#fetch,
+        `/v1/conversations/${encodeURIComponent(sessionId)}/status`,
+        { method: "GET", ...(signal ? { signal } : {}) },
+        this.#authorizationToken,
+      ),
+    );
+  }
+
   async getConversationUsage(
     sessionId: string,
     signal?: AbortSignal,

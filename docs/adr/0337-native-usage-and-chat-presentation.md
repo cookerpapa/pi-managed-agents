@@ -2,6 +2,8 @@
 
 Accepted for the controlled [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) performance candidate after the complete-message review.
 
+The public usage query in this decision was superseded by [ADR-0342](0342-context-status-and-gateway-usage.md). The native retention contract still applies.
+
 ## Storage ownership
 
 Pi continues to publish its entire original atomic Storage batch on the physical Session log. A stable answer can both resolve the input and generation Task, settle live output, and replace the cumulative usage document. The assistant Entry keeps its provider usage. Cloud charge eligibility and provider evidence retain their existing independent accounting contracts.

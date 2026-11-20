@@ -1,5 +1,9 @@
 import { useState } from "react";
-import type { ConversationUsageResource, ConversationCompactResource } from "@pi-cloud/protocol";
+import type {
+  ConversationStatusResource,
+  ConversationUsageResource,
+  ConversationCompactResource,
+} from "@pi-cloud/protocol";
 import { useI18n } from "./i18n.tsx";
 
 const labels = {
@@ -28,13 +32,15 @@ export function CompactStatus({
   );
 }
 export function ConversationUsage({
+  kind,
   value,
   loading,
   error,
   onRefresh,
   onClose,
 }: {
-  value: ConversationUsageResource | null;
+  kind: "status" | "usage";
+  value: ConversationUsageResource | ConversationStatusResource | null;
   loading: boolean;
   error: boolean;
   onRefresh: () => void;
@@ -44,12 +50,21 @@ export function ConversationUsage({
   const [children, setChildren] = useState(false);
   const count = (value: number | null) =>
     value === null ? "—" : new Intl.NumberFormat(language).format(value);
-  const tokens = children && value ? value.includingChildren : value?.tokens;
+  const usage = kind === "usage" && value && "tokens" in value ? value : null;
+  const status = kind === "status" && value && "context" in value ? value : null;
+  const tokens = children ? usage?.includingChildren : usage?.tokens;
+  const missing =
+    (usage?.unconfirmedRequests ?? 0) +
+    (children ? (usage?.children.reduce((n, c) => n + c.unconfirmedRequests, 0) ?? 0) : 0);
   return (
-    <section className="product-usage-panel" role="dialog" aria-label={t("usage.title")}>
+    <section
+      className="product-usage-panel"
+      role="dialog"
+      aria-label={t(kind === "status" ? "status.title" : "usage.title")}
+    >
       <header>
-        <strong>/usage</strong>
-        <span>{value?.model.modelId}</span>
+        <strong>/{kind}</strong>
+        {status && <span>{status.model.modelId}</span>}
         <button
           type="button"
           onClick={onRefresh}
@@ -64,7 +79,7 @@ export function ConversationUsage({
       </header>
       {error ? <p role="alert">{t("usage.failed")}</p> : null}
       {loading && !value ? <p role="status">{t("usage.loading")}</p> : null}
-      {value && tokens ? (
+      {usage && tokens ? (
         <>
           <dl className="product-usage-grid">
             <div>
@@ -90,7 +105,7 @@ export function ConversationUsage({
               <dd>{count(tokens.total)}</dd>
             </div>
           </dl>
-          {value.children.length ? (
+          {usage.children.length ? (
             <label className="product-usage-child-toggle">
               <input
                 type="checkbox"
@@ -100,31 +115,15 @@ export function ConversationUsage({
               {t("usage.includeChildren")}
             </label>
           ) : null}
-          <div className="product-usage-context">
-            <span>{t("usage.context")}</span>
-            <strong>
-              ≈ {count(value.context.estimatedTokens)} / {count(value.context.window)}
-            </strong>
-            {value.context.window && value.context.estimatedTokens !== null ? (
-              <progress
-                max={value.context.window}
-                value={Math.min(value.context.estimatedTokens, value.context.window)}
-                aria-label={t("usage.context")}
-              />
-            ) : null}
-            <small>
-              {t("usage.threshold")} {count(value.context.compactThreshold)}
-            </small>
-          </div>
           <details>
             <summary>{t("usage.breakdown")}</summary>
-            {value.models.map((model) => (
+            {usage.models.map((model) => (
               <div className="product-usage-breakdown" key={`${model.provider}/${model.modelId}`}>
                 <span>{model.modelId}</span>
                 <span>{count(model.tokens.total)}</span>
               </div>
             ))}
-            {value.children.map((child) => (
+            {usage.children.map((child) => (
               <div className="product-usage-breakdown" key={child.sessionId}>
                 <span>{child.title}</span>
                 <span>{count(child.tokens.total)}</span>
@@ -132,8 +131,31 @@ export function ConversationUsage({
             ))}
           </details>
           <small>{t("usage.recorded")}</small>
+          {missing > 0 && (
+            <p>
+              {t("usage.unconfirmed")} {count(missing)}
+            </p>
+          )}
         </>
       ) : null}
+      {status && (
+        <div className="product-usage-context">
+          <span>{t("usage.context")}</span>
+          <strong>
+            ≈ {count(status.context.estimatedTokens)} / {count(status.context.window)}
+          </strong>
+          {status.context.window && status.context.estimatedTokens !== null ? (
+            <progress
+              max={status.context.window}
+              value={Math.min(status.context.estimatedTokens, status.context.window)}
+              aria-label={t("usage.context")}
+            />
+          ) : null}
+          <small>
+            {t("usage.threshold")} {count(status.context.compactThreshold)}
+          </small>
+        </div>
+      )}
     </section>
   );
 }

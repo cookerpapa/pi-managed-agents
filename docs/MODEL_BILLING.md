@@ -3,7 +3,7 @@
 [ADR-0297](adr/0297-model-metering-receipts-and-statements.md) adds an accounting
 port beside native execution. The account menu's **Usage and costs** page shows model
 usage and simulated amounts in its Models tab. Compute and Storage use separate
-[resource statements](RESOURCE_BILLING.md); no tab collects payment. `/usage` still describes native conversation usage and context estimates.
+[resource statements](RESOURCE_BILLING.md); no tab collects payment. `/usage` shows complete provider-reported consumption on demand. Customer charges additionally require the existing eligibility and pricing evidence. `/status` shows native context usage and the model window.
 
 ## Flow and authority
 

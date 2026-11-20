@@ -75,8 +75,8 @@ targets does not synchronize their files. See the [client](docs/SESSION_CLIENT.m
   transcript with sending/acknowledgement states; only follow-up/steer uses the
   pending-input list.
 - **Long histories:** bounded pagination and virtual scrolling, history navigation,
-  search and streamed Markdown export. `/usage` shows committed token usage and
-  context estimates; `/compact [instructions]` requests native compaction.
+  search and streamed Markdown export. `/status` shows estimated context use and the model window;
+  `/usage` totals confirmed CLIProxyAPI token receipts for this Session; `/compact [instructions]` requests native compaction.
 - **Independent branches:** Fork only the selected Agent's history while later
   work continues. Forks are peers in the conversation list and retain a source
   link; deleting the source preserves independent Forks. Old subagents and pending

@@ -612,7 +612,7 @@ async function verifyTextStorage(sessions) {
   }
   assert.equal(layout.native_system_entries, sessions.length);
   // Both sides of an A/B run verify their own public API against the raw
-  // provider counters in the corresponding immutable native assistant Entry.
+  // context baseline in the corresponding immutable native assistant Entry.
   const checks = [0, Math.floor(sessions.length / 2), sessions.length - 1];
   for (const index of checks) {
     const sessionId = sessions[index].sessionId;
@@ -623,15 +623,9 @@ async function verifyTextStorage(sessions) {
       where g.tenant_id=${tenant.tenantId}::uuid and g.session_id=${sessionId}
         and g.fields->>'role'='assistant'`.execute(database);
     const message = JSON.parse(stored.payload_text).model[0];
-    const { input, output, cacheRead, cacheWrite } = message.usage;
-    const usage = await api.getConversationUsage(sessionId);
-    assert.deepEqual(usage.tokens, {
-      input: input + cacheRead + cacheWrite,
-      output,
-      cacheRead,
-      cacheWrite,
-      total: input + cacheRead + cacheWrite + output,
-    });
+    const status = await api.getConversationStatus(sessionId);
+    assert.equal(status.context.method, "latest_usage");
+    assert.equal(status.context.estimatedTokens, message.usage.totalTokens);
     const history = await api.getConversation(sessionId);
     const text = history.turns
       .flatMap((t) => t.transcript?.items ?? [])
@@ -646,7 +640,7 @@ async function verifyTextStorage(sessions) {
         .join(""),
     );
   }
-  return { ...layout, publicUsageAndHistoryChecks: checks.length };
+  return { ...layout, publicStatusAndHistoryChecks: checks.length };
 }
 
 async function stage(profile) {

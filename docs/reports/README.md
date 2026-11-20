@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Context status, gateway usage and PG contention](status-usage-contention-20261120.md) records the read paths and shared-instance controls.
+
 - [Current usage row and bulk writes](minimal-usage-bulk-20261120.md) measures grouped upserts and distinguishes cumulative spending from current-context compaction.
 
 - [Cumulative Conversation usage under batched projection](minimal-projection-usage-20261120.md) compares the same response traffic with and without a current-value write.

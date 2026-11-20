@@ -1280,6 +1280,10 @@ export class ControlPlaneStore {
   ): Promise<ConversationDetailResource> {
     return this.#conversations.getConversation(sessionId, query);
   }
+  getConversationStatus(sessionId: string) {
+    return readConversationStatus(this.#database, this.#tenantId, sessionId);
+  }
+
   getConversationUsage(sessionId: string) {
     return readConversationUsage(this.#database, this.#tenantId, sessionId);
   }
@@ -2250,4 +2254,5 @@ export class ControlPlaneStore {
   }
 }
 import { TOOL_CANCELLATION_TIMEOUT_MS } from "@pi-cloud/protocol";
+import { readConversationStatus } from "./conversation-status.ts";
 import { readConversationUsage } from "./conversation-usage.ts";

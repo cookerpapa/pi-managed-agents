@@ -308,3 +308,12 @@ For a source-independent PG control, run
 It creates a disposable local PG container and times 12 warmed pairs of
 fixed-size prefixes using one connection. Only aggregate timings leave the
 fixture. [Results and default selection](../../../docs/reports/minimal-usage-bulk-20261120.md).
+
+### Concurrent accounting writes
+
+Run `node --import tsx scripts/experiments/minimal-session-storage/usage-contention.mjs --direct`
+for the archived #49 model receipt SQL. Append `--settle` after `--direct` to include native model settlement evidence for the same invocation IDs in the projection transactions. Pass the migration path to run the source revision
+directly, or omit the argument for the committed receiver. Uses a dedicated test container;
+each comparison replays the same fixed prefixes and receipts, rotates layout order,
+verifies 2,048 receipt events per concurrent sample and reads the expected Session totals.
+[Conditions and results](../../../docs/reports/status-usage-contention-20261120.md).

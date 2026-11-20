@@ -1667,7 +1667,12 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
       return;
     }
     if (command.kind === "invalid") {
-      update({ type: "api.error", message: t("commands.usageArguments") });
+      update({
+        type: "api.error",
+        message: t(
+          command.command === "usage" ? "commands.usageArguments" : "commands.statusArguments",
+        ),
+      });
       return;
     }
     if (command.kind === "compact" && (!canMutate || selectedDelegatedSession !== null)) {
@@ -1677,8 +1682,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
     setCommandMenuDismissed(true);
     update({ type: "api.error.cleared" });
     try {
-      if (command.kind === "usage") {
-        if (!(await commands.openUsage())) return;
+      if (command.kind === "usage" || command.kind === "status") {
+        if (!(await commands.openPanel(command.kind))) return;
       } else {
         setOperation("submitting");
         const accepted = await composerSubmission.current.send(
@@ -2791,13 +2796,15 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
             </div>
 
             <footer className="product-composer-area">
-              {commands.usageOpen ? (
+              {commands.panel ? (
                 <ConversationUsage
-                  value={commands.usage}
-                  loading={commands.usageLoading}
-                  error={commands.usageError}
-                  onRefresh={() => void commands.refreshUsage()}
-                  onClose={() => commands.closeUsage()}
+                  kind={commands.panel}
+                  key={commands.panel}
+                  value={commands.report}
+                  loading={commands.loading}
+                  error={commands.error}
+                  onRefresh={() => void commands.refreshReport()}
+                  onClose={() => commands.closePanel()}
                 />
               ) : null}
               {activeCompact &&
@@ -2898,7 +2905,15 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
                           onClick={() => void submitComposerCommand("/" + command)}
                         >
                           <code>/{command}</code>
-                          <span>{t(command === "usage" ? "usage.title" : "commands.compact")}</span>
+                          <span>
+                            {t(
+                              command === "usage"
+                                ? "usage.title"
+                                : command === "status"
+                                  ? "status.title"
+                                  : "commands.compact",
+                            )}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -2978,9 +2993,9 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
                         setCommandMenuDismissed(true);
                         return;
                       }
-                      if (event.key === "Escape" && commands.usageOpen) {
+                      if (event.key === "Escape" && commands.panel) {
                         event.preventDefault();
-                        commands.closeUsage();
+                        commands.closePanel();
                         return;
                       }
                       if (event.key === "Escape") {

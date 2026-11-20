@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0342](0342-context-status-and-gateway-usage.md) separates context status and confirmed gateway usage.
+
 [ADR-0341](0341-minimal-storage-fork-study.md) measures a shared-history Fork on the minimal message projection.
 
 [ADR-0340](0340-selective-async-projection-study.md) scopes moving checkpoints and transaction-local asynchronous projection to the performance experiment.

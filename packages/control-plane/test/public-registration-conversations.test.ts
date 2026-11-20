@@ -272,6 +272,25 @@ describe.sequential("opt-in registration and tenant conversation discovery", () 
     expect(alphaListResponse.body).not.toContain(bravoSession.sessionId);
     expect(bravoListResponse.body).not.toContain(alphaSession.sessionId);
 
+    for (const command of ["status", "usage"] as const) {
+      const url = `/v1/conversations/${alphaSession.sessionId}/${command}`;
+      const own = await http.inject({ method: "GET", url, headers: authorization(alpha.apiToken) });
+      expect(own.statusCode).toBe(200);
+      const body = own.json();
+      if (command === "status") {
+        expect(body.context).toMatchObject({ window: null, estimatedTokens: 0 }); // Uncatalogued bootstrap model.
+        expect(body).not.toHaveProperty("tokens");
+      } else {
+        expect(body).toMatchObject({ tokens: { total: 0 }, source: "provider_receipts" });
+        expect(body).not.toHaveProperty("context");
+      }
+      const foreign = await http.inject({
+        method: "GET",
+        url,
+        headers: authorization(bravo.apiToken),
+      });
+      expect(foreign.statusCode).toBe(404);
+    }
     const alphaDetailResponse = await http.inject({
       method: "GET",
       url: `/v1/conversations/${alphaSession.sessionId}`,

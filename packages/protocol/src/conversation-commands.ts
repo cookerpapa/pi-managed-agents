@@ -19,27 +19,29 @@ export const UsageTokensSchema = Type.Object(
   object,
 );
 export type UsageTokens = Static<typeof UsageTokensSchema>;
+export const emptyUsageTokens = (): UsageTokens => ({
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  total: 0,
+});
+export function addUsageTokens(target: UsageTokens, value: UsageTokens): void {
+  for (const key of Object.keys(target) as Array<keyof UsageTokens>) {
+    target[key] += value[key];
+    if (!Number.isSafeInteger(target[key]) || target[key] < 0)
+      throw new Error("Token total is invalid");
+  }
+}
 const ModelUsageSchema = Type.Object(
   { provider: Type.String(), modelId: Type.String(), tokens: UsageTokensSchema },
   object,
 );
-export const ConversationUsageResourceSchema = Type.Object(
+export const ConversationStatusResourceSchema = Type.Object(
   {
     sessionId: UuidSchema,
-    nativeSequence: Count,
     observedAt: UtcTimestampSchema,
-    source: Type.Literal("postgres"),
-    inFlight: Type.Boolean(),
     model: Type.Object({ provider: Type.String(), modelId: Type.String() }, object),
-    tokens: UsageTokensSchema,
-    models: Type.Array(ModelUsageSchema),
-    children: Type.Array(
-      Type.Object(
-        { sessionId: UuidSchema, title: Type.String(), tokens: UsageTokensSchema },
-        object,
-      ),
-    ),
-    includingChildren: UsageTokensSchema,
     context: Type.Object(
       {
         estimatedTokens: Type.Union([Count, Type.Null()]),
@@ -56,12 +58,41 @@ export const ConversationUsageResourceSchema = Type.Object(
   },
   object,
 );
+export type ConversationStatusResource = Static<typeof ConversationStatusResourceSchema>;
+export function parseConversationStatusResource(value: unknown): ConversationStatusResource {
+  if (!Value.Check(ConversationStatusResourceSchema, value))
+    throw new TypeError("Invalid conversation status");
+  return value;
+}
+export const ConversationUsageResourceSchema = Type.Object(
+  {
+    sessionId: UuidSchema,
+    observedAt: UtcTimestampSchema,
+    source: Type.Literal("provider_receipts"),
+    tokens: UsageTokensSchema,
+    unconfirmedRequests: Count,
+    models: Type.Array(ModelUsageSchema),
+    children: Type.Array(
+      Type.Object(
+        {
+          sessionId: UuidSchema,
+          title: Type.String(),
+          tokens: UsageTokensSchema,
+          unconfirmedRequests: Count,
+        },
+        object,
+      ),
+    ),
+    includingChildren: UsageTokensSchema,
+  },
+  object,
+);
 export type ConversationUsageResource = Static<typeof ConversationUsageResourceSchema>;
-export const parseConversationUsageResource = (value: unknown): ConversationUsageResource => {
+export function parseConversationUsageResource(value: unknown): ConversationUsageResource {
   if (!Value.Check(ConversationUsageResourceSchema, value))
     throw new TypeError("Invalid conversation usage");
   return value;
-};
+}
 
 export const CompactRequestSchema = Type.Object(
   {

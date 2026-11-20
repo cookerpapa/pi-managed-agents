@@ -868,6 +868,17 @@ export class ControlPlaneController {
     );
   }
 
+  @Get("conversations/:sessionId/status")
+  async getConversationStatus(
+    @Req() request: FastifyRequest,
+    @Param("sessionId") value: unknown,
+  ): Promise<ConversationStatusResource> {
+    const identity = this.tenantRequestContext.resolve(request);
+    return this.controlPlaneStores
+      .forIdentity(identity)
+      .getConversationStatus(parseUuidPathParameter(value, "sessionId"));
+  }
+
   @Get("conversations/:sessionId/usage")
   async getConversationUsage(
     @Req() request: FastifyRequest,
@@ -1483,7 +1494,7 @@ export class ControlPlaneController {
     }
   }
 }
-import type { ConversationUsageResource } from "@pi-cloud/protocol";
+import type { ConversationStatusResource, ConversationUsageResource } from "@pi-cloud/protocol";
 
 function parseNativeEntryPosition(value: unknown): string {
   if (

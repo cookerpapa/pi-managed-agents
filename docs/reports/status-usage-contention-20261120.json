@@ -1,0 +1,418 @@
+{
+  "studies": [
+    {
+      "source": "direct-sql",
+      "migrationSha256": "2c2dfbaf22e987f4b222bc58e59d621aac397d242bcc75f3d3a538c03b8393e2",
+      "postgres": "17.6",
+      "cpus": 2,
+      "memoryMiB": 768,
+      "projectionConnections": 1,
+      "receiptConnections": 1,
+      "messages": 1024,
+      "requests": 512,
+      "receipts": 2048,
+      "trials": [
+        {
+          "layout": "alone",
+          "projectionMs": 878.5470430000005,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 915.1691100000007,
+          "receiptMs": 1004.544781999999
+        },
+        {
+          "layout": "split",
+          "projectionMs": 883.850715999999,
+          "receiptMs": 1049.023999000001
+        },
+        {
+          "layout": "same",
+          "projectionMs": 884.0197009999993,
+          "receiptMs": 1086.6205009999994
+        },
+        {
+          "layout": "split",
+          "projectionMs": 909.5391799999998,
+          "receiptMs": 1085.7925379999997
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 899.3691159999998,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 924.9854369999994,
+          "receiptMs": 1043.0623739999992
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 891.7972730000001,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 928.2513370000015,
+          "receiptMs": 1125.6361780000007
+        },
+        {
+          "layout": "split",
+          "projectionMs": 937.5886790000004,
+          "receiptMs": 1080.1951520000002
+        },
+        {
+          "layout": "same",
+          "projectionMs": 941.0920540000006,
+          "receiptMs": 1048.4705879999965
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 937.9835579999999,
+          "receiptMs": null
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 914.3851429999995,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 937.7585910000016,
+          "receiptMs": 1005.9831200000008
+        },
+        {
+          "layout": "same",
+          "projectionMs": 941.2299480000001,
+          "receiptMs": 1055.0049050000016
+        },
+        {
+          "layout": "same",
+          "projectionMs": 920.3208430000013,
+          "receiptMs": 1036.8918890000023
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 904.1909669999986,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 889.7558119999994,
+          "receiptMs": 1051.3873249999997
+        }
+      ]
+    },
+    {
+      "source": "direct-sql",
+      "postgres": "17.6",
+      "cpus": 2,
+      "memoryMiB": 768,
+      "projectionConnections": 1,
+      "receiptConnections": 1,
+      "messages": 1024,
+      "requests": 512,
+      "receipts": 2048,
+      "trials": [
+        {
+          "layout": "alone",
+          "projectionMs": 1074.6128000000008,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 1238.4313970000003,
+          "receiptMs": 1289.699156999999
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1171.0906189999987,
+          "receiptMs": 1338.8282920000001
+        },
+        {
+          "layout": "same",
+          "projectionMs": 1176.9805770000003,
+          "receiptMs": 1435.7081159999998
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1085.6111099999998,
+          "receiptMs": 1286.023217
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1065.1595220000017,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1083.4748550000004,
+          "receiptMs": 1234.8448489999973
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1122.0289359999988,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 1194.7397810000002,
+          "receiptMs": 1390.1151129999998
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1198.7639879999988,
+          "receiptMs": 1364.1039979999987
+        },
+        {
+          "layout": "same",
+          "projectionMs": 1237.6070209999998,
+          "receiptMs": 1371.778119999999
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1025.8040990000009,
+          "receiptMs": null
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1038.334659,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1102.653241,
+          "receiptMs": 1195.7814929999986
+        },
+        {
+          "layout": "same",
+          "projectionMs": 1109.1089479999973,
+          "receiptMs": 1209.614257000001
+        },
+        {
+          "layout": "same",
+          "projectionMs": 1209.5243300000002,
+          "receiptMs": 1443.3274189999975
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1151.994103000001,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 925.1248200000009,
+          "receiptMs": 1128.275391999996
+        }
+      ]
+    },
+    {
+      "source": "metering-receiver",
+      "postgres": "17.6",
+      "cpus": 2,
+      "memoryMiB": 768,
+      "projectionConnections": 1,
+      "receiptConnections": 1,
+      "messages": 1024,
+      "requests": 512,
+      "receipts": 2048,
+      "trials": [
+        {
+          "layout": "alone",
+          "projectionMs": 865.0415549999998,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 891.4859639999995,
+          "receiptMs": 2582.1863080000003
+        },
+        {
+          "layout": "split",
+          "projectionMs": 839.4812500000007,
+          "receiptMs": 2714.2721580000016
+        },
+        {
+          "layout": "same",
+          "projectionMs": 856.65236,
+          "receiptMs": 2546.3219370000006
+        },
+        {
+          "layout": "split",
+          "projectionMs": 846.3637139999992,
+          "receiptMs": 2585.2748490000013
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 843.2308660000017,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 875.6519640000006,
+          "receiptMs": 2604.9902939999993
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 849.7223720000002,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 874.2905119999996,
+          "receiptMs": 2584.4870169999995
+        },
+        {
+          "layout": "split",
+          "projectionMs": 909.7766999999985,
+          "receiptMs": 2581.276958000002
+        },
+        {
+          "layout": "same",
+          "projectionMs": 925.8454450000027,
+          "receiptMs": 2513.2167050000025
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 848.2447610000017,
+          "receiptMs": null
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 857.2937639999946,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 886.165912000004,
+          "receiptMs": 2608.0207939999964
+        },
+        {
+          "layout": "same",
+          "projectionMs": 884.617683000004,
+          "receiptMs": 2517.137821000004
+        },
+        {
+          "layout": "same",
+          "projectionMs": 882.6085200000016,
+          "receiptMs": 2499.985740999997
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 853.5917019999979,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 840.7500550000041,
+          "receiptMs": 2605.3912589999964
+        }
+      ]
+    },
+    {
+      "source": "direct-sql",
+      "postgres": "17.6",
+      "withSettlement": true,
+      "cpus": 2,
+      "memoryMiB": 768,
+      "projectionConnections": 1,
+      "receiptConnections": 1,
+      "messages": 1024,
+      "requests": 512,
+      "receipts": 2048,
+      "trials": [
+        {
+          "layout": "alone",
+          "projectionMs": 3178.840253000002,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 3866.267197000001,
+          "receiptMs": 1765.951692999999
+        },
+        {
+          "layout": "split",
+          "projectionMs": 3714.9989700000006,
+          "receiptMs": 2105.0492940000004
+        },
+        {
+          "layout": "same",
+          "projectionMs": 4385.803613,
+          "receiptMs": 1962.0197420000004
+        },
+        {
+          "layout": "split",
+          "projectionMs": 3090.5733180000025,
+          "receiptMs": 2254.6126399999994
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1957.005935000001,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1975.7274210000032,
+          "receiptMs": 1119.805945
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1910.4556100000045,
+          "receiptMs": null
+        },
+        {
+          "layout": "same",
+          "projectionMs": 2258.010313000006,
+          "receiptMs": 1129.979496
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1933.9710540000015,
+          "receiptMs": 1083.0110249999998
+        },
+        {
+          "layout": "same",
+          "projectionMs": 2236.656938,
+          "receiptMs": 1123.9193019999948
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1876.3664449999997,
+          "receiptMs": null
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1973.5535510000045,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 1933.8099750000038,
+          "receiptMs": 1025.8491960000028
+        },
+        {
+          "layout": "same",
+          "projectionMs": 2272.9861450000026,
+          "receiptMs": 1047.9201200000025
+        },
+        {
+          "layout": "same",
+          "projectionMs": 2281.796556000001,
+          "receiptMs": 1084.7121079999997
+        },
+        {
+          "layout": "alone",
+          "projectionMs": 1931.6484109999947,
+          "receiptMs": null
+        },
+        {
+          "layout": "split",
+          "projectionMs": 2521.1069329999955,
+          "receiptMs": 1152.1587220000001
+        }
+      ]
+    }
+  ]
+}

@@ -8,14 +8,18 @@ and continuation. PG owns cloud admission and lease decisions. See
 
 ## Intake and native input
 
-### Composer commands (ADR-0277, schema 199)
+### Composer commands (ADR-0277, ADR-0342)
 
-`GET /v1/conversations/:sessionId/usage` is read-only. It returns committed
-Conversation totals, per-model totals, separately attributed descendants and
-an estimate of current context/window/compaction threshold. Cache input is a
-subset of input, not added a second time. A switched model or compaction head
-invalidates older response usage as a context estimate. In-flight output may
-not yet be included. No model request, queue row or Workspace activation occurs.
+`GET /v1/conversations/:sessionId/status` returns the selected model, active
+context estimate, model window and compaction threshold. A model change or
+compaction head invalidates older response usage as a baseline. In-flight output
+may still be awaiting projection. Unknown limits are null.
+
+`GET /v1/conversations/:sessionId/usage` returns confirmed CLIProxyAPI token
+receipts over the lifetime of this public Session, per-model breakdown, optional
+descendant totals and the number of known requests awaiting complete usage.
+Cache reads and writes are included in input, and reasoning is included in output.
+Both are authenticated reads and allocate no Run, model request or Workspace.
 
 `POST /v1/conversations/:sessionId/compact` accepts `{instructions?: string}`
 with the usual idempotency key. During active work it routes through the

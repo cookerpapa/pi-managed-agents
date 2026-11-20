@@ -705,6 +705,9 @@ export {
 export { toolImageView, toolContentView, type ToolImageView } from "./tool-image-view.ts";
 export {
   UsageTokensSchema,
+  ConversationStatusResourceSchema,
+  parseConversationStatusResource,
+  type ConversationStatusResource,
   ConversationUsageResourceSchema,
   parseConversationUsageResource,
   CompactRequestSchema,
@@ -714,6 +717,8 @@ export {
   parseConversationCompactResource,
   NativeCompactCommandSchema,
   NativeCompactResultSchema,
+  emptyUsageTokens,
+  addUsageTokens,
   type UsageTokens,
   type ConversationUsageResource,
   type CompactRequest,

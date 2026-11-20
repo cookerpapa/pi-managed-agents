@@ -11,13 +11,15 @@ import { ConversationUsage } from "../src/ConversationUsage.tsx";
 
 it("intercepts only complete command tokens and preserves instructions", () => {
   expect(parseComposerCommand("/usage")).toEqual({ kind: "usage" });
+  expect(parseComposerCommand("/status")).toEqual({ kind: "status" });
+  expect(parseComposerCommand("/status extra")).toEqual({ kind: "invalid", command: "status" });
   expect(parseComposerCommand(" /compact 保留 API\n和待办 ")).toEqual({
     kind: "compact",
     instructions: "保留 API\n和待办",
   });
   expect(parseComposerCommand("/usage extra")).toEqual({
     kind: "invalid",
-    reason: "usage_arguments",
+    command: "usage",
   });
   for (const text of [
     "/home/user/project",
@@ -27,7 +29,7 @@ it("intercepts only complete command tokens and preserves instructions", () => {
     "/compactly",
   ])
     expect(parseComposerCommand(text)).toBeUndefined();
-  expect(composerCommandSuggestions("/")).toEqual(["usage", "compact"]);
+  expect(composerCommandSuggestions("/")).toEqual(["status", "usage", "compact"]);
   expect(composerCommandSuggestions("/com")).toEqual(["compact"]);
   expect(composerCommandSuggestions("/compact keep this")).toEqual([]);
 });
@@ -75,21 +77,40 @@ it("separates cached input from total input and leaves the context window per co
   const tokens = { input: 100, output: 20, cacheRead: 70, cacheWrite: 0, total: 120 };
   const markup = renderToStaticMarkup(
     <ConversationUsage
+      kind="usage"
       loading={false}
       error={false}
       onRefresh={() => {}}
       onClose={() => {}}
       value={{
         sessionId: "session",
-        source: "postgres",
-        nativeSequence: 3,
+        source: "provider_receipts",
+        unconfirmedRequests: 1,
         observedAt: new Date().toISOString(),
-        inFlight: false,
-        model: { provider: "openai-codex", modelId: "gpt-6-luna" },
+
         tokens,
         models: [],
         children: [],
         includingChildren: tokens,
+      }}
+    />,
+  );
+  expect(markup).toContain("100");
+  expect(markup).toContain("70");
+  expect(markup).toContain("120");
+  expect(markup).toContain("CLIProxyAPI");
+  expect(markup).not.toContain("1,000");
+  const status = renderToStaticMarkup(
+    <ConversationUsage
+      kind="status"
+      loading={false}
+      error={false}
+      onRefresh={() => {}}
+      onClose={() => {}}
+      value={{
+        sessionId: "session",
+        observedAt: new Date().toISOString(),
+        model: { provider: "p", modelId: "m" },
         context: {
           estimatedTokens: 200,
           window: 1000,
@@ -99,8 +120,7 @@ it("separates cached input from total input and leaves the context window per co
       }}
     />,
   );
-  expect(markup).toContain("100");
-  expect(markup).toContain("70");
-  expect(markup).toContain("120");
-  expect(markup).toContain("1,000");
+  expect(status).toContain("1,000");
+  expect(status).toContain("200");
+  expect(status).not.toContain("CLIProxyAPI");
 });

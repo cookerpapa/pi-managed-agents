@@ -1,3 +1,4 @@
+export { readSessionModelUsage } from "./session-model-usage.ts";
 export { ModelMeteringService } from "./model-metering-service.ts";
 export { ModelExecutionAccounting } from "./model-execution-accounting.ts";
 export { priceModelUsage, formatModelAmount } from "./model-pricing.ts";

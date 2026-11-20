@@ -1,6 +1,11 @@
 import { sql, type Kysely } from "kysely";
 import type { Database } from "@pi-cloud/database";
-import type { UsageTokens, ImagePacked } from "@pi-cloud/protocol";
+import {
+  emptyUsageTokens,
+  addUsageTokens,
+  type UsageTokens,
+  type ImagePacked,
+} from "@pi-cloud/protocol";
 import type { ConversationId, EntryRecord, StorageWrite } from "@earendil-works/pi-durable";
 import type { Message, Usage } from "@earendil-works/pi-ai";
 import {
@@ -11,20 +16,6 @@ import { readDurableEntries } from "./history.ts";
 import { documentAddress, type DurableScope } from "./types.ts";
 import { NATIVE_USAGE_DOCUMENT } from "./current-state.ts";
 
-export const emptyUsageTokens = (): UsageTokens => ({
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  total: 0,
-});
-export function addUsageTokens(target: UsageTokens, value: UsageTokens): void {
-  for (const key of Object.keys(target) as Array<keyof UsageTokens>) {
-    target[key] += value[key];
-    if (!Number.isSafeInteger(target[key]) || target[key] < 0)
-      throw new Error("Native token total is invalid");
-  }
-}
 function tokens(value: unknown): UsageTokens {
   if (typeof value !== "object" || value === null) throw new Error("Native usage is invalid");
   const usage = value as Usage;

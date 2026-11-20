@@ -203,7 +203,8 @@ try {
   sessions.push(session);
   await seed(session);
   phase("cold usage and manual compaction without Cube");
-  const before = await api.getConversationUsage(session.sessionId);
+  const before = await api.getConversationStatus(session.sessionId);
+  const initialUsage = await api.getConversationUsage(session.sessionId);
   assert.deepEqual(
     (await api.getConversation(session.sessionId)).turns,
     [],
@@ -259,6 +260,8 @@ try {
         });
       };
       try {
+        await enter("/status");
+        await page.waitFor("document.querySelector('.product-usage-context progress')");
         await enter("/usage");
         await page.waitFor("document.querySelector('.product-usage-panel .product-usage-grid')");
         assert.equal((await runs(session.sessionId)).length, 0);
@@ -291,8 +294,11 @@ try {
   assert.equal((await compactSettled(session, cold.commandId)).state, "applied");
   assert.equal((await settled(cold.runId)).state, "completed");
   assert.equal((await runs(session.sessionId)).length, 1);
-  const after = await api.getConversationUsage(session.sessionId);
-  assert(after.tokens.total > before.tokens.total, "Summary usage must be counted");
+  const after = await api.getConversationStatus(session.sessionId);
+  const measured = await until(async () => {
+    const u = await api.getConversationUsage(session.sessionId);
+    return u.tokens.total > initialUsage.tokens.total && u;
+  }, "Summary provider receipt");
   assert(
     after.context.estimatedTokens < before.context.estimatedTokens,
     "Summary must reduce active context",
@@ -310,7 +316,7 @@ try {
   report.checks.cold = {
     before: before.context.estimatedTokens,
     after: after.context.estimatedTokens,
-    tokens: after.tokens,
+    tokens: measured.tokens,
     conversationId: (await scopeOf(session)).conversationId,
   };
   await save();

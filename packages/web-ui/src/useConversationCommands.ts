@@ -1,49 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ConversationUsageResource, ConversationCompactResource } from "@pi-cloud/protocol";
+import type {
+  ConversationStatusResource,
+  ConversationUsageResource,
+  ConversationCompactResource,
+} from "@pi-cloud/protocol";
 import type { PiCloudApi } from "./api.ts";
-import { compactionPending } from "./composer-commands.ts";
+import { compactionPending, type ReportCommand } from "./composer-commands.ts";
 
-/** Reads are event-driven. Only an outstanding command has a slow reconciliation
- * fallback; a hidden usage panel never polls and text deltas trigger no reads. */
+/** Status follows stable context changes while open. Lifetime receipt sums are read on demand. */
 export function useConversationCommands(api: PiCloudApi, sessionId: string | undefined) {
-  const usageSession = useRef(sessionId);
   const current = useRef(sessionId);
   current.current = sessionId;
-  const [usageOpen, setUsageOpen] = useState(false),
-    openRef = useRef(false);
-  openRef.current = usageOpen && usageSession.current === sessionId;
-  const [usage, setUsage] = useState<ConversationUsageResource | null>(null);
-  const [usageError, setUsageError] = useState(false),
-    [usageLoading, setUsageLoading] = useState(false);
+  const [panel, setPanel] = useState<ReportCommand | null>(null);
+  const opened = useRef<{ sessionId: string; kind: ReportCommand } | null>(null);
+  const [report, setReport] = useState<
+    ConversationStatusResource | ConversationUsageResource | null
+  >(null);
+  const [error, setError] = useState(false),
+    [loading, setLoading] = useState(false);
   const [compact, setCompact] = useState<ConversationCompactResource | null>(null),
     compactRef = useRef(compact);
   compactRef.current = compact;
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const refreshFlags = useRef({ compact: false, usage: false });
+  const refreshFlags = useRef({ compact: false, status: false });
   const revision = useRef(0),
-    usageRequest = useRef<AbortController | null>(null),
+    reportRequest = useRef<AbortController | null>(null),
     compactRequest = useRef<AbortController | null>(null);
-  const refreshUsage = useCallback(async () => {
-    if (!sessionId) return false;
-    usageRequest.current?.abort();
+  const refreshReport = useCallback(async () => {
+    const request = opened.current;
+    if (!sessionId || !request || request.sessionId !== sessionId) return false;
+    reportRequest.current?.abort();
     const abort = new AbortController();
-    usageRequest.current = abort;
-    setUsageLoading(true);
-    setUsageError(false);
+    reportRequest.current = abort;
+    setLoading(true);
+    setError(false);
     try {
-      const value = await api.getConversationUsage(sessionId, abort.signal);
-      if (abort.signal.aborted || current.current !== sessionId) return false;
-      setUsage((old) =>
-        old && old.sessionId === sessionId && old.nativeSequence > value.nativeSequence
-          ? old
-          : value,
-      );
+      const value =
+        request.kind === "status"
+          ? await api.getConversationStatus(sessionId, abort.signal)
+          : await api.getConversationUsage(sessionId, abort.signal);
+      if (abort.signal.aborted || current.current !== sessionId || opened.current !== request)
+        return false;
+      setReport(value);
       return true;
     } catch {
-      if (!abort.signal.aborted && current.current === sessionId) setUsageError(true);
+      if (!abort.signal.aborted && current.current === sessionId) setError(true);
       return false;
     } finally {
-      if (!abort.signal.aborted && current.current === sessionId) setUsageLoading(false);
+      if (!abort.signal.aborted && current.current === sessionId) setLoading(false);
     }
   }, [api, sessionId]);
   const refreshCompact = useCallback(async () => {
@@ -71,18 +75,19 @@ export function useConversationCommands(api: PiCloudApi, sessionId: string | und
   }, [api, sessionId]);
   useEffect(() => {
     revision.current++;
-    setUsageOpen(false);
-    setUsage(null);
-    setUsageError(false);
-    setUsageLoading(false);
+    opened.current = null;
+    setPanel(null);
+    setReport(null);
+    setError(false);
+    setLoading(false);
     setCompact(null);
     void refreshCompact();
     return () => {
-      usageRequest.current?.abort();
+      reportRequest.current?.abort();
       compactRequest.current?.abort();
       clearTimeout(refreshTimer.current);
       refreshTimer.current = undefined;
-      refreshFlags.current = { compact: false, usage: false };
+      refreshFlags.current = { compact: false, status: false };
     };
   }, [refreshCompact]);
   useEffect(() => {
@@ -112,37 +117,40 @@ export function useConversationCommands(api: PiCloudApi, sessionId: string | und
       )
         refreshFlags.current.compact = true;
       if (
-        openRef.current &&
+        opened.current?.kind === "status" &&
         (type !== "model.sampling.started" || compactRef.current?.state === "awaiting_placement")
       )
-        refreshFlags.current.usage = true;
+        refreshFlags.current.status = true;
       if (refreshTimer.current === undefined)
         refreshTimer.current = setTimeout(() => {
           const flags = refreshFlags.current;
-          refreshFlags.current = { compact: false, usage: false };
+          refreshFlags.current = { compact: false, status: false };
           refreshTimer.current = undefined;
           if (flags.compact) void refreshCompact();
-          if (flags.usage && openRef.current) void refreshUsage();
+          if (flags.status && opened.current?.kind === "status") void refreshReport();
         }, 100);
     },
-    [refreshCompact, refreshUsage],
+    [refreshCompact, refreshReport],
   );
   return {
-    usageOpen: usageOpen && usageSession.current === sessionId,
-    usage: usage?.sessionId === sessionId ? usage : null,
-    usageError,
-    usageLoading,
+    panel: opened.current?.sessionId === sessionId ? panel : null,
+    report: report?.sessionId === sessionId ? report : null,
+    error,
+    loading,
     compact: compact?.sessionId === sessionId ? compact : null,
     notify,
-    refreshUsage,
-    closeUsage() {
-      setUsageOpen(false);
-      usageRequest.current?.abort();
+    refreshReport,
+    closePanel() {
+      opened.current = null;
+      setPanel(null);
+      reportRequest.current?.abort();
     },
-    async openUsage() {
-      usageSession.current = sessionId;
-      setUsageOpen(true);
-      return refreshUsage();
+    openPanel(kind: ReportCommand) {
+      if (!sessionId) return Promise.resolve(false);
+      opened.current = { sessionId, kind };
+      setPanel(kind);
+      setReport(null);
+      return refreshReport();
     },
     acceptedCompact(value: ConversationCompactResource) {
       if (current.current !== value.sessionId) return;

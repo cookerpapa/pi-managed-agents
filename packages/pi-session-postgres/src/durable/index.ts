@@ -35,8 +35,6 @@ export {
   readNativeUsageBatch,
   readNativeContextEstimate,
   nativeUsageTotals,
-  emptyUsageTokens,
-  addUsageTokens,
 } from "./conversation-usage.ts";
 export {
   readNativeCompaction,

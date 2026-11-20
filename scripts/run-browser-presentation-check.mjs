@@ -320,7 +320,7 @@ window.renderChat = (sessionState='idle', history=false, childViews=false, peerF
   const fixtureTurnId='50000000-0000-4000-8000-000000000011';
   window.fixtureQueue={sessionId:sid,revision:0,activeTurnId:sessionState==='running'?fixtureTurnId:null,items:[]};
   window.steerRequests=[];window.steerReceipts=new Map();
-  window.usageReads=0;window.compactRequests=[];window.compactReceipts=new Map();window.compactValue=null;window.loseCompactReply=false;window.deferCompactReply=false;
+  window.statusReads=0;window.usageReads=0;window.compactRequests=[];window.compactReceipts=new Map();window.compactValue=null;window.loseCompactReply=false;window.deferCompactReply=false;
   window.turnReceipts=new Map();
   window.turnStates=new Map();window.returnedInputs=null;window.returnInputsReady=true;
   const delegates=['branch','fresh'].map((contextMode,index)=>({sessionId:'10000000-0000-4000-8000-00000000000'+(index+2),
@@ -457,8 +457,11 @@ window.renderChat = (sessionState='idle', history=false, childViews=false, peerF
     if(String(url).endsWith('/usage')){
       window.usageReads++;
       const tokens={input:7000,output:1000,cacheRead:6000,cacheWrite:0,total:8000};
-      return Response.json({sessionId:String(url).split('/').at(-2),nativeSequence:7,observedAt:new Date().toISOString(),source:'postgres',inFlight:sessionState==='running',
-        model:{provider:'openai-codex',modelId:'gpt-6.1-sol'},tokens,models:[],children:[],includingChildren:tokens,context:{estimatedTokens:9000,window:1000000,compactThreshold:900000,method:'latest_usage'}});
+      return Response.json({sessionId:String(url).split('/').at(-2),observedAt:new Date().toISOString(),source:'provider_receipts',unconfirmedRequests:0,tokens,models:[],children:[],includingChildren:tokens});
+    }
+    if(String(url).endsWith('/status')){
+      window.statusReads++;
+      return Response.json({sessionId:String(url).split('/').at(-2),observedAt:new Date().toISOString(),model:{provider:'openai-codex',modelId:'gpt-6.1-sol'},context:{estimatedTokens:9000,window:1000000,compactThreshold:900000,method:'latest_usage'}});
     }
     if(String(url).endsWith('/compact')){
       if((init.method??'GET')==='GET')return Response.json(window.compactValue);
@@ -2958,7 +2961,7 @@ try {
     assert.equal(await page.evaluate("usageReads"), 0, "hidden usage must not load");
     await fill("/");
     await page.waitFor(
-      "document.querySelectorAll('.product-command-menu [role=option]').length===2",
+      "document.querySelectorAll('.product-command-menu [role=option]').length===3",
     );
     await key("Escape");
     await page.waitFor("!document.querySelector('.product-command-menu')");
@@ -2983,6 +2986,15 @@ try {
       "",
     );
     await page.screenshot("/tmp/pi-cloud-usage-panel.png");
+    assert.equal(await page.evaluate("statusReads"), 0);
+    await fill("/status");
+    await key("Enter");
+    await page.waitFor(
+      "document.querySelector('.product-usage-context')?.textContent.includes('1,000,000')",
+    );
+    assert.equal(await page.evaluate("usageReads"), 1);
+    assert.equal(await page.evaluate("!!document.querySelector('.product-usage-grid')"), false);
+
     await key("Escape");
     await page.waitFor("!document.querySelector('.product-usage-panel')");
     assert.equal(await page.evaluate("!!window.returnedInputs"), false);
@@ -3125,14 +3137,14 @@ try {
                     ? {
                         accepted: true,
                         scope: "commands",
-                        slashUsageAndCompact: true,
+                        slashStatusUsageAndCompact: true,
                         compactLostReplyAndDraftRetention: true,
                         compactWaitsForPlacement: true,
                       }
                     : {
                         accepted: true,
                         scope: "all",
-                        slashUsageAndCompact: true,
+                        slashStatusUsageAndCompact: true,
                         compactLostReplyAndDraftRetention: true,
                         compactWaitsForPlacement: true,
                         retainedSessionImageLoads: true,

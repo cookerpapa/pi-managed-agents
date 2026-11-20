@@ -10,7 +10,13 @@ import {
   DurablePostgresProjection,
   PublishedDurableStorage,
 } from "@pi-cloud/pi-session-postgres/durable";
-import { parseConversationUsageResource } from "@pi-cloud/protocol";
+import { ModelMeteringService } from "@pi-cloud/accounting";
+import {
+  parseConversationStatusResource,
+  parseConversationUsageResource,
+  type ModelMeteringContext,
+  type ModelMeteringEvent,
+} from "@pi-cloud/protocol";
 import { createPrivateTenant } from "../src/tenant-administration.ts";
 import { ControlPlaneStore } from "../src/control-plane-store.ts";
 import { ConversationCompactService } from "../src/conversation-compact-service.ts";
@@ -123,8 +129,7 @@ it("compact history stays scoped while including queued and pre-start-cancelled 
 
 it("reads native current usage and context without admitting work or hydrating images", async () => {
   const f = await fixture();
-  const empty = await f.store.getConversationUsage(f.session.sessionId);
-  expect(empty.tokens.total).toBe(0);
+  const empty = await f.store.getConversationStatus(f.session.sessionId);
   expect(empty.context.estimatedTokens).toBe(0);
   expect(empty.context.window).toBeGreaterThan(10000);
   const row = await db
@@ -185,23 +190,15 @@ it("reads native current usage and context without admitting work or hydrating i
       const state = await tx.doc(UsageDoc, root.id);
       state.models[`${empty.model.provider}/${empty.model.modelId}`] = usage;
     }, BACKGROUND_CONTEXT);
-    const result = parseConversationUsageResource(
-      await f.store.getConversationUsage(f.session.sessionId),
+    const status = parseConversationStatusResource(
+      await f.store.getConversationStatus(f.session.sessionId),
     );
-    expect(result.tokens).toEqual({
-      input: 100,
-      output: 20,
-      cacheRead: 70,
-      cacheWrite: 0,
-      total: 120,
-    });
-    expect(result.context).toMatchObject({ method: "latest_usage", estimatedTokens: 120 });
-    expect(result.includingChildren).toEqual(result.tokens);
+    expect(status.context).toMatchObject({ method: "latest_usage", estimatedTokens: 120 });
     await root.commit(async (tx) => {
       const usage = await tx.doc(UsageDoc, root.id);
       usage.models[`${empty.model.provider}/${empty.model.modelId}`]!.output += 5;
     }, BACKGROUND_CONTEXT);
-    expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(125);
+    expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(0);
     const {
       rows: [document],
     } = await sql<{ id: string; checkpoints: number; revisions: number; history: number }>`
@@ -213,7 +210,7 @@ it("reads native current usage and context without admitting work or hydrating i
         and r.fields->>'nativeKind'='"pi.usage"'`.execute(db);
     expect(document).toMatchObject({ checkpoints: 1, revisions: 0, history: 0 });
     await projection.rebuild();
-    expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(125);
+    expect((await f.store.getConversationUsage(f.session.sessionId)).tokens.total).toBe(0);
     expect(
       (await projection.revisions(Number(document!.id), storage.committedSequence)).at(-1)
         ?.checkpoint,
@@ -232,6 +229,136 @@ it("reads native current usage and context without admitting work or hydrating i
   }
 });
 
+it("aggregates deduplicated provider executions by session, including maintenance, retries and delayed receipts", async () => {
+  const f = await fixture(),
+    foreign = await fixture(),
+    meter = new ModelMeteringService(db);
+  const other = await f.store.createSession(
+    f.project.projectId,
+    f.project.workspaceId,
+    "other",
+    "elastic",
+  );
+  const context = (
+    sessionId: string,
+    purpose: ModelMeteringContext["purpose"] = "agent",
+  ): ModelMeteringContext => ({
+    version: 1,
+    invocationId: randomUUID(),
+    tenantId: f.tenant.tenantId,
+    sessionId,
+    runId: randomUUID(),
+    requestedAt: new Date().toISOString(),
+    purpose,
+    provider: "requested",
+    model: "alias",
+  });
+  const events = (
+    c: ModelMeteringContext,
+    id: string,
+    quality: "complete" | "unclassified" = "complete",
+  ): ModelMeteringEvent[] => {
+    const common = { context: c, occurredAt: c.requestedAt };
+    return [
+      { ...common, kind: "attempt", executionId: id },
+      {
+        ...common,
+        kind: "usage",
+        executionId: id,
+        usage: {
+          provider: "actual",
+          model: "actual-model",
+          serviceTier: "default",
+          quality,
+          failed: false,
+          unsupportedDimensions: false,
+          tokens: {
+            input: 20,
+            cacheRead: 7,
+            cacheWrite: 3,
+            output: 8,
+            reasoning: 2,
+            total: 40,
+            unclassified: 0,
+          },
+        },
+      },
+    ];
+  };
+  const own = context(f.session.sessionId),
+    retry = events(own, randomUUID()),
+    maintenance = events(context(f.session.sessionId, "context_maintenance"), randomUUID());
+  const pending = context(f.session.sessionId),
+    late = events(pending, randomUUID());
+  await meter.ingest({
+    events: [
+      ...events(own, randomUUID()),
+      ...retry,
+      ...maintenance,
+      late[0],
+      ...events(context(other.sessionId), randomUUID()),
+      ...events(
+        { ...own, invocationId: randomUUID(), tenantId: foreign.tenant.tenantId },
+        randomUUID(),
+      ),
+    ],
+  });
+  await meter.ingest({ events: retry });
+  const read = async () =>
+    parseConversationUsageResource(await f.store.getConversationUsage(f.session.sessionId));
+  let result = await read();
+  expect(result.tokens).toEqual({
+    input: 90,
+    cacheRead: 21,
+    cacheWrite: 9,
+    output: 30,
+    total: 120,
+  });
+  expect(result.includingChildren).toEqual(result.tokens);
+  expect(result.models).toEqual([
+    { provider: "actual", modelId: "actual-model", tokens: result.tokens },
+  ]);
+  expect(result.unconfirmedRequests).toBe(1);
+  await meter.ingest({
+    events: [late[1]!, ...events(context(f.session.sessionId), randomUUID(), "unclassified")],
+  });
+  result = await read();
+  expect(result.tokens.total).toBe(160);
+  expect(result.unconfirmedRequests).toBe(1);
+  await expect(foreign.store.getConversationUsage(f.session.sessionId)).rejects.toThrow();
+  const rootRun = await f.store.acceptTurn(f.session.sessionId, randomUUID(), {
+    prompt: "fixture",
+  });
+  await db
+    .insertInto("subagent_conversations")
+    .values({
+      id: randomUUID(),
+      tenant_id: f.tenant.tenantId,
+      root_session_id: f.session.sessionId,
+      root_run_id: rootRun.runId,
+      parent_session_id: f.session.sessionId,
+      parent_turn_id: rootRun.turnId,
+      parent_tool_call_id: "fixture",
+      parent_execution_id: null,
+      depth: 1,
+      source_sequence: "1",
+      source_record_id: "1",
+      source_kind: "task",
+      request_sha256: "fixture",
+      child_session_id: other.sessionId,
+      child_turn_id: randomUUID(),
+      agent_name: "helper",
+      context_mode: "fresh",
+      sandbox_mode: "none",
+    })
+    .execute();
+  result = await read();
+  expect(result.tokens.total).toBe(160);
+  expect(result.children.map((c) => [c.sessionId, c.tokens.total])).toEqual([
+    [other.sessionId, 40],
+  ]);
+  expect(result.includingChildren.total).toBe(200);
+});
 it("cold compact is typed root work, is idempotent, and does not require Workspace compute", async () => {
   const f = await fixture(),
     service = new ConversationCompactService({ database: db });

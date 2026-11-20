@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Separate on-demand gateway usage and native context status in the Session API/client and web composer. Measure PG contention with both writers. [Results](reports/status-usage-contention-20261120.md).
+
 - [x] Compare row-wise and multi-row cumulative usage writes, relation footprint and compaction inputs in the isolated prototype. [Evidence](reports/minimal-usage-bulk-20261120.md).
 
 - [x] Measure the projection cost of retaining native cumulative usage in the admitting batch. Verify a streamed two-tool trace separately from the complete-message capacity study. [Evidence](reports/minimal-projection-usage-20261120.md).
