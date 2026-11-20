@@ -1,0 +1,122 @@
+{
+  "rootMessageSmoke": {
+    "runs": 32,
+    "countedMessagesPerTrial": 6400,
+    "scope": "Recorded complete messages; no tool execution or output from a model during this test.",
+    "trials": [
+      {
+        "rate": 2315,
+        "policy": "moving-sync",
+        "rps": 2248.3306523996107,
+        "elapsedMs": 2846.556396484375,
+        "finalLag": 0,
+        "verifiedEntries": 6464,
+        "sampledPeakLag": 133,
+        "sourceLateP95Ms": 1.1197599148410973,
+        "p95Ms": 132.04096211939992,
+        "drainMs": 81.97756279107034
+      },
+      {
+        "rate": 2315,
+        "policy": "recorded-history",
+        "rps": 2296.611616521299,
+        "elapsedMs": 2786.714111328125,
+        "finalLag": 0,
+        "verifiedEntries": 6464,
+        "sampledPeakLag": 37,
+        "sourceLateP95Ms": 1.1387346342256706,
+        "p95Ms": 49.31637359865999,
+        "drainMs": 22.13527763482034
+      },
+      {
+        "rate": "preloaded",
+        "policy": "recorded-history",
+        "rps": 3004.83294568974,
+        "elapsedMs": 2129.902099609375,
+        "finalLag": 0,
+        "verifiedEntries": 6464,
+        "sampledPeakLag": 5097,
+        "sourceLateP95Ms": 3188.61576171875
+      },
+      {
+        "rate": "preloaded",
+        "policy": "moving-sync",
+        "rps": 2985.6845591643764,
+        "elapsedMs": 2143.56201171875,
+        "finalLag": 0,
+        "verifiedEntries": 6464,
+        "sampledPeakLag": 4846,
+        "sourceLateP95Ms": 2273.18021484375
+      }
+    ]
+  },
+  "rootRunSmoke": {
+    "scope": "Two independent Workers; deterministic local provider; ordinary fresh roots; no Worker failure.",
+    "trials": [
+      {
+        "rate": 260,
+        "completed": 520,
+        "dropped": 0,
+        "runsPerSecond": 251.51,
+        "prefixWidth": 1,
+        "projectionPolicy": "moving-sync",
+        "finalModelOutputToRunSettlementMs": {
+          "count": 520,
+          "p50": 27,
+          "p95": 63,
+          "p99": 87,
+          "max": 103,
+          "min": 14
+        }
+      },
+      {
+        "rate": 260,
+        "completed": 520,
+        "dropped": 0,
+        "runsPerSecond": 252.52,
+        "prefixWidth": 1,
+        "projectionPolicy": "selective",
+        "finalModelOutputToRunSettlementMs": {
+          "count": 520,
+          "p50": 21,
+          "p95": 34,
+          "p99": 46,
+          "max": 66,
+          "min": 12
+        }
+      },
+      {
+        "rate": 260,
+        "completed": 520,
+        "dropped": 0,
+        "runsPerSecond": 252.98,
+        "prefixWidth": 16,
+        "projectionPolicy": "moving-sync",
+        "finalModelOutputToRunSettlementMs": {
+          "count": 520,
+          "p50": 23,
+          "p95": 32,
+          "p99": 39,
+          "max": 52,
+          "min": 14
+        }
+      },
+      {
+        "rate": 260,
+        "completed": 520,
+        "dropped": 0,
+        "runsPerSecond": 252.16,
+        "prefixWidth": 16,
+        "projectionPolicy": "selective",
+        "finalModelOutputToRunSettlementMs": {
+          "count": 520,
+          "p50": 21,
+          "p95": 36,
+          "p99": 71,
+          "max": 84,
+          "min": 15
+        }
+      }
+    ]
+  }
+}

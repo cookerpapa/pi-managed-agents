@@ -221,7 +221,7 @@ function receive(a, m) {
   if (m.kind === "confirmed") {
     assert(e.worker);
     e.worker.write({ kind: "confirmed", id: m.id, seq: m.seq, at: m.at });
-    if (m.placed && m.depth === 0) e.placed = true;
+    if (m.queues.some((q) => q.conversation === 1 && q.placed && q.depth === 0)) e.placed = true;
   }
   if (m.kind === "answerCommitted") e.answerCommitted = true;
   if (m.kind === "finishHeld") e.finishHeld = true;
@@ -831,6 +831,13 @@ async function wave(spec) {
     finishToHandlerMs: d(items.map((i) => i.terminal.finishTransitMs)),
     finishPgMs: d(items.map((i) => i.terminal.finishHandlerMs)),
     answerCommitToRunCommitMs: d(items.map((i) => i.terminal.terminalSinceAnswerMs)),
+    ...(items.length && items.every((i) => Number.isFinite(i.work.finalModelOutputAt))
+      ? {
+          finalModelOutputToRunSettlementMs: d(
+            items.map((i) => i.terminal.at - i.work.finalModelOutputAt),
+          ),
+        }
+      : {}),
     extraInputConfirmedMs: d(items.flatMap((i) => i.work.inputAcks)),
     inputClientWaitMs: d(items.map((i) => i.work.clientAckWaitMs)),
     workerResources,

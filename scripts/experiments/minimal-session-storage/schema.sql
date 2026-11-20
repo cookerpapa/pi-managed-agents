@@ -11,15 +11,15 @@ create unique index runs_one_active on runs (tenant_id,session_id) where state='
 create table messages (
   tenant_id uuid not null, pi_session_id uuid not null, entry_id bigint not null,
   conversation_id bigint not null, run_id uuid not null references runs(id),
-  role text not null, content text not null, source_input_id uuid, commit_seq bigint not null,
+  role text not null, content text not null, source_input_id text, commit_seq bigint not null,
   ordinal integer not null, created_at timestamptz not null default clock_timestamp(),
   primary key (tenant_id,pi_session_id,entry_id),
   unique (tenant_id,pi_session_id,commit_seq,ordinal)
 );
 create index messages_run on messages(run_id,commit_seq,ordinal);
-create unique index messages_input on messages(tenant_id,pi_session_id,source_input_id) where source_input_id is not null;
+create unique index messages_input on messages(tenant_id,pi_session_id,conversation_id,source_input_id) where source_input_id is not null;
 create table inboxes (
   tenant_id uuid not null, pi_session_id uuid not null, conversation_id bigint not null,
   doc_id bigint not null, commit_seq bigint not null, ordinal integer not null,
-  items jsonb not null, primary key (tenant_id,pi_session_id,conversation_id)
+  items jsonb not null, created_seq bigint not null, primary key (tenant_id,pi_session_id,conversation_id)
 );

@@ -29,7 +29,10 @@ const state = () => ({
   writer: "writer",
   seq: 11,
   lastFact: "fact",
-  value: { items: [] },
+  inboxes: {
+    4: { conversation: 1, value: { items: [] } },
+    5: { conversation: 7, value: { items: [] } },
+  },
   liveDocs: foldLive({}, [create(2, 1, {}), create(3, 7, {})]),
 });
 
@@ -50,7 +53,13 @@ test("checkpoints only bounded settled document metadata and preserves the origi
     assert.equal(checkpoint({ ...v, liveDocs: changed }, record), undefined);
     assert.deepEqual(v.liveDocs[3].value, {});
   }
-  assert.equal(checkpoint({ ...v, value: { items: ["pending"] } }, record), undefined);
+  assert.equal(
+    checkpoint(
+      { ...v, inboxes: { ...v.inboxes, 5: { conversation: 7, value: { items: ["pending"] } } } },
+      record,
+    ),
+    undefined,
+  );
   assert.equal(checkpoint({ ...v, pendingTools: { 4: {} } }, record), undefined);
 });
 

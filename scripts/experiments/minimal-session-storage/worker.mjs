@@ -150,7 +150,8 @@ async function execute(row, claimMs, claimReason) {
     observed,
     observedTools,
     toolExecutions = 0,
-    firstModelAt;
+    firstModelAt,
+    finalModelOutputAt;
   const restoredMs = performance.now() - started;
   const scope = {
     tenantId: row.tenant_id,
@@ -305,6 +306,7 @@ async function execute(row, claimMs, claimReason) {
       records,
       bytes,
       modelCalls,
+      finalModelOutputAt,
       rechecks,
       clientAckWaitMs,
       inputAcks: issued.map((i) => i.ackMs),
@@ -387,7 +389,17 @@ async function execute(row, claimMs, claimReason) {
       tokenSize: { min: 256, max: 256 },
       models: [{ id: row.model_ref }],
     });
-  models.setProvider(fake.provider);
+  models.setProvider({
+    ...fake.provider,
+    streamSimple(...args) {
+      const stream = fake.provider.streamSimple(...args);
+      // Observe the provider's completed response without consuming its stream.
+      void stream.result().then((message) => {
+        if (message.stopReason === "stop") finalModelOutputAt = Date.now();
+      });
+      return stream;
+    },
+  });
   if (previous) restoreSettled(store, row, head, previous.records);
   const registry = createRegistry();
   if (sc.scene === "steer")

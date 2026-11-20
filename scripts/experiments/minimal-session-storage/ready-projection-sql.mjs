@@ -14,7 +14,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
     create index active_projection_start on runs(projection_partition,projection_first) where state='running' and projection_first is not null;
     create function prefix_message(uuid,uuid,uuid,bigint,text,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${message} $fn$;
-    create function prefix_inbox(uuid,uuid,bigint,bigint,int,text,uuid,uuid) returns table(accepted boolean,writes int)
+    create function prefix_inbox(uuid,uuid,bigint,bigint,bigint,int,text,uuid,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${inbox} $fn$;
     create function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${finishAndRelease} $fn$;
     create function project_ready(p_topic text,p_partition int,p_expected bigint,p_next bigint,p_frames jsonb,p_relaxed boolean default false,p_allow_finish boolean default false,p_bulk_usage boolean default false)
@@ -33,12 +33,12 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
         for op in select value from jsonb_array_elements(frame->'ops') loop
           a:=op->'args';
           if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin') and not (op->>'kind'='finish' and p_allow_finish)) or
-            (op->>'kind'='inbox' and (a->>5)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
+            (op->>'kind'='inbox' and (a->>6)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
           case op->>'kind'
           when 'message' then
             select accepted,writes into strict ok,n from prefix_message((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid);
           when 'inbox' then
-            select accepted,writes into strict ok,n from prefix_inbox((a->>0)::uuid,(a->>1)::uuid,(a->>2)::bigint,(a->>3)::bigint,(a->>4)::int,a->>5,(a->>6)::uuid,(a->>7)::uuid);
+            select accepted,writes into strict ok,n from prefix_inbox((a->>0)::uuid,(a->>1)::uuid,(a->>2)::bigint,(a->>3)::bigint,(a->>4)::bigint,(a->>5)::int,a->>6,(a->>7)::uuid,(a->>8)::uuid);
           when 'finish' then
             select count(*)::int into n from prefix_finish((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::uuid,a->>4);
             ok:=n=1;

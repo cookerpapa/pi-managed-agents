@@ -43,13 +43,20 @@ const message = [
   ]),
   lease,
 ];
-const inbox = [tenant, session, 3, 1, 0, "[]", run, lease],
+const inbox = [tenant, session, 1, 3, 1, 0, "[]", run, lease],
   finish = [
     tenant,
     session,
     run,
     lease,
-    JSON.stringify({ version: randomUUID(), seq: 6, nextId: 12, floor: 1, count: 1, bytes: 4096 }),
+    JSON.stringify({
+      version: randomUUID(),
+      seq: 6,
+      nextId: 12,
+      floor: 1,
+      count: 1,
+      bytes: 4096,
+    }),
   ];
 await db.connect();
 try {
@@ -67,7 +74,7 @@ try {
    select gen_random_uuid(),$1,gen_random_uuid(),1,gen_random_uuid(),'fixture','none',case when i<=256 then 'running' else 'completed' end from generate_series(1,8192)i`,
     [tenant],
   );
-  await db.query("insert into inboxes select tenant_id,session_id,1,3,1,0,'[]'::jsonb from runs");
+  await db.query("insert into inboxes select tenant_id,session_id,1,3,1,0,'[]'::jsonb,1 from runs");
   await db.query(
     "insert into messages select tenant_id,session_id,i,1,id,'user','fixture',null,i,0 from runs cross join generate_series(4,5)i",
   );

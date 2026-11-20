@@ -317,3 +317,15 @@ directly, or omit the argument for the committed receiver. Uses a dedicated test
 each comparison replays the same fixed prefixes and receipts, rotates layout order,
 verifies 2,048 receipt events per concurrent sample and reads the expected Session totals.
 [Conditions and results](../../../docs/reports/status-usage-contention-20261120.md).
+
+### Family Inbox recovery (#52)
+
+`family-inboxes.integration.spec.mjs` drives the ordinary projection code from
+Pi's real Storage commits. On a pending parent delegation and child Tool it
+replaces the Projector, replays the protected suffix and checks both queues,
+native owner identity, input placement and root-only history bounds. The fixture
+uses local deterministic tools. The integrated Worker/Guest takeover with an
+original Kafka reply remains outstanding. In live model fixture stages,
+`finalModelOutputToRunSettlementMs` measures final provider stream completion
+to logical Run settlement. Recorded playback has no model-completion sample.
+[Results](../../../docs/reports/minimal-family-recovery-20261120.md).

@@ -93,7 +93,7 @@ export async function seedCohort(db, tenant, sc) {
           select $1,$2,n+3,1,$3,'user',body,1,n from unnest($4::text[]) with ordinality x(body,n)`,
           [tenant, session, run, bodies],
         );
-        await client.query("insert into inboxes values ($1,$2,1,3,1,0,'[]')", [tenant, session]);
+        await client.query("insert into inboxes values ($1,$2,1,3,1,0,'[]',1)", [tenant, session]);
         await client.query("commit");
       } catch (error) {
         await client.query("rollback");
@@ -175,7 +175,7 @@ export async function forkSeed(db, tenant, source) {
       where tenant_id=$1 and pi_session_id=$2 and run_id=$5`,
       [tenant, source.session, session, run, p.id],
     );
-    await c.query("insert into inboxes values($1,$2,1,3,1,0,'[]')", [tenant, session]);
+    await c.query("insert into inboxes values($1,$2,1,3,1,0,'[]',1)", [tenant, session]);
     await c.query("commit");
     return { session, witness: source.witness, seeded: true };
   } catch (error) {

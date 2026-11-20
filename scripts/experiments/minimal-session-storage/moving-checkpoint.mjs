@@ -5,6 +5,8 @@ import { applyImmutableBatches } from "@earendil-works/chord/delta";
 import { LiveDoc } from "@earendil-works/pi-durable";
 import { parseToolReplyRecovery } from "../../../packages/protocol/src/tool-recovery.ts";
 
+import { emptyInboxRoutes, reopenEmptyInboxes } from "./family-inboxes.mjs";
+
 const bounded = 16 * 1024;
 export const batchHash = (batch) =>
   createHash("sha256").update(JSON.stringify(batch)).digest("hex");
@@ -70,9 +72,9 @@ export function foldLive(documents = {}, writes) {
 }
 
 export function checkpoint(view, record) {
+  const inboxRoutes = emptyInboxRoutes(view.inboxes);
   if (
-    !view.value ||
-    view.value.items.length ||
+    !inboxRoutes ||
     Object.keys(view.pendingTools ?? {}).length ||
     !Object.keys(view.liveDocs).length ||
     !Object.values(view.liveDocs).every((doc) => compactLive(doc.value))
@@ -88,7 +90,6 @@ export function checkpoint(view, record) {
     "floor",
     "floorChanged",
     "markerId",
-    "inboxId",
     "liveId",
     "usageDocs",
     "lastFact",
@@ -98,6 +99,7 @@ export function checkpoint(view, record) {
     version: 1,
     writer: record.fact.scope.writerId,
     ...fields,
+    inboxRoutes,
     liveDocs: view.liveDocs,
     answered: view.lastAnswerCommit !== undefined,
     offset: String(record.offset),
@@ -117,13 +119,13 @@ export function hydrate(state, writer, first) {
       Object.values(state.liveDocs).every((doc) => compactLive(doc.value)),
     "Invalid active projection checkpoint",
   );
-  const { version, offset, hash, answered, ...fields } = state;
+  const { version, offset, hash, answered, inboxRoutes, ...fields } = state;
   return {
     ...fields,
     writer,
     lastOffset: BigInt(offset),
     lastHash: hash,
-    value: { items: [] },
+    inboxes: reopenEmptyInboxes(inboxRoutes),
     ...(answered ? { lastAnswerCommit: performance.now() } : {}),
   };
 }
@@ -229,12 +231,12 @@ export function replayableMetadata(frame, fact) {
     if (op.kind === "pin") return true;
     if (op.kind === "inbox")
       return (
-        op.args[5] === "[]" &&
+        op.args[6] === "[]" &&
         fact.commit.writes.some(
           (w) =>
             w.type === "document.create" &&
             w.record.kind === "pi.inbox" &&
-            w.record.id === op.args[2],
+            w.record.id === op.args[3],
         )
       );
     if (op.kind !== "message") return false;

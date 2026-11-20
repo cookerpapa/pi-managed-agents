@@ -16,7 +16,9 @@ export const claimPreferredWithHead = withHead(
    and p.mailbox_position=r.mailbox_position-1 and p.state='completed' and p.history_head->>'version'=$4)`,
   ),
 );
-export const openingHead = `select r.state,r.lease_id,r.mailbox_position,${columns} from runs r ${priorJoin}
+export const openingHead = `select r.state,r.lease_id,r.mailbox_position,${columns},
+ (select jsonb_object_agg(b.doc_id::text,b.conversation_id) from inboxes b where b.tenant_id=r.tenant_id
+  and b.pi_session_id=r.session_id and b.created_seq<=(prior.history_head->>'seq')::bigint) as inbox_routes from runs r ${priorJoin}
  where r.id=$1 and r.tenant_id=$2 and r.session_id=$3`;
 export const scopeKey = (tenant, session) => tenant + "/" + session + "/1";
 export const EMPTY_HEAD = Object.freeze({ seq: 0, nextId: 2, floor: 1, count: 0, bytes: 0 });

@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0343](0343-minimal-family-recovery.md) preserves Conversation-scoped Inboxes and root history bounds in the #52 storage candidate.
+
 [ADR-0342](0342-context-status-and-gateway-usage.md) separates context status and confirmed gateway usage.
 
 [ADR-0341](0341-minimal-storage-fork-study.md) measures a shared-history Fork on the minimal message projection.

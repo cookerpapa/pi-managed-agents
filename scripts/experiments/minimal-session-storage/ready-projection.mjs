@@ -102,7 +102,10 @@ class Draft {
           canonical = inbox;
           if (sql === plainInbox) args = [...args, f.scope.runId, f.scope.writerId];
           opening = f.commit.writes.some(
-            (w) => w.type === "document.create" && w.record.kind === "pi.inbox",
+            (w) =>
+              w.type === "document.create" &&
+              w.record.kind === "pi.inbox" &&
+              w.record.id === args[3],
           );
           if (!opening) this.barrier = true;
         } else if (sql === finish) {

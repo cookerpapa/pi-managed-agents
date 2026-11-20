@@ -72,6 +72,7 @@ async function fixture(test, requestedRun = randomUUID()) {
         .query(projectionTemplates.inbox, [
           s.tenantId,
           s.piSessionId,
+          1,
           42,
           f.commit.seq,
           1,

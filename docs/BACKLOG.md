@@ -4,6 +4,8 @@
 
 - [ ] **P0 · first implementation milestone.** [#52](https://github.com/cookerpapa/pi-managed-agents/issues/52) — cold-open the same Run on a replacement Worker while a child Conversation is waiting for a real sandbox Tool. Verify the original reply, deadline, single execution and parent continuation before implementing the database placement alternatives in [#51](https://github.com/cookerpapa/pi-managed-agents/issues/51).
 
+- [x] Under #52, isolate native parent and child Inboxes and verify Projector replay during their active waits. [Evidence and remaining Worker gap](reports/minimal-family-recovery-20261120.md).
+
 - [x] Separate on-demand gateway usage and native context status in the Session API/client and web composer. Measure PG contention with both writers. [Results](reports/status-usage-contention-20261120.md).
 
 - [x] Compare row-wise and multi-row cumulative usage writes, relation footprint and compaction inputs in the isolated prototype. [Evidence](reports/minimal-usage-bulk-20261120.md).

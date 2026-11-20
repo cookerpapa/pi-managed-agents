@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { isDeepStrictEqual } from "node:util";
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
-import { applyImmutableBatches } from "@earendil-works/chord/delta";
+import { foldInboxes, emptyInboxRoutes, reopenEmptyInboxes } from "./family-inboxes.mjs";
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 import {
   finishStatement,
@@ -83,20 +83,10 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       let head;
       if (stage?.integrated) {
         assert.equal(f.baseSequence, s.baseSeq);
-        assert(s.inboxId && s.value.items.length === 0, "Run finished before Inbox settlement");
-        if (s.floorChanged) {
-          const {
-            rows: [covered],
-          } = await c.query(
-            `select count(*)::int n,coalesce(sum(octet_length(content)),0)::bigint bytes
-            from messages where tenant_id=$1 and pi_session_id=$2 and conversation_id=1 and entry_id>=$3`,
-            [tenantId, piSessionId, s.floor],
-          );
-          metrics.queries++;
-          s.count = covered.n;
-          s.bytes = Number(covered.bytes);
-        }
+        const inboxRoutes = emptyInboxRoutes(s.inboxes);
+        assert(inboxRoutes, "Run finished before Inbox settlement");
         head = {
+          ...(s.floorChanged ? { recount: true } : {}),
           version: f.factId,
           seq: s.seq,
           nextId: s.nextId,
@@ -151,8 +141,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
     // If the final record already retired the view, an old Kafka delivery must
     // not re-open it. An active replacement needs native recovery beyond this assay.
     let prior = EMPTY_HEAD,
-      inboxId = null,
-      items = [];
+      inboxes = {};
     if (batch.seq !== 1) {
       if (stage?.integrated) {
         const {
@@ -167,8 +156,8 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
         // The predecessor settled with an empty Inbox. During rewind the PG
         // row can already contain this Run's later, still-pending additions.
         prior = priorState(draft?.restoring ? { ...row, inbox_items: [] } : row);
-        inboxId = Number(row.inbox_id);
-        items = draft?.restoring ? [] : row.inbox_items;
+        inboxes = reopenEmptyInboxes(row.inbox_routes);
+        assert(inboxes[row.inbox_id]?.conversation === 1, "Predecessor root Inbox changed");
       } else {
         const prior = await pool.query(
           "select state,lease_id from runs where tenant_id=$1 and session_id=$2 and id=$3",
@@ -192,8 +181,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       nextId: prior.nextId,
       ...(prior.usageDocs ? { usageDocs: prior.usageDocs } : {}),
       floor: prior.floor,
-      inboxId,
-      value: { items },
+      inboxes,
       lastFact: null,
     };
   }
@@ -211,27 +199,19 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
     return;
   }
   assert.equal(batch.seq, s.seq + 1, "Native commit sequence gap");
-  let inboxId = s.inboxId,
-    value = s.value,
-    inboxOrdinal = -1;
+  const { documents, changed } = foldInboxes(s.inboxes, batch.writes);
   const messages = [],
     inputs = new Map();
   for (const w of batch.writes)
     if (w.type === "submission" && w.value.requestId && w.value.entry !== undefined)
       inputs.set(w.value.entry, w.value.requestId);
   for (const [ordinal, w] of batch.writes.entries()) {
-    if (w.type === "document.create" && w.record.kind === "pi.live") s.liveId = w.record.id;
-    if (w.type === "document.create" && w.record.kind === "pi.inbox") {
-      assert.equal(w.content.kind, "base");
-      assert.equal(w.record.scope.conversationId, 1);
-      inboxId = w.record.id;
-      value = w.content.value;
-      inboxOrdinal = ordinal;
-    } else if (w.type === "document.change" && w.id === inboxId) {
-      value =
-        w.content.kind === "base" ? w.content.value : applyImmutableBatches(value, [w.content.ops]);
-      inboxOrdinal = ordinal;
-    }
+    if (
+      w.type === "document.create" &&
+      w.record.kind === "pi.live" &&
+      w.record.scope.conversationId === 1
+    )
+      s.liveId = w.record.id;
     if (w.type === "entry") {
       const role = w.value.model?.[0]?.role;
       if (stage?.integrated || ["user", "assistant", "toolResult"].includes(role))
@@ -243,18 +223,24 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
           input: inputs.get(w.value.id) ?? null,
           ordinal,
         });
-      if (stage?.integrated && w.value.head !== undefined && (s.markerId ?? 0) < w.value.id) {
+      if (
+        stage?.integrated &&
+        w.value.conversationId === 1 &&
+        w.value.head !== undefined &&
+        (s.markerId ?? 0) < w.value.id
+      ) {
         s.markerId = w.value.id;
         s.floor = w.value.head;
         s.floorChanged = true;
       }
     }
   }
-  const lastAssistant = messages.some((m) => m.role === "assistant");
+  const rootMessages = messages.filter((m) => m.conversation === 1);
+  const lastAssistant = rootMessages.some((m) => m.role === "assistant");
   const kind =
-    inboxOrdinal >= 0 && messages.length
+    changed.length > 0 && messages.length
       ? "inbox+messages"
-      : inboxOrdinal >= 0
+      : changed.length > 0
         ? "inbox"
         : messages.length
           ? "messages"
@@ -265,7 +251,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
   let poolMs = 0,
     pgMs = 0;
   let io;
-  if ((inboxOrdinal >= 0 || messages.length) && stage?.sink !== "terminal-only") {
+  if ((changed.length > 0 || messages.length) && stage?.sink !== "terminal-only") {
     metrics.peakWaiting = Math.max(metrics.peakWaiting, pool.waitingCount);
     const acq = performance.now(),
       c = await borrow(),
@@ -275,30 +261,34 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       metrics.queries++;
       return c.query(...args);
     };
+    const inboxArgs = ({ id, conversation, ordinal, value }) => [
+      tenantId,
+      piSessionId,
+      conversation,
+      id,
+      batch.seq,
+      ordinal,
+      JSON.stringify(value.items),
+    ];
+    const countInbox = (args) => {
+      metrics.inboxSnapshots++;
+      metrics.inboxBytes += Buffer.byteLength(args[6]);
+    };
     try {
-      if (
-        stage.sink === "single" &&
-        ((messages.length === 1 && inboxOrdinal < 0) || (!messages.length && inboxOrdinal >= 0))
-      ) {
-        const items = inboxOrdinal < 0 ? null : JSON.stringify(value.items);
+      if (stage.sink === "single" && messages.length + changed.length === 1) {
+        const args = changed.length
+          ? [...inboxArgs(changed[0]), runId, writerId]
+          : [tenantId, piSessionId, runId, batch.seq, JSON.stringify(messages), writerId];
         const {
           rows: [proof],
-        } = await query(
-          items === null ? oneMessage : oneInbox,
-          items === null
-            ? [tenantId, piSessionId, runId, batch.seq, JSON.stringify(messages), writerId]
-            : [tenantId, piSessionId, inboxId, batch.seq, inboxOrdinal, items, runId, writerId],
-        );
+        } = await query(changed.length ? oneInbox : oneMessage, args);
         if (!proof.accepted) {
           metrics.stale++;
           measure("obsolete", poolMs, performance.now() - q);
           return;
         }
         assert.equal(proof.writes, 1, "Conflicting immutable message or Inbox position");
-        if (items !== null) {
-          metrics.inboxSnapshots++;
-          metrics.inboxBytes += Buffer.byteLength(items);
-        }
+        if (changed.length) countInbox(args);
       } else {
         await query("begin");
         const owner = await query(
@@ -324,23 +314,10 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
             ).rowCount,
             messages.length,
           );
-        if (inboxOrdinal >= 0) {
-          const items = JSON.stringify(value.items);
-          assert.equal(
-            (
-              await query(upsertInbox, [
-                tenantId,
-                piSessionId,
-                inboxId,
-                batch.seq,
-                inboxOrdinal,
-                items,
-              ])
-            ).rowCount,
-            1,
-          );
-          metrics.inboxSnapshots++;
-          metrics.inboxBytes += Buffer.byteLength(items);
+        for (const change of changed) {
+          const args = inboxArgs(change);
+          assert.equal((await query(upsertInbox, args)).rowCount, 1, "Conflicting Inbox position");
+          countInbox(args);
         }
         await query("commit");
       }
@@ -356,32 +333,37 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
   s.seq = batch.seq;
   if (stage?.integrated) {
     s.nextId = batch.nextId;
-    s.count += messages.length;
-    for (const m of messages) s.bytes += Buffer.byteLength(m.content);
+    s.count += rootMessages.length;
+    for (const m of rootMessages) s.bytes += Buffer.byteLength(m.content);
   }
   s.lastFact = f.factId;
   if (draft) s.lastOffset = offset;
   s.lastBatch = batch;
-  s.value = value;
-  s.inboxId = inboxId;
+  s.inboxes = documents;
   if (lastAssistant) s.lastAnswerCommit = performance.now();
   views.set(runId, s);
   if (lastAssistant && stage?.holdFinish) publish(() => send("answerCommitted", { id: runId }));
   measure(kind, poolMs, pgMs, io);
   if (
     stage?.scene !== "plain" &&
-    (inboxOrdinal >= 0 || messages.some((m) => m.role === "user" && m.input !== runId))
+    (changed.length > 0 ||
+      messages.some((m) => m.role === "user" && m.input != null && m.input !== runId))
   ) {
     metrics.acknowledgedInputs++;
     if (draft) draft.barrier = true;
-    publish(() =>
-      send("confirmed", {
-        id: runId,
-        seq: batch.seq,
-        at: Date.now(),
-        depth: value.items.length,
-        placed: messages.some((m) => m.role === "user" && m.input !== runId),
-      }),
+    const placed = new Set(
+      messages
+        .filter((m) => m.role === "user" && m.input != null && m.input !== runId)
+        .map((m) => m.conversation),
     );
+    const affected = new Set([...changed.map((c) => c.conversation), ...placed]);
+    const queues = Object.values(documents)
+      .filter((doc) => affected.has(doc.conversation))
+      .map((doc) => ({
+        conversation: doc.conversation,
+        depth: doc.value.items.length,
+        placed: placed.has(doc.conversation),
+      }));
+    publish(() => send("confirmed", { id: runId, seq: batch.seq, at: Date.now(), queues }));
   }
 }
