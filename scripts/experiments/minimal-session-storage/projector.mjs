@@ -15,6 +15,15 @@ import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 import { installTailProbe } from "./tail-probe.mjs";
 import { PgPathStudy } from "./pg-path-study.mjs";
+import { ReadyProjection } from "./ready-projection.mjs";
+import {
+  finishStatement,
+  projectionTemplates,
+  oneMessage,
+  oneInbox,
+  insertMessages,
+  upsertInbox,
+} from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 
 const pool = await openPool(
@@ -83,38 +92,28 @@ function summary() {
     elapsed: performance.now() - startedAt,
   };
 }
-const messageSql = (
-  guarded,
-) => `insert into messages(tenant_id,pi_session_id,entry_id,conversation_id,run_id,role,content,source_input_id,commit_seq,ordinal)
- select $1,$2,v.id,v.conversation,$3,v.role,v.content,v.input,$4,v.ordinal from
- jsonb_to_recordset($5::jsonb) v(id bigint,conversation bigint,role text,content text,input uuid,ordinal int) ${guarded ? "cross join owner" : ""}
- on conflict(tenant_id,pi_session_id,entry_id) do update set entry_id=excluded.entry_id
- where (messages.run_id,messages.commit_seq,messages.ordinal,messages.role,messages.content,messages.source_input_id)
- is not distinct from (excluded.run_id,excluded.commit_seq,excluded.ordinal,excluded.role,excluded.content,excluded.source_input_id) returning entry_id`;
-const inboxSql = (
-  guarded,
-) => `insert into inboxes select $1,$2,1,$3,$4,$5,$6::jsonb ${guarded ? "from owner" : ""}
- on conflict(tenant_id,pi_session_id,conversation_id) do update set commit_seq=excluded.commit_seq,ordinal=excluded.ordinal,items=excluded.items
- where inboxes.doc_id=excluded.doc_id and (inboxes.commit_seq,inboxes.ordinal)<(excluded.commit_seq,excluded.ordinal) returning doc_id`;
-const insertMessages = messageSql(false),
-  upsertInbox = inboxSql(false);
-function singleSql(mutation, run, lease) {
-  return `with owner as materialized (select id from runs where tenant_id=$1 and session_id=$2 and id=${run} and lease_id=${lease} and state='running' for share), changed as (${mutation}) select exists(select 1 from owner) as accepted, (select count(*)::int from changed) as writes`;
-}
-const oneMessage = singleSql(messageSql(true), "$3", "$6"),
-  oneInbox = singleSql(inboxSql(true), "$7", "$8");
-async function processRecord({ fact: f, partition, offset }) {
+const prefixStudy = __READY_STUDY__
+  ? new ReadyProjection(pool, topic, sessions, projectionTemplates)
+  : undefined;
+async function processRecord({ fact: f, partition, offset }, draft) {
   const t = performance.now(),
     wireMs = Date.now() - Date.parse(f.occurredAt),
     { tenantId, piSessionId, runId, writerId } = f.scope;
   assert.equal(kafkaProducerLane(piSessionId, 32), partition);
-  let s = sessions.get(runId);
+  const views = draft?.views ?? sessions;
+  const publish = (fn) => (draft ? draft.after.push(fn) : fn());
+  const borrow = () =>
+    draft ? draft.acquire(f) : pathStudy?.mode ? pathStudy.acquire(f) : pool.connect();
+  let s = views.get(runId);
   const trace = tailProbe?.begin(partition, offset, f);
   const measure = (kind, poolMs = 0, pgMs = 0, io) => {
-    trace?.complete(io);
-    account(kind, t, poolMs, pgMs, wireMs);
-    metrics.byPartition[partition]++;
-    nextOffsets.set(partition, offset + 1n);
+    if (draft && (kind === "obsolete" || kind === "duplicate")) draft.frame.rejected = true;
+    publish(() => {
+      trace?.complete(io);
+      account(kind, t, poolMs, pgMs, wireMs);
+      metrics.byPartition[partition]++;
+      nextOffsets.set(partition, offset + 1n);
+    });
   };
   metrics.firstReceipt ??= Date.now();
   if (f.kind === "work_finished") {
@@ -147,7 +146,7 @@ async function processRecord({ fact: f, partition, offset }) {
     assert.equal(f.nativeSequence, s.seq);
     assert(s.lastAnswerCommit !== undefined, "Completion lacks a preceding complete answer");
     const sqlStart = performance.now(),
-      c = await (pathStudy?.mode ? pathStudy.acquire(f) : pool.connect()),
+      c = await borrow(),
       taken = performance.now();
     let result;
     try {
@@ -177,11 +176,13 @@ async function processRecord({ fact: f, partition, offset }) {
         };
       }
       metrics.queries++;
-      result = await c.query(
-        `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=$5::jsonb" : ""}
-     where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running' returning id`,
-        [tenantId, piSessionId, runId, writerId, ...(head ? [JSON.stringify(head)] : [])],
-      );
+      result = await c.query(finishStatement(!!head), [
+        tenantId,
+        piSessionId,
+        runId,
+        writerId,
+        ...(head ? [JSON.stringify(head)] : []),
+      ]);
     } finally {
       c.release();
     }
@@ -198,17 +199,19 @@ async function processRecord({ fact: f, partition, offset }) {
       return;
     }
 
-    sessions.delete(runId);
-    metrics.lastCommit = at;
-    if (pathStudy?.mode !== "projector")
-      send("settled", {
-        id: runId,
-        at,
-        terminalSinceAnswerMs: end - s.lastAnswerCommit,
-        finishTransitMs: wireMs,
-        finishHandlerMs: end - t,
-        ...(trace ? { tail: trace.terminal } : {}),
-      });
+    views.delete(runId);
+    publish(() => {
+      metrics.lastCommit = draft ? Date.now() : at;
+      if (pathStudy?.mode !== "projector")
+        send("settled", {
+          id: runId,
+          at: metrics.lastCommit,
+          terminalSinceAnswerMs: (draft ? performance.now() : end) - s.lastAnswerCommit,
+          finishTransitMs: wireMs,
+          finishHandlerMs: (draft ? performance.now() : end) - t,
+          ...(trace ? { tail: trace.terminal } : {}),
+        });
+    });
     return;
   }
   assert.equal(f.kind, "durable_commit");
@@ -230,9 +233,11 @@ async function processRecord({ fact: f, partition, offset }) {
           measure("obsolete");
           return;
         }
-        prior = priorState(row);
+        // The predecessor settled with an empty Inbox. During rewind the PG
+        // row can already contain this Run's later, still-pending additions.
+        prior = priorState(draft?.restoring ? { ...row, inbox_items: [] } : row);
         inboxId = Number(row.inbox_id);
-        items = row.inbox_items;
+        items = draft?.restoring ? [] : row.inbox_items;
       } else {
         const prior = await pool.query(
           "select state,lease_id from runs where tenant_id=$1 and session_id=$2 and id=$3",
@@ -330,7 +335,7 @@ async function processRecord({ fact: f, partition, offset }) {
   if ((inboxOrdinal >= 0 || messages.length) && stage?.sink !== "terminal-only") {
     metrics.peakWaiting = Math.max(metrics.peakWaiting, pool.waitingCount);
     const acq = performance.now(),
-      c = await (pathStudy?.mode ? pathStudy.acquire(f) : pool.connect()),
+      c = await borrow(),
       q = performance.now();
     poolMs = q - acq;
     const query = (...args) => {
@@ -422,25 +427,29 @@ async function processRecord({ fact: f, partition, offset }) {
     for (const m of messages) s.bytes += Buffer.byteLength(m.content);
   }
   s.lastFact = f.factId;
+  if (draft) s.lastOffset = offset;
   s.lastBatch = batch;
   s.value = value;
   s.inboxId = inboxId;
   if (lastAssistant) s.lastAnswerCommit = performance.now();
-  sessions.set(runId, s);
-  if (lastAssistant && stage?.holdFinish) send("answerCommitted", { id: runId });
+  views.set(runId, s);
+  if (lastAssistant && stage?.holdFinish) publish(() => send("answerCommitted", { id: runId }));
   measure(kind, poolMs, pgMs, io);
   if (
     stage?.scene !== "plain" &&
     (inboxOrdinal >= 0 || messages.some((m) => m.role === "user" && m.input !== runId))
   ) {
     metrics.acknowledgedInputs++;
-    send("confirmed", {
-      id: runId,
-      seq: batch.seq,
-      at: Date.now(),
-      depth: value.items.length,
-      placed: messages.some((m) => m.role === "user" && m.input !== runId),
-    });
+    if (draft) draft.barrier = true;
+    publish(() =>
+      send("confirmed", {
+        id: runId,
+        seq: batch.seq,
+        at: Date.now(),
+        depth: value.items.length,
+        placed: messages.some((m) => m.role === "user" && m.input !== runId),
+      }),
+    );
   }
 }
 const reader = new KafkaLogConsumer({
@@ -450,7 +459,24 @@ const reader = new KafkaLogConsumer({
   clientId: group,
   groupRecovery: true,
   batchRead: process.argv[6] !== "single",
-  replayOffsets: async (bounds) => new Map(bounds.map((b) => [b.partition, b.low])),
+  replayOffsets: async (bounds) =>
+    prefixStudy?.width
+      ? prefixStudy.recover(bounds)
+      : new Map(bounds.map((b) => [b.partition, b.low])),
+  ...(prefixStudy
+    ? {
+        prepareReady: (records, current) =>
+          prefixStudy.apply(
+            records,
+            current,
+            processRecord,
+            pathStudy?.mode ? (f, sql, args) => pathStudy.note(f, sql, args) : undefined,
+            () =>
+              pathStudy?.mode ? pathStudy.measure.acquire(() => "stable_prefix") : pool.connect(),
+          ),
+        onRevoked: () => prefixStudy.revoke(),
+      }
+    : {}),
   decode: (v) => {
     const f = decodeSessionLogFact(v).fact;
     pathStudy?.decoded(f, v);
@@ -459,7 +485,7 @@ const reader = new KafkaLogConsumer({
   handler: async (record) => {
     try {
       if (pathStudy?.mode) pathStudy.before(record);
-      await processRecord(record);
+      if (!prefixStudy?.width) await processRecord(record);
       if (pathStudy?.mode) pathStudy.applied(record.fact);
     } catch (e) {
       fail(e);
@@ -467,6 +493,12 @@ const reader = new KafkaLogConsumer({
     }
   },
 });
+async function resetPrefix(width) {
+  if (!prefixStudy) return;
+  const ends = await reader.captureEndOffsets();
+  await reader.waitUntilInitialReplay(ends);
+  await prefixStudy.reset(new Map(ends.entries()), width ?? 0);
+}
 async function lag() {
   const ends = await admin.fetchTopicOffsets(topic);
   let sum = 0,
@@ -522,6 +554,7 @@ try {
     ],
   });
   created = true;
+  if (prefixStudy) await prefixStudy.install();
   await reader.start();
   await reader.waitUntilAssigned(45000);
   listen(
@@ -529,6 +562,7 @@ try {
       stage: async (m) => {
         assert.equal(sessions.size, 0);
         stage = m;
+        await resetPrefix(m.prefixWidth);
         cpuAt = process.cpuUsage();
         eluAt = performance.eventLoopUtilization();
         metrics = blank();
@@ -540,12 +574,14 @@ try {
       freezePaths: async () => send("pathTape", { tape: await pathStudy.freeze() }),
       preparePaths: async (m) => {
         stage = { integrated: true, scene: "plain", sink: "single" };
+        await resetPrefix(m.prefixWidth);
         const start = await pathStudy.prepare(m.path, m.rate, m.diagnostics, m.commitSetting);
         send("pathReady", { start });
       },
       runPaths: async (m) => {
         const source = m.path === "direct" ? await pathStudy.direct() : undefined;
-        send("pathResult", { source, result: await pathStudy.result() });
+        const prefix = prefixStudy?.width ? prefixStudy.stats : undefined;
+        send("pathResult", { source, result: { ...(await pathStudy.result(prefix)), prefix } });
       },
       results: async (m) => {
         const ends = await reader.captureEndOffsets();
@@ -554,6 +590,7 @@ try {
         send("results", {
           stage: m.stage,
           stats: summary(),
+          ...(prefixStudy?.width ? { prefix: prefixStudy.stats } : {}),
           tail: tailProbe?.results(),
           ...(pathStudy?.mode ? { pgPath: await pathStudy.endLive() } : {}),
           ...(await lag()),

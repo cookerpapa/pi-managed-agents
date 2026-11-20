@@ -39,28 +39,29 @@ export class PgPathStudy {
     } else if (this.mode === "projector") this.checkOrder(this.frames.get(fact.factId), partition);
   }
   acquire(f) {
-    return this.measure.acquire((sql, values) => {
-      const kind =
-        f.kind === "work_finished"
-          ? "finish"
-          : sql.includes("insert into inboxes")
-            ? "inbox"
-            : f.commit.writes.find((w) => w.type === "entry")?.value.model[0].role;
-      assert(["finish", "inbox", "user", "assistant"].includes(kind));
-      const frame = this.frames.get(f.factId);
-      if (this.mode === "capture") {
-        assert(!frame.command);
-        frame.command = { kind, sql, values };
-      } else if (this.mode === "projector") {
-        assert.equal(sql, frame.command.sql);
-        assert.equal(values.length, frame.command.values.length);
-        assert(
-          values.every((v, i) => v === frame.command.values[i]),
-          "Changed SQL parameters in replay",
-        );
-      }
-      return kind;
-    });
+    return this.measure.acquire((sql, values) => this.note(f, sql, values));
+  }
+  note(f, sql, values) {
+    const kind =
+      f.kind === "work_finished"
+        ? "finish"
+        : sql.includes("insert into inboxes")
+          ? "inbox"
+          : f.commit.writes.find((w) => w.type === "entry")?.value.model[0].role;
+    assert(["finish", "inbox", "user", "assistant"].includes(kind));
+    const frame = this.frames.get(f.factId);
+    if (this.mode === "capture") {
+      assert(!frame.command);
+      frame.command = { kind, sql, values };
+    } else if (this.mode === "projector") {
+      assert.equal(sql, frame.command.sql);
+      assert.equal(values.length, frame.command.values.length);
+      assert(
+        values.every((v, i) => v === frame.command.values[i]),
+        "Changed SQL parameters in replay",
+      );
+    }
+    return kind;
   }
   checkOrder(f, partition) {
     assert(
@@ -219,7 +220,7 @@ export class PgPathStudy {
     if (error) throw error;
     return source;
   }
-  async result() {
+  async result(prefix) {
     await this.drained.promise;
     const measurement = await this.measure.end();
     const digest = await this.digest();
@@ -228,10 +229,9 @@ export class PgPathStudy {
       this.positions,
       this.lanes.map((l) => l.length),
     );
-    assert.equal(
-      Object.values(measurement.byKind).reduce((s, k) => s + k.operations, 0),
-      4 * digest.completed,
-    );
+    const calls = Object.values(measurement.byKind).reduce((s, k) => s + k.operations, 0);
+    assert.equal(prefix ? prefix.logicalWrites : calls, 4 * digest.completed);
+    if (prefix) assert.equal(calls, prefix.commits);
     const dueAt = (at) =>
       Math.min(
         this.tape.length,

@@ -23,6 +23,10 @@ export type KafkaLogConsumerOptions<T> = {
   commitMessages?: boolean;
   /** Drain immediately available native records in one bounded callback. */
   batchRead?: boolean;
+  /** Synchronously materialize a ready prefix before any per-record handler
+   * or progress acknowledgement. Return its length, ending at the first
+   * externally observable barrier. A retry first isolates the failing record. */
+  prepareReady?(records: readonly KafkaLogRecord<T>[], current: () => boolean): Promise<number>;
   /** Boot-local callback delivery only; never a durable projection recovery cursor. */
   resumeFromMemory?: boolean;
   /** Include completed delivery as well as the durable projection recovery floor. */
@@ -206,6 +210,7 @@ export class KafkaLogConsumer<T> {
         groupId: this.#options.groupId,
         topic: this.#options.topic,
         batchRead: this.#options.batchRead === true,
+        readyPrefixes: this.#options.prepareReady !== undefined,
         logger,
         onPosition: (partition, offset) => {
           if (
@@ -474,19 +479,45 @@ export class KafkaLogConsumer<T> {
       });
       return;
     }
-    for (const message of batch.messages) {
+    const current = () =>
+      !this.#closing && epoch === this.#epoch && this.#ready && !payload.isStale();
+    const decoded: KafkaLogRecord<T>[] = [];
+    const at = (index: number) => {
+      if (decoded[index]) return decoded[index]!;
+      const m = batch.messages[index]!;
+      if (m.value === null) throw new Error("AcceptedFact cannot be a Kafka tombstone");
+      return (decoded[index] = {
+        fact: this.#options.decode(m.value),
+        topic: batch.topic,
+        partition: batch.partition,
+        offset: BigInt(m.offset),
+      });
+    };
+    let prepared = 0;
+    for (const [i, message] of batch.messages.entries()) {
       if (this.#closing || epoch !== this.#epoch || payload.isStale() || !this.#ready) return;
       try {
-        if (message.value === null) throw new Error("AcceptedFact cannot be a Kafka tombstone");
-        const fact = this.#options.decode(message.value);
+        const record = at(i);
+        if (this.#options.prepareReady && i === prepared) {
+          const ready = [record];
+          if (!this.#retries.has(batch.partition))
+            for (let j = i + 1; j < batch.messages.length; j++) {
+              // Settle the valid prefix before an undecodable successor stalls.
+              try {
+                ready.push(at(j));
+              } catch {
+                break;
+              }
+            }
+          const length = await this.#options.prepareReady(ready, current);
+          if (!current()) return;
+          if (!Number.isInteger(length) || length < 1 || length > ready.length)
+            throw new Error("Invalid projected prefix length");
+          prepared += length;
+        }
         await this.#options.handler(
-          {
-            fact,
-            topic: batch.topic,
-            partition: batch.partition,
-            offset: BigInt(message.offset),
-          },
-          () => !this.#closing && epoch === this.#epoch && this.#ready && !payload.isStale(),
+          record,
+          current,
           this.#options.orderedEffects
             ? async () => {
                 if (epoch !== this.#epoch || payload.isStale() || this.#closing) return false;

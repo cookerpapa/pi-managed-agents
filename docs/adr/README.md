@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0339](0339-ready-prefix-projection-study.md) scopes synchronous ready-prefix batching to the minimal storage experiment.
+
 [ADR-0338](0338-initial-world-and-run-binding.md) binds a fresh root’s initial environment and Run configuration in one Pi transaction.
 
 [ADR-0337](0337-native-usage-and-chat-presentation.md) sets the native usage retention and chat presentation boundary.

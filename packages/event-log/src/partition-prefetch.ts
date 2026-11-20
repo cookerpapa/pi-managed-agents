@@ -78,6 +78,24 @@ export class PartitionPrefetch {
   take(partition: number): BufferedRecord | undefined {
     return this.#parts.get(partition)?.queue.shift();
   }
+  /** The caller retains the budget of every returned record until the handler settles. */
+  takeReady(first: BufferedRecord): BufferedRecord[] {
+    const queue = this.#parts.get(first.message.partition)!.queue;
+    let extra = 0,
+      bytes = first.bytes;
+    while (extra < 15 && extra < queue.length) {
+      const next = queue[extra]!;
+      if (
+        next.generation !== first.generation ||
+        next.epoch !== first.epoch ||
+        bytes + next.bytes > 256 * 1024
+      )
+        break;
+      bytes += next.bytes;
+      extra++;
+    }
+    return [first, ...queue.splice(0, extra)];
+  }
   queued(partition: number): number {
     return this.#parts.get(partition)?.queue.length ?? 0;
   }

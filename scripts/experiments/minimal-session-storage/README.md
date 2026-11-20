@@ -6,6 +6,21 @@ The original storage controls use fresh physical Sessions. The `wake-throughput`
 
 ## Run serially
 
+### Synchronous partition-prefix study
+
+Set `PI_CLOUD_RUNTIME_DIRECTORY` to the development runtime directory. These runs use a private PG instance with the serving image, the existing three Kafka brokers, two native Pi Worker processes and a deterministic model. Run the two profiles in order. The second profile repeats the comparison using a fresh recording. The `prefix-smoke` profile provides a shorter check.
+
+```sh
+export PI_CLOUD_RUNTIME_LOAD_CHECK=1
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/prefix-first prefix-study
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/prefix-confirm prefix-confirm
+node scripts/experiments/minimal-session-storage/summarize-ready-projection.mjs /private/prefix-summary.json /private/prefix-first /private/prefix-confirm
+```
+
+Width 0 uses the original prototype SQL. Width 1 co-commits each stable record and the partition checkpoint. Width 16 uses the same mutations and checkpoint, and can combine already-buffered records on the same partition. Tool intents, human confirmations and completion end a prefix. The recovery tests use isolated PG and Kafka through `npm run test:transport`. [Measurements and limits](../../../docs/reports/synchronous-ready-prefix-20261120.md).
+
+### Other storage experiments
+
 Set `PI_CLOUD_RUNTIME_DIRECTORY` to the managed development runtime directory. The operator checks for unrelated active Runs and takes the existing release lock. Use a new private directory per invocation. Development PG must allow creating a disposable database, and all three Kafka brokers plus the Session runtime and two Worker Pods must be ready.
 
 ```sh

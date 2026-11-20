@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { isCommitStudy, isAsyncStudy } from "./pg-group-commit.mjs";
+import { isPrefixStudy } from "./ready-projection.mjs";
 import { runtimeDirectory, serviceAddress, kubectl } from "../../lib/production-kubernetes.mjs";
 import { serializeRelease } from "../../lib/release-lock.mjs";
 import {
@@ -17,7 +18,12 @@ import {
 
 assert.equal(process.env.PI_CLOUD_RUNTIME_LOAD_CHECK, "1");
 const [output, profile = "cpu"] = process.argv.slice(2);
-assert(output && (["cpu", "cpu-smoke", "cpu-confirm"].includes(profile) || isCommitStudy(profile)));
+assert(
+  output &&
+    (["cpu", "cpu-smoke", "cpu-confirm"].includes(profile) ||
+      isCommitStudy(profile) ||
+      isPrefixStudy(profile)),
+);
 serializeRelease(runtimeDirectory);
 process.umask(0o077);
 const out = resolve(output);

@@ -139,7 +139,9 @@ export class PgPathMeasure {
           processCpuUs: usage.user + usage.system - processCpu.user - processCpu.system,
           throttledUs: now[1] - cpu[1],
           cpuPressureUs: now[2] - cpu[2],
-          ...(["cpu", "cpu-smoke"].includes(process.argv[8]) || isCommitStudy(process.argv[8])
+          ...(["cpu", "cpu-smoke", "prefix-smoke", "prefix-study", "prefix-confirm"].includes(
+            process.argv[8],
+          ) || isCommitStudy(process.argv[8])
             ? {
                 allowed: readFileSync("/sys/fs/cgroup/cpuset.cpus.effective", "utf8").trim(),
               }

@@ -110,12 +110,16 @@ vi.mock("@confluentinc/kafka-javascript", async () => {
   };
 });
 import { KafkaPartitionReader } from "../src/kafka-partition-reader.ts";
-import type { PrefetchLimits } from "../src/partition-prefetch.ts";
+import { PartitionPrefetch, type PrefetchLimits } from "../src/partition-prefetch.ts";
 const readers: KafkaPartitionReader[] = [];
 afterEach(async () => {
   await Promise.allSettled(readers.splice(0).map((r) => r.disconnect()));
 });
-async function create(handler: KafkaJS.EachBatchHandler, prefetch?: PrefetchLimits) {
+async function create(
+  handler: KafkaJS.EachBatchHandler,
+  prefetch?: PrefetchLimits,
+  readyPrefixes = false,
+) {
   const positions: [number, bigint][] = [],
     errors: unknown[] = [];
   const reader = new KafkaPartitionReader({
@@ -124,6 +128,7 @@ async function create(handler: KafkaJS.EachBatchHandler, prefetch?: PrefetchLimi
     groupId: "prefetch",
     topic: "prefetch",
     batchRead: true,
+    readyPrefixes,
     ...(prefetch ? { prefetch } : {}),
     logger: { error: (e: unknown) => errors.push(e) } as unknown as KafkaJS.Logger,
     rebalance: async (_e, a, f) => f.assign(a),
@@ -141,6 +146,72 @@ async function create(handler: KafkaJS.EachBatchHandler, prefetch?: PrefetchLimi
   await reader.run({ eachBatch: handler });
   return { reader, native: fixture.client, positions, errors };
 }
+
+it("bounds a ready prefix by count, bytes, generation and seek epoch", () => {
+  const p = new PartitionPrefetch();
+  const push = (index: number, bytes = 1, generation = 1, epoch = 0) =>
+    p.push(
+      { partition: 0, offset: index, value: Buffer.alloc(bytes) } as Message,
+      generation,
+      epoch,
+    );
+  for (let i = 0; i < 18; i++) push(i);
+  const take = () => {
+    const records = p.takeReady(p.take(0)!);
+    for (const r of records) p.release(r);
+    return records.map((r) => r.message.offset);
+  };
+  expect(take()).toHaveLength(16);
+  expect(take()).toEqual([16, 17]);
+  push(18, 300_000);
+  push(19, 140_000);
+  push(20, 140_000);
+  push(21, 1, 1, 7);
+  push(22, 1, 2, 7);
+  for (let i = 18; i <= 22; i++) expect(take()).toEqual([i]);
+  expect(p.statistics().records).toBe(0);
+});
+
+it("dispatches a lone record immediately and holds EOF until the last already-buffered batch settles", async () => {
+  const first = Promise.withResolvers<void>(),
+    firstRelease = Promise.withResolvers<void>();
+  const batchReady = Promise.withResolvers<void>(),
+    batchRelease = Promise.withResolvers<void>();
+  const lengths: number[] = [];
+  const { native, reader, positions } = await create(
+    async ({ batch }) => {
+      lengths.push(batch.messages.length);
+      if (batch.messages[0]!.offset === "0") {
+        first.resolve();
+        await firstRelease.promise;
+      } else if (batch.messages[0]!.offset === "1") {
+        batchReady.resolve();
+        await batchRelease.promise;
+      }
+    },
+    undefined,
+    true,
+  );
+  try {
+    native.add(0, 0);
+    await first.promise;
+    expect(lengths).toEqual([1]);
+    for (let i = 1; i <= 21; i++) native.add(0, i);
+    native.add(0, 22, "", true);
+    await vi.waitFor(() => expect(reader.statistics().queuedRecords).toBe(21));
+    firstRelease.resolve();
+    await batchReady.promise;
+    expect(lengths).toEqual([1, 16]);
+    expect(reader.statistics().records).toBe(21);
+    expect(positions).not.toContainEqual([0, 22n]);
+    batchRelease.resolve();
+    await vi.waitFor(() => expect(positions).toContainEqual([0, 22n]));
+    expect(lengths).toEqual([1, 16, 5]);
+  } finally {
+    firstRelease.resolve();
+    batchRelease.resolve();
+  }
+});
 
 it("re-observes an EOF-only tail when asynchronous assignment finishes inside a poll", async () => {
   const install = Promise.withResolvers<void>();

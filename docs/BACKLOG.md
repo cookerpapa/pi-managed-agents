@@ -11,7 +11,8 @@
 - [x] Replay identical ordered records and SQL bindings directly into PG and through the real Projector. Match query, implicit transaction and client-return timing in fast/slow windows, then validate the full Run lifecycle with admission and Workers. [PG baseline and timing](reports/projector-pg-path-baseline-20261119.md).
 
 - [x] Batch immediately available Session-log records while bounding admitted buffers, preserving offset confirmation and measuring full-Run latency. Compare PG connection counts separately. [Batch-read measurements](reports/session-projector-batch-read-20261119.md).
-- [ ] For #48, measure how much same-partition stable projection can reduce connection hold time under backlog. Preserve post-commit input acknowledgement, atomic Inbox placement and the pre-dispatch offset boundary in any write-batching experiment.
+- [x] For #48, measure synchronous same-partition batching with a PG checkpoint and the original Kafka dispatch boundary. Include input placement, transaction failure, lost replies and consumer replacement. [Measurements](reports/synchronous-ready-prefix-20261120.md).
+- [ ] Repeat the upper-rate replay with isolated sender resources and a sustained traffic mix including real tool boundaries and long-lived Sessions. Review native recovery coverage before adopting the experimental writer in the serving Projector. Keep asynchronous projection as an alternative.
 
 - [x] Attribute terminal delay before and after native Kafka delivery and measure predecessor PG work on the same partition. Verify the actual minimal projection statements and distinguish fresh admission from chained Session waits. [Attribution](reports/session-tail-attribution-20261119.md).
 

@@ -1,5 +1,7 @@
 # Runtime capacity evaluation
 
+The [synchronous ready-prefix study](reports/synchronous-ready-prefix-20261120.md) compares one-record transactions and bounded ready batches with the same PG checkpoint. It reports full-Run throughput, sender delay, cold reconstruction and the independent Kafka dispatch grant.
+
 The [successive Run benchmark](reports/session-continuation-throughput-20261119.md) measures end-to-end PG settlement with bounded Worker history reuse across fresh native harnesses.
 
 The [Worker sizing study](reports/worker-claim-sizing-20261119.md) measures batch admission, active root Sessions per Worker and the tradeoff between preferred claiming and a reusable history prefix.

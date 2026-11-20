@@ -12,6 +12,7 @@ type Assignment = { topic: string; partition: number; offset?: number };
 export type PartitionReaderOptions = {
   prefetch?: PrefetchLimits;
   batchRead?: boolean;
+  readyPrefixes?: boolean;
   /** Optional diagnostics only; observer failure cannot change delivery. */
   onStatistics?(statistics: {
     receivedRecords: number;
@@ -370,25 +371,27 @@ export class KafkaPartitionReader {
       this.#failed === undefined &&
       generation === this.#generation &&
       epoch === this.#epoch(partition);
-    const record: K.KafkaMessage = {
+    const prefix = this.#options.readyPrefixes ? this.#prefetch.takeReady(buffered) : [buffered];
+    const records = prefix.map(({ message }): K.KafkaMessage => ({
       key: typeof message.key === "string" ? Buffer.from(message.key) : (message.key ?? null),
       value: message.value,
       timestamp: String(message.timestamp ?? 0),
       attributes: 0,
       offset: String(message.offset),
       headers: Object.assign({}, ...(message.headers ?? [])),
-    };
+    }));
+    const last = records.at(-1)!.offset;
     const task = Promise.resolve()
       .then(() =>
         this.#handler!({
           batch: {
             topic: message.topic,
             partition,
-            highWatermark: String(message.offset + 1),
-            messages: [record],
+            highWatermark: String(BigInt(last) + 1n),
+            messages: records,
             isEmpty: () => false,
             firstOffset: () => String(message.offset),
-            lastOffset: () => String(message.offset),
+            lastOffset: () => last,
             offsetLag: () => "0",
             offsetLagLow: () => "0",
           },
@@ -410,7 +413,7 @@ export class KafkaPartitionReader {
       )
       .catch((error) => this.#fail(error))
       .finally(() => {
-        this.#prefetch.release(buffered);
+        for (const record of prefix) this.#prefetch.release(record);
         if (this.#active.get(partition) !== task) return;
         this.#active.delete(partition);
         this.#updatePauses();

@@ -80,7 +80,7 @@ vi.mock("../src/kafka-partition-reader.ts", () => ({
     commitOffset = f.commit;
   },
 }));
-import { KafkaLogConsumer } from "../src/kafka-log-consumer.ts";
+import { KafkaLogConsumer, type KafkaLogConsumerOptions } from "../src/kafka-log-consumer.ts";
 
 beforeEach(() => {
   f.committed = "3";
@@ -95,7 +95,11 @@ beforeEach(() => {
   f.logger = undefined;
   f.commit.mockReset().mockResolvedValue(undefined);
 });
-async function fixture(options?: { memory?: boolean; beforeHandle?: () => Promise<void> }) {
+async function fixture(options?: {
+  memory?: boolean;
+  beforeHandle?: () => Promise<void>;
+  prepareReady?: KafkaLogConsumerOptions<{ command: boolean; n: number }>["prepareReady"];
+}) {
   const effects: number[] = [],
     projected: number[] = [];
   const consumer = new KafkaLogConsumer<{ command: boolean; n: number }>({
@@ -103,6 +107,7 @@ async function fixture(options?: { memory?: boolean; beforeHandle?: () => Promis
     topic: "log",
     groupId: "group",
     clientId: "test",
+    ...(options?.prepareReady ? { prepareReady: options.prepareReady } : {}),
     ...(options?.memory
       ? { commitMessages: false, resumeFromMemory: true }
       : {
@@ -136,6 +141,51 @@ async function fixture(options?: { memory?: boolean; beforeHandle?: () => Promis
     } as unknown as KafkaJS.EachBatchPayload);
   return { consumer, effects, projected, deliver };
 }
+
+it("waits for each durable prefix, isolates a failed prefix on retry and keeps effect grants ordered", async () => {
+  const entered = Promise.withResolvers<void>(),
+    gate = Promise.withResolvers<void>();
+  const planned: number[][] = [];
+  let failOnce = true;
+  const t = await fixture({
+    prepareReady: async (records) => {
+      const positions = records.map((r) => Number(r.offset));
+      planned.push(positions);
+      if (failOnce) {
+        failOnce = false;
+        throw new Error("rolled back");
+      }
+      const barrier = records.findIndex((r) => r.fact.command);
+      if (positions[0] === 4) {
+        entered.resolve();
+        await gate.promise;
+      }
+      return barrier < 0 ? records.length : barrier + 1;
+    },
+  });
+  const input: Array<[number, boolean]> = [
+    [3, false],
+    [4, true],
+    [5, false],
+  ];
+  try {
+    await t.deliver(input);
+    expect(t.projected).toEqual([]);
+    const retry = t.deliver(input);
+    await entered.promise;
+    expect(t.projected).toEqual([3]);
+    expect(f.commit).not.toHaveBeenCalled();
+    gate.resolve();
+    await retry;
+    expect(planned).toEqual([[3, 4, 5], [3], [4, 5], [5]]);
+    expect(t.projected).toEqual([3, 4, 5]);
+    expect(t.effects).toEqual([4]);
+    expect(f.commit.mock.calls.map(([p]) => p.offset)).toEqual(["5"]);
+  } finally {
+    gate.resolve();
+    await t.consumer.close();
+  }
+});
 
 it("resumes boot-local callback progress across assignment and reader recreation without commits", async () => {
   const test = await fixture({ memory: true });
