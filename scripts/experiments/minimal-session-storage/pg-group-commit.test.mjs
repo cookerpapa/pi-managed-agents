@@ -1,12 +1,66 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { observeFlush } from "./pg-path-measure.mjs";
 import {
+  asyncLiveCases,
+  asyncReplayCases,
   commitProfiles,
-  groupController,
+  commitController,
   groupLiveCases,
   groupReplayCases,
   verifyCommitClients,
 } from "./pg-group-commit.mjs";
+
+test("the post-ACK read-only observer holds one WAL target even when newer writes arrive", async () => {
+  const target = "0/428",
+    remaining = [256, -96];
+  let probes = 0;
+  const client = {
+    async query(sql, args) {
+      assert(!/checkpoint|pg_switch_wal/i.test(sql));
+      if (!args) {
+        assert.equal(probes++, 0);
+        return { rows: [{ target, bytes: 512 }] };
+      }
+      assert.deepEqual(args, [target]);
+      assert(!sql.includes("pg_current_wal_insert_lsn"));
+      return { rows: [{ bytes: remaining.shift() }] };
+    },
+  };
+  const result = await observeFlush(client, performance.timeOrigin + performance.now());
+  assert.equal(result.initialGapBytes, 512);
+  assert.equal(result.polls, 2);
+  assert(result.coveredMs >= result.firstProbeMs);
+  assert.equal(remaining.length, 0);
+});
+
+test("async trial pairs hold the write path and offered rate fixed", () => {
+  const cases = asyncReplayCases(false);
+  for (const stages of Map.groupBy(cases, ([rate, path]) => rate + "/" + path).values()) {
+    assert.equal(
+      stages.filter((s) => s[4] === "async").length,
+      stages.filter((s) => s[4] === "default").length,
+    );
+    assert(stages.every((s) => s[2] && s[3] === "open"));
+  }
+  for (const stages of Map.groupBy(asyncLiveCases(false), ([rate]) => rate).values()) {
+    assert.equal(
+      stages.filter((s) => s[1] === "async").length,
+      stages.filter((s) => s[1] === "default").length,
+    );
+  }
+});
+test("async mode still needs fsync, zero group delay and twelve verified writers", async () => {
+  const cfg = { delayUs: 0, siblings: 5, fsync: "on", sync: "off", method: "fdatasync" };
+  const clients = Array.from({ length: 12 }, (_, i) => ({
+    processID: i + 1,
+    query: async () => ({ rows: [{ ...cfg }] }),
+  }));
+  assert.equal((await verifyCommitClients(clients, "async")).sync, "off");
+  await assert.rejects(verifyCommitClients(clients, "default"));
+  cfg.fsync = "off";
+  await assert.rejects(verifyCommitClients(clients, "async"));
+});
 
 test("260/s switchbacks balance positions and preceding treatments", () => {
   const settings = Object.keys(commitProfiles).sort();
@@ -54,12 +108,45 @@ test("settings controller rejects an unrelated PG endpoint before issuing a quer
       queries++;
     },
   };
-  await assert.rejects(groupController(pool, undefined));
+  await assert.rejects(commitController(pool, undefined));
   await assert.rejects(
-    groupController(pool, {
+    commitController(pool, {
       pg: "pma-cpu-1234567890abcdef-pg",
       url: new URL("postgresql://bench@different-host/postgres"),
     }),
   );
   assert.equal(queries, 0);
+});
+
+test("only the async study can change synchronous_commit and it restores the default", async () => {
+  const db = "pma_sessbench_1234567890abcdef",
+    url = new URL("postgresql://bench@study-host/" + db);
+  const fixture = { pg: "pma-cpu-1234567890abcdef-pg", url };
+  const settings = { ...commitProfiles.default, fsync: "on", sync: "on", method: "fdatasync" };
+  const changes = [];
+  const pool = {
+    options: { connectionString: url.href },
+    async query(sql) {
+      if (sql.startsWith("select current_database")) return { rows: [{ db, role: "bench" }] };
+      if (sql.startsWith("select current_setting")) return { rows: [{ ...settings }] };
+      if (sql.startsWith("select pg_reload_conf")) return { rows: [{ ok: true }] };
+      changes.push(sql);
+      if (sql === "alter system set synchronous_commit = 'off'") settings.sync = "off";
+      else if (sql === "alter system reset synchronous_commit") settings.sync = "on";
+      else assert.fail("Unexpected configuration mutation: " + sql);
+      return { rows: [] };
+    },
+  };
+  const group = await commitController(pool, fixture);
+  await assert.rejects(group.apply("async"));
+  const asyncMode = await commitController(pool, fixture, true);
+  await assert.rejects(asyncMode.apply("short"));
+  assert.deepEqual(changes, []);
+  await asyncMode.apply("async");
+  assert.equal(settings.sync, "off");
+  assert.deepEqual(await asyncMode.restore(), asyncMode.start);
+  assert.deepEqual(changes, [
+    "alter system set synchronous_commit = 'off'",
+    "alter system reset synchronous_commit",
+  ]);
 });

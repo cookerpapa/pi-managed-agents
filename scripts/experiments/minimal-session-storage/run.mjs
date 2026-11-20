@@ -1,6 +1,6 @@
 /** Isolated test of the two-table lifecycle. Run through the maintained development cluster. */
 import assert from "node:assert/strict";
-import { isGroupStudy } from "./pg-group-commit.mjs";
+import { isCommitStudy } from "./pg-group-commit.mjs";
 import { answer, claimSql, claimBatchSql, claimHintedBatchSql } from "./fixture.mjs";
 import { runWakeTrials, waitForWakeState, wakeNetwork } from "./wake-trials.mjs";
 import { measureClaimPreference, runSizingTrials } from "./wake-sizing.mjs";
@@ -70,7 +70,7 @@ const cpuProfile =
   mode === "wake-throughput" &&
   suite === "pg-paths" &&
   (["cpu", "cpu-smoke"].includes(process.env.PI_CLOUD_PG_PATH_PROFILE) ||
-    isGroupStudy(process.env.PI_CLOUD_PG_PATH_PROFILE));
+    isCommitStudy(process.env.PI_CLOUD_PG_PATH_PROFILE));
 const cpuFixture = cpuProfile
   ? (await import("./cpu-placement-fixture.mjs")).attachFixture(process.env.PI_CLOUD_CPU_FIXTURE)
   : undefined;
@@ -923,7 +923,7 @@ try {
       rows: [identity],
     } = await admin.query("select current_user as role,to_regclass('public.runs') as serving_runs");
     assert.deepEqual(identity, { role: "bench", serving_runs: null });
-    await cpuFixture.pin(isGroupStudy(process.env.PI_CLOUD_PG_PATH_PROFILE) ? "open" : "shared");
+    await cpuFixture.pin(isCommitStudy(process.env.PI_CLOUD_PG_PATH_PROFILE) ? "open" : "shared");
   } else {
     const {
       rows: [state],

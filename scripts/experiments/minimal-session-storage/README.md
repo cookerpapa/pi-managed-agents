@@ -169,6 +169,25 @@ zero-sibling setting on a new recording, then also tests low-rate live input.
 The summary verifies settings, ordering, PG content and cleanup before
 exporting aggregates. [Measurements and recovery boundaries](../../../docs/reports/pg-native-group-commit-20261119.md).
 
+### Asynchronous PG acknowledgement
+
+The `async-commit` study alternates `synchronous_commit=on/off` on a disposable
+PG instance, with `fsync=on`, `commit_delay=0`, twelve identical projection
+connections and a fixed CPU layout. `async-smoke` is the short regression.
+It times the return to the client. A separate read-only observation after the
+timed interval waits for the WAL flush position to cover a fixed insert LSN.
+After the timed workload, a second private socket-only server checks which
+already acknowledged rows survive `pg_ctl stop -m immediate`; it uses a fresh
+data directory inside the disposable Pod.
+
+```sh
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/async-pg async-commit
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/async-peak async-peak
+node scripts/experiments/minimal-session-storage/summarize-async-commit.mjs /private/async-pg-summary.json /private/async-pg /private/async-peak
+```
+
+[Results and acknowledgement semantics](../../../docs/reports/pg-async-commit-20261120.md).
+
 The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load and an already queued burst. One Worker holds 64, 128 or 256 distinct physical Sessions at the real Pi model boundary. The driver records concurrent waiters, process RSS and event-loop delay. Separately it measures a bounded, tenant-scoped preference for one Run ID and exercises fresh native context assembly with the same frozen entries fetched from PG or already in memory. The individual experiments stop short of routing successive production Runs to a retained cache. [Results](../../../docs/reports/worker-claim-sizing-20261119.md).
 
 `schema.sql` defines the three physical tables and constraints. An independent client request is durably registered before success. Two concurrent SQL claimers cannot skip an active predecessor in the same Session. Inbox removal and the `user` Entry are committed together. The separately delivered `work_finished` updates the admitted Run under its claim identity. The experiment does not reconstruct an in-flight Pi Task after Worker death. That requires the additional stored state and recovery contract in the full runtime.

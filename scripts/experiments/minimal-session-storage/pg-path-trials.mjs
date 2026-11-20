@@ -6,10 +6,13 @@ import { setTimeout as delay } from "node:timers/promises";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { kubeconfig, namespace, podFor } from "../../lib/production-kubernetes.mjs";
 import {
-  groupController,
+  commitController,
   groupLiveCases,
   groupReplayCases,
-  isGroupStudy,
+  isCommitStudy,
+  isAsyncStudy,
+  asyncReplayCases,
+  asyncLiveCases,
 } from "./pg-group-commit.mjs";
 
 // Ordered protocol durations for one warmed backend. Only timing, PID and our
@@ -147,7 +150,7 @@ async function observe(pool, logs, work) {
     before = (await pool.query(walSql)).rows[0];
   const timing =
     ["timing", "cpu", "cpu-smoke"].includes(process.env.PI_CLOUD_PG_PATH_PROFILE) ||
-    isGroupStudy(process.env.PI_CLOUD_PG_PATH_PROFILE);
+    isCommitStudy(process.env.PI_CLOUD_PG_PATH_PROFILE);
   const witnesses = new Map();
   let stop = false,
     calibratedAt = 0;
@@ -247,12 +250,21 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
-  const grouping = isGroupStudy(profile);
+  const commitStudy = isCommitStudy(profile);
+  const asyncCommit = isAsyncStudy(profile);
+  const peak = profile === "async-peak";
+  const commitResult = asyncCommit ? "asyncCommit" : "groupCommit";
   const confirm = profile === "group-confirm";
-  assert(["smoke", "full", "timing", "cpu", "cpu-smoke"].includes(profile) || grouping);
-  const smoke = profile === "smoke" || profile === "cpu-smoke" || profile === "group-smoke",
+  const replayCommitCases = asyncCommit ? asyncReplayCases : groupReplayCases;
+  const liveCommitCases = asyncCommit ? asyncLiveCases : groupLiveCases;
+  assert(["smoke", "full", "timing", "cpu", "cpu-smoke"].includes(profile) || commitStudy);
+  const smoke =
+      profile === "smoke" ||
+      profile === "cpu-smoke" ||
+      profile === "group-smoke" ||
+      profile === "async-smoke",
     timing = profile === "timing";
-  const count = smoke ? (cpuFixture ? 520 : 320) : timing || confirm ? 4160 : 6240;
+  const count = smoke ? (cpuFixture ? 520 : 320) : timing || confirm || peak ? 4160 : 6240;
   const call = async (actor, command, response, args = {}) => {
     const done = actor.wait(response);
     actor.write({ kind: command, ...args });
@@ -329,12 +341,16 @@ export async function runPgPaths({
     };
   };
   try {
-    if (grouping) {
-      controller = await groupController(observer, cpuFixture);
-      report.pgPaths.groupCommit = { initial: controller.start, confirm };
+    if (commitStudy) {
+      controller = await commitController(observer, cpuFixture, asyncCommit);
+      report.pgPaths[commitResult] = {
+        initial: controller.start,
+        confirm,
+        ...(asyncCommit ? { peak } : {}),
+      };
     }
     const capture = await observe(observer, logs, () =>
-      runLive("path-capture", "capture", 116, count, true, grouping ? "default" : undefined),
+      runLive("path-capture", "capture", 116, count, true, commitStudy ? "default" : undefined),
     );
     assert.equal(capture.completed, count);
     report.pgPaths.live.push(capture);
@@ -345,8 +361,8 @@ export async function runPgPaths({
     assert.equal((await call(emitter, "loadPathFrames", "pathSourceReady")).frames, tape.frames);
     await save();
     const cases = cpuFixture
-      ? grouping
-        ? groupReplayCases(smoke, confirm)
+      ? commitStudy
+        ? replayCommitCases(smoke, peak || confirm)
         : cpuReplayCases(smoke, reverse)
       : smoke
         ? [
@@ -425,7 +441,7 @@ export async function runPgPaths({
         }),
       );
     }
-    const liveSettings = grouping ? groupLiveCases(smoke, confirm) : undefined;
+    const liveSettings = commitStudy ? liveCommitCases(smoke, peak || confirm) : undefined;
     const liveLayouts = liveSettings
       ? liveSettings.map(() => "open")
       : cpuFixture
@@ -458,13 +474,13 @@ export async function runPgPaths({
         ),
       );
       verifyPlacement(result, placement);
-      if (grouping) result.commitSetting = commitSetting;
+      if (commitStudy) result.commitSetting = commitSetting;
       report.pgPaths.live.push(result);
       await save();
     }
   } finally {
     try {
-      if (controller) report.pgPaths.groupCommit.restored = await controller.restore();
+      if (controller) report.pgPaths[commitResult].restored = await controller.restore();
     } finally {
       await logs.close();
     }

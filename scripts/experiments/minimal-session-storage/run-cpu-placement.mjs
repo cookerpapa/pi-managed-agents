@@ -5,8 +5,8 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { isGroupStudy } from "./pg-group-commit.mjs";
-import { runtimeDirectory, serviceAddress } from "../../lib/production-kubernetes.mjs";
+import { isCommitStudy, isAsyncStudy } from "./pg-group-commit.mjs";
+import { runtimeDirectory, serviceAddress, kubectl } from "../../lib/production-kubernetes.mjs";
 import { serializeRelease } from "../../lib/release-lock.mjs";
 import {
   assertUnusedFixture,
@@ -17,7 +17,7 @@ import {
 
 assert.equal(process.env.PI_CLOUD_RUNTIME_LOAD_CHECK, "1");
 const [output, profile = "cpu"] = process.argv.slice(2);
-assert(output && (["cpu", "cpu-smoke", "cpu-confirm"].includes(profile) || isGroupStudy(profile)));
+assert(output && (["cpu", "cpu-smoke", "cpu-confirm"].includes(profile) || isCommitStudy(profile)));
 serializeRelease(runtimeDirectory);
 process.umask(0o077);
 const out = resolve(output);
@@ -88,6 +88,31 @@ try {
     child.once("close", res);
   });
   assert.equal(code, 0, "CPU study failed");
+  if (isAsyncStudy(profile)) {
+    const pod = prefix + "-pg";
+    const owned = JSON.parse(kubectl(["get", "pod", pod, "-o", "json"]));
+    assert.equal(owned.metadata.labels["pi-cloud.io/pg-cpu-study"], prefix);
+    assert.equal(owned.metadata.labels["pi-cloud.io/pg-cpu-role"], "pg");
+    assert(owned.spec.volumes.some((v) => v.name === "data" && v.emptyDir));
+    const script = await readFile(new URL("./pg-async-crash.sh", import.meta.url), "utf8");
+    const output = kubectl(["exec", "-i", pod, "--", "gosu", "postgres", "sh", "-s"], {
+      input: script,
+      timeout: 120000,
+    });
+    const trials = output
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.deepEqual(
+      trials.map((x) => x.mode),
+      ["on", "off", "off", "on", "on", "off"],
+    );
+    await writeFile(
+      resolve(out, "crash-recovery.json"),
+      JSON.stringify({ immediateStop: true, trials }, null, 2) + "\n",
+      { mode: 0o600 },
+    );
+  }
 } finally {
   removePods(prefix);
   await writeFile(

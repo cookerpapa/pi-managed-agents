@@ -15,7 +15,7 @@ import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs
 import { EMPTY_HEAD, openingHead, priorState } from "./session-prefix.mjs";
 import { installTailProbe } from "./tail-probe.mjs";
 import { PgPathStudy } from "./pg-path-study.mjs";
-import { isGroupStudy } from "./pg-group-commit.mjs";
+import { isCommitStudy } from "./pg-group-commit.mjs";
 
 const pool = await openPool(
     Number(process.argv[7] ?? 12),
@@ -32,7 +32,7 @@ const pathStudy = __PG_PATH_STUDY__
   ? new PgPathStudy(
       pool,
       topic.slice(-16),
-      ["timing", "cpu", "cpu-smoke"].includes(process.argv[8]) || isGroupStudy(process.argv[8]),
+      ["timing", "cpu", "cpu-smoke"].includes(process.argv[8]) || isCommitStudy(process.argv[8]),
     )
   : undefined;
 const sessions = new Map(),

@@ -54,6 +54,10 @@ The [native PostgreSQL group-commit study](reports/pg-native-group-commit-202611
 compares WAL sync count, projection backlog and full-Run tails under different
 leader waits, keeping all twelve projection connections synchronous.
 
+The [asynchronous commit study](reports/pg-async-commit-20261120.md) measures
+client acknowledgements with synchronous commit on and off, the subsequent WAL
+flush, and recovery following an immediate stop of an isolated test server.
+
 For isolated cache/live-view memory checks (mock PG authority, no service changes):
 
 ```sh

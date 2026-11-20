@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare synchronous and asynchronous PG acknowledgements with the same four writes per Run. Independently check acknowledged rows after a database crash. [Asynchronous commit measurements](reports/pg-async-commit-20261120.md).
+
 - [x] Measure native PG group commit with zero and positive leader delays on an isolated instance, retaining independent synchronous transactions and Kafka dispatch protection. [Group-commit study](reports/pg-native-group-commit-20261119.md).
 
 - [x] Compare shared and disjoint guest cores for PG and the Session Projector under a fixed total budget, verify the granted CPU sets during load, and repeat both trace replay and the full Run lifecycle in reversed order. [CPU placement study](reports/projector-cpu-placement-20261119.md).

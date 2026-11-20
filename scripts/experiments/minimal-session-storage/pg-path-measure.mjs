@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import pg from "pg";
-import { verifyCommitClients, isGroupStudy } from "./pg-group-commit.mjs";
+import { verifyCommitClients, isCommitStudy, isAsyncStudy } from "./pg-group-commit.mjs";
+import { setTimeout as delay } from "node:timers/promises";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { wall } from "./pg-path-replay.mjs";
 
@@ -29,6 +30,32 @@ const summarize = (b) => ({
   hold: dist(b.hold),
   terminal: dist(b.terminal),
 });
+
+// Observe a fixed cluster-wide WAL position after the measured ACK interval.
+// Polling is read-only and never forces a flush.
+export async function observeFlush(client, end) {
+  const {
+    rows: [first],
+  } =
+    await client.query(`with s as materialized (select pg_current_wal_insert_lsn() target,pg_current_wal_flush_lsn() flushed)
+    select target::text, greatest(0,pg_wal_lsn_diff(target,flushed))::float8 bytes from s`);
+  const firstProbeMs = wall() - end;
+  let remaining = first.bytes,
+    polls = 0;
+  while (remaining > 0) {
+    assert(wall() - end < 15000, "Post-trial WAL flush did not reach its captured target");
+    await delay(5);
+    const {
+      rows: [row],
+    } = await client.query(
+      "select pg_wal_lsn_diff($1::pg_lsn,pg_current_wal_flush_lsn())::float8 bytes",
+      [first.target],
+    );
+    remaining = row.bytes;
+    polls++;
+  }
+  return { initialGapBytes: first.bytes, firstProbeMs, coveredMs: wall() - end, polls };
+}
 
 export class PgPathMeasure {
   constructor(pool, token, tagIdle) {
@@ -67,7 +94,7 @@ export class PgPathMeasure {
     this.samples = [];
     this.diagnostics = diagnostics;
     this.readPings = [];
-    if (diagnostics && !this.connected) {
+    if ((diagnostics || isAsyncStudy(process.argv[8])) && !this.connected) {
       await this.canary.connect();
       this.connected = true;
     }
@@ -112,7 +139,7 @@ export class PgPathMeasure {
           processCpuUs: usage.user + usage.system - processCpu.user - processCpu.system,
           throttledUs: now[1] - cpu[1],
           cpuPressureUs: now[2] - cpu[2],
-          ...(["cpu", "cpu-smoke"].includes(process.argv[8]) || isGroupStudy(process.argv[8])
+          ...(["cpu", "cpu-smoke"].includes(process.argv[8]) || isCommitStudy(process.argv[8])
             ? {
                 allowed: readFileSync("/sys/fs/cgroup/cpuset.cpus.effective", "utf8").trim(),
               }
@@ -191,6 +218,7 @@ export class PgPathMeasure {
     this.delay.disable();
     await this.pendingPing;
     if (this.pingError) throw this.pingError;
+    const flush = isAsyncStudy(process.argv[8]) ? await observeFlush(this.canary, end) : undefined;
     if (this.diagnostics)
       await this.withClients(async (clients) => {
         const c = clients.find((c) => c.processID === this.pid);
@@ -210,6 +238,7 @@ export class PgPathMeasure {
       pid: this.pid,
       diagnostics: this.diagnostics,
       ...(this.commitSetting ? { commitSetting: this.commitSetting } : {}),
+      ...(flush ? { postAckFlush: flush } : {}),
       started: this.startAt,
       ended: end,
       spans: this.spans,

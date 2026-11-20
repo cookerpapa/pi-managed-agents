@@ -9,8 +9,35 @@ export const commitProfiles = Object.freeze({
   long: { delayUs: 1500, siblings: 5 },
   unconditional: { delayUs: 1500, siblings: 0 },
 });
-export const isGroupStudy = (name) =>
-  ["group-commit", "group-smoke", "group-confirm"].includes(name);
+export const isAsyncStudy = (name) => ["async-commit", "async-smoke", "async-peak"].includes(name);
+export const isCommitStudy = (name) =>
+  ["group-commit", "group-smoke", "group-confirm"].includes(name) || isAsyncStudy(name);
+
+export function asyncReplayCases(smoke, peak = false) {
+  const rows = (rate, path, keys) => keys.map((key) => [rate, path, true, "open", key]);
+  const on = "default",
+    off = "async";
+  if (smoke) return rows(260, "projector", [on, off]);
+  if (peak) return rows(520, "projector", [on, off, off, on]);
+  return [
+    ...rows(260, "projector", [on, off, off, on, off, on, on, off]),
+    ...rows(520, "projector", [off, on, on, off]),
+    ...rows(520, "direct", [on, off, off, on]),
+  ];
+}
+export function asyncLiveCases(smoke, peak = false) {
+  const on = "default",
+    off = "async",
+    at = (rate, keys) => keys.map((key) => [rate, key]);
+  if (smoke) return at(260, [on, off]);
+  if (peak) return [...at(520, [off, on, on, off]), ...at(260, [off, on])];
+  return [...at(260, [on, off, off, on, off, on, on, off]), ...at(10, [on, off, off, on])];
+}
+function expected(key) {
+  if (key === "async") return { ...commitProfiles.default, sync: "off" };
+  assert(Object.hasOwn(commitProfiles, key), "Unknown PG commit setting");
+  return { ...commitProfiles[key], sync: "on" };
+}
 
 export function groupReplayCases(smoke, confirm = false) {
   const rows = (rate, keys) => keys.map((key) => [rate, "projector", true, "open", key]);
@@ -72,15 +99,14 @@ const settingsSql = `select current_setting('commit_delay')::int as "delayUs",
 const read = async (client) => (await client.query(settingsSql)).rows[0];
 
 export async function verifyCommitClients(clients, key) {
-  assert(Object.hasOwn(commitProfiles, key), "Unknown PG commit setting");
-  const target = commitProfiles[key];
+  const target = expected(key);
   assert.equal(clients.length, 12);
   assert.equal(new Set(clients.map((c) => c.processID)).size, 12);
   const settings = await Promise.all(clients.map(read));
   for (const s of settings) {
     assert.equal(s.delayUs, target.delayUs);
     assert.equal(s.siblings, target.siblings);
-    assert.equal(s.sync, "on");
+    assert.equal(s.sync, target.sync);
     assert.equal(s.fsync, "on");
     assert.equal(s.method, settings[0].method);
   }
@@ -89,7 +115,7 @@ export async function verifyCommitClients(clients, key) {
 
 // Only the disposable server owned by the existing K3s measurement fixture
 // may change postmaster configuration. Never touch the serving PG instance.
-export async function groupController(pool, fixture) {
+export async function commitController(pool, fixture, asyncStudy = false) {
   assert(fixture && /^pma-cpu-[0-9a-f]{16}-pg$/.test(fixture.pg));
   const u = new URL(pool.options.connectionString);
   assert.equal(u.host, fixture.url.host);
@@ -108,8 +134,12 @@ export async function groupController(pool, fixture) {
     const deadline = Date.now() + 5000;
     for (;;) {
       const s = await read(pool);
-      if (s.delayUs === target.delayUs && s.siblings === target.siblings) {
-        assert(s.fsync === "on" && s.sync === "on" && s.method === start.method);
+      if (
+        s.delayUs === target.delayUs &&
+        s.siblings === target.siblings &&
+        s.sync === target.sync
+      ) {
+        assert(s.fsync === "on" && s.method === start.method);
         return;
       }
       assert(Date.now() < deadline, "Temporary PG settings did not take effect");
@@ -119,15 +149,26 @@ export async function groupController(pool, fixture) {
   return {
     start,
     async apply(key) {
-      assert(Object.hasOwn(commitProfiles, key), "Unknown PG commit setting");
-      const target = commitProfiles[key];
-      await pool.query("alter system set commit_delay = " + target.delayUs);
-      await pool.query("alter system set commit_siblings = " + target.siblings);
+      const target = expected(key);
+      if (asyncStudy) {
+        assert(
+          key === "default" || key === "async",
+          "Async study must retain default group settings",
+        );
+        await pool.query(`alter system set synchronous_commit = '${target.sync}'`);
+      } else {
+        assert.equal(target.sync, "on", "Group-commit trials must remain synchronous");
+        await pool.query("alter system set commit_delay = " + target.delayUs);
+        await pool.query("alter system set commit_siblings = " + target.siblings);
+      }
       await reload(target);
     },
     async restore() {
-      await pool.query("alter system reset commit_delay");
-      await pool.query("alter system reset commit_siblings");
+      if (asyncStudy) await pool.query("alter system reset synchronous_commit");
+      else {
+        await pool.query("alter system reset commit_delay");
+        await pool.query("alter system reset commit_siblings");
+      }
       await reload(start);
       return read(pool);
     },

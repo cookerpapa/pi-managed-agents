@@ -1,0 +1,1726 @@
+{
+  "studies": [
+    {
+      "peak": false,
+      "capturedRuns": 6240,
+      "frames": 43680,
+      "projectionWrites": 24960,
+      "traceSha256": "ecac13d93ed4d077c0957c4d76afe5b4b35077a39fb9805021ef5a0739cdaf72",
+      "pg": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "server": {
+        "initial": {
+          "delayUs": 0,
+          "siblings": 5,
+          "fsync": "on",
+          "sync": "on",
+          "method": "fdatasync"
+        },
+        "confirm": false,
+        "restored": {
+          "delayUs": 0,
+          "siblings": 5,
+          "fsync": "on",
+          "sync": "on",
+          "method": "fdatasync"
+        }
+      },
+      "groups": [
+        {
+          "name": "projector/260/on",
+          "trials": 4,
+          "passed": 4,
+          "completed": 24960,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 259.63,
+            "max": 259.71
+          },
+          "ackP95Ms": {
+            "min": 75.69,
+            "max": 79.04
+          },
+          "meanHoldMs": {
+            "min": 6.06,
+            "max": 6.22
+          },
+          "peakBacklog": {
+            "min": 47,
+            "max": 145
+          },
+          "ackDrainMs": {
+            "min": 27.54,
+            "max": 35.14
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.58,
+            "max": 0.88
+          }
+        },
+        {
+          "name": "projector/260/off",
+          "trials": 4,
+          "passed": 4,
+          "completed": 24960,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 259.89,
+            "max": 259.91
+          },
+          "ackP95Ms": {
+            "min": 59.46,
+            "max": 60.35
+          },
+          "meanHoldMs": {
+            "min": 1.19,
+            "max": 1.21
+          },
+          "peakBacklog": {
+            "min": 29,
+            "max": 40
+          },
+          "ackDrainMs": {
+            "min": 8.53,
+            "max": 10.71
+          },
+          "walGapBytes": {
+            "min": 106928,
+            "max": 268160
+          },
+          "walCoveredAfterEndMs": {
+            "min": 286.69,
+            "max": 364.29
+          }
+        },
+        {
+          "name": "projector/520/off",
+          "trials": 2,
+          "passed": 2,
+          "completed": 12480,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 519.42,
+            "max": 519.48
+          },
+          "ackP95Ms": {
+            "min": 47.44,
+            "max": 54.6
+          },
+          "meanHoldMs": {
+            "min": 1.45,
+            "max": 1.53
+          },
+          "peakBacklog": {
+            "min": 89,
+            "max": 191
+          },
+          "ackDrainMs": {
+            "min": 12.23,
+            "max": 13.62
+          },
+          "walGapBytes": {
+            "min": 743248,
+            "max": 762656
+          },
+          "walCoveredAfterEndMs": {
+            "min": 230.12,
+            "max": 329.95
+          }
+        },
+        {
+          "name": "projector/520/on",
+          "trials": 2,
+          "passed": 0,
+          "completed": 12480,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 426.31,
+            "max": 429.54
+          },
+          "ackP95Ms": {
+            "min": 2636.95,
+            "max": 3321.67
+          },
+          "meanHoldMs": {
+            "min": 6.63,
+            "max": 6.81
+          },
+          "peakBacklog": {
+            "min": 6374,
+            "max": 7511
+          },
+          "ackDrainMs": {
+            "min": 2527.61,
+            "max": 2637.45
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.69,
+            "max": 0.88
+          }
+        },
+        {
+          "name": "direct/520/on",
+          "trials": 2,
+          "passed": 2,
+          "completed": 12480,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 494.28,
+            "max": 506.22
+          },
+          "ackP95Ms": {
+            "min": 365.86,
+            "max": 653.38
+          },
+          "meanHoldMs": {
+            "min": 5.85,
+            "max": 5.96
+          },
+          "peakBacklog": {
+            "min": 671,
+            "max": 1262
+          },
+          "ackDrainMs": {
+            "min": 326.91,
+            "max": 624.81
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.51,
+            "max": 1.02
+          }
+        },
+        {
+          "name": "direct/520/off",
+          "trials": 2,
+          "passed": 2,
+          "completed": 12480,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 518.39,
+            "max": 518.51
+          },
+          "ackP95Ms": {
+            "min": 25.56,
+            "max": 25.69
+          },
+          "meanHoldMs": {
+            "min": 1,
+            "max": 1.03
+          },
+          "peakBacklog": {
+            "min": 9,
+            "max": 10
+          },
+          "ackDrainMs": {
+            "min": 34.8,
+            "max": 37.63
+          },
+          "walGapBytes": {
+            "min": 73960,
+            "max": 356104
+          },
+          "walCoveredAfterEndMs": {
+            "min": 402.84,
+            "max": 404.29
+          }
+        },
+        {
+          "name": "full/260/on",
+          "trials": 4,
+          "passed": 4,
+          "completed": 41600,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 259.49,
+            "max": 259.58
+          },
+          "ackP95Ms": {
+            "min": 97,
+            "max": 106
+          },
+          "meanHoldMs": {
+            "min": 6.52,
+            "max": 6.81
+          },
+          "peakBacklog": {
+            "min": 34,
+            "max": 213
+          },
+          "ackDrainMs": {
+            "min": 67,
+            "max": 81
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 26624
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.76,
+            "max": 194.24
+          }
+        },
+        {
+          "name": "full/260/off",
+          "trials": 4,
+          "passed": 4,
+          "completed": 41600,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 259.69,
+            "max": 259.71
+          },
+          "ackP95Ms": {
+            "min": 69,
+            "max": 71
+          },
+          "meanHoldMs": {
+            "min": 1.4,
+            "max": 1.44
+          },
+          "peakBacklog": {
+            "min": 19,
+            "max": 25
+          },
+          "ackDrainMs": {
+            "min": 47,
+            "max": 51
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 5561520
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.7,
+            "max": 302.86
+          }
+        },
+        {
+          "name": "full/10/on",
+          "trials": 2,
+          "passed": 2,
+          "completed": 400,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 10.02,
+            "max": 10.02
+          },
+          "ackP95Ms": {
+            "min": 72,
+            "max": 72
+          },
+          "meanHoldMs": {
+            "min": 3.94,
+            "max": 4.24
+          },
+          "peakBacklog": {
+            "min": 2,
+            "max": 3
+          },
+          "ackDrainMs": {
+            "min": 59,
+            "max": 65
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.67,
+            "max": 0.72
+          }
+        },
+        {
+          "name": "full/10/off",
+          "trials": 2,
+          "passed": 2,
+          "completed": 400,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 10.03,
+            "max": 10.03
+          },
+          "ackP95Ms": {
+            "min": 56,
+            "max": 68
+          },
+          "meanHoldMs": {
+            "min": 1.27,
+            "max": 1.28
+          },
+          "peakBacklog": {
+            "min": 4,
+            "max": 4
+          },
+          "ackDrainMs": {
+            "min": 45,
+            "max": 49
+          },
+          "walGapBytes": {
+            "min": 2880,
+            "max": 3584
+          },
+          "walCoveredAfterEndMs": {
+            "min": 95.3,
+            "max": 108.51
+          }
+        }
+      ],
+      "rows": [
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.63,
+          "ackP95Ms": 77.88,
+          "ackP99Ms": 112.59,
+          "peakBacklog": 82,
+          "ackDrainMs": 35.14,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.06,
+          "meanCheckoutMs": 0.08,
+          "meanQueryMs": 6.02,
+          "hostHashMedianMs": 2.16,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.8,
+          "fixedLsnCoveredMsAfterMeasurement": 0.81,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2104
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.89,
+          "ackP95Ms": 60.23,
+          "ackP99Ms": 94.84,
+          "peakBacklog": 40,
+          "ackDrainMs": 10.71,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.19,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 1.13,
+          "hostHashMedianMs": 2.21,
+          "observedWalGapBytes": 220112,
+          "firstProbeMsAfterMeasurement": 0.75,
+          "fixedLsnCoveredMsAfterMeasurement": 304.42,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3310
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.91,
+          "ackP95Ms": 59.46,
+          "ackP99Ms": 95.4,
+          "peakBacklog": 37,
+          "ackDrainMs": 8.53,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.21,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 1.14,
+          "hostHashMedianMs": 2.27,
+          "observedWalGapBytes": 268160,
+          "firstProbeMsAfterMeasurement": 0.76,
+          "fixedLsnCoveredMsAfterMeasurement": 286.69,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2787
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.71,
+          "ackP95Ms": 75.69,
+          "ackP99Ms": 108.73,
+          "peakBacklog": 128,
+          "ackDrainMs": 27.54,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.09,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 6.05,
+          "hostHashMedianMs": 2.27,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.58,
+          "fixedLsnCoveredMsAfterMeasurement": 0.58,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2010
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.91,
+          "ackP95Ms": 60.35,
+          "ackP99Ms": 95.96,
+          "peakBacklog": 36,
+          "ackDrainMs": 8.93,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.21,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 1.15,
+          "hostHashMedianMs": 2.25,
+          "observedWalGapBytes": 182920,
+          "firstProbeMsAfterMeasurement": 0.9,
+          "fixedLsnCoveredMsAfterMeasurement": 330.04,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3169
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.63,
+          "ackP95Ms": 79.04,
+          "ackP99Ms": 105.96,
+          "peakBacklog": 47,
+          "ackDrainMs": 35.11,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.18,
+          "meanCheckoutMs": 0.07,
+          "meanQueryMs": 6.15,
+          "hostHashMedianMs": 2.2,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.68,
+          "fixedLsnCoveredMsAfterMeasurement": 0.69,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1928
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.66,
+          "ackP95Ms": 77.7,
+          "ackP99Ms": 109.36,
+          "peakBacklog": 145,
+          "ackDrainMs": 31.63,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.22,
+          "meanCheckoutMs": 0.08,
+          "meanQueryMs": 6.19,
+          "hostHashMedianMs": 2.26,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.87,
+          "fixedLsnCoveredMsAfterMeasurement": 0.88,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2101
+        },
+        {
+          "path": "projector",
+          "rate": 260,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 259.91,
+          "ackP95Ms": 59.72,
+          "ackP99Ms": 94.54,
+          "peakBacklog": 29,
+          "ackDrainMs": 8.91,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.2,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 1.14,
+          "hostHashMedianMs": 2.19,
+          "observedWalGapBytes": 106928,
+          "firstProbeMsAfterMeasurement": 0.63,
+          "fixedLsnCoveredMsAfterMeasurement": 364.29,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2920
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 519.42,
+          "ackP95Ms": 47.44,
+          "ackP99Ms": 66.04,
+          "peakBacklog": 89,
+          "ackDrainMs": 13.62,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.45,
+          "meanCheckoutMs": 0.06,
+          "meanQueryMs": 1.36,
+          "hostHashMedianMs": 2.37,
+          "observedWalGapBytes": 743248,
+          "firstProbeMsAfterMeasurement": 0.9,
+          "fixedLsnCoveredMsAfterMeasurement": 329.95,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2357
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 426.31,
+          "ackP95Ms": 2636.95,
+          "ackP99Ms": 3971.39,
+          "peakBacklog": 6374,
+          "ackDrainMs": 2637.45,
+          "meetsAckTarget": false,
+          "meanHoldMs": 6.63,
+          "meanCheckoutMs": 8.08,
+          "meanQueryMs": 6.59,
+          "hostHashMedianMs": 2.36,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.69,
+          "fixedLsnCoveredMsAfterMeasurement": 0.69,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2062
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 429.54,
+          "ackP95Ms": 3321.67,
+          "ackP99Ms": 3664.03,
+          "peakBacklog": 7511,
+          "ackDrainMs": 2527.61,
+          "meetsAckTarget": false,
+          "meanHoldMs": 6.81,
+          "meanCheckoutMs": 7.71,
+          "meanQueryMs": 6.78,
+          "hostHashMedianMs": 2.35,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.87,
+          "fixedLsnCoveredMsAfterMeasurement": 0.88,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2113
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 519.48,
+          "ackP95Ms": 54.6,
+          "ackP99Ms": 107.99,
+          "peakBacklog": 191,
+          "ackDrainMs": 12.23,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.53,
+          "meanCheckoutMs": 0.1,
+          "meanQueryMs": 1.44,
+          "hostHashMedianMs": 2.34,
+          "observedWalGapBytes": 762656,
+          "firstProbeMsAfterMeasurement": 0.56,
+          "fixedLsnCoveredMsAfterMeasurement": 230.12,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1873
+        },
+        {
+          "path": "direct",
+          "rate": 520,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 494.28,
+          "ackP95Ms": 653.38,
+          "ackP99Ms": 939.69,
+          "peakBacklog": 1262,
+          "ackDrainMs": 624.81,
+          "meetsAckTarget": true,
+          "meanHoldMs": 5.96,
+          "meanCheckoutMs": 7.3,
+          "meanQueryMs": 5.95,
+          "hostHashMedianMs": 2.13,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.5,
+          "fixedLsnCoveredMsAfterMeasurement": 0.51,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2072
+        },
+        {
+          "path": "direct",
+          "rate": 520,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 518.39,
+          "ackP95Ms": 25.56,
+          "ackP99Ms": 44.07,
+          "peakBacklog": 10,
+          "ackDrainMs": 37.63,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.03,
+          "meanCheckoutMs": 0.01,
+          "meanQueryMs": 0.98,
+          "hostHashMedianMs": 2.12,
+          "observedWalGapBytes": 73960,
+          "firstProbeMsAfterMeasurement": 0.64,
+          "fixedLsnCoveredMsAfterMeasurement": 402.84,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3233
+        },
+        {
+          "path": "direct",
+          "rate": 520,
+          "sync": "off",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 518.51,
+          "ackP95Ms": 25.69,
+          "ackP99Ms": 43.99,
+          "peakBacklog": 9,
+          "ackDrainMs": 34.8,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1,
+          "meanCheckoutMs": 0.01,
+          "meanQueryMs": 0.95,
+          "hostHashMedianMs": 2.01,
+          "observedWalGapBytes": 356104,
+          "firstProbeMsAfterMeasurement": 0.5,
+          "fixedLsnCoveredMsAfterMeasurement": 404.29,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1738
+        },
+        {
+          "path": "direct",
+          "rate": 520,
+          "sync": "on",
+          "completed": 6240,
+          "notIssued": 0,
+          "writes": 24960,
+          "ackRps": 506.22,
+          "ackP95Ms": 365.86,
+          "ackP99Ms": 509.57,
+          "peakBacklog": 671,
+          "ackDrainMs": 326.91,
+          "meetsAckTarget": true,
+          "meanHoldMs": 5.85,
+          "meanCheckoutMs": 5.9,
+          "meanQueryMs": 5.84,
+          "hostHashMedianMs": 2.05,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 1.01,
+          "fixedLsnCoveredMsAfterMeasurement": 1.02,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2056
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "on",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.55,
+          "ackP95Ms": 106,
+          "ackP99Ms": 162,
+          "peakBacklog": 113,
+          "ackDrainMs": 73,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.81,
+          "meanCheckoutMs": 0.1,
+          "meanQueryMs": 6.75,
+          "hostHashMedianMs": 2.46,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.75,
+          "fixedLsnCoveredMsAfterMeasurement": 0.76,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3541
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "off",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.7,
+          "ackP95Ms": 70,
+          "ackP99Ms": 78,
+          "peakBacklog": 23,
+          "ackDrainMs": 48,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.42,
+          "meanCheckoutMs": 0.08,
+          "meanQueryMs": 1.31,
+          "hostHashMedianMs": 2.45,
+          "observedWalGapBytes": 5561520,
+          "firstProbeMsAfterMeasurement": 0.68,
+          "fixedLsnCoveredMsAfterMeasurement": 231.35,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 4594
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "off",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.69,
+          "ackP95Ms": 69,
+          "ackP99Ms": 78,
+          "peakBacklog": 19,
+          "ackDrainMs": 51,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.4,
+          "meanCheckoutMs": 0.07,
+          "meanQueryMs": 1.3,
+          "hostHashMedianMs": 2.39,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.7,
+          "fixedLsnCoveredMsAfterMeasurement": 0.7,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3994
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "on",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.58,
+          "ackP95Ms": 99,
+          "ackP99Ms": 294,
+          "peakBacklog": 213,
+          "ackDrainMs": 67,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.59,
+          "meanCheckoutMs": 0.16,
+          "meanQueryMs": 6.53,
+          "hostHashMedianMs": 2.36,
+          "observedWalGapBytes": 5216,
+          "firstProbeMsAfterMeasurement": 2.45,
+          "fixedLsnCoveredMsAfterMeasurement": 115.38,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3500
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "off",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.71,
+          "ackP95Ms": 70,
+          "ackP99Ms": 79,
+          "peakBacklog": 24,
+          "ackDrainMs": 47,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.43,
+          "meanCheckoutMs": 0.08,
+          "meanQueryMs": 1.33,
+          "hostHashMedianMs": 2.43,
+          "observedWalGapBytes": 189552,
+          "firstProbeMsAfterMeasurement": 1.16,
+          "fixedLsnCoveredMsAfterMeasurement": 302.86,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 4944
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "on",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.49,
+          "ackP95Ms": 97,
+          "ackP99Ms": 115,
+          "peakBacklog": 34,
+          "ackDrainMs": 81,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.52,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 6.46,
+          "hostHashMedianMs": 2.38,
+          "observedWalGapBytes": 26624,
+          "firstProbeMsAfterMeasurement": 1.02,
+          "fixedLsnCoveredMsAfterMeasurement": 194.24,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3434
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "on",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.58,
+          "ackP95Ms": 97,
+          "ackP99Ms": 118,
+          "peakBacklog": 50,
+          "ackDrainMs": 67,
+          "meetsAckTarget": true,
+          "meanHoldMs": 6.53,
+          "meanCheckoutMs": 0.07,
+          "meanQueryMs": 6.47,
+          "hostHashMedianMs": 2.41,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.76,
+          "fixedLsnCoveredMsAfterMeasurement": 0.77,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3573
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "off",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.69,
+          "ackP95Ms": 71,
+          "ackP99Ms": 78,
+          "peakBacklog": 25,
+          "ackDrainMs": 50,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.44,
+          "meanCheckoutMs": 0.08,
+          "meanQueryMs": 1.33,
+          "hostHashMedianMs": 2.4,
+          "observedWalGapBytes": 63048,
+          "firstProbeMsAfterMeasurement": 1.92,
+          "fixedLsnCoveredMsAfterMeasurement": 249.6,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 4682
+        },
+        {
+          "path": "full",
+          "rate": 10,
+          "sync": "on",
+          "completed": 200,
+          "notIssued": 0,
+          "writes": 800,
+          "ackRps": 10.02,
+          "ackP95Ms": 72,
+          "ackP99Ms": 78,
+          "peakBacklog": 3,
+          "ackDrainMs": 59,
+          "meetsAckTarget": true,
+          "meanHoldMs": 3.94,
+          "meanCheckoutMs": 0.02,
+          "meanQueryMs": 3.92,
+          "hostHashMedianMs": 1.95,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.72,
+          "fixedLsnCoveredMsAfterMeasurement": 0.72,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 800
+        },
+        {
+          "path": "full",
+          "rate": 10,
+          "sync": "off",
+          "completed": 200,
+          "notIssued": 0,
+          "writes": 800,
+          "ackRps": 10.03,
+          "ackP95Ms": 56,
+          "ackP99Ms": 70,
+          "peakBacklog": 4,
+          "ackDrainMs": 45,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.28,
+          "meanCheckoutMs": 0.02,
+          "meanQueryMs": 1.26,
+          "hostHashMedianMs": 2.02,
+          "observedWalGapBytes": 2880,
+          "firstProbeMsAfterMeasurement": 0.8,
+          "fixedLsnCoveredMsAfterMeasurement": 95.3,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 800
+        },
+        {
+          "path": "full",
+          "rate": 10,
+          "sync": "off",
+          "completed": 200,
+          "notIssued": 0,
+          "writes": 800,
+          "ackRps": 10.03,
+          "ackP95Ms": 68,
+          "ackP99Ms": 72,
+          "peakBacklog": 4,
+          "ackDrainMs": 49,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.27,
+          "meanCheckoutMs": 0.02,
+          "meanQueryMs": 1.25,
+          "hostHashMedianMs": 1.99,
+          "observedWalGapBytes": 3584,
+          "firstProbeMsAfterMeasurement": 0.73,
+          "fixedLsnCoveredMsAfterMeasurement": 108.51,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 800
+        },
+        {
+          "path": "full",
+          "rate": 10,
+          "sync": "on",
+          "completed": 200,
+          "notIssued": 0,
+          "writes": 800,
+          "ackRps": 10.02,
+          "ackP95Ms": 72,
+          "ackP99Ms": 81,
+          "peakBacklog": 2,
+          "ackDrainMs": 65,
+          "meetsAckTarget": true,
+          "meanHoldMs": 4.24,
+          "meanCheckoutMs": 0.02,
+          "meanQueryMs": 4.22,
+          "hostHashMedianMs": 2.07,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.67,
+          "fixedLsnCoveredMsAfterMeasurement": 0.67,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 800
+        }
+      ],
+      "hostSpeed": [
+        {
+          "key": "projector/on/fast",
+          "rounds": 4,
+          "seconds": 89,
+          "hashMs": 2.25,
+          "writesPerSecond": 1039.65,
+          "meanHoldMs": 6.13,
+          "meanCheckoutMs": 0.07
+        },
+        {
+          "key": "projector/off/fast",
+          "rounds": 4,
+          "seconds": 90,
+          "hashMs": 2.26,
+          "writesPerSecond": 1040.08,
+          "meanHoldMs": 1.2,
+          "meanCheckoutMs": 0.05
+        },
+        {
+          "key": "full/on/fast",
+          "rounds": 4,
+          "seconds": 149,
+          "hashMs": 2.41,
+          "writesPerSecond": 1039.98,
+          "meanHoldMs": 6.61,
+          "meanCheckoutMs": 0.1
+        },
+        {
+          "key": "full/off/fast",
+          "rounds": 4,
+          "seconds": 146,
+          "hashMs": 2.44,
+          "writesPerSecond": 1039.86,
+          "meanHoldMs": 1.42,
+          "meanCheckoutMs": 0.08
+        },
+        {
+          "key": "full/off/middle",
+          "rounds": 2,
+          "seconds": 2,
+          "hashMs": 3.3,
+          "writesPerSecond": 1047.5,
+          "meanHoldMs": 1.45,
+          "meanCheckoutMs": 0.08
+        }
+      ],
+      "crash": {
+        "immediateStop": true,
+        "trials": [
+          {
+            "trial": 1,
+            "mode": "on",
+            "acknowledged": 32,
+            "recovered": 32,
+            "lost": 0,
+            "gapBytesBeforeStop": 0
+          },
+          {
+            "trial": 2,
+            "mode": "off",
+            "acknowledged": 32,
+            "recovered": 22,
+            "lost": 10,
+            "gapBytesBeforeStop": 7352
+          },
+          {
+            "trial": 3,
+            "mode": "off",
+            "acknowledged": 32,
+            "recovered": 0,
+            "lost": 32,
+            "gapBytesBeforeStop": 8624
+          },
+          {
+            "trial": 4,
+            "mode": "on",
+            "acknowledged": 32,
+            "recovered": 32,
+            "lost": 0,
+            "gapBytesBeforeStop": 0
+          },
+          {
+            "trial": 5,
+            "mode": "on",
+            "acknowledged": 32,
+            "recovered": 32,
+            "lost": 0,
+            "gapBytesBeforeStop": 0
+          },
+          {
+            "trial": 6,
+            "mode": "off",
+            "acknowledged": 32,
+            "recovered": 0,
+            "lost": 32,
+            "gapBytesBeforeStop": 12208
+          }
+        ]
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    },
+    {
+      "peak": true,
+      "capturedRuns": 4160,
+      "frames": 29120,
+      "projectionWrites": 16640,
+      "traceSha256": "3be54f7fef87c5f25d93029833b4f49ceddeb6e5484001f139e8ed0ead968322",
+      "pg": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "server": {
+        "initial": {
+          "delayUs": 0,
+          "siblings": 5,
+          "fsync": "on",
+          "sync": "on",
+          "method": "fdatasync"
+        },
+        "confirm": false,
+        "peak": true,
+        "restored": {
+          "delayUs": 0,
+          "siblings": 5,
+          "fsync": "on",
+          "sync": "on",
+          "method": "fdatasync"
+        }
+      },
+      "groups": [
+        {
+          "name": "projector/520/on",
+          "trials": 2,
+          "passed": 0,
+          "completed": 8320,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 431.86,
+            "max": 441.13
+          },
+          "ackP95Ms": {
+            "min": 1672.55,
+            "max": 1852.22
+          },
+          "meanHoldMs": {
+            "min": 6.57,
+            "max": 6.76
+          },
+          "peakBacklog": {
+            "min": 4011,
+            "max": 4674
+          },
+          "ackDrainMs": {
+            "min": 1430.51,
+            "max": 1633.11
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.55,
+            "max": 0.72
+          }
+        },
+        {
+          "name": "projector/520/off",
+          "trials": 2,
+          "passed": 2,
+          "completed": 8320,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 518.73,
+            "max": 518.96
+          },
+          "ackP95Ms": {
+            "min": 34.27,
+            "max": 36.74
+          },
+          "meanHoldMs": {
+            "min": 1.42,
+            "max": 1.56
+          },
+          "peakBacklog": {
+            "min": 79,
+            "max": 106
+          },
+          "ackDrainMs": {
+            "min": 16.37,
+            "max": 19.79
+          },
+          "walGapBytes": {
+            "min": 220128,
+            "max": 782152
+          },
+          "walCoveredAfterEndMs": {
+            "min": 358.76,
+            "max": 425.34
+          }
+        },
+        {
+          "name": "full/520/off",
+          "trials": 2,
+          "passed": 1,
+          "completed": 20272,
+          "notIssued": 528,
+          "ackRps": {
+            "min": 483.51,
+            "max": 517.81
+          },
+          "ackP95Ms": {
+            "min": 168,
+            "max": 1212
+          },
+          "meanHoldMs": {
+            "min": 2.7,
+            "max": 4.59
+          },
+          "peakBacklog": {
+            "min": 47,
+            "max": 2127
+          },
+          "ackDrainMs": {
+            "min": 86,
+            "max": 418
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.93,
+            "max": 0.96
+          }
+        },
+        {
+          "name": "full/520/on",
+          "trials": 2,
+          "passed": 0,
+          "completed": 16203,
+          "notIssued": 4597,
+          "ackRps": {
+            "min": 381.1,
+            "max": 387.9
+          },
+          "ackP95Ms": {
+            "min": 1915,
+            "max": 2174
+          },
+          "meanHoldMs": {
+            "min": 7.55,
+            "max": 7.72
+          },
+          "peakBacklog": {
+            "min": 2401,
+            "max": 2407
+          },
+          "ackDrainMs": {
+            "min": 1017,
+            "max": 1124
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 0.8,
+            "max": 0.96
+          }
+        },
+        {
+          "name": "full/260/off",
+          "trials": 1,
+          "passed": 1,
+          "completed": 10400,
+          "notIssued": 0,
+          "ackRps": {
+            "min": 259.66,
+            "max": 259.66
+          },
+          "ackP95Ms": {
+            "min": 71,
+            "max": 71
+          },
+          "meanHoldMs": {
+            "min": 1.45,
+            "max": 1.45
+          },
+          "peakBacklog": {
+            "min": 18,
+            "max": 18
+          },
+          "ackDrainMs": {
+            "min": 55,
+            "max": 55
+          },
+          "walGapBytes": {
+            "min": 296,
+            "max": 296
+          },
+          "walCoveredAfterEndMs": {
+            "min": 62.1,
+            "max": 62.1
+          }
+        },
+        {
+          "name": "full/260/on",
+          "trials": 1,
+          "passed": 0,
+          "completed": 7086,
+          "notIssued": 3314,
+          "ackRps": {
+            "min": 170.69,
+            "max": 170.69
+          },
+          "ackP95Ms": {
+            "min": 4398,
+            "max": 4398
+          },
+          "meanHoldMs": {
+            "min": 17.16,
+            "max": 17.16
+          },
+          "peakBacklog": {
+            "min": 2313,
+            "max": 2313
+          },
+          "ackDrainMs": {
+            "min": 1516,
+            "max": 1516
+          },
+          "walGapBytes": {
+            "min": 0,
+            "max": 0
+          },
+          "walCoveredAfterEndMs": {
+            "min": 1.16,
+            "max": 1.16
+          }
+        }
+      ],
+      "rows": [
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "on",
+          "completed": 4160,
+          "notIssued": 0,
+          "writes": 16640,
+          "ackRps": 431.86,
+          "ackP95Ms": 1852.22,
+          "ackP99Ms": 2236.28,
+          "peakBacklog": 4674,
+          "ackDrainMs": 1633.11,
+          "meetsAckTarget": false,
+          "meanHoldMs": 6.76,
+          "meanCheckoutMs": 9.54,
+          "meanQueryMs": 6.72,
+          "hostHashMedianMs": 2.41,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.71,
+          "fixedLsnCoveredMsAfterMeasurement": 0.72,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1389
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "off",
+          "completed": 4160,
+          "notIssued": 0,
+          "writes": 16640,
+          "ackRps": 518.73,
+          "ackP95Ms": 36.74,
+          "ackP99Ms": 45.67,
+          "peakBacklog": 106,
+          "ackDrainMs": 19.79,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.56,
+          "meanCheckoutMs": 0.06,
+          "meanQueryMs": 1.48,
+          "hostHashMedianMs": 2.4,
+          "observedWalGapBytes": 220128,
+          "firstProbeMsAfterMeasurement": 0.78,
+          "fixedLsnCoveredMsAfterMeasurement": 358.76,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1633
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "off",
+          "completed": 4160,
+          "notIssued": 0,
+          "writes": 16640,
+          "ackRps": 518.96,
+          "ackP95Ms": 34.27,
+          "ackP99Ms": 43.2,
+          "peakBacklog": 79,
+          "ackDrainMs": 16.37,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.42,
+          "meanCheckoutMs": 0.05,
+          "meanQueryMs": 1.35,
+          "hostHashMedianMs": 2.36,
+          "observedWalGapBytes": 782152,
+          "firstProbeMsAfterMeasurement": 0.62,
+          "fixedLsnCoveredMsAfterMeasurement": 425.34,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1664
+        },
+        {
+          "path": "projector",
+          "rate": 520,
+          "sync": "on",
+          "completed": 4160,
+          "notIssued": 0,
+          "writes": 16640,
+          "ackRps": 441.13,
+          "ackP95Ms": 1672.55,
+          "ackP99Ms": 2088.73,
+          "peakBacklog": 4011,
+          "ackDrainMs": 1430.51,
+          "meetsAckTarget": false,
+          "meanHoldMs": 6.57,
+          "meanCheckoutMs": 9.31,
+          "meanQueryMs": 6.53,
+          "hostHashMedianMs": 2.45,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.55,
+          "fixedLsnCoveredMsAfterMeasurement": 0.55,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 1343
+        },
+        {
+          "path": "full",
+          "rate": 520,
+          "sync": "off",
+          "completed": 9872,
+          "notIssued": 528,
+          "writes": 39488,
+          "ackRps": 483.51,
+          "ackP95Ms": 1212,
+          "ackP99Ms": 1844,
+          "peakBacklog": 2127,
+          "ackDrainMs": 418,
+          "meetsAckTarget": false,
+          "meanHoldMs": 4.59,
+          "meanCheckoutMs": 4.75,
+          "meanQueryMs": 4.43,
+          "hostHashMedianMs": 2.8,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.94,
+          "fixedLsnCoveredMsAfterMeasurement": 0.96,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2973
+        },
+        {
+          "path": "full",
+          "rate": 520,
+          "sync": "on",
+          "completed": 8009,
+          "notIssued": 2391,
+          "writes": 32036,
+          "ackRps": 381.1,
+          "ackP95Ms": 2174,
+          "ackP99Ms": 2658,
+          "peakBacklog": 2401,
+          "ackDrainMs": 1017,
+          "meetsAckTarget": false,
+          "meanHoldMs": 7.72,
+          "meanCheckoutMs": 11.52,
+          "meanQueryMs": 7.67,
+          "hostHashMedianMs": 2.72,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.8,
+          "fixedLsnCoveredMsAfterMeasurement": 0.8,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2681
+        },
+        {
+          "path": "full",
+          "rate": 520,
+          "sync": "on",
+          "completed": 8194,
+          "notIssued": 2206,
+          "writes": 32776,
+          "ackRps": 387.9,
+          "ackP95Ms": 1915,
+          "ackP99Ms": 2803,
+          "peakBacklog": 2407,
+          "ackDrainMs": 1124,
+          "meetsAckTarget": false,
+          "meanHoldMs": 7.55,
+          "meanCheckoutMs": 11.36,
+          "meanQueryMs": 7.5,
+          "hostHashMedianMs": 2.65,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.96,
+          "fixedLsnCoveredMsAfterMeasurement": 0.96,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2657
+        },
+        {
+          "path": "full",
+          "rate": 520,
+          "sync": "off",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 517.81,
+          "ackP95Ms": 168,
+          "ackP99Ms": 184,
+          "peakBacklog": 47,
+          "ackDrainMs": 86,
+          "meetsAckTarget": true,
+          "meanHoldMs": 2.7,
+          "meanCheckoutMs": 0.32,
+          "meanQueryMs": 2.43,
+          "hostHashMedianMs": 2.67,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 0.92,
+          "fixedLsnCoveredMsAfterMeasurement": 0.93,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3475
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "off",
+          "completed": 10400,
+          "notIssued": 0,
+          "writes": 41600,
+          "ackRps": 259.66,
+          "ackP95Ms": 71,
+          "ackP99Ms": 82,
+          "peakBacklog": 18,
+          "ackDrainMs": 55,
+          "meetsAckTarget": true,
+          "meanHoldMs": 1.45,
+          "meanCheckoutMs": 0.08,
+          "meanQueryMs": 1.34,
+          "hostHashMedianMs": 2.34,
+          "observedWalGapBytes": 296,
+          "firstProbeMsAfterMeasurement": 2.41,
+          "fixedLsnCoveredMsAfterMeasurement": 62.1,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 3289
+        },
+        {
+          "path": "full",
+          "rate": 260,
+          "sync": "on",
+          "completed": 7086,
+          "notIssued": 3314,
+          "writes": 28344,
+          "ackRps": 170.69,
+          "ackP95Ms": 4398,
+          "ackP99Ms": 5013,
+          "peakBacklog": 2313,
+          "ackDrainMs": 1516,
+          "meetsAckTarget": false,
+          "meanHoldMs": 17.16,
+          "meanCheckoutMs": 25.39,
+          "meanQueryMs": 17.02,
+          "hostHashMedianMs": 8.59,
+          "observedWalGapBytes": 0,
+          "firstProbeMsAfterMeasurement": 1.15,
+          "fixedLsnCoveredMsAfterMeasurement": 1.16,
+          "pgAndProjectorMask": "0-31",
+          "verifiedWriterConnections": 12,
+          "sampledPgQueries": 2300
+        }
+      ],
+      "hostSpeed": [
+        {
+          "key": "full/off/fast",
+          "rounds": 1,
+          "seconds": 37,
+          "hashMs": 2.36,
+          "writesPerSecond": 1040.03,
+          "meanHoldMs": 1.45,
+          "meanCheckoutMs": 0.08
+        },
+        {
+          "key": "full/on/slow",
+          "rounds": 1,
+          "seconds": 38,
+          "hashMs": 9.57,
+          "writesPerSecond": 665.84,
+          "meanHoldMs": 17.96,
+          "meanCheckoutMs": 27.91
+        }
+      ],
+      "crash": {
+        "immediateStop": true,
+        "trials": [
+          {
+            "trial": 1,
+            "mode": "on",
+            "acknowledged": 32,
+            "recovered": 32,
+            "lost": 0,
+            "gapBytesBeforeStop": 0
+          },
+          {
+            "trial": 2,
+            "mode": "off",
+            "acknowledged": 32,
+            "recovered": 0,
+            "lost": 32,
+            "gapBytesBeforeStop": 7352
+          },
+          {
+            "trial": 3,
+            "mode": "off",
+            "acknowledged": 32,
+            "recovered": 20,
+            "lost": 12,
+            "gapBytesBeforeStop": 7352
+          },
+          {
+            "trial": 4,
+            "mode": "on",
+            "acknowledged": 32,
+            "recovered": 32,
+            "lost": 0,
+            "gapBytesBeforeStop": 0
+          },
+          {
+            "trial": 5,
+            "mode": "on",
+            "acknowledged": 32,
+            "recovered": 32,
+            "lost": 0,
+            "gapBytesBeforeStop": 0
+          },
+          {
+            "trial": 6,
+            "mode": "off",
+            "acknowledged": 32,
+            "recovered": 0,
+            "lost": 32,
+            "gapBytesBeforeStop": 12120
+          }
+        ]
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    }
+  ]
+}
