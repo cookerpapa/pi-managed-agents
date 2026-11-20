@@ -1,6 +1,13 @@
 // Each SQL helper executes the original parameterized mutation. The ordered
 // loop and partition checkpoint execute in one synchronous autocommit call.
 export async function installPrefixSql(db, { message, inbox, finishAndRelease }) {
+  const replaceUsage = `on conflict(tenant_id,pi_session_id,conversation_id) do update
+    set commit_seq=excluded.commit_seq,ordinal=excluded.ordinal,value=excluded.value
+    where u.doc_id=excluded.doc_id and (u.commit_seq,u.ordinal)<(excluded.commit_seq,excluded.ordinal)`;
+  const usageValues = (
+    row,
+  ) => `(${row}->>'tenant')::uuid,(${row}->>'session')::uuid,(${row}->>'conversation')::bigint,
+    (${row}->>'document')::bigint,(${row}->>'seq')::bigint,(${row}->>'ordinal')::int,${row}->'value'`;
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
     alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,
       add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
@@ -10,9 +17,9 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
     create function prefix_inbox(uuid,uuid,bigint,bigint,int,text,uuid,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${inbox} $fn$;
     create function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${finishAndRelease} $fn$;
-    create function project_ready(p_topic text,p_partition int,p_expected bigint,p_next bigint,p_frames jsonb,p_relaxed boolean default false,p_allow_finish boolean default false)
+    create function project_ready(p_topic text,p_partition int,p_expected bigint,p_next bigint,p_frames jsonb,p_relaxed boolean default false,p_allow_finish boolean default false,p_bulk_usage boolean default false)
     returns text language plpgsql as $body$
-    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; snap jsonb;
+    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; snap jsonb; pending_usage jsonb[];
     begin
       select next_offset into strict saved from accepted_fact_projection_offsets
        where topic=p_topic and partition=p_partition for update;
@@ -73,13 +80,12 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
         if frame?'usage' then
           if applied=0 then raise exception 'Usage lacks admitted source'; end if;
           for op in select value from jsonb_array_elements(frame->'usage') loop
-            insert into usage_latest as u values ((op->>'tenant')::uuid,(op->>'session')::uuid,
-              (op->>'conversation')::bigint,(op->>'document')::bigint,(op->>'seq')::bigint,
-              (op->>'ordinal')::int,op->'value')
-            on conflict(tenant_id,pi_session_id,conversation_id) do update
-              set commit_seq=excluded.commit_seq,ordinal=excluded.ordinal,value=excluded.value
-              where u.doc_id=excluded.doc_id and (u.commit_seq,u.ordinal)<(excluded.commit_seq,excluded.ordinal);
-            if not found then raise exception 'Conflicting accepted usage position' using errcode='PZ002'; end if;
+            if p_bulk_usage then
+              pending_usage:=array_append(pending_usage,op);
+            else
+              insert into usage_latest as u values (${usageValues("op")}) ${replaceUsage};
+              if not found then raise exception 'Conflicting accepted usage position' using errcode='PZ002'; end if;
+            end if;
           end loop;
         end if;
         if frame?'snapshot' then
@@ -99,6 +105,12 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
           if not found then raise exception 'Pin owner changed' using errcode='40001'; end if;
         end if;
       end loop;
+      if pending_usage is not null then
+        insert into usage_latest as u select ${usageValues("item")}
+          from unnest(pending_usage) as v(item) ${replaceUsage};
+        get diagnostics n = row_count;
+        if n<>cardinality(pending_usage) then raise exception 'Conflicting accepted usage position' using errcode='PZ002'; end if;
+      end if;
       update accepted_fact_projection_offsets set next_offset=p_next where topic=p_topic and partition=p_partition;
       if p_relaxed then perform set_config('synchronous_commit','off',true); end if;
       return 'applied';
@@ -107,8 +119,12 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
 export const applyPrefixSql = "select project_ready($1,$2,$3,$4,$5::jsonb) as outcome";
 // The function has no SET clause. The local setting survives function return
 // through the implicit COMMIT, then reverts before the pooled client is reused.
-export const applyMovingSql = `with result as materialized (select project_ready($1,$2,$3,$4,$5::jsonb,$6,$7) as outcome)
+const movingSql = (
+  bulk,
+) => `with result as materialized (select project_ready($1,$2,$3,$4,$5::jsonb,$6,$7,${bulk}) as outcome)
   select outcome,current_setting('synchronous_commit') as mode from result`;
+export const applyMovingSql = movingSql(false);
+export const applyBulkUsageSql = movingSql(true);
 export async function projectionStarts(db, topic, bounds) {
   const { rows } = await db.query(
     `select h.partition,h.next_offset,min(r.projection_first) as first

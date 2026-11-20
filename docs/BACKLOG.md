@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare row-wise and multi-row cumulative usage writes, relation footprint and compaction inputs in the isolated prototype. [Evidence](reports/minimal-usage-bulk-20261120.md).
+
 - [x] Measure the projection cost of retaining native cumulative usage in the admitting batch. Verify a streamed two-tool trace separately from the complete-message capacity study. [Evidence](reports/minimal-projection-usage-20261120.md).
 
 - [x] Measure ordinary stable projection with shared message Forks, existing descendants and simultaneous Fork creation. Validate independent history after source prune/delete and measure first-page, nested and concurrent Fork performance. [Evidence](reports/minimal-projection-fork-20261120.md).

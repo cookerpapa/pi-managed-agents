@@ -48,6 +48,19 @@ export function coCommittedUsage(view, fact, frame, persist) {
   }
 }
 
+// PostgreSQL cannot upsert a conflicting key twice in one statement.
+export function canGroupUsage(frames, count) {
+  if (count < 2) return false;
+  const keys = new Set();
+  for (const frame of frames)
+    for (const op of frame.usage ?? []) {
+      const key = op.tenant + "/" + op.session + "/" + op.conversation;
+      if (keys.has(key)) return false;
+      keys.add(key);
+    }
+  return true;
+}
+
 export const usageTableSql = `create table usage_latest(
     tenant_id uuid, pi_session_id uuid, conversation_id bigint, doc_id bigint not null,
     commit_seq bigint not null, ordinal int not null, value jsonb not null,
@@ -57,14 +70,20 @@ export async function usageStudy(pool, profile, owners, token) {
   const { installForkStudy, setForkLayout, ForkStorage } = await import("./fork-storage.mjs");
   await installForkStudy(pool, token);
   const storage = new ForkStorage(pool);
-  const rates = profile.endsWith("smoke") ? [2315] : [2315, 6000, 0];
+  const bulk = profile.startsWith("usage-rate-bulk");
+  const rates = profile.endsWith("smoke") ? [bulk ? 0 : 2315] : [2315, 6000, 0];
   const cases = rates.flatMap((rate) => {
     const arms = profile.endsWith("smoke")
       ? [false, true]
       : profile.endsWith("confirm")
         ? [true, false, false, true]
         : [false, true, true, false];
-    return arms.map((persistUsage) => ({ rate, policy: "recorded-history", persistUsage }));
+    return arms.map((enabled) => ({
+      rate,
+      policy: "recorded-history",
+      persistUsage: bulk || enabled,
+      ...(bulk ? { bulkUsage: enabled } : {}),
+    }));
   });
   await pool.query(usageTableSql);
   return {

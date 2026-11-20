@@ -266,6 +266,7 @@ try {
         metrics = blank();
         await resetPrefix(16, m.policy);
         prefixStudy.persistUsage = m.persistUsage;
+        prefixStudy.bulkUsage = m.bulkUsage;
         messageMeter = new MessageRateMeter(m.owners, m.rate, !m.rate);
         send("messagesReady");
       },

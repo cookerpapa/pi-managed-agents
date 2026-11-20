@@ -4,6 +4,7 @@ import {
   installPrefixSql,
   applyPrefixSql,
   applyMovingSql,
+  applyBulkUsageSql,
   projectionStarts,
 } from "./ready-projection-sql.mjs";
 import {
@@ -17,7 +18,7 @@ import {
   assertFamilySettled,
 } from "./moving-checkpoint.mjs";
 
-import { coCommittedUsage } from "./usage-study.mjs";
+import { canGroupUsage, coCommittedUsage } from "./usage-study.mjs";
 
 export const isPrefixStudy = (name) =>
   ["prefix-smoke", "prefix-study", "prefix-confirm"].includes(name) || isMovingStudy(name);
@@ -34,6 +35,9 @@ export const isMovingStudy = (name) =>
     "fork-rate-confirm",
     "fork-rate-smoke",
     "fork-rate-index",
+    "usage-rate-bulk",
+    "usage-rate-bulk-confirm",
+    "usage-rate-bulk-smoke",
     "usage-rate-smoke",
     "usage-rate-confirm",
     "usage-rate",
@@ -150,6 +154,8 @@ export class ReadyProjection {
     this.stats = {
       commits: 0,
       usageUpserts: 0,
+      usageStatements: 0,
+      multiUsageStatements: 0,
       recordsInTransactions: 0,
       logicalWrites: 0,
       transactionsByWrites: {},
@@ -353,9 +359,12 @@ export class ReadyProjection {
           !draft.frames.some((f) => f.strict) &&
           operations.every((f) => f.history);
         const moving = this.policy !== "fixed";
+        const usageCount = draft.frames.reduce((n, f) => n + (f.usage?.length ?? 0), 0);
+        const grouped = this.bulkUsage && moving && canGroupUsage(draft.frames, usageCount);
+        const statement = grouped ? applyBulkUsageSql : moving ? applyMovingSql : applyPrefixSql;
         const {
           rows: [row],
-        } = await c.query(moving ? applyMovingSql : applyPrefixSql, [
+        } = await c.query(statement, [
           this.topic,
           partition,
           String(expected),
@@ -369,7 +378,9 @@ export class ReadyProjection {
         if (outcome === "applied" && moving) {
           assert.equal(row.mode, relaxed ? "off" : "on", "PG transaction policy mismatch");
           this.stats[row.mode === "off" ? "asyncTransactions" : "syncTransactions"]++;
-          this.stats.usageUpserts += draft.frames.reduce((n, f) => n + (f.usage?.length ?? 0), 0);
+          this.stats.usageUpserts += usageCount;
+          this.stats.usageStatements += grouped ? 1 : usageCount;
+          if (grouped) this.stats.multiUsageStatements++;
           this.stats.checkpointAdvances += draft.frames.filter((f) => f.snapshot).length;
           this.stats.firstPins += draft.frames.filter((f) => f.pin).length;
         }

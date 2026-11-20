@@ -29,3 +29,12 @@ batching. The measured candidate upserts one current row per Conversation in the
 transaction that admits its source. No text fragment schedules a usage write.
 This experiment covers the co-committed response path. It does not change serving
 storage, charge eligibility, or the public usage API.
+
+The follow-up compares ordered per-row upserts with one multi-row upsert for
+independent Conversation keys in the same admitted partition prefix. Duplicate
+keys in a prefix keep their original ordered validation. Both measured modes
+retain the exact same current values, immutable assistant usage and atomic
+recovery position. Keep the simpler writer unless repeated high-load runs show
+a consistent improvement. Measure relation allocation separately from WAL.
+
+The [paired measurements](../reports/minimal-usage-bulk-20261120.md) retain the row-wise writer as the prototype default. The multi-row variant remains a benchmark selection.

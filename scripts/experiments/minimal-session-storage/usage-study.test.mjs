@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import { captureNativeUsage } from "./native-usage-fixture.mjs";
-import { coCommittedUsage } from "./usage-study.mjs";
+import { captureNativeUsage, checkCompactionUsage } from "./native-usage-fixture.mjs";
+import { canGroupUsage, coCommittedUsage } from "./usage-study.mjs";
 
 test("two model replies co-commit two cumulative values even with two tools and streamed text", async (t) => {
   const { commits, finalUsage } = await captureNativeUsage(randomUUID());
@@ -48,4 +48,22 @@ test("two model replies co-commit two cumulative values even with two tools and 
       pureLive,
     }),
   );
+});
+
+test("group distinct admitted usage identities and leave repeated keys in source order", () => {
+  const put = (tenant, session, conversation) => ({ tenant, session, conversation });
+  const a = put("t", "s", 1);
+  const distinct = [
+    { usage: [a, put("t", "s", 2)] },
+    {},
+    { usage: [put("t", "s2", 1), put("t2", "s", 1)] },
+  ];
+  assert(canGroupUsage(distinct, 4));
+  assert(!canGroupUsage([...distinct, { usage: [{ ...a }] }], 5));
+  assert(!canGroupUsage([{ usage: [a] }], 1));
+  assert(!canGroupUsage([], 0));
+});
+
+test("automatic compaction follows current-context usage when cumulative spending exceeds the threshold", async (t) => {
+  t.diagnostic(JSON.stringify(await checkCompactionUsage()));
 });

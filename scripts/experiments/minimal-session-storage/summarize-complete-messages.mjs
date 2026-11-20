@@ -33,6 +33,12 @@ for (const directory of directories) {
       assert.equal(t.usageUpserts, t.persistUsage ? m.runs * 102 : 0);
       assert(t.walBytes > 0 && t.syncTransactions === 0);
     }
+    if (typeof t.bulkUsage === "boolean") {
+      assert(t.persistUsage && t.usageTableBytes >= t.usageValueBytes && t.usageValueBytes > 0);
+      assert(t.usageStatements > 0 && t.usageStatements <= t.usageUpserts);
+      assert.equal(t.usageStatements < t.usageUpserts, t.multiUsageStatements > 0);
+      if (!t.bulkUsage) assert.equal(t.usageStatements, t.usageUpserts);
+    }
     if (t.layout) {
       assert(t.policy === "recorded-history");
       assert.equal(t.concurrentForks > 0, t.layout === "busy");

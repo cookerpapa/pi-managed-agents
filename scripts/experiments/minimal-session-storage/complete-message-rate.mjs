@@ -286,7 +286,7 @@ export async function messageTrials(
         (policy) => ({ rate, policy }),
       ),
     );
-  for (const { rate, policy, layout, persistUsage } of trials) {
+  for (const { rate, policy, layout, persistUsage, bulkUsage } of trials) {
     if (usage) await usage.before();
     else if (fork) await fork.before(layout);
     else await observer.query("truncate messages,inboxes,runs");
@@ -305,6 +305,7 @@ export async function messageTrials(
       rate,
       policy,
       persistUsage,
+      bulkUsage,
     });
     const walBefore =
       fork || usage
@@ -366,7 +367,22 @@ export async function messageTrials(
     await fork?.verify(layout);
     const usageRows = await usage?.verify(persistUsage);
     if (usage) assert.equal(stats.usageUpserts, persistUsage ? owners.length * 102 : 0);
+    let usageStorage;
+    if (bulkUsage !== undefined) {
+      const {
+        rows: [size],
+      } =
+        await observer.query(`select pg_total_relation_size('usage_latest')::int as "usageTableBytes",
+        sum(pg_column_size(value))::int as "usageValueBytes" from usage_latest`);
+      usageStorage = {
+        ...size,
+        bulkUsage,
+        usageStatements: stats.usageStatements,
+        multiUsageStatements: stats.multiUsageStatements,
+      };
+    }
     const trial = {
+      ...usageStorage,
       rate: rate || "preloaded",
       policy,
       ...(fork ? { layout, ...traffic, walBytes } : {}),

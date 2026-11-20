@@ -406,7 +406,7 @@ it.skipIf(!url)(
   async () => {
     await fixture(async ({ db, scope, cursor, topic }) => {
       const { usageTableSql, usageValue } = await import("./usage-study.mjs");
-      const { applyMovingSql } = await import("./ready-projection-sql.mjs");
+      const { applyMovingSql, applyBulkUsageSql } = await import("./ready-projection-sql.mjs");
       await db.query(usageTableSql);
       function frame(offset, writer = scope.writerId) {
         const seq = offset + 1;
@@ -441,9 +441,9 @@ it.skipIf(!url)(
           ],
         };
       }
-      const apply = async (from, frames) =>
+      const apply = async (from, frames, statement = applyMovingSql) =>
         (
-          await db.query(applyMovingSql, [
+          await db.query(statement, [
             topic,
             0,
             from,
@@ -454,7 +454,11 @@ it.skipIf(!url)(
           ])
         ).rows[0].outcome;
       const rows = async () =>
-        (await db.query("select commit_seq::int as seq, value from usage_latest")).rows;
+        (
+          await db.query(
+            "select commit_seq::int as seq, value from usage_latest order by conversation_id",
+          )
+        ).rows;
       expect(await apply(0, [frame(0), frame(1)])).toBe("applied");
       expect(await rows()).toEqual([{ seq: 2, value: usageValue(2) }]);
       expect(await apply(0, [frame(0), frame(1)])).toBe("covered");
@@ -468,6 +472,33 @@ it.skipIf(!url)(
       expect(await rows()).toEqual([{ seq: 2, value: usageValue(2) }]);
       expect(await apply(3, [frame(3)])).toBe("applied");
       expect(await rows()).toEqual([{ seq: 4, value: usageValue(4) }]);
+      function secondConversation(offset) {
+        const f = frame(offset);
+        const entry = JSON.parse(f.ops[0].args[4]);
+        entry[0].conversation = 2;
+        f.ops[0].args[4] = JSON.stringify(entry);
+        Object.assign(f.usage[0], { conversation: 2, document: 7 });
+        return f;
+      }
+      const pair = [frame(4), secondConversation(5)];
+      expect(await apply(4, pair, applyBulkUsageSql)).toBe("applied");
+      expect(await apply(4, pair, applyBulkUsageSql)).toBe("covered");
+      const agreed = [
+        { seq: 5, value: usageValue(5) },
+        { seq: 6, value: usageValue(6) },
+      ];
+      expect(await rows()).toEqual(agreed);
+      const conflict = secondConversation(7);
+      conflict.usage[0].document = 99;
+      await expect(apply(6, [frame(6), conflict], applyBulkUsageSql)).rejects.toMatchObject({
+        code: "PZ002",
+      });
+      await expect(
+        apply(6, [frame(6), frame(7, randomUUID())], applyBulkUsageSql),
+      ).rejects.toMatchObject({ code: "PZ001" });
+      expect(await rows()).toEqual(agreed);
+      expect(await cursor()).toBe(6n);
+      expect(Number((await db.query("select count(*) as n from messages")).rows[0].n)).toBe(5);
     });
   },
 );

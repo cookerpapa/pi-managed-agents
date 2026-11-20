@@ -287,3 +287,24 @@ node scripts/experiments/minimal-session-storage/summarize-complete-messages.mjs
 The native frequency test uses the pinned Harness and a streamed faux model.
 The PG integration test also projects this trace one commit at a time.
 [Protocol, measurements and scope](../../../docs/reports/minimal-projection-usage-20261120.md).
+
+The `usage-rate-bulk` / `usage-rate-bulk-confirm` pair keeps cumulative usage
+enabled in both arms. One writer executes each row change inside the existing
+transaction. The candidate issues a multi-row upsert when at least two distinct
+Conversation keys are ready together. A repeated key retains the sequential
+path, including every original position and conflict check. Read the allocated
+heap/index/TOAST size and live JSONB payload after each run, outside the timing
+and WAL window. The one-Session-per-partition `usage-rate-bulk-smoke` covers
+the sequential path with repeated keys; the formal runs cover distinct keys.
+
+```sh
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/usage-row-bulk usage-rate-bulk
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/usage-row-bulk-confirm usage-rate-bulk-confirm
+node scripts/experiments/minimal-session-storage/summarize-complete-messages.mjs /private/usage-row-bulk.json /private/usage-row-bulk /private/usage-row-bulk-confirm
+```
+
+For a source-independent PG control, run
+`node scripts/experiments/minimal-session-storage/usage-sql-pair.mjs`.
+It creates a disposable local PG container and times 12 warmed pairs of
+fixed-size prefixes using one connection. Only aggregate timings leave the
+fixture. [Results and default selection](../../../docs/reports/minimal-usage-bulk-20261120.md).
