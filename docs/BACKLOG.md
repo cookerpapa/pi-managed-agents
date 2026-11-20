@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Measure ordinary stable projection with shared message Forks, existing descendants and simultaneous Fork creation. Validate independent history after source prune/delete and measure first-page, nested and concurrent Fork performance. [Evidence](reports/minimal-projection-fork-20261120.md).
+
 - [x] Compare synchronous and asynchronous PG projection in complete messages per second with 200 entries per Run, paced arrivals and a preloaded Kafka backlog. Count verified message rows separately from Run lifecycle records. [Throughput and recovery conditions](reports/complete-message-capacity-20261120.md).
 
 - [x] Measure moving recovery positions, single/ready-prefix transactions, and transaction-local asynchronous PG commits in the prototype. Recover an acknowledged tool intent, its original reply and a lost normal Run completion after an actual PG crash. [Measurements and fault evidence](reports/moving-projection-recovery-20261120.md).

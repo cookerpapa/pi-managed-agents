@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0341](0341-minimal-storage-fork-study.md) measures a shared-history Fork on the minimal message projection.
+
 [ADR-0340](0340-selective-async-projection-study.md) scopes moving checkpoints and transaction-local asynchronous projection to the performance experiment.
 
 [ADR-0339](0339-ready-prefix-projection-study.md) scopes synchronous ready-prefix batching to the minimal storage experiment.

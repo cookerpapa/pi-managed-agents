@@ -28,6 +28,10 @@ export const isMovingStudy = (name) =>
     "message-rate",
     "message-rate-smoke",
     "message-rate-confirm",
+    "fork-rate",
+    "fork-rate-confirm",
+    "fork-rate-smoke",
+    "fork-rate-index",
   ].includes(name);
 export function recoveryConnectionError(error) {
   return (

@@ -1179,6 +1179,7 @@ try {
           configure,
           guard,
           observer: statsDb,
+          forkPool: db,
           report,
           save,
           out,

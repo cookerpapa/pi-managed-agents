@@ -4,8 +4,8 @@ const messageSql = (
  select $1,$2,v.id,v.conversation,$3,v.role,v.content,v.input,$4,v.ordinal from
  jsonb_to_recordset($5::jsonb) v(id bigint,conversation bigint,role text,content text,input uuid,ordinal int) ${guarded ? "cross join owner" : ""}
  on conflict(tenant_id,pi_session_id,entry_id) do update set entry_id=excluded.entry_id
- where (messages.run_id,messages.commit_seq,messages.ordinal,messages.role,messages.content,messages.source_input_id)
- is not distinct from (excluded.run_id,excluded.commit_seq,excluded.ordinal,excluded.role,excluded.content,excluded.source_input_id) returning entry_id`;
+ where (messages.run_id,messages.conversation_id,messages.commit_seq,messages.ordinal,messages.role,messages.content,messages.source_input_id)
+ is not distinct from (excluded.run_id,excluded.conversation_id,excluded.commit_seq,excluded.ordinal,excluded.role,excluded.content,excluded.source_input_id) returning entry_id`;
 const inboxSql = (
   guarded,
 ) => `insert into inboxes select $1,$2,1,$3,$4,$5,$6::jsonb ${guarded ? "from owner" : ""}

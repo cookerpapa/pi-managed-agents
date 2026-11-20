@@ -245,16 +245,27 @@ export async function runPgPaths({
   configure,
   guard,
   observer,
+  forkPool,
   report,
   save,
   token,
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
-  if (["message-rate", "message-rate-smoke", "message-rate-confirm"].includes(profile)) {
+  if (
+    [
+      "message-rate",
+      "message-rate-smoke",
+      "message-rate-confirm",
+      "fork-rate",
+      "fork-rate-confirm",
+      "fork-rate-smoke",
+      "fork-rate-index",
+    ].includes(profile)
+  ) {
     const { messageTrials } = await import("./complete-message-rate.mjs");
     return messageTrials(
-      { projector, emitter, configure, guard, observer, report, save, cpuFixture, token },
+      { projector, emitter, configure, guard, observer, forkPool, report, save, cpuFixture, token },
       profile,
     );
   }

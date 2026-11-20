@@ -203,10 +203,10 @@ export class MessageRateMeter {
 }
 
 export async function messageTrials(
-  { projector, emitter, configure, guard, observer, report, save, cpuFixture, token },
+  { projector, emitter, configure, guard, observer, forkPool, report, save, cpuFixture, token },
   profile,
 ) {
-  const smoke = profile === "message-rate-smoke",
+  const smoke = profile === "message-rate-smoke" || profile === "fork-rate-smoke",
     confirm = profile === "message-rate-confirm";
   assert.match(token, /^[0-9a-f]{16}$/);
   const {
@@ -225,6 +225,9 @@ export async function messageTrials(
   });
   const expected = owners.map((o) => [o.runId, o.digest]).sort();
   const count = owners.length * middle;
+  const fork = profile.startsWith("fork-rate")
+    ? await (await import("./fork-trials.mjs")).forkStudy(forkPool, profile, owners, token)
+    : undefined;
   report.completeMessages = {
     count,
     runs: owners.length,
@@ -256,68 +259,108 @@ export async function messageTrials(
           [2315, true],
           [4630, true],
         ];
-  for (const [rate, reverse] of pairs)
-    for (const policy of reverse
-      ? ["recorded-history", "moving-sync"]
-      : ["moving-sync", "recorded-history"]) {
-      await observer.query("truncate messages,inboxes,runs");
-      await observer.query(
-        `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id)
+  const trials =
+    fork?.cases ??
+    pairs.flatMap(([rate, reverse]) =>
+      (reverse ? ["recorded-history", "moving-sync"] : ["moving-sync", "recorded-history"]).map(
+        (policy) => ({ rate, policy }),
+      ),
+    );
+  for (const { rate, policy, layout } of trials) {
+    if (fork) await fork.before(layout);
+    else await observer.query("truncate messages,inboxes,runs");
+    await observer.query(
+      `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id)
       select r,t,s,1,r,'Replay recorded work','local-load','running',w from unnest($1::uuid[],$2::uuid[],$3::uuid[],$4::uuid[]) b(r,t,s,w)`,
-        [
-          owners.map((o) => o.runId),
-          owners.map((o) => o.tenantId),
-          owners.map((o) => o.sessionId),
-          owners.map((o) => o.writerId),
-        ],
-      );
-      await request(projector, "prepareMessages", "messagesReady", {
-        owners: owners.map((o) => ({ runId: o.runId })),
-        rate,
-        policy,
-      });
-      const start = wall() + 500;
+      [
+        owners.map((o) => o.runId),
+        owners.map((o) => o.tenantId),
+        owners.map((o) => o.sessionId),
+        owners.map((o) => o.writerId),
+      ],
+    );
+    await request(projector, "prepareMessages", "messagesReady", {
+      owners: owners.map((o) => ({ runId: o.runId })),
+      rate,
+      policy,
+    });
+    const walBefore = fork
+      ? (await observer.query("select pg_current_wal_insert_lsn()::text as lsn")).rows[0].lsn
+      : undefined;
+    const start = wall() + 500;
+    let stopTraffic;
+    let traffic;
+    let sent, finished;
+    try {
+      if (rate) stopTraffic = fork?.start(layout, start);
       if (rate) await request(projector, "releaseMessages", "messagesReleased", { start });
-      const sent = await request(emitter, "emitMessages", "messagesEmitted", {
+      sent = await request(emitter, "emitMessages", "messagesEmitted", {
         start,
         frameRate: rate ? (rate * framesPerRun) / middle : 25000,
       });
-      if (!rate) await request(projector, "releaseMessages", "messagesReleased");
-      const { result, stats, lag } = await request(projector, "finishMessages", "messagesFinished");
-      assert.equal(sent.source.frames, owners.length * framesPerRun);
-      assert.equal(lag, 0);
-      assert.equal(stats.logicalWrites, owners.length * framesPerRun);
-      assert.equal(
-        stats.commits,
-        policy === "moving-sync" ? stats.syncTransactions : stats.asyncTransactions,
-      );
-      const { rows } =
-        await observer.query(`select run_id as id,count(*)::int n,md5(string_agg(md5(content),'' order by commit_seq,ordinal)) digest,
+      if (!rate) {
+        stopTraffic = fork?.start(layout, Date.now());
+        await request(projector, "releaseMessages", "messagesReleased");
+      }
+      finished = await request(projector, "finishMessages", "messagesFinished");
+    } finally {
+      traffic = await stopTraffic?.();
+    }
+    const { result, stats, lag } = finished;
+    const walBytes = fork
+      ? Number(
+          (
+            await observer.query(
+              "select pg_wal_lsn_diff(pg_current_wal_insert_lsn(),$1::pg_lsn)::text as bytes",
+              [walBefore],
+            )
+          ).rows[0].bytes,
+        )
+      : undefined;
+    assert.equal(sent.source.frames, owners.length * framesPerRun);
+    assert.equal(lag, 0);
+    assert.equal(stats.logicalWrites, owners.length * framesPerRun);
+    assert.equal(
+      stats.commits,
+      policy === "moving-sync" ? stats.syncTransactions : stats.asyncTransactions,
+    );
+    const { rows } = await observer.query(
+      `select run_id as id,count(*)::int n,md5(string_agg(md5(content),'' order by commit_seq,ordinal)) digest,
       count(*) filter(where commit_seq between 3 and 202 and role='toolResult')::int results,
       count(*) filter(where commit_seq between 3 and 202 and role='assistant')::int calls
-      from messages group by run_id`);
-      assert.deepEqual(rows.map((r) => [r.id, r.digest]).sort(), expected);
-      assert(rows.every((r) => r.n === 202 && r.results === 100 && r.calls === 100));
-      const closed = await observer.query(
-        "select count(*)::int n from runs where state='completed' and history_head is not null",
-      );
-      assert.equal(closed.rows[0].n, owners.length);
-      const trial = {
-        rate: rate || "preloaded",
-        policy,
-        ...result,
-        sourceLateP95Ms: sent.source.lateMs.p95,
-        transactions: stats.commits,
-        syncTransactions: stats.syncTransactions,
-        asyncTransactions: stats.asyncTransactions,
-        holdMsPerTxn: stats.holdMs / stats.commits,
-        poolMsPerTxn: stats.poolMs / stats.commits,
-        maxBatch: stats.maxRecords,
-        finalLag: lag,
-        verifiedEntries: rows.length * 202,
-      };
-      report.completeMessages.trials.push(trial);
-      await save();
-      console.log(JSON.stringify(trial));
-    }
+      from messages ${fork ? "where run_id=any($1::uuid[])" : ""} group by run_id`,
+      fork ? [owners.map((o) => o.runId)] : [],
+    );
+    assert.deepEqual(rows.map((r) => [r.id, r.digest]).sort(), expected);
+    assert(rows.every((r) => r.n === 202 && r.results === 100 && r.calls === 100));
+    const closed = await observer.query(
+      "select count(*)::int n from runs where state='completed' and history_head is not null" +
+        (fork ? " and id=any($1::uuid[])" : ""),
+      fork ? [owners.map((o) => o.runId)] : [],
+    );
+    assert.equal(closed.rows[0].n, owners.length);
+    await fork?.verify(layout);
+    const trial = {
+      rate: rate || "preloaded",
+      policy,
+      ...(fork ? { layout, ...traffic, walBytes } : {}),
+      ...result,
+      sourceLateP95Ms: sent.source.lateMs.p95,
+      transactions: stats.commits,
+      syncTransactions: stats.syncTransactions,
+      asyncTransactions: stats.asyncTransactions,
+      holdMsPerTxn: stats.holdMs / stats.commits,
+      poolMsPerTxn: stats.poolMs / stats.commits,
+      maxBatch: stats.maxRecords,
+      finalLag: lag,
+      verifiedEntries: rows.length * 202,
+    };
+    report.completeMessages.trials.push(trial);
+    await save();
+    console.log(JSON.stringify(trial));
+  }
+  if (fork) {
+    report.forkStudy = await fork.finish();
+    await save();
+  }
 }

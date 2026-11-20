@@ -28,10 +28,22 @@ for (const directory of directories) {
       t.policy === "recorded-history" ? t.asyncTransactions : t.syncTransactions,
     );
     assert(Math.abs((t.rps * t.elapsedMs) / 1000 - m.count) < 0.01);
+    if (t.layout) {
+      assert(t.policy === "recorded-history");
+      assert.equal(t.concurrentForks > 0, t.layout === "busy");
+      assert.equal(t.existingForks > 0, ["busy", "fanout"].includes(t.layout));
+    }
+  }
+  if (report.forkStudy) {
+    assert(Object.values(report.forkStudy.correctness).every((x) => x === true));
+    for (const shape of report.forkStudy.results)
+      for (const key of ["forkMs", "firstPageMs", "nestedForkMs"])
+        assert.equal(shape[key].count, shape.samples);
   }
   const { placement, trials, ...measures } = m;
   studies.push({
     ...measures,
+    ...(report.forkStudy ? { forkStudy: report.forkStudy } : {}),
     trials: trials.map(({ rate, rps, ...t }) => ({
       input: rate === "preloaded" ? "preloaded" : "paced",
       ...(rate === "preloaded" ? {} : { offeredMessagesPerSecond: rate }),

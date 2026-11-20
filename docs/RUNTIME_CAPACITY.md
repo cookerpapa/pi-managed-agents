@@ -1,5 +1,7 @@
 # Runtime capacity evaluation
 
+The [Fork storage experiment](reports/minimal-projection-fork-20261120.md) compares normal append costs and measures user-initiated PG Fork transactions at different history sizes.
+
 The [complete-message capacity study](reports/complete-message-capacity-20261120.md) measures ordered PG projection in entries per second for Runs with 100 recorded tool-call/result pairs. Paced input and consumption of a preloaded Kafka backlog are reported separately.
 
 The [moving-checkpoint experiment](reports/moving-projection-recovery-20261120.md) measures ready batches and transaction-local WAL acknowledgement separately, including a tool whose PG projection disappears after its Kafka dispatch grant.

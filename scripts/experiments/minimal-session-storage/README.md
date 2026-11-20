@@ -6,6 +6,23 @@ The original storage controls use fresh physical Sessions. The `wake-throughput`
 
 ## Run serially
 
+### Shared Forks on the message projection
+
+The Fork profiles use the same 200-message emitter and projector as the
+complete-message study. They compare the original schema with retained streams
+and completed-Run headers, existing forks and concurrent Fork requests.
+The index profile measures the additional covering index separately. The
+timing includes a committed PostgreSQL Fork and reports wall time to read the
+first page separately. Use new private directories and run serially.
+
+```sh
+export PI_CLOUD_RUNTIME_LOAD_CHECK=1
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/fork-first fork-rate
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/fork-reverse fork-rate-confirm
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/fork-index fork-rate-index
+node scripts/experiments/minimal-session-storage/summarize-complete-messages.mjs /private/fork-summary.json /private/fork-first /private/fork-reverse /private/fork-index
+```
+
 ### Complete messages per second
 
 The `message-rate` profile feeds the same 256 Runs to the prototype Projector and PG. Each Run contributes 100 recorded assistant tool calls and 100 corresponding tool results with 4 KiB per payload. Run opening, input, final answer and settlement also travel through the normal projection path and are excluded from the message numerator. The test compares synchronous and transaction-local asynchronous commits at fixed offered rates and while draining an already-populated Kafka partition set. Verify ordered content against the emitter's per-Run digest. This profile measures stored history and issues no sandbox commands.

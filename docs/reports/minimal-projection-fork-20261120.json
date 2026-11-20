@@ -1,0 +1,3130 @@
+{
+  "studies": [
+    {
+      "count": 51200,
+      "runs": 256,
+      "bodyBytes": 4096,
+      "partitions": 32,
+      "connections": 12,
+      "replicas": 3,
+      "settings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "forkStudy": {
+        "correctness": {
+          "idempotent": true,
+          "lateLowerIdExcluded": true,
+          "siblingExcluded": true,
+          "sourcePruned": true,
+          "independentAppend": true,
+          "sourceDeleted": true,
+          "nestedSurvives": true,
+          "lastReferenceCollected": true
+        },
+        "results": [
+          {
+            "entries": 16,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.8803789999801666,
+              "p95": 8.996014999982435,
+              "p99": 9.926065000006929,
+              "max": 9.926065000006929
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 4.926054999988992,
+              "p95": 5.29732899996452,
+              "p99": 7.152549999998882,
+              "max": 7.152549999998882
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.904107000038493,
+              "p95": 7.8595210000057705,
+              "p99": 12.185816000041086,
+              "max": 12.185816000041086
+            }
+          },
+          {
+            "entries": 16,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.936991000024136,
+              "p95": 9.99813899997389,
+              "p99": 10.56576299999142,
+              "max": 10.56576299999142
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.0202099999878556,
+              "p95": 6.4211299999733455,
+              "p99": 7.225896999996621,
+              "max": 7.225896999996621
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.9314809999777935,
+              "p95": 8.61715100001311,
+              "p99": 10.469504000036977,
+              "max": 10.469504000036977
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.952864999999292,
+              "p95": 9.167871000012383,
+              "p99": 11.035980999993626,
+              "max": 11.035980999993626
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.1388909999514,
+              "p95": 6.359141999972053,
+              "p99": 8.959486000007018,
+              "max": 8.959486000007018
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.015371999994386,
+              "p95": 8.182977000018582,
+              "p99": 11.706525999994483,
+              "max": 11.706525999994483
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.049699000024702,
+              "p95": 11.07140099996468,
+              "p99": 15.11884899996221,
+              "max": 15.11884899996221
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.1515390000422485,
+              "p95": 6.126311000029091,
+              "p99": 8.208129000035115,
+              "max": 8.208129000035115
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.950902000011411,
+              "p95": 8.087685999984387,
+              "p99": 8.16407599998638,
+              "max": 8.16407599998638
+            }
+          },
+          {
+            "entries": 4096,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 12.034889000002295,
+              "p95": 14.017485000018496,
+              "p99": 16.023775000008754,
+              "max": 16.023775000008754
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.010941999964416,
+              "p95": 7.043131000013091,
+              "p99": 8.014698999992106,
+              "max": 8.014698999992106
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.929512000002433,
+              "p95": 8.086711999960244,
+              "p99": 9.169744000013452,
+              "max": 9.169744000013452
+            }
+          },
+          {
+            "entries": 4096,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 17.023253999999724,
+              "p95": 20.700095999985933,
+              "p99": 22.054655999992974,
+              "max": 22.054655999992974
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.893562000012025,
+              "p95": 8.016856000002008,
+              "p99": 9.212278000020888,
+              "max": 9.212278000020888
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.988971999962814,
+              "p95": 8.377930999966338,
+              "p99": 9.862309999996796,
+              "max": 9.862309999996796
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 44.06772399996407,
+              "p95": 46.818078999989666,
+              "p99": 49.1514760000282,
+              "max": 49.1514760000282
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 17.06927600002382,
+              "p95": 18.971827999979723,
+              "p99": 21.92043100000592,
+              "max": 21.92043100000592
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 6.932473000022583,
+              "p95": 7.8934230000013486,
+              "p99": 8.002942000050098,
+              "max": 8.002942000050098
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 77.9958129999577,
+              "p95": 81.99511999997776,
+              "p99": 82.00465299998177,
+              "max": 82.00465299998177
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 20.982932000013534,
+              "p95": 22.92701699997997,
+              "p99": 23.01155200001085,
+              "max": 23.01155200001085
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.090933999978006,
+              "p95": 8.906335000006948,
+              "p99": 9.697144000034314,
+              "max": 9.697144000034314
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 44.6745510000037,
+              "p95": 46.58532000001287,
+              "p99": 46.93160499999067,
+              "max": 46.93160499999067
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 15.829977000015788,
+              "p95": 17.118538999988232,
+              "p99": 17.822431000007782,
+              "max": 17.822431000007782
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.017164999968372,
+              "p95": 9.12223300000187,
+              "p99": 9.429298999952152,
+              "max": 9.429298999952152
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 78.17298899998423,
+              "p95": 84.14067499997327,
+              "p99": 89.09151699999347,
+              "max": 89.09151699999347
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 17.415764999983367,
+              "p95": 19.107186000037473,
+              "p99": 22.766751000017393,
+              "max": 22.766751000017393
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 6.9938700000057,
+              "p95": 8.13446999998996,
+              "p99": 9.787506000022404,
+              "max": 9.787506000022404
+            }
+          }
+        ]
+      },
+      "trials": [
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2311.2750881912916,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 22152.2744140625,
+          "p95Ms": 24.661649237179518,
+          "drainMs": 35.643744516062725,
+          "sampledPeakLag": 30,
+          "sourceLateP95Ms": 1.123198675815729,
+          "transactions": 51392,
+          "syncTransactions": 0,
+          "asyncTransactions": 51392,
+          "holdMsPerTxn": 2.8094934004319954,
+          "poolMsPerTxn": 0.82016473630138,
+          "maxBatch": 8,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.2375234946503,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 22123.91748046875,
+          "p95Ms": 25.994812107357575,
+          "drainMs": 7.286810922312725,
+          "sampledPeakLag": 60,
+          "sourceLateP95Ms": 1.115910758159771,
+          "transactions": 51330,
+          "syncTransactions": 0,
+          "asyncTransactions": 51330,
+          "holdMsPerTxn": 2.7730144915254282,
+          "poolMsPerTxn": 0.6852519857977819,
+          "maxBatch": 7,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.191377347593,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 22124.358642578125,
+          "p95Ms": 23.975889425400965,
+          "drainMs": 7.727973031687725,
+          "sampledPeakLag": 36,
+          "sourceLateP95Ms": 1.114529517556548,
+          "transactions": 51484,
+          "syncTransactions": 0,
+          "asyncTransactions": 51484,
+          "holdMsPerTxn": 2.7345904492464186,
+          "poolMsPerTxn": 0.7455563313650646,
+          "maxBatch": 5,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.09615406557,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 443,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 443,
+            "p50": 14.685043000004953,
+            "p95": 18.493944000001648,
+            "p99": 22.000671000001603,
+            "max": 46.68368699999701
+          },
+          "elapsedMs": 22125.26904296875,
+          "p95Ms": 23.42165328520059,
+          "drainMs": 8.638373422312725,
+          "sampledPeakLag": 25,
+          "sourceLateP95Ms": 1.113622072920407,
+          "transactions": 51432,
+          "syncTransactions": 0,
+          "asyncTransactions": 51432,
+          "holdMsPerTxn": 2.6823010812528096,
+          "poolMsPerTxn": 0.6988686813073792,
+          "maxBatch": 6,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5888.096098443403,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 174,
+          "missedForkOffers": 1,
+          "forkMs": {
+            "count": 174,
+            "p50": 17.69191100000171,
+            "p95": 28.48641499999212,
+            "p99": 35.17222700000275,
+            "max": 93.8307860000059
+          },
+          "elapsedMs": 8695.51025390625,
+          "p95Ms": 284.47204669628263,
+          "drainMs": 162.17692057291606,
+          "sampledPeakLag": 1473,
+          "sourceLateP95Ms": 1.2841780918097356,
+          "transactions": 4035,
+          "syncTransactions": 0,
+          "asyncTransactions": 4035,
+          "holdMsPerTxn": 25.674060165551495,
+          "poolMsPerTxn": 40.877178373729684,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5898.334649838834,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8680.416259765625,
+          "p95Ms": 219.02415077359092,
+          "drainMs": 147.08292643229106,
+          "sampledPeakLag": 1152,
+          "sourceLateP95Ms": 1.2662154054328312,
+          "transactions": 4405,
+          "syncTransactions": 0,
+          "asyncTransactions": 4405,
+          "holdMsPerTxn": 23.453854510102715,
+          "poolMsPerTxn": 37.07467204903488,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5871.040204612058,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8720.771484375,
+          "p95Ms": 262.93040875204315,
+          "drainMs": 187.43815104166606,
+          "sampledPeakLag": 1393,
+          "sourceLateP95Ms": 1.277447469873323,
+          "transactions": 4269,
+          "syncTransactions": 0,
+          "asyncTransactions": 4269,
+          "holdMsPerTxn": 24.343941777700064,
+          "poolMsPerTxn": 38.591473390489504,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5901.632129049575,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8675.566162109375,
+          "p95Ms": 242.93895686529777,
+          "drainMs": 142.23282877604106,
+          "sampledPeakLag": 1309,
+          "sourceLateP95Ms": 1.2759698606005259,
+          "transactions": 4351,
+          "syncTransactions": 0,
+          "asyncTransactions": 4351,
+          "holdMsPerTxn": 23.810337744656362,
+          "poolMsPerTxn": 37.98736157320163,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7297.0095250561735,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7016.572998046875,
+          "sampledPeakLag": 48137,
+          "sourceLateP95Ms": 8577.816875,
+          "transactions": 3645,
+          "syncTransactions": 0,
+          "asyncTransactions": 3645,
+          "holdMsPerTxn": 20.264853803017978,
+          "poolMsPerTxn": 13.229753359944821,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6891.876108757425,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7429.03662109375,
+          "sampledPeakLag": 48227,
+          "sourceLateP95Ms": 8677.4448046875,
+          "transactions": 3661,
+          "syncTransactions": 0,
+          "asyncTransactions": 3661,
+          "holdMsPerTxn": 20.801583052444705,
+          "poolMsPerTxn": 13.295578373122055,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7133.421436211153,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7177.4814453125,
+          "sampledPeakLag": 48285,
+          "sourceLateP95Ms": 8765.69529296875,
+          "transactions": 3647,
+          "syncTransactions": 0,
+          "asyncTransactions": 3647,
+          "holdMsPerTxn": 21.516818520976074,
+          "poolMsPerTxn": 13.491320498766203,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6623.907395073951,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 155,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 155,
+            "p50": 15.651190000004135,
+            "p95": 22.9064650000073,
+            "p99": 26.921838000009302,
+            "max": 43.82279900001595
+          },
+          "elapsedMs": 7729.57666015625,
+          "sampledPeakLag": 48892,
+          "sourceLateP95Ms": 8729.842509765625,
+          "transactions": 3656,
+          "syncTransactions": 0,
+          "asyncTransactions": 3656,
+          "holdMsPerTxn": 24.10911487691453,
+          "poolMsPerTxn": 15.402615274070023,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        }
+      ],
+      "actorHashes": {
+        "worker": "707ccaeb9551557580b023e0f912ccb4b7cdae44ca2af55dbe4353cf48725121",
+        "projector": "c7e8512df6516f196509e9e262b50f58735ca48aaf3633834f0656cee802b233",
+        "wake-runtime": "b23b0c691e2dad6be1fc780d582de1b770b677e04eb943c9917f6906247be666"
+      },
+      "cpus": {
+        "pg": "0-31",
+        "projector": "0-31",
+        "sender": "0-7,24-31"
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    },
+    {
+      "count": 51200,
+      "runs": 256,
+      "bodyBytes": 4096,
+      "partitions": 32,
+      "connections": 12,
+      "replicas": 3,
+      "settings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "forkStudy": {
+        "correctness": {
+          "idempotent": true,
+          "lateLowerIdExcluded": true,
+          "siblingExcluded": true,
+          "sourcePruned": true,
+          "independentAppend": true,
+          "sourceDeleted": true,
+          "nestedSurvives": true,
+          "lastReferenceCollected": true
+        },
+        "results": [
+          {
+            "entries": 16,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.956223000015598,
+              "p95": 9.660750000039116,
+              "p99": 11.382458999985829,
+              "max": 11.382458999985829
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.017091999994591,
+              "p95": 6.790456000017002,
+              "p99": 10.110739000025205,
+              "max": 10.110739000025205
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.95463600003859,
+              "p95": 8.132165999966674,
+              "p99": 9.913876999984495,
+              "max": 9.913876999984495
+            }
+          },
+          {
+            "entries": 16,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.96575600001961,
+              "p95": 9.160205999971367,
+              "p99": 12.004943000036292,
+              "max": 12.004943000036292
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.076303999987431,
+              "p95": 7.609966000018176,
+              "p99": 12.023661999963224,
+              "max": 12.023661999963224
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.983430000022054,
+              "p95": 8.921904999995604,
+              "p99": 10.059027999988757,
+              "max": 10.059027999988757
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.168304999999236,
+              "p95": 9.934775999980047,
+              "p99": 11.035475999990012,
+              "max": 11.035475999990012
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.0190070000244305,
+              "p95": 7.541863999969792,
+              "p99": 8.226467000029515,
+              "max": 8.226467000029515
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.979188000026625,
+              "p95": 8.136694999993779,
+              "p99": 9.618365999951493,
+              "max": 9.618365999951493
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.07580799999414,
+              "p95": 9.265225000039209,
+              "p99": 13.004513999971095,
+              "max": 13.004513999971095
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.015220999950543,
+              "p95": 7.0012749999878,
+              "p99": 12.071184999949764,
+              "max": 12.071184999949764
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.006423999962863,
+              "p95": 9.002309000003152,
+              "p99": 9.992885000014212,
+              "max": 9.992885000014212
+            }
+          },
+          {
+            "entries": 4096,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 12.908180999977048,
+              "p95": 14.727872999967076,
+              "p99": 15.08614700002363,
+              "max": 15.08614700002363
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 7.009976999950595,
+              "p95": 8.124466000008397,
+              "p99": 10.163279000029434,
+              "max": 10.163279000029434
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.9948679999797605,
+              "p95": 9.021864000009373,
+              "p99": 11.050040999951307,
+              "max": 11.050040999951307
+            }
+          },
+          {
+            "entries": 4096,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 17.05122800002573,
+              "p95": 18.93803299998399,
+              "p99": 19.640094999980647,
+              "max": 19.640094999980647
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 7.085175000014715,
+              "p95": 8.101449999958277,
+              "p99": 8.86212099995464,
+              "max": 8.86212099995464
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.045961000025272,
+              "p95": 8.153229999996256,
+              "p99": 11.508275000029244,
+              "max": 11.508275000029244
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 44.06881399999838,
+              "p95": 47.13994000002276,
+              "p99": 48.2196399999666,
+              "max": 48.2196399999666
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 17.898992999980692,
+              "p95": 22.635505999962334,
+              "p99": 22.774738999956753,
+              "max": 22.774738999956753
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.821162000007462,
+              "p95": 9.42511899996316,
+              "p99": 9.833332999958657,
+              "max": 9.833332999958657
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 79.98123400000622,
+              "p95": 86.91177000000607,
+              "p99": 87.08798700000625,
+              "max": 87.08798700000625
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 21.815172000031453,
+              "p95": 23.99341200001072,
+              "p99": 27.259357000002638,
+              "max": 27.259357000002638
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 6.989658000005875,
+              "p95": 8.129692000045907,
+              "p99": 9.638500000000931,
+              "max": 9.638500000000931
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 44.25948499998776,
+              "p95": 47.98333699995419,
+              "p99": 48.02072999998927,
+              "max": 48.02072999998927
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 15.832652999961283,
+              "p95": 16.823203000007197,
+              "p99": 16.909594000026118,
+              "max": 16.909594000026118
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.23689000000013,
+              "p95": 11.101143000007141,
+              "p99": 17.132197999977507,
+              "max": 17.132197999977507
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 79.992024999985,
+              "p95": 85.21888999996008,
+              "p99": 88.14457100001164,
+              "max": 88.14457100001164
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 17.053665000014007,
+              "p95": 18.12001600000076,
+              "p99": 18.167221000010613,
+              "max": 18.167221000010613
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.005483999964781,
+              "p95": 8.04453499999363,
+              "p99": 8.077003999962471,
+              "max": 8.077003999962471
+            }
+          }
+        ]
+      },
+      "trials": [
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2313.9433382278644,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 409,
+          "missedForkOffers": 35,
+          "forkMs": {
+            "count": 409,
+            "p50": 15.89227600000595,
+            "p95": 73.94183899999916,
+            "p99": 99.7629700000034,
+            "max": 384.7664020000011
+          },
+          "elapsedMs": 22126.730224609375,
+          "p95Ms": 51.78410782973788,
+          "drainMs": 10.099555062937725,
+          "sampledPeakLag": 530,
+          "sourceLateP95Ms": 1.138094510803512,
+          "transactions": 48387,
+          "syncTransactions": 0,
+          "asyncTransactions": 48387,
+          "holdMsPerTxn": 3.546779795068917,
+          "poolMsPerTxn": 1.84350843329823,
+          "maxBatch": 14,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2311.0664863820166,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 22154.27392578125,
+          "p95Ms": 24.646001718301704,
+          "drainMs": 37.643256234812725,
+          "sampledPeakLag": 31,
+          "sourceLateP95Ms": 1.1147738339495845,
+          "transactions": 51331,
+          "syncTransactions": 0,
+          "asyncTransactions": 51331,
+          "holdMsPerTxn": 2.7816911703064835,
+          "poolMsPerTxn": 0.6941871961387934,
+          "maxBatch": 5,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.1884916784525,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 22124.38623046875,
+          "p95Ms": 25.248957721250918,
+          "drainMs": 7.755560922312725,
+          "sampledPeakLag": 28,
+          "sourceLateP95Ms": 1.1179550546366954,
+          "transactions": 51453,
+          "syncTransactions": 0,
+          "asyncTransactions": 51453,
+          "holdMsPerTxn": 2.8036762028452547,
+          "poolMsPerTxn": 0.6898204839368406,
+          "maxBatch": 4,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2313.741606274977,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 22128.659423828125,
+          "p95Ms": 23.356076004958595,
+          "drainMs": 12.028754281687725,
+          "sampledPeakLag": 23,
+          "sourceLateP95Ms": 1.118770831513757,
+          "transactions": 51535,
+          "syncTransactions": 0,
+          "asyncTransactions": 51535,
+          "holdMsPerTxn": 2.703124252624425,
+          "poolMsPerTxn": 0.6819325734355443,
+          "maxBatch": 3,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5886.362093879576,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8698.07177734375,
+          "p95Ms": 210.08610185610723,
+          "drainMs": 164.73844401041606,
+          "sampledPeakLag": 1068,
+          "sourceLateP95Ms": 1.2814686095791785,
+          "transactions": 4639,
+          "syncTransactions": 0,
+          "asyncTransactions": 4639,
+          "holdMsPerTxn": 22.413350354817826,
+          "poolMsPerTxn": 35.49794924035357,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5899.286533431031,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8679.015625,
+          "p95Ms": 226.5561794704863,
+          "drainMs": 145.68229166666606,
+          "sampledPeakLag": 1131,
+          "sourceLateP95Ms": 1.289065691380756,
+          "transactions": 4075,
+          "syncTransactions": 0,
+          "asyncTransactions": 4075,
+          "holdMsPerTxn": 25.39159432785279,
+          "poolMsPerTxn": 39.78769550674847,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5826.5880253763,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8787.303955078125,
+          "p95Ms": 345.7069355085787,
+          "drainMs": 253.97062174479106,
+          "sampledPeakLag": 1897,
+          "sourceLateP95Ms": 1.2713136361307988,
+          "transactions": 4201,
+          "syncTransactions": 0,
+          "asyncTransactions": 4201,
+          "holdMsPerTxn": 24.9302505565343,
+          "poolMsPerTxn": 39.603294580099465,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5779.800809482772,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 177,
+          "missedForkOffers": 1,
+          "forkMs": {
+            "count": 177,
+            "p50": 18.234962999995332,
+            "p95": 25.754501999996137,
+            "p99": 28.892308000009507,
+            "max": 93.16503200001898
+          },
+          "elapsedMs": 8858.436767578125,
+          "p95Ms": 409.44287428513053,
+          "drainMs": 325.10343424479106,
+          "sampledPeakLag": 2356,
+          "sourceLateP95Ms": 1.268896165237038,
+          "transactions": 4216,
+          "syncTransactions": 0,
+          "asyncTransactions": 4216,
+          "holdMsPerTxn": 25.083319971062725,
+          "poolMsPerTxn": 39.89507625545507,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7197.534386499626,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 141,
+          "missedForkOffers": 2,
+          "forkMs": {
+            "count": 141,
+            "p50": 15.751424999994924,
+            "p95": 26.676791999983834,
+            "p99": 58.62076099999831,
+            "max": 63.031942000001436
+          },
+          "elapsedMs": 7113.547119140625,
+          "sampledPeakLag": 48154,
+          "sourceLateP95Ms": 9172.674296875,
+          "transactions": 3635,
+          "syncTransactions": 0,
+          "asyncTransactions": 3635,
+          "holdMsPerTxn": 21.401088970288995,
+          "poolMsPerTxn": 12.69044908060521,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7033.257148031451,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7279.69970703125,
+          "sampledPeakLag": 48248,
+          "sourceLateP95Ms": 9335.2905078125,
+          "transactions": 3649,
+          "syncTransactions": 0,
+          "asyncTransactions": 3649,
+          "holdMsPerTxn": 20.967345570841353,
+          "poolMsPerTxn": 13.223700544258524,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7197.96522059375,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7113.121337890625,
+          "sampledPeakLag": 48215,
+          "sourceLateP95Ms": 9003.912822265625,
+          "transactions": 3632,
+          "syncTransactions": 0,
+          "asyncTransactions": 3632,
+          "holdMsPerTxn": 20.893745146751048,
+          "poolMsPerTxn": 12.353715234581662,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7259.28232051185,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7053.038818359375,
+          "sampledPeakLag": 48092,
+          "sourceLateP95Ms": 9180.629619140625,
+          "transactions": 3647,
+          "syncTransactions": 0,
+          "asyncTransactions": 3647,
+          "holdMsPerTxn": 20.464958818206703,
+          "poolMsPerTxn": 12.69361918618085,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        }
+      ],
+      "actorHashes": {
+        "worker": "707ccaeb9551557580b023e0f912ccb4b7cdae44ca2af55dbe4353cf48725121",
+        "projector": "c7e8512df6516f196509e9e262b50f58735ca48aaf3633834f0656cee802b233",
+        "wake-runtime": "b23b0c691e2dad6be1fc780d582de1b770b677e04eb943c9917f6906247be666"
+      },
+      "cpus": {
+        "pg": "0-31",
+        "projector": "0-31",
+        "sender": "0-7,24-31"
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    },
+    {
+      "count": 51200,
+      "runs": 256,
+      "bodyBytes": 4096,
+      "partitions": 32,
+      "connections": 12,
+      "replicas": 3,
+      "settings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "forkStudy": {
+        "coveringIndex": true,
+        "correctness": {
+          "idempotent": true,
+          "activeSourceFork": true,
+          "activeDeleteRejected": true,
+          "obsoleteAppendRejected": true,
+          "lateLowerIdExcluded": true,
+          "siblingExcluded": true,
+          "sourcePruned": true,
+          "independentAppend": true,
+          "sourceDeleted": true,
+          "nestedSurvives": true,
+          "lastReferenceCollected": true,
+          "concurrentDelete": true,
+          "piColdContext": true
+        },
+        "results": [
+          {
+            "entries": 16,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.980512999987695,
+              "p95": 9.26918200001819,
+              "p99": 14.874348999990616,
+              "max": 14.874348999990616
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.022377000015695,
+              "p95": 5.9551469999714755,
+              "p99": 6.903465000039432,
+              "max": 6.903465000039432
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.973452000005636,
+              "p95": 9.147010000015143,
+              "p99": 10.923069999960717,
+              "max": 10.923069999960717
+            }
+          },
+          {
+            "entries": 16,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 7.233131000015419,
+              "p95": 9.03983599995263,
+              "p99": 9.11092100001406,
+              "max": 9.11092100001406
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 5.0322460000170395,
+              "p95": 6.138934999995399,
+              "p99": 6.882383000047412,
+              "max": 6.882383000047412
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.929974999977276,
+              "p95": 8.372367000032682,
+              "p99": 15.247643000038806,
+              "max": 15.247643000038806
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.013510000018869,
+              "p95": 9.05278199998429,
+              "p99": 10.959638999949675,
+              "max": 10.959638999949675
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.849363000015728,
+              "p95": 7.307376999990083,
+              "p99": 8.017371000023559,
+              "max": 8.017371000023559
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.003335000015795,
+              "p95": 9.207374999998137,
+              "p99": 12.825477999984287,
+              "max": 12.825477999984287
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.042445000028238,
+              "p95": 10.005493999982718,
+              "p99": 11.935302999976557,
+              "max": 11.935302999976557
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.106068000022788,
+              "p95": 7.9876619999995455,
+              "p99": 9.87968600000022,
+              "max": 9.87968600000022
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 6.989027999981772,
+              "p95": 8.346421999973245,
+              "p99": 11.042930000054184,
+              "max": 11.042930000054184
+            }
+          },
+          {
+            "entries": 4096,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 12.841810000012629,
+              "p95": 14.808963000017684,
+              "p99": 15.799629000015557,
+              "max": 15.799629000015557
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 7.222895000013523,
+              "p95": 9.028608999971766,
+              "p99": 10.32423700002255,
+              "max": 10.32423700002255
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.225894999981392,
+              "p95": 9.139555000001565,
+              "p99": 10.985092999995686,
+              "max": 10.985092999995686
+            }
+          },
+          {
+            "entries": 4096,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 17.048850000021048,
+              "p95": 18.993951999989804,
+              "p99": 20.922908000007737,
+              "max": 20.922908000007737
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 7.925784999970347,
+              "p95": 9.771900000050664,
+              "p99": 12.79335799999535,
+              "max": 12.79335799999535
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.021970000001602,
+              "p95": 8.873816000006627,
+              "p99": 9.073961999965832,
+              "max": 9.073961999965832
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 43.92765599995619,
+              "p95": 47.79140500002541,
+              "p99": 50.79145399999106,
+              "max": 50.79145399999106
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 18.148489999992307,
+              "p95": 21.237173999950755,
+              "p99": 21.64324399997713,
+              "max": 21.64324399997713
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 6.997292999993078,
+              "p95": 8.997816999966744,
+              "p99": 10.026326999999583,
+              "max": 10.026326999999583
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 79.11249799997313,
+              "p95": 83.14045900001656,
+              "p99": 84.25376200000755,
+              "max": 84.25376200000755
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 22.97106900002109,
+              "p95": 25.003639000002295,
+              "p99": 26.00591100001475,
+              "max": 26.00591100001475
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.173928000032902,
+              "p95": 8.187166000017896,
+              "p99": 10.153019000019412,
+              "max": 10.153019000019412
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 44.43677299999399,
+              "p95": 46.05377399997087,
+              "p99": 47.473888999957126,
+              "max": 47.473888999957126
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 15.977503000001889,
+              "p95": 17.660008000035305,
+              "p99": 17.895604999968782,
+              "max": 17.895604999968782
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.914669000019785,
+              "p95": 9.072699000011198,
+              "p99": 9.080453999980818,
+              "max": 9.080453999980818
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 79.8411780000315,
+              "p95": 83.96297699998831,
+              "p99": 86.89511799998581,
+              "max": 86.89511799998581
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 17.355160999984946,
+              "p95": 20.797441999951843,
+              "p99": 20.947262999950908,
+              "max": 20.947262999950908
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.079361999989487,
+              "p95": 8.982839000003878,
+              "p99": 9.061539000016637,
+              "max": 9.061539000016637
+            }
+          }
+        ],
+        "tree": {
+          "depth": 128,
+          "first": 9.037994000012986,
+          "last": 103.06764899997506,
+          "appendThenForkMs": {
+            "count": 128,
+            "p50": 27.012187999964226,
+            "p95": 90.8663869999582,
+            "p99": 103.06764899997506,
+            "max": 107.13987399998587
+          },
+          "clippedAcrossAncestors": true
+        },
+        "burst": {
+          "clients": 8,
+          "completed": 64,
+          "forksPerSecond": 79.20096365396613,
+          "latencyMs": {
+            "count": 64,
+            "p50": 98.01500600000145,
+            "p95": 120.00666699995054,
+            "p99": 120.3075780000072,
+            "max": 120.3075780000072
+          }
+        }
+      },
+      "trials": [
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2313.9166581671057,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 415,
+          "missedForkOffers": 29,
+          "forkMs": {
+            "count": 415,
+            "p50": 16.66469500000312,
+            "p95": 70.78057099999933,
+            "p99": 89.78826200000185,
+            "max": 314.6854830000011
+          },
+          "walBytes": 355838744,
+          "elapsedMs": 22126.9853515625,
+          "p95Ms": 39.509327850969385,
+          "drainMs": 10.354682016062725,
+          "sampledPeakLag": 373,
+          "sourceLateP95Ms": 1.1327343559760266,
+          "transactions": 49442,
+          "syncTransactions": 0,
+          "asyncTransactions": 49442,
+          "holdMsPerTxn": 3.2727647977225724,
+          "poolMsPerTxn": 1.1943915498361528,
+          "maxBatch": 12,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.090715160549,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 363862432,
+          "elapsedMs": 22125.321044921875,
+          "p95Ms": 25.496297236710234,
+          "drainMs": 8.690375375437725,
+          "sampledPeakLag": 25,
+          "sourceLateP95Ms": 1.119896827141929,
+          "transactions": 51300,
+          "syncTransactions": 0,
+          "asyncTransactions": 51300,
+          "holdMsPerTxn": 2.8707593851851505,
+          "poolMsPerTxn": 0.7813929126901027,
+          "maxBatch": 5,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.090664091139,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 356479040,
+          "elapsedMs": 22125.321533203125,
+          "p95Ms": 27.571755486583243,
+          "drainMs": 8.690863656687725,
+          "sampledPeakLag": 38,
+          "sourceLateP95Ms": 1.124978277244736,
+          "transactions": 51240,
+          "syncTransactions": 0,
+          "asyncTransactions": 51240,
+          "holdMsPerTxn": 3.17013573421156,
+          "poolMsPerTxn": 0.7669277092115634,
+          "maxBatch": 6,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 2315,
+          "completeMessagesPerSecond": 2314.0856337653436,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 342947248,
+          "elapsedMs": 22125.36962890625,
+          "p95Ms": 25.67065232208006,
+          "drainMs": 8.738959359812725,
+          "sampledPeakLag": 31,
+          "sourceLateP95Ms": 1.123793720124013,
+          "transactions": 51362,
+          "syncTransactions": 0,
+          "asyncTransactions": 51362,
+          "holdMsPerTxn": 3.1104366287722223,
+          "poolMsPerTxn": 0.7276257443051185,
+          "maxBatch": 5,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 840.1700235049074,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 340525552,
+          "elapsedMs": 60940.046142578125,
+          "p95Ms": 53627.6181800194,
+          "drainMs": 52406.71280924479,
+          "sampledPeakLag": 28577,
+          "sourceLateP95Ms": 4085.6835347094566,
+          "transactions": 3976,
+          "syncTransactions": 0,
+          "asyncTransactions": 3976,
+          "holdMsPerTxn": 182.58127814914536,
+          "poolMsPerTxn": 239.7380555374743,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5843.172644543888,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 349298528,
+          "elapsedMs": 8762.363037109375,
+          "p95Ms": 352.2112279156454,
+          "drainMs": 229.02970377604106,
+          "sampledPeakLag": 2033,
+          "sourceLateP95Ms": 1.2720524407677658,
+          "transactions": 4305,
+          "syncTransactions": 0,
+          "asyncTransactions": 4305,
+          "holdMsPerTxn": 24.33041175632992,
+          "poolMsPerTxn": 38.74566676097569,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5863.187501518461,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 352334416,
+          "elapsedMs": 8732.451416015625,
+          "p95Ms": 299.31866574754895,
+          "drainMs": 199.11808268229106,
+          "sampledPeakLag": 1544,
+          "sourceLateP95Ms": 1.2798745149102615,
+          "transactions": 4177,
+          "syncTransactions": 0,
+          "asyncTransactions": 4177,
+          "holdMsPerTxn": 24.926531659803803,
+          "poolMsPerTxn": 39.57785687862091,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5648.311111744341,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 176,
+          "missedForkOffers": 6,
+          "forkMs": {
+            "count": 176,
+            "p50": 17.82707400000072,
+            "p95": 26.074600999971153,
+            "p99": 48.06316200000583,
+            "max": 316.08288000000175
+          },
+          "walBytes": 358785080,
+          "elapsedMs": 9064.656494140625,
+          "p95Ms": 628.9936842575571,
+          "drainMs": 531.3231608072911,
+          "sampledPeakLag": 3604,
+          "sourceLateP95Ms": 1.3138563368056566,
+          "transactions": 3926,
+          "syncTransactions": 0,
+          "asyncTransactions": 3926,
+          "holdMsPerTxn": 27.53727211844116,
+          "poolMsPerTxn": 43.15125429521173,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6383.6504674733815,
+          "policy": "recorded-history",
+          "layout": "busy",
+          "existingForks": 1024,
+          "concurrentForks": 138,
+          "missedForkOffers": 23,
+          "forkMs": {
+            "count": 138,
+            "p50": 16.326579999993555,
+            "p95": 70.1614380000392,
+            "p99": 345.4850940000033,
+            "max": 353.80103600001894
+          },
+          "walBytes": 349268416,
+          "elapsedMs": 8020.4892578125,
+          "sampledPeakLag": 48697,
+          "sourceLateP95Ms": 9710.472880859375,
+          "transactions": 3628,
+          "syncTransactions": 0,
+          "asyncTransactions": 3628,
+          "holdMsPerTxn": 24.213188397188066,
+          "poolMsPerTxn": 15.463784361080574,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7281.573994838895,
+          "policy": "recorded-history",
+          "layout": "fanout",
+          "existingForks": 1024,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 353820280,
+          "elapsedMs": 7031.44677734375,
+          "sampledPeakLag": 48126,
+          "sourceLateP95Ms": 9732.885478515625,
+          "transactions": 3642,
+          "syncTransactions": 0,
+          "asyncTransactions": 3642,
+          "holdMsPerTxn": 20.85333717133411,
+          "poolMsPerTxn": 13.160678441789887,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7004.653732321379,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 353336920,
+          "elapsedMs": 7309.42626953125,
+          "sampledPeakLag": 48132,
+          "sourceLateP95Ms": 9635.435771484375,
+          "transactions": 3654,
+          "syncTransactions": 0,
+          "asyncTransactions": 3654,
+          "holdMsPerTxn": 21.93244961904809,
+          "poolMsPerTxn": 14.045799036124563,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7306.91916136724,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 333110632,
+          "elapsedMs": 7007.05712890625,
+          "sampledPeakLag": 49972,
+          "sourceLateP95Ms": 9648.9194140625,
+          "transactions": 3645,
+          "syncTransactions": 0,
+          "asyncTransactions": 3645,
+          "holdMsPerTxn": 20.674772259533956,
+          "poolMsPerTxn": 15.30351043209866,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        }
+      ],
+      "actorHashes": {
+        "worker": "9dc910d165c8e7cd2631a40255204a53fec874d812e63109185c2a060cb35243",
+        "projector": "2e7ced7a569cf4db35ed99b7fd09ea0ab7ff9331ae3f989281be974355760df8",
+        "wake-runtime": "b23b0c691e2dad6be1fc780d582de1b770b677e04eb943c9917f6906247be666"
+      },
+      "cpus": {
+        "pg": "0-31",
+        "projector": "0-31",
+        "sender": "0-7,24-31"
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    },
+    {
+      "count": 51200,
+      "runs": 256,
+      "bodyBytes": 4096,
+      "partitions": 32,
+      "connections": 12,
+      "replicas": 3,
+      "settings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "forkStudy": {
+        "coveringIndex": false,
+        "correctness": {
+          "idempotent": true,
+          "lateLowerIdExcluded": true,
+          "siblingExcluded": true,
+          "sourcePruned": true,
+          "independentAppend": true,
+          "sourceDeleted": true,
+          "nestedSurvives": true,
+          "lastReferenceCollected": true,
+          "concurrentDelete": true,
+          "piColdContext": true
+        },
+        "results": [
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.844719999993686,
+              "p95": 10.807425000006333,
+              "p99": 13.795317999989493,
+              "max": 13.795317999989493
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.055280000000494,
+              "p95": 8.191107999999076,
+              "p99": 8.9862130000256,
+              "max": 8.9862130000256
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.115596999996342,
+              "p95": 10.170191999990493,
+              "p99": 11.212888999987626,
+              "max": 11.212888999987626
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.307342999993125,
+              "p95": 10.037920000002487,
+              "p99": 10.100769000011496,
+              "max": 10.100769000011496
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.007091000006767,
+              "p95": 7.146106000000145,
+              "p99": 10.086362000001827,
+              "max": 10.086362000001827
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.021393000002718,
+              "p95": 8.230753000010736,
+              "p99": 9.289756999991369,
+              "max": 9.289756999991369
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 46.039420999994036,
+              "p95": 50.81228299997747,
+              "p99": 56.27481499998248,
+              "max": 56.27481499998248
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 16.039572999987286,
+              "p95": 20.90978200000245,
+              "p99": 21.080577000015182,
+              "max": 21.080577000015182
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.15899100000388,
+              "p95": 11.303220999980113,
+              "p99": 12.253564999991795,
+              "max": 12.253564999991795
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 82.0967590000073,
+              "p95": 84.00985599998967,
+              "p99": 84.0438950000098,
+              "max": 84.0438950000098
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 17.876319000002695,
+              "p95": 19.14936999999918,
+              "p99": 20.3860889999778,
+              "max": 20.3860889999778
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.000933000002988,
+              "p95": 8.128021999989869,
+              "p99": 8.197099000011804,
+              "max": 8.197099000011804
+            }
+          }
+        ],
+        "tree": {
+          "depth": 128,
+          "first": 8.011020000005374,
+          "last": 14.2716809999838,
+          "appendThenForkMs": {
+            "count": 128,
+            "p50": 15.118287000019336,
+            "p95": 38.05372300001909,
+            "p99": 42.279401000007056,
+            "max": 49.02353000000585
+          },
+          "clippedAcrossAncestors": true
+        }
+      },
+      "trials": [
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7119.494101042301,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7191.522216796875,
+          "sampledPeakLag": 49094,
+          "sourceLateP95Ms": 9307.257060546875,
+          "transactions": 3635,
+          "syncTransactions": 0,
+          "asyncTransactions": 3635,
+          "holdMsPerTxn": 21.235456627510327,
+          "poolMsPerTxn": 14.019551896836322,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7017.7256172457155,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7295.81103515625,
+          "sampledPeakLag": 48124,
+          "sourceLateP95Ms": 8724.760966796875,
+          "transactions": 3646,
+          "syncTransactions": 0,
+          "asyncTransactions": 3646,
+          "holdMsPerTxn": 20.791866944322525,
+          "poolMsPerTxn": 12.511330929237442,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6421.542975442211,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7973.16162109375,
+          "sampledPeakLag": 48737,
+          "sourceLateP95Ms": 8860.259013671875,
+          "transactions": 3645,
+          "syncTransactions": 0,
+          "asyncTransactions": 3645,
+          "holdMsPerTxn": 23.51129257009601,
+          "poolMsPerTxn": 15.901907233196066,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7203.276074931174,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7107.876953125,
+          "sampledPeakLag": 48128,
+          "sourceLateP95Ms": 8832.688701171875,
+          "transactions": 3656,
+          "syncTransactions": 0,
+          "asyncTransactions": 3656,
+          "holdMsPerTxn": 20.296250103938767,
+          "poolMsPerTxn": 12.35270968408104,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6572.495307838601,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7790.039794921875,
+          "sampledPeakLag": 48128,
+          "sourceLateP95Ms": 8703.673564453125,
+          "transactions": 3653,
+          "syncTransactions": 0,
+          "asyncTransactions": 3653,
+          "holdMsPerTxn": 20.406569992608844,
+          "poolMsPerTxn": 13.628678545579215,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6694.625208924524,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 7647.92626953125,
+          "sampledPeakLag": 49295,
+          "sourceLateP95Ms": 8966.5698046875,
+          "transactions": 3647,
+          "syncTransactions": 0,
+          "asyncTransactions": 3647,
+          "holdMsPerTxn": 22.81325254757344,
+          "poolMsPerTxn": 16.416300454894312,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5835.472526878097,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8773.92529296875,
+          "p95Ms": 361.4210276884187,
+          "drainMs": 240.59195963541606,
+          "sampledPeakLag": 1944,
+          "sourceLateP95Ms": 1.2796846277574332,
+          "transactions": 4260,
+          "syncTransactions": 0,
+          "asyncTransactions": 4260,
+          "holdMsPerTxn": 24.509488827699805,
+          "poolMsPerTxn": 38.85186674131449,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5911.5813861881925,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8660.965087890625,
+          "p95Ms": 200.48763499540473,
+          "drainMs": 127.63175455729106,
+          "sampledPeakLag": 939,
+          "sourceLateP95Ms": 1.257426342933286,
+          "transactions": 4469,
+          "syncTransactions": 0,
+          "asyncTransactions": 4469,
+          "holdMsPerTxn": 23.084046824121593,
+          "poolMsPerTxn": 36.61853623875597,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5809.399414520357,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8813.303466796875,
+          "p95Ms": 337.2656760620912,
+          "drainMs": 279.97013346354106,
+          "sampledPeakLag": 2086,
+          "sourceLateP95Ms": 1.2875721252042922,
+          "transactions": 4051,
+          "syncTransactions": 0,
+          "asyncTransactions": 4051,
+          "holdMsPerTxn": 25.925304673660843,
+          "poolMsPerTxn": 41.24040393433727,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5395.432481262394,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 9489.508056640625,
+          "p95Ms": 802.7601071027366,
+          "drainMs": 956.1747233072911,
+          "sampledPeakLag": 4461,
+          "sourceLateP95Ms": 1.2823079427082575,
+          "transactions": 4121,
+          "syncTransactions": 0,
+          "asyncTransactions": 4121,
+          "holdMsPerTxn": 26.69685714511046,
+          "poolMsPerTxn": 42.3336050407668,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5908.0311030080575,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8666.169677734375,
+          "p95Ms": 235.76526756535986,
+          "drainMs": 132.83634440104106,
+          "sampledPeakLag": 1130,
+          "sourceLateP95Ms": 1.2723268995098351,
+          "transactions": 4612,
+          "syncTransactions": 0,
+          "asyncTransactions": 4612,
+          "holdMsPerTxn": 22.366239553772665,
+          "poolMsPerTxn": 35.36375042801406,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5910.704160456462,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "elapsedMs": 8662.25048828125,
+          "p95Ms": 213.81719930810868,
+          "drainMs": 128.91715494791606,
+          "sampledPeakLag": 968,
+          "sourceLateP95Ms": 1.2763225081707787,
+          "transactions": 4437,
+          "syncTransactions": 0,
+          "asyncTransactions": 4437,
+          "holdMsPerTxn": 23.261607583727596,
+          "poolMsPerTxn": 36.82796559995472,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        }
+      ],
+      "actorHashes": {
+        "worker": "9dc910d165c8e7cd2631a40255204a53fec874d812e63109185c2a060cb35243",
+        "projector": "2e7ced7a569cf4db35ed99b7fd09ea0ab7ff9331ae3f989281be974355760df8",
+        "wake-runtime": "b23b0c691e2dad6be1fc780d582de1b770b677e04eb943c9917f6906247be666"
+      },
+      "cpus": {
+        "pg": "0-31",
+        "projector": "0-31",
+        "sender": "0-7,24-31"
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    },
+    {
+      "count": 51200,
+      "runs": 256,
+      "bodyBytes": 4096,
+      "partitions": 32,
+      "connections": 12,
+      "replicas": 3,
+      "settings": {
+        "postgres": "17.6",
+        "synchronous_commit": "on",
+        "fsync": "on"
+      },
+      "forkStudy": {
+        "coveringIndex": false,
+        "correctness": {
+          "idempotent": true,
+          "activeSourceFork": true,
+          "activeDeleteRejected": true,
+          "obsoleteAppendRejected": true,
+          "lateLowerIdExcluded": true,
+          "siblingExcluded": true,
+          "sourcePruned": true,
+          "independentAppend": true,
+          "sourceDeleted": true,
+          "nestedSurvives": true,
+          "lastReferenceCollected": true,
+          "concurrentDelete": true,
+          "piColdContext": true
+        },
+        "results": [
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "middle",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.793298999982653,
+              "p95": 12.01945400002296,
+              "p99": 51.30516499999794,
+              "max": 51.30516499999794
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.069489000015892,
+              "p95": 8.080427999986568,
+              "p99": 8.957521000003908,
+              "max": 8.957521000003908
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.063652000011643,
+              "p95": 8.89480999999796,
+              "p99": 145.1205150000169,
+              "max": 145.1205150000169
+            }
+          },
+          {
+            "entries": 200,
+            "bytes": 4096,
+            "position": "end",
+            "samples": 50,
+            "forkMs": {
+              "count": 50,
+              "p50": 8.705515000008745,
+              "p95": 10.083427000005031,
+              "p99": 11.125027000001865,
+              "max": 11.125027000001865
+            },
+            "firstPageMs": {
+              "count": 50,
+              "p50": 6.019859000021825,
+              "p95": 7.078968000016175,
+              "p99": 10.128372999985004,
+              "max": 10.128372999985004
+            },
+            "nestedForkMs": {
+              "count": 50,
+              "p50": 7.110564999980852,
+              "p95": 9.810469000018202,
+              "p99": 15.004050000017742,
+              "max": 15.004050000017742
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "middle",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 46.04890900000464,
+              "p95": 91.01890399999684,
+              "p99": 738.1386110000021,
+              "max": 738.1386110000021
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 15.992801000014879,
+              "p95": 17.8719609999971,
+              "p99": 214.69425699999556,
+              "max": 214.69425699999556
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.54241500000353,
+              "p95": 10.183427000010852,
+              "p99": 24.192287000012584,
+              "max": 24.192287000012584
+            }
+          },
+          {
+            "entries": 32768,
+            "bytes": 32768,
+            "position": "end",
+            "samples": 25,
+            "forkMs": {
+              "count": 25,
+              "p50": 81.94235300002038,
+              "p95": 85.93239599998924,
+              "p99": 105.09633400000166,
+              "max": 105.09633400000166
+            },
+            "firstPageMs": {
+              "count": 25,
+              "p50": 18.0096729999932,
+              "p95": 19.12001300000702,
+              "p99": 20.090941000002204,
+              "max": 20.090941000002204
+            },
+            "nestedForkMs": {
+              "count": 25,
+              "p50": 7.894754999986617,
+              "p95": 9.498353999981191,
+              "p99": 16.622921999980463,
+              "max": 16.622921999980463
+            }
+          }
+        ],
+        "tree": {
+          "depth": 128,
+          "first": 8.931061000010232,
+          "last": 12.080482000019401,
+          "appendThenForkMs": {
+            "count": 128,
+            "p50": 12.992634999973234,
+            "p95": 15.837601999985054,
+            "p99": 17.059745999984443,
+            "max": 17.747609000012744
+          },
+          "clippedAcrossAncestors": true
+        },
+        "burst": {
+          "clients": 8,
+          "completed": 64,
+          "forksPerSecond": 75.04929149516869,
+          "latencyMs": {
+            "count": 64,
+            "p50": 99.28993600001559,
+            "p95": 121.93389699998079,
+            "p99": 130.64776699998765,
+            "max": 130.64776699998765
+          }
+        },
+        "sparse": [
+          {
+            "cover": false,
+            "totalEntries": 32768,
+            "selectedEntries": 1024,
+            "ms": {
+              "count": 35,
+              "p50": 17.078125,
+              "p95": 18.94813900004374,
+              "p99": 19.044495000038296,
+              "max": 19.044495000038296
+            }
+          },
+          {
+            "cover": true,
+            "totalEntries": 32768,
+            "selectedEntries": 1024,
+            "ms": {
+              "count": 35,
+              "p50": 10.024745999951847,
+              "p95": 11.003948000026867,
+              "p99": 11.184430999972392,
+              "max": 11.184430999972392
+            }
+          },
+          {
+            "cover": true,
+            "totalEntries": 32768,
+            "selectedEntries": 1024,
+            "ms": {
+              "count": 35,
+              "p50": 10.069530999986455,
+              "p95": 12.104808999982197,
+              "p99": 14.243743999977596,
+              "max": 14.243743999977596
+            }
+          },
+          {
+            "cover": false,
+            "totalEntries": 32768,
+            "selectedEntries": 1024,
+            "ms": {
+              "count": 35,
+              "p50": 18.820361000020057,
+              "p95": 20.05956600001082,
+              "p99": 23.03892200003611,
+              "max": 23.03892200003611
+            }
+          }
+        ]
+      },
+      "trials": [
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7285.468322825059,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 332399048,
+          "elapsedMs": 7027.688232421875,
+          "sampledPeakLag": 49006,
+          "sourceLateP95Ms": 9154.348369140625,
+          "transactions": 3634,
+          "syncTransactions": 0,
+          "asyncTransactions": 3634,
+          "holdMsPerTxn": 20.8755067407815,
+          "poolMsPerTxn": 14.287785141717105,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6938.848787801164,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 355822008,
+          "elapsedMs": 7378.74560546875,
+          "sampledPeakLag": 48126,
+          "sourceLateP95Ms": 8977.28953125,
+          "transactions": 3673,
+          "syncTransactions": 0,
+          "asyncTransactions": 3673,
+          "holdMsPerTxn": 21.388307947998882,
+          "poolMsPerTxn": 13.7234845398856,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6648.087607138355,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 336618744,
+          "elapsedMs": 7701.462890625,
+          "sampledPeakLag": 48095,
+          "sourceLateP95Ms": 9046.4184375,
+          "transactions": 3655,
+          "syncTransactions": 0,
+          "asyncTransactions": 3655,
+          "holdMsPerTxn": 22.44531853570461,
+          "poolMsPerTxn": 14.728776030369414,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 6818.368321783371,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 339735344,
+          "elapsedMs": 7509.1279296875,
+          "sampledPeakLag": 48124,
+          "sourceLateP95Ms": 8850.7866015625,
+          "transactions": 3671,
+          "syncTransactions": 0,
+          "asyncTransactions": 3671,
+          "holdMsPerTxn": 21.386689187414856,
+          "poolMsPerTxn": 15.29926026613994,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7195.454559022829,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 351684208,
+          "elapsedMs": 7115.603271484375,
+          "sampledPeakLag": 48480,
+          "sourceLateP95Ms": 9015.615947265625,
+          "transactions": 3662,
+          "syncTransactions": 0,
+          "asyncTransactions": 3662,
+          "holdMsPerTxn": 21.188654629164436,
+          "poolMsPerTxn": 13.879604296286033,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "preloaded",
+          "completeMessagesPerSecond": 7270.654181786185,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 333357008,
+          "elapsedMs": 7042.00732421875,
+          "sampledPeakLag": 48299,
+          "sourceLateP95Ms": 8882.30173828125,
+          "transactions": 3647,
+          "syncTransactions": 0,
+          "asyncTransactions": 3647,
+          "holdMsPerTxn": 19.830687227035714,
+          "poolMsPerTxn": 13.23831188730478,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5838.323782552038,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 342006472,
+          "elapsedMs": 8769.640380859375,
+          "p95Ms": 315.41084399254487,
+          "drainMs": 236.30704752604106,
+          "sampledPeakLag": 1691,
+          "sourceLateP95Ms": 1.2740741804534537,
+          "transactions": 4432,
+          "syncTransactions": 0,
+          "asyncTransactions": 4432,
+          "holdMsPerTxn": 23.595270188854045,
+          "poolMsPerTxn": 37.51125635694946,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5889.686224643256,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 333419688,
+          "elapsedMs": 8693.16259765625,
+          "p95Ms": 291.3368853400734,
+          "drainMs": 159.82926432291606,
+          "sampledPeakLag": 1422,
+          "sourceLateP95Ms": 1.2510515599460632,
+          "transactions": 4230,
+          "syncTransactions": 0,
+          "asyncTransactions": 4230,
+          "holdMsPerTxn": 24.49238620638297,
+          "poolMsPerTxn": 38.46343943498791,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5352.4060166994195,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 351496504,
+          "elapsedMs": 9565.79150390625,
+          "p95Ms": 1303.8493811912786,
+          "drainMs": 1032.458170572916,
+          "sampledPeakLag": 6132,
+          "sourceLateP95Ms": 1.3253756255107874,
+          "transactions": 4159,
+          "syncTransactions": 0,
+          "asyncTransactions": 4159,
+          "holdMsPerTxn": 26.832953071892135,
+          "poolMsPerTxn": 38.3336596960807,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5274.304570345346,
+          "policy": "recorded-history",
+          "layout": "enabled",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 357122552,
+          "elapsedMs": 9707.44091796875,
+          "p95Ms": 1055.5759628395626,
+          "drainMs": 1174.107584635416,
+          "sampledPeakLag": 6218,
+          "sourceLateP95Ms": 1.2936166002859864,
+          "transactions": 4057,
+          "syncTransactions": 0,
+          "asyncTransactions": 4057,
+          "holdMsPerTxn": 27.218622704707442,
+          "poolMsPerTxn": 42.11865531254645,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5904.999803884871,
+          "policy": "recorded-history",
+          "layout": "baseline",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 334507104,
+          "elapsedMs": 8670.618408203125,
+          "p95Ms": 245.095530790441,
+          "drainMs": 137.28507486979106,
+          "sampledPeakLag": 1175,
+          "sourceLateP95Ms": 1.2771490757761512,
+          "transactions": 4587,
+          "syncTransactions": 0,
+          "asyncTransactions": 4587,
+          "holdMsPerTxn": 22.520014986047403,
+          "poolMsPerTxn": 35.57865024220599,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        },
+        {
+          "input": "paced",
+          "offeredMessagesPerSecond": 6000,
+          "completeMessagesPerSecond": 5798.915700716232,
+          "policy": "recorded-history",
+          "layout": "lean",
+          "existingForks": 0,
+          "concurrentForks": 0,
+          "missedForkOffers": 0,
+          "forkMs": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null
+          },
+          "walBytes": 340043096,
+          "elapsedMs": 8829.23681640625,
+          "p95Ms": 453.2455591937296,
+          "drainMs": 295.90348307291606,
+          "sampledPeakLag": 2565,
+          "sourceLateP95Ms": 1.2865269480189454,
+          "transactions": 4153,
+          "syncTransactions": 0,
+          "asyncTransactions": 4153,
+          "holdMsPerTxn": 25.32224128003844,
+          "poolMsPerTxn": 40.31272363737119,
+          "maxBatch": 16,
+          "finalLag": 0,
+          "verifiedEntries": 51712
+        }
+      ],
+      "actorHashes": {
+        "worker": "9dc910d165c8e7cd2631a40255204a53fec874d812e63109185c2a060cb35243",
+        "projector": "204dc2024f5b5c018a5d07f3c1950c5fab9b2b011907b55f997ef91a9864d045",
+        "wake-runtime": "b23b0c691e2dad6be1fc780d582de1b770b677e04eb943c9917f6906247be666"
+      },
+      "cpus": {
+        "pg": "0-31",
+        "projector": "0-31",
+        "sender": "0-7,24-31"
+      },
+      "cleanup": {
+        "temporaryPodsRemoved": true,
+        "temporaryServiceRemoved": true,
+        "temporaryAuthRemoved": true
+      }
+    }
+  ]
+}
