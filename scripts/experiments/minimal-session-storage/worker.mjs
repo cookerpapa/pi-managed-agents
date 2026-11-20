@@ -638,6 +638,7 @@ listen(
         m.perPartition,
         encodeSessionLogFact,
         kafkaProducerLane,
+        m.withUsage,
       );
       pathFrames = frames;
       send("messageTape", { owners });

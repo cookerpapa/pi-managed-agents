@@ -103,6 +103,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
           floor: s.floor,
           count: s.count,
           bytes: s.bytes,
+          ...(s.usageDocs ? { usageDocs: s.usageDocs } : {}),
         };
       }
       metrics.queries++;
@@ -189,6 +190,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       count: prior.count,
       bytes: prior.bytes,
       nextId: prior.nextId,
+      ...(prior.usageDocs ? { usageDocs: prior.usageDocs } : {}),
       floor: prior.floor,
       inboxId,
       value: { items },

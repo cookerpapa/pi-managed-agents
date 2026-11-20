@@ -28,6 +28,11 @@ for (const directory of directories) {
       t.policy === "recorded-history" ? t.asyncTransactions : t.syncTransactions,
     );
     assert(Math.abs((t.rps * t.elapsedMs) / 1000 - m.count) < 0.01);
+    if (typeof t.persistUsage === "boolean") {
+      assert.equal(t.usageRows, t.persistUsage ? m.runs : 0);
+      assert.equal(t.usageUpserts, t.persistUsage ? m.runs * 102 : 0);
+      assert(t.walBytes > 0 && t.syncTransactions === 0);
+    }
     if (t.layout) {
       assert(t.policy === "recorded-history");
       assert.equal(t.concurrentForks > 0, t.layout === "busy");

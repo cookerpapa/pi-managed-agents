@@ -17,6 +17,8 @@ import {
   assertFamilySettled,
 } from "./moving-checkpoint.mjs";
 
+import { coCommittedUsage } from "./usage-study.mjs";
+
 export const isPrefixStudy = (name) =>
   ["prefix-smoke", "prefix-study", "prefix-confirm"].includes(name) || isMovingStudy(name);
 export const isMovingStudy = (name) =>
@@ -32,6 +34,9 @@ export const isMovingStudy = (name) =>
     "fork-rate-confirm",
     "fork-rate-smoke",
     "fork-rate-index",
+    "usage-rate-smoke",
+    "usage-rate-confirm",
+    "usage-rate",
   ].includes(name);
 export function recoveryConnectionError(error) {
   return (
@@ -144,6 +149,7 @@ export class ReadyProjection {
     this.width = width;
     this.stats = {
       commits: 0,
+      usageUpserts: 0,
       recordsInTransactions: 0,
       logicalWrites: 0,
       transactionsByWrites: {},
@@ -259,6 +265,8 @@ export class ReadyProjection {
           draft.frame.history = true;
         }
         if (view && !draft.frame.rejected && f.kind === "durable_commit") {
+          if (this.persistUsage !== undefined)
+            coCommittedUsage(view, f, draft.frame, this.persistUsage && !covered);
           view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
           if (covered && owner?.projection_pin != null)
             view.pinOffset = BigInt(owner.projection_pin);
@@ -295,12 +303,15 @@ export class ReadyProjection {
               draft.frame.ops.every((op) => op.kind === "message") &&
               f.commit.writes.every(
                 (w) =>
-                  w.type === "entry" &&
-                  w.value.model?.length === 1 &&
-                  (w.value.model[0].role === "toolResult" ||
-                    (w.value.model[0].role === "assistant" &&
-                      w.value.model[0].stopReason === "toolUse" &&
-                      w.value.model[0].content.some((b) => b.type === "toolCall"))),
+                  (this.persistUsage !== undefined &&
+                    w.type === "document.change" &&
+                    Object.hasOwn(view.usageDocs ?? {}, w.id)) ||
+                  (w.type === "entry" &&
+                    w.value.model?.length === 1 &&
+                    (w.value.model[0].role === "toolResult" ||
+                      (w.value.model[0].role === "assistant" &&
+                        w.value.model[0].stopReason === "toolUse" &&
+                        w.value.model[0].content.some((b) => b.type === "toolCall")))),
               ) &&
               !hasEffect) ||
             replayableMetadata(draft.frame, f) ||
@@ -358,6 +369,7 @@ export class ReadyProjection {
         if (outcome === "applied" && moving) {
           assert.equal(row.mode, relaxed ? "off" : "on", "PG transaction policy mismatch");
           this.stats[row.mode === "off" ? "asyncTransactions" : "syncTransactions"]++;
+          this.stats.usageUpserts += draft.frames.reduce((n, f) => n + (f.usage?.length ?? 0), 0);
           this.stats.checkpointAdvances += draft.frames.filter((f) => f.snapshot).length;
           this.stats.firstPins += draft.frames.filter((f) => f.pin).length;
         }

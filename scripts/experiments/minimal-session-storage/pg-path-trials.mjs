@@ -261,6 +261,9 @@ export async function runPgPaths({
       "fork-rate-confirm",
       "fork-rate-smoke",
       "fork-rate-index",
+      "usage-rate-smoke",
+      "usage-rate-confirm",
+      "usage-rate",
     ].includes(profile)
   ) {
     const { messageTrials } = await import("./complete-message-rate.mjs");

@@ -265,6 +265,7 @@ try {
         stage = { integrated: true, scene: "plain", sink: "single" };
         metrics = blank();
         await resetPrefix(16, m.policy);
+        prefixStudy.persistUsage = m.persistUsage;
         messageMeter = new MessageRateMeter(m.owners, m.rate, !m.rate);
         send("messagesReady");
       },

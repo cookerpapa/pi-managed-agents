@@ -90,6 +90,7 @@ export function checkpoint(view, record) {
     "markerId",
     "inboxId",
     "liveId",
+    "usageDocs",
     "lastFact",
   ])
     if (view[key] !== undefined) fields[key] = view[key];

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Cumulative Conversation usage under batched projection](minimal-projection-usage-20261120.md) compares the same response traffic with and without a current-value write.
+
 - [Where a prototype Run waits](session-tail-attribution-20261119.md) traces a single terminal record through native delivery, ordered handling and PostgreSQL, with captured SQL.
 
 - [Successive Run throughput](session-continuation-throughput-20261119.md) compares new Sessions, returning Sessions and mixed arrivals with integrated Worker locality.

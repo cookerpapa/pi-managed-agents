@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
+import { responseUsage, usageValue, usageStudy } from "./usage-study.mjs";
 import { wall } from "./pg-path-replay.mjs";
 
 const middle = 200,
@@ -8,7 +9,7 @@ const middle = 200,
 const md5 = (s) => createHash("md5").update(s).digest("hex");
 
 // Only the emitter holds encoded payloads. The verifier receives per-Run hashes.
-export function messageTape(tenantId, perPartition, encode, lane) {
+export function messageTape(tenantId, perPartition, encode, lane, withUsage = false) {
   const groups = Array.from({ length: 32 }, () => []);
   while (groups.some((g) => g.length < perPartition)) {
     const sessionId = randomUUID(),
@@ -57,8 +58,10 @@ export function messageTape(tenantId, perPartition, encode, lane) {
         };
       } else {
         let writes;
-        if (seq === 1) writes = [doc(2, "pi.inbox", { items: [] }), doc(3, "pi.live", {})];
-        else {
+        if (seq === 1) {
+          writes = [doc(2, "pi.inbox", { items: [] }), doc(3, "pi.live", {})];
+          if (withUsage) writes.push(doc(5, "pi.usage", usageValue(0)));
+        } else {
           const n = seq - 3,
             callId = "call-" + Math.floor(n / 2),
             payload = n >= 0 && n < middle ? randomBytes(3072).toString("base64") : "";
@@ -92,6 +95,13 @@ export function messageTape(tenantId, perPartition, encode, lane) {
               isError: false,
               content: [{ type: "text", text: payload }],
             };
+          if (withUsage && m.role === "assistant")
+            Object.assign(m, {
+              api: "faux",
+              provider: "faux",
+              model: "local-load",
+              usage: responseUsage(1),
+            });
           const entry = {
             id: seq + 6,
             conversationId: 1,
@@ -104,6 +114,12 @@ export function messageTape(tenantId, perPartition, encode, lane) {
           };
           hashes[i].update(md5(JSON.stringify(entry)));
           writes = [{ type: "entry", value: entry }];
+          if (withUsage && m.role === "assistant")
+            writes.push({
+              type: "document.change",
+              id: 5,
+              content: { kind: "base", version: 1, value: usageValue(Math.floor((seq - 1) / 2)) },
+            });
           if (seq === 2)
             writes.push({
               type: "submission",
@@ -206,7 +222,8 @@ export async function messageTrials(
   { projector, emitter, configure, guard, observer, forkPool, report, save, cpuFixture, token },
   profile,
 ) {
-  const smoke = profile === "message-rate-smoke" || profile === "fork-rate-smoke",
+  const withUsage = profile.startsWith("usage-rate");
+  const smoke = profile.endsWith("-smoke"),
     confirm = profile === "message-rate-confirm";
   assert.match(token, /^[0-9a-f]{16}$/);
   const {
@@ -221,6 +238,7 @@ export async function messageTrials(
   };
   const { owners } = await request(emitter, "makeMessages", "messageTape", {
     tenantId: randomUUID(),
+    withUsage,
     perPartition: smoke ? 1 : confirm ? 24 : 8,
   });
   const expected = owners.map((o) => [o.runId, o.digest]).sort();
@@ -228,6 +246,7 @@ export async function messageTrials(
   const fork = profile.startsWith("fork-rate")
     ? await (await import("./fork-trials.mjs")).forkStudy(forkPool, profile, owners, token)
     : undefined;
+  const usage = withUsage ? await usageStudy(forkPool, profile, owners, token) : undefined;
   report.completeMessages = {
     count,
     runs: owners.length,
@@ -260,14 +279,16 @@ export async function messageTrials(
           [4630, true],
         ];
   const trials =
+    usage?.cases ??
     fork?.cases ??
     pairs.flatMap(([rate, reverse]) =>
       (reverse ? ["recorded-history", "moving-sync"] : ["moving-sync", "recorded-history"]).map(
         (policy) => ({ rate, policy }),
       ),
     );
-  for (const { rate, policy, layout } of trials) {
-    if (fork) await fork.before(layout);
+  for (const { rate, policy, layout, persistUsage } of trials) {
+    if (usage) await usage.before();
+    else if (fork) await fork.before(layout);
     else await observer.query("truncate messages,inboxes,runs");
     await observer.query(
       `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id)
@@ -283,10 +304,12 @@ export async function messageTrials(
       owners: owners.map((o) => ({ runId: o.runId })),
       rate,
       policy,
+      persistUsage,
     });
-    const walBefore = fork
-      ? (await observer.query("select pg_current_wal_insert_lsn()::text as lsn")).rows[0].lsn
-      : undefined;
+    const walBefore =
+      fork || usage
+        ? (await observer.query("select pg_current_wal_insert_lsn()::text as lsn")).rows[0].lsn
+        : undefined;
     const start = wall() + 500;
     let stopTraffic;
     let traffic;
@@ -307,16 +330,17 @@ export async function messageTrials(
       traffic = await stopTraffic?.();
     }
     const { result, stats, lag } = finished;
-    const walBytes = fork
-      ? Number(
-          (
-            await observer.query(
-              "select pg_wal_lsn_diff(pg_current_wal_insert_lsn(),$1::pg_lsn)::text as bytes",
-              [walBefore],
-            )
-          ).rows[0].bytes,
-        )
-      : undefined;
+    const walBytes =
+      fork || usage
+        ? Number(
+            (
+              await observer.query(
+                "select pg_wal_lsn_diff(pg_current_wal_insert_lsn(),$1::pg_lsn)::text as bytes",
+                [walBefore],
+              )
+            ).rows[0].bytes,
+          )
+        : undefined;
     assert.equal(sent.source.frames, owners.length * framesPerRun);
     assert.equal(lag, 0);
     assert.equal(stats.logicalWrites, owners.length * framesPerRun);
@@ -340,10 +364,13 @@ export async function messageTrials(
     );
     assert.equal(closed.rows[0].n, owners.length);
     await fork?.verify(layout);
+    const usageRows = await usage?.verify(persistUsage);
+    if (usage) assert.equal(stats.usageUpserts, persistUsage ? owners.length * 102 : 0);
     const trial = {
       rate: rate || "preloaded",
       policy,
       ...(fork ? { layout, ...traffic, walBytes } : {}),
+      ...(usage ? { persistUsage, usageRows, usageUpserts: stats.usageUpserts, walBytes } : {}),
       ...result,
       sourceLateP95Ms: sent.source.lateMs.p95,
       transactions: stats.commits,

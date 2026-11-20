@@ -13,7 +13,7 @@ const now = () => true;
 
 // Use the same guarded SQL as the Pi actor. The small fact fixture lets us
 // place the process failure precisely, without executing a shell command.
-async function fixture(test) {
+async function fixture(test, requestedRun = randomUUID()) {
   const schema = "ready_" + randomUUID().replaceAll("-", "");
   const topic = "prefix-" + randomUUID(),
     admin = new pg.Pool({ connectionString: url, max: 1 });
@@ -21,7 +21,7 @@ async function fixture(test) {
   const scope = {
     tenantId: randomUUID(),
     piSessionId: randomUUID(),
-    runId: randomUUID(),
+    runId: requestedRun,
     writerId: randomUUID(),
   };
   const { tenantId, piSessionId, runId, writerId } = scope;
@@ -399,4 +399,156 @@ it.skipIf(!url || !brokers)(
     });
   },
   60000,
+);
+
+it.skipIf(!url)(
+  "co-commits cumulative usage with the accepted message and skips a previously accepted prefix",
+  async () => {
+    await fixture(async ({ db, scope, cursor, topic }) => {
+      const { usageTableSql, usageValue } = await import("./usage-study.mjs");
+      const { applyMovingSql } = await import("./ready-projection-sql.mjs");
+      await db.query(usageTableSql);
+      function frame(offset, writer = scope.writerId) {
+        const seq = offset + 1;
+        const entry = {
+          id: seq,
+          conversation: 1,
+          role: "assistant",
+          ordinal: 0,
+          content: "answer-" + seq,
+        };
+        const { tenantId, piSessionId, runId } = scope;
+        return {
+          offset: String(offset),
+          history: true,
+          ops: [
+            {
+              kind: "message",
+              count: 1,
+              args: [tenantId, piSessionId, runId, seq, JSON.stringify([entry]), writer],
+            },
+          ],
+          usage: [
+            {
+              tenant: tenantId,
+              session: piSessionId,
+              conversation: 1,
+              document: 5,
+              seq,
+              ordinal: 1,
+              value: usageValue(seq),
+            },
+          ],
+        };
+      }
+      const apply = async (from, frames) =>
+        (
+          await db.query(applyMovingSql, [
+            topic,
+            0,
+            from,
+            from + frames.length,
+            JSON.stringify(frames),
+            true,
+            true,
+          ])
+        ).rows[0].outcome;
+      const rows = async () =>
+        (await db.query("select commit_seq::int as seq, value from usage_latest")).rows;
+      expect(await apply(0, [frame(0), frame(1)])).toBe("applied");
+      expect(await rows()).toEqual([{ seq: 2, value: usageValue(2) }]);
+      expect(await apply(0, [frame(0), frame(1)])).toBe("covered");
+      const bad = frame(3);
+      bad.usage[0].document = 999;
+      await expect(apply(2, [frame(2), bad])).rejects.toMatchObject({ code: "PZ002" });
+      expect(await cursor()).toBe(2n);
+      expect(await rows()).toEqual([{ seq: 2, value: usageValue(2) }]);
+      expect(Number((await db.query("select count(*) as n from messages")).rows[0].n)).toBe(2);
+      expect(await apply(2, [frame(2, randomUUID())])).toBe("obsolete");
+      expect(await rows()).toEqual([{ seq: 2, value: usageValue(2) }]);
+      expect(await apply(3, [frame(3)])).toBe("applied");
+      expect(await rows()).toEqual([{ seq: 4, value: usageValue(4) }]);
+    });
+  },
+);
+
+it.skipIf(!url)(
+  "counts PG transactions for one streamed native two-tool conversation",
+  async () => {
+    const { captureNativeUsage } = await import("./native-usage-fixture.mjs");
+    const { projectRecord } = await import("./project-record.mjs");
+    const { usageTableSql } = await import("./usage-study.mjs");
+    const runId = randomUUID(),
+      { commits, finalUsage } = await captureNativeUsage(runId);
+    let baseline;
+    for (const persist of [false, true])
+      await fixture(async ({ view, db, scope }) => {
+        await db.query(usageTableSql);
+        view.configure(16, "recorded-history");
+        view.persistUsage = persist;
+        const environment = {
+          pool: db,
+          sessions: view.sessions,
+          stage: { integrated: true, sink: "single", scene: "plain" },
+          metrics: {
+            byPartition: [0],
+            peakWaiting: 0,
+            queries: 0,
+            skipped: 0,
+            inboxSnapshots: 0,
+            inboxBytes: 0,
+          },
+          account() {},
+          nextOffsets: new Map(),
+          send() {},
+          partitions: 1,
+        };
+        const fold = (r, d) => projectRecord(r, d, environment);
+        const accepted = [];
+        for (const [i, commit] of commits.entries()) {
+          const fact = {
+            kind: "durable_commit",
+            scope,
+            factId: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            commit,
+            tools: [],
+            cancellations: [],
+            display: [],
+          };
+          const prior = view.stats.commits;
+          await view.apply([{ partition: 0, offset: BigInt(i), fact }], now, fold);
+          if (view.stats.commits > prior) accepted.push(commit.seq);
+        }
+        const n = commits.length;
+        const last = {
+          kind: "work_finished",
+          scope,
+          factId: randomUUID(),
+          occurredAt: new Date().toISOString(),
+          baseSequence: 0,
+          nativeSequence: commits.at(-1).seq,
+          terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
+        };
+        await view.apply([{ partition: 0, offset: BigInt(n), fact: last }], now, fold);
+        expect((await db.query("select value from usage_latest")).rows).toEqual(
+          persist ? [{ value: finalUsage }] : [],
+        );
+        expect((await db.query("select state from runs")).rows).toEqual([{ state: "completed" }]);
+        expect(view.stats.usageUpserts).toBe(persist ? 3 : 0);
+        if (persist) expect(accepted).toEqual(baseline);
+        else baseline = accepted;
+        expect(accepted.length).toBeLessThan(n);
+        expect(view.stats.commits).toBe(accepted.length + 1);
+        if (persist)
+          console.log(
+            JSON.stringify({
+              nativeCommits: n,
+              nativeCommitsWithPG: accepted,
+              usageUpserts: view.stats.usageUpserts,
+              runFinishTransactions: 1,
+            }),
+          );
+      }, runId);
+  },
 );

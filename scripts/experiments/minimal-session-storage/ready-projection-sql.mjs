@@ -70,6 +70,18 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
           if n<>(op->>'count')::int then raise exception 'Conflicting projection' using errcode='PZ002'; end if;
           applied:=applied+1;
         end loop;
+        if frame?'usage' then
+          if applied=0 then raise exception 'Usage lacks admitted source'; end if;
+          for op in select value from jsonb_array_elements(frame->'usage') loop
+            insert into usage_latest as u values ((op->>'tenant')::uuid,(op->>'session')::uuid,
+              (op->>'conversation')::bigint,(op->>'document')::bigint,(op->>'seq')::bigint,
+              (op->>'ordinal')::int,op->'value')
+            on conflict(tenant_id,pi_session_id,conversation_id) do update
+              set commit_seq=excluded.commit_seq,ordinal=excluded.ordinal,value=excluded.value
+              where u.doc_id=excluded.doc_id and (u.commit_seq,u.ordinal)<(excluded.commit_seq,excluded.ordinal);
+            if not found then raise exception 'Conflicting accepted usage position' using errcode='PZ002'; end if;
+          end loop;
+        end if;
         if frame?'snapshot' then
           snap:=frame->'snapshot';
           update runs set projection_first=(frame->>'offset')::bigint+1,projection_partition=p_partition,projection_pin=null,

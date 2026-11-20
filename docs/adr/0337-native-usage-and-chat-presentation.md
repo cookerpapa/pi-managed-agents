@@ -19,3 +19,13 @@ The writer, native readers and public history/usage readers change together. Dev
 Verify repeated cumulative updates, duplicate/changed commits, missing state, cold reconstruction, initial Fork usage, original/fork model context, and forward/backward history pages before and after settlement. Compare isolated 192-client synthetic waves with the pre-change #50 implementation on the same host, including visible items, SQL calls by native batch, model-to-terminal latency, consumer lag and complete resource cleanup.
 
 [Implementation and measurements](../reports/native-usage-and-chat-history-20261118.md).
+
+## Minimal storage performance comparison
+
+Measure the same encoded assistant Entries and native latest-value usage updates with
+and without materializing the cumulative value. Both arms use the lean shared-stream
+Fork schema, the same recorded-history acknowledgement policy and the same partition
+batching. The measured candidate upserts one current row per Conversation in the
+transaction that admits its source. No text fragment schedules a usage write.
+This experiment covers the co-committed response path. It does not change serving
+storage, charge eligibility, or the public usage API.

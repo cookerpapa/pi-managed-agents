@@ -267,3 +267,23 @@ The `wake-sizing` study varies batches 8, 16, 32 and 64 under replenished load a
 Throughput counts confirmed Runs divided by elapsed stage time, including drainage. Latency starts just before registration and ends at the Projector's successful terminal PG callback. Native-ACK totals are sums per Run, so pipelined intervals can overlap. The final gap is timed between durable answer and terminal callbacks on the same Projector process. The finish transit metric also includes time waiting behind earlier Session-partition records. Kafka lag is sampled high offset minus processed offset, and all 32 partitions must drain. A short peak between samples may be missed. JSON bytes for the Inbox are the parameter payload of current-value writes. PostgreSQL WAL and on-disk bytes have different accounting.
 
 The serving database is only read for preflight. Every measured mutation targets the newly created database, which is dropped after closing the actors. Topic and group absence are checked through the Kafka admin API. Data published with the [report](../../../docs/reports/minimal-session-storage-load-20261119.md) contain aggregates only.
+
+
+### Conversation usage
+
+The `usage-rate` profile replays one immutable recording across both arms with
+the selected lean shared-stream schema. Each assistant reply already contains
+provider usage and a complete native cumulative update. The enabled arm also
+upserts the current document inside the admitting PG transaction. `usage-rate-confirm`
+uses a new recording and the complementary order. `usage-rate-smoke` exercises
+the same guarded SQL with one Session per partition. All three run serially.
+
+```sh
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/usage-study usage-rate
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/usage-confirm usage-rate-confirm
+node scripts/experiments/minimal-session-storage/summarize-complete-messages.mjs /private/usage-summary.json /private/usage-study /private/usage-confirm
+```
+
+The native frequency test uses the pinned Harness and a streamed faux model.
+The PG integration test also projects this trace one commit at a time.
+[Protocol, measurements and scope](../../../docs/reports/minimal-projection-usage-20261120.md).
