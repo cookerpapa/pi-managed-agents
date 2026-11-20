@@ -1,9 +1,34 @@
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
-import { installPrefixSql, applyPrefixSql, projectionStarts } from "./ready-projection-sql.mjs";
+import {
+  installPrefixSql,
+  applyPrefixSql,
+  applyMovingSql,
+  projectionStarts,
+} from "./ready-projection-sql.mjs";
+import {
+  foldLive,
+  foldToolReferences,
+  checkpoint,
+  plainAnswer,
+  replayableMetadata,
+  useSynchronousPolicy,
+  movingStarts,
+  assertFamilySettled,
+} from "./moving-checkpoint.mjs";
 
 export const isPrefixStudy = (name) =>
-  ["prefix-smoke", "prefix-study", "prefix-confirm"].includes(name);
+  ["prefix-smoke", "prefix-study", "prefix-confirm"].includes(name) || isMovingStudy(name);
+export const isMovingStudy = (name) =>
+  ["moving-smoke", "moving-study", "moving-confirm", "moving-finish"].includes(name);
+export function recoveryConnectionError(error) {
+  return (
+    /^(08|57P0[123]$|ECONNRESET$|EPIPE$|ECONNREFUSED$|40001$|PZ003$)/.test(error?.code ?? "") ||
+    /connection (?:terminated|ended)|timeout exceeded when trying to connect/i.test(
+      error?.message ?? "",
+    )
+  );
+}
 
 // The same native fold prepares a private overlay. Entries, Inbox values and
 // previous native batches are immutable; the scalar Run state is copied.
@@ -98,8 +123,10 @@ export class ReadyProjection {
   canDeliver({ partition, offset }) {
     return this.effects.get(partition)?.has(offset) === true;
   }
-  configure(width) {
+  configure(width, policy = "fixed") {
     assert([0, 1, 16].includes(width));
+    assert(["fixed", "moving-sync", "selective", "replay-finish"].includes(policy));
+    this.policy = policy;
     this.width = width;
     this.stats = {
       commits: 0,
@@ -112,13 +139,18 @@ export class ReadyProjection {
       holdMs: 0,
       zeroWritePrefixes: 0,
       maxRecords: 0,
+      syncTransactions: 0,
+      asyncTransactions: 0,
+      checkpointAdvances: 0,
+      firstPins: 0,
+      pinOnlyWrites: 0,
     };
   }
   // Only independent benchmark trials reset the fixture. Assignment recovers
   // the existing head; a fresh process must never overwrite it.
-  async reset(ends, width) {
+  async reset(ends, width, policy) {
     this.revoke();
-    this.configure(width);
+    this.configure(width, policy);
     await this.db.query(
       `insert into accepted_fact_projection_offsets select $1,p,n from unnest($2::int[],$3::bigint[]) as v(p,n)
       on conflict(topic,partition) do update set next_offset=excluded.next_offset`,
@@ -128,9 +160,17 @@ export class ReadyProjection {
   }
   async recover(bounds) {
     const generation = this.generation;
-    const starts = await projectionStarts(this.db, this.topic, bounds);
+    const starts = await (this.policy === "fixed" ? projectionStarts : movingStarts)(
+      this.db,
+      this.topic,
+      bounds,
+    );
     assert.equal(generation, this.generation, "Assignment changed during bootstrap");
-    for (const [p, next] of starts) this.next.set(p, next);
+    for (const [p, next, start, states] of starts) {
+      if (start instanceof Error) continue;
+      this.next.set(p, next);
+      for (const [id, s] of states ?? []) this.sessions.set(id, s);
+    }
     return new Map(starts.map(([p, , start]) => [p, start]));
   }
   async apply(ready, current, process, witness, connect = () => this.db.connect()) {
@@ -175,8 +215,15 @@ export class ReadyProjection {
         }
         continue;
       }
+      if (
+        this.policy !== "fixed" &&
+        f.kind === "work_finished" &&
+        previous?.writer === f.scope.writerId
+      )
+        assertFamilySettled(previous);
       await process(r, draft);
-      const opened = !previous && draft.views.get(f.scope.runId);
+      const view = draft.views.get(f.scope.runId);
+      const opened = !previous && view;
       if (opened && !covered) {
         // Remember even a memory-only first fact before another Run can advance
         // this partition's checkpoint beyond it.
@@ -184,9 +231,56 @@ export class ReadyProjection {
         if (!draft.frame.ops.length) draft.frame.ops.push({ kind: "anchor", args, count: 1 });
         draft.frame.anchor = args;
       }
+      if (this.policy !== "fixed") {
+        draft.frame.strict = useSynchronousPolicy(f) || draft.barrier;
+        if (
+          this.policy === "replay-finish" &&
+          f.kind === "work_finished" &&
+          f.terminal.type === "turn.completed" &&
+          draft.frame.ops.length === 1 &&
+          draft.frame.ops[0].kind === "finish" &&
+          !draft.frame.rejected
+        ) {
+          draft.frame.strict = false;
+          draft.frame.history = true;
+        }
+        if (view && !draft.frame.rejected && f.kind === "durable_commit") {
+          view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
+          if (covered && owner?.projection_pin != null)
+            view.pinOffset = BigInt(owner.projection_pin);
+          const registered = foldToolReferences(view, previous, draft.frame, f, r.offset);
+          if (f.tools?.length && !registered)
+            throw new Error(
+              "Moving projection requires a retained native reference for every dispatched Tool",
+            );
+          if (registered)
+            draft.frame.strict =
+              useSynchronousPolicy(f, true) ||
+              draft.barrier ||
+              draft.frame.ops.some((op) => op.kind !== "tool");
+          if (draft.frame.ops.length && !hasEffect && !covered) {
+            const state = checkpoint(view, r);
+            if (state) {
+              draft.frame.snapshot = { run: f.scope.runId, writer: f.scope.writerId, state };
+              delete view.pinOffset;
+            }
+          }
+          if (!covered && !draft.frame.snapshot && previous?.pinOffset === undefined) {
+            const args = [f.scope.tenantId, f.scope.piSessionId, f.scope.runId, f.scope.writerId];
+            draft.frame.pin = args;
+            view.pinOffset = r.offset;
+            if (!draft.frame.ops.length) draft.frame.ops.push({ kind: "pin", args, count: 1 });
+          }
+          draft.views.set(f.scope.runId, view);
+          draft.frame.history =
+            plainAnswer(draft.frame, f) ||
+            replayableMetadata(draft.frame, f) ||
+            (registered && !draft.frame.strict && !draft.frame.anchor);
+        }
+      }
       if (hasEffect && !draft.frame.rejected) {
         assert(
-          draft.frame.ops.some((op) => op.kind !== "anchor"),
+          draft.frame.ops.some((op) => op.kind !== "anchor" && op.kind !== "pin"),
           "Tool requires stable native intent",
         );
         effects.add(r.offset);
@@ -212,16 +306,28 @@ export class ReadyProjection {
         taken = performance.now();
       try {
         if (!owned()) return kept.length;
+        const relaxed =
+          (this.policy === "selective" || this.policy === "replay-finish") &&
+          !draft.frames.some((f) => f.strict) &&
+          operations.every((f) => f.history);
+        const moving = this.policy !== "fixed";
         const {
           rows: [row],
-        } = await c.query(applyPrefixSql, [
+        } = await c.query(moving ? applyMovingSql : applyPrefixSql, [
           this.topic,
           partition,
           String(expected),
           String(next),
           JSON.stringify(draft.frames),
+          ...(moving ? [relaxed, this.policy === "replay-finish"] : []),
         ]);
         outcome = row.outcome;
+        if (outcome === "applied" && moving) {
+          assert.equal(row.mode, relaxed ? "off" : "on", "PG transaction policy mismatch");
+          this.stats[row.mode === "off" ? "asyncTransactions" : "syncTransactions"]++;
+          this.stats.checkpointAdvances += draft.frames.filter((f) => f.snapshot).length;
+          this.stats.firstPins += draft.frames.filter((f) => f.pin).length;
+        }
       } finally {
         c.release();
         this.stats.poolMs += taken - started;
@@ -229,6 +335,11 @@ export class ReadyProjection {
       }
       if (!owned()) return kept.length;
       if (outcome === "covered") {
+        if (this.policy !== "fixed") {
+          const error = new Error("Reload the committed projection checkpoint");
+          error.code = "PZ003";
+          throw error;
+        }
         // The first commit survived a lost client reply. Re-enter via the
         // durable head to validate restored state and suppress notifications.
         const {
@@ -244,7 +355,12 @@ export class ReadyProjection {
       this.next.set(partition, next);
       this.stats.commits++;
       const n = operations.reduce((a, f) => a + f.ops.length, 0);
-      this.stats.logicalWrites += n;
+      const pins = operations.reduce(
+        (n, f) => n + f.ops.filter((op) => op.kind === "pin").length,
+        0,
+      );
+      this.stats.pinOnlyWrites += pins;
+      this.stats.logicalWrites += n - pins;
       this.stats.recordsInTransactions += kept.length;
       this.stats.transactionsByWrites[n] = (this.stats.transactionsByWrites[n] ?? 0) + 1;
       this.stats.maxRecords = Math.max(this.stats.maxRecords, kept.length);
@@ -262,7 +378,7 @@ export class ReadyProjection {
   async activeRuns(partition, records) {
     const ids = [...new Set(records.map((r) => r.fact.scope.runId))];
     const { rows } = await this.db.query(
-      `select id,tenant_id,session_id,lease_id,projection_first from runs
+      `select id,tenant_id,session_id,lease_id,projection_first,projection_pin from runs
       where state='running' and projection_partition=$1 and projection_first is not null and id=any($2::uuid[])`,
       [partition, ids],
     );

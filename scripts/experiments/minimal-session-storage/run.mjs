@@ -259,6 +259,19 @@ function receive(a, m) {
 }
 async function startActor(role, id, pod, ...roleArgs) {
   const binary = process.env.PI_CLOUD_KUBECTL_BIN ?? "/usr/local/bin/k3s";
+  const program = Buffer.from(source[role]);
+  // Read exactly the source bytes before the actor starts its normal line
+  // protocol. A virtual module under the working directory resolves installed
+  // packages normally without putting the bundle in an exec argument.
+  const bootstrap = `import {readSync} from 'node:fs';import {registerHooks} from 'node:module';
+    import {pathToFileURL} from 'node:url';import {resolve} from 'node:path';
+    const bytes=Buffer.alloc(Number(process.argv.pop()));
+    for(let n=0;n<bytes.length;){const read=readSync(0,bytes,n,bytes.length-n,null);if(!read)throw Error('Incomplete actor source');n+=read;}
+    const url=pathToFileURL(resolve('pma-experiment-actor.mjs')).href;
+    const hook=registerHooks({
+      resolve:(id,c,next)=>id===url?{url,format:'module',shortCircuit:true}:next(id,c),
+      load:(id,c,next)=>id===url?{source:bytes,format:'module',shortCircuit:true}:next(id,c)
+    });try{await import(url);}finally{hook.deregister();}`;
   const args = [
     ...(process.env.PI_CLOUD_KUBECTL_BIN ? [] : ["kubectl"]),
     "--kubeconfig",
@@ -274,14 +287,16 @@ async function startActor(role, id, pod, ...roleArgs) {
     "tsx",
     "--input-type=module",
     "-e",
-    source[role],
+    bootstrap,
     name,
     topic,
     id,
     mode,
     ...roleArgs,
+    String(program.length),
   ];
   const child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] });
+  child.stdin.write(program);
   const a = {
     id,
     pod,

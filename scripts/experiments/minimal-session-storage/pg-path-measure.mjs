@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import pg from "pg";
 import { verifyCommitClients, isCommitStudy, isAsyncStudy } from "./pg-group-commit.mjs";
+import { isPrefixStudy } from "./ready-projection.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { wall } from "./pg-path-replay.mjs";
@@ -139,9 +140,9 @@ export class PgPathMeasure {
           processCpuUs: usage.user + usage.system - processCpu.user - processCpu.system,
           throttledUs: now[1] - cpu[1],
           cpuPressureUs: now[2] - cpu[2],
-          ...(["cpu", "cpu-smoke", "prefix-smoke", "prefix-study", "prefix-confirm"].includes(
-            process.argv[8],
-          ) || isCommitStudy(process.argv[8])
+          ...(["cpu", "cpu-smoke"].includes(process.argv[8]) ||
+          isPrefixStudy(process.argv[8]) ||
+          isCommitStudy(process.argv[8])
             ? {
                 allowed: readFileSync("/sys/fs/cgroup/cpuset.cpus.effective", "utf8").trim(),
               }

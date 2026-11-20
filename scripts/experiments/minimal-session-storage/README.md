@@ -6,6 +6,35 @@ The original storage controls use fresh physical Sessions. The `wake-throughput`
 
 ## Run serially
 
+### Moving recovery and transaction-local commit
+
+For the moving-checkpoint and selective-commit comparison, run the following
+serially with `PI_CLOUD_RUNTIME_DIRECTORY` set to the managed development
+runtime directory. The performance fixtures use the
+existing three brokers and their own database. The recovery command starts its
+own disposable PG and three Kafka containers and immediately stops only its
+own postmaster. The full benchmark uses the default WAL writer timing. The
+isolated fault fixture gives the WAL writer five seconds to make the loss window
+observable.
+
+```sh
+export PI_CLOUD_RUNTIME_LOAD_CHECK=1
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/moving-first moving-study
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/moving-reverse moving-confirm
+node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /private/moving-finish moving-finish
+node --import tsx scripts/experiments/minimal-session-storage/run-moving-recovery.mjs /private/moving-recovery.json
+node scripts/experiments/minimal-session-storage/summarize-ready-projection.mjs /private/moving-results.json /private/moving-first /private/moving-reverse /private/moving-finish
+```
+
+The selective policy permits complete text answers, the copy of an admitted
+root input, the initial empty Inbox, the first replay pin and validated sandbox
+intents with an original reply reference to use a transaction-local asynchronous commit.
+Any control operation which uses the conservative synchronous policy promotes
+the whole ready batch. Neither mode buffers sparse arrivals to fill the batch.
+The `moving-finish` profile additionally relaxes the prototype's normally
+completed Run projection. The crash fixture tests a read held behind replay
+after a previously acknowledged completion disappears from PG.
+
 ### Synchronous partition-prefix study
 
 Set `PI_CLOUD_RUNTIME_DIRECTORY` to the development runtime directory. These runs use a private PG instance with the serving image, the existing three Kafka brokers, two native Pi Worker processes and a deterministic model. Run the two profiles in order. The second profile repeats the comparison using a fresh recording. The `prefix-smoke` profile provides a shorter check.

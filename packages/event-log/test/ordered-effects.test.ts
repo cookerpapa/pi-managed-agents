@@ -207,6 +207,42 @@ it("resumes boot-local callback progress across assignment and reader recreation
   }
 });
 
+it("discards a PG snapshot invalidated during assignment and rejoins at the recovered offset", async () => {
+  const entered = Promise.withResolvers<void>(),
+    release = Promise.withResolvers<void>();
+  let reads = 0;
+  const reader = new KafkaLogConsumer({
+    brokers: ["fake"],
+    topic: "log",
+    groupId: "group",
+    clientId: "test",
+    groupRecovery: true,
+    orderedEffects: true,
+    replayOffsets: async () => {
+      if (++reads === 1) {
+        entered.resolve();
+        await release.promise;
+        return new Map([[0, 2n]]);
+      }
+      return new Map([[0, 1n]]);
+    },
+    decode: () => 0,
+    handler: async () => {},
+  });
+  try {
+    await reader.start();
+    await entered.promise;
+    reader.reloadRecoveryState();
+    expect(reader.ownsPartition(0)).toBe(false);
+    release.resolve();
+    await reader.waitUntilAssigned(2500);
+    expect(f.assignments).toEqual([[1]]);
+  } finally {
+    release.resolve();
+    await reader.close();
+  }
+});
+
 it("starts a fresh callback consumer at the retained floor, without another boot's progress", async () => {
   const old = await fixture({ memory: true });
   await old.deliver([

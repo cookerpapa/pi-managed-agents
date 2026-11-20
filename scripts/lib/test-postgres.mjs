@@ -9,10 +9,27 @@ const IMAGE = "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d745
 
 /** Existing integration URLs are caller-owned test infrastructure. Otherwise
  * use a disposable official PG container, with no host mounts or production data. */
-export async function testPostgres(environment = process.env) {
+export async function testPostgres(environment = process.env, { crashable = false } = {}) {
+  if (crashable && environment.PI_CLOUD_POSTGRES_INTEGRATION_URL)
+    throw new Error("A crash test requires its own disposable PostgreSQL instance");
   if (environment.PI_CLOUD_POSTGRES_INTEGRATION_URL)
     return { url: environment.PI_CLOUD_POSTGRES_INTEGRATION_URL, async close() {} };
   const name = `pi-cloud-test-pg-${randomUUID()}`;
+  const data = "/var/lib/postgresql/data/pma-crash-study";
+  // Keep the test container and its loopback port alive across an immediate
+  // postmaster shutdown. The server and data directory belong to this fixture.
+  const bootstrap = `set -eu
+install -d -m 0700 -o postgres -g postgres ${data}
+gosu postgres initdb -D ${data} -A trust --no-locale >/dev/null
+echo 'host all all all trust' >>${data}/pg_hba.conf
+cat >>${data}/postgresql.conf <<'CONF'
+listen_addresses='*'
+fsync=on
+synchronous_commit=on
+wal_writer_delay='5s'
+CONF
+gosu postgres pg_ctl -D ${data} -l /tmp/pma-fault-postgres.log -w start >/dev/null
+exec sleep infinity`;
   let started = false,
     closed = false;
   const close = async () => {
@@ -38,6 +55,7 @@ export async function testPostgres(environment = process.env) {
         "--env",
         "POSTGRES_HOST_AUTH_METHOD=trust",
         IMAGE,
+        ...(crashable ? ["sh", "-c", bootstrap] : []),
       ],
       { timeout: 300000 },
     );
@@ -63,7 +81,33 @@ export async function testPostgres(environment = process.env) {
     } finally {
       await pool.end();
     }
-    return { url, close };
+    const control = async (action) => {
+      if (!crashable || !started || closed) throw new Error("Unowned database restart");
+      await execute(
+        "docker",
+        [
+          "exec",
+          "--user",
+          "postgres",
+          name,
+          "pg_ctl",
+          "-D",
+          data,
+          "-w",
+          "-t",
+          "30",
+          ...(action === "stop"
+            ? ["-m", "immediate", "stop"]
+            : ["-l", "/tmp/pma-fault-postgres.log", "start"]),
+        ],
+        { timeout: 35000 },
+      );
+    };
+    return {
+      url,
+      close,
+      ...(crashable ? { crash: () => control("stop"), restart: () => control("start") } : {}),
+    };
   } catch (error) {
     await close();
     throw new Error(

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Measure moving recovery positions, single/ready-prefix transactions, and transaction-local asynchronous PG commits in the prototype. Recover an acknowledged tool intent, its original reply and a lost normal Run completion after an actual PG crash. [Measurements and fault evidence](reports/moving-projection-recovery-20261120.md).
+
 - [x] Compare synchronous and asynchronous PG acknowledgements with the same four writes per Run. Independently check acknowledged rows after a database crash. [Asynchronous commit measurements](reports/pg-async-commit-20261120.md).
 
 - [x] Measure native PG group commit with zero and positive leader delays on an isolated instance, retaining independent synchronous transactions and Kafka dispatch protection. [Group-commit study](reports/pg-native-group-commit-20261119.md).
@@ -12,7 +14,7 @@
 
 - [x] Batch immediately available Session-log records while bounding admitted buffers, preserving offset confirmation and measuring full-Run latency. Compare PG connection counts separately. [Batch-read measurements](reports/session-projector-batch-read-20261119.md).
 - [x] For #48, measure synchronous same-partition batching with a PG checkpoint and the original Kafka dispatch boundary. Include input placement, transaction failure, lost replies and consumer replacement. [Measurements](reports/synchronous-ready-prefix-20261120.md).
-- [ ] Repeat the upper-rate replay with isolated sender resources and a sustained traffic mix including real tool boundaries and long-lived Sessions. Review native recovery coverage before adopting the experimental writer in the serving Projector. Keep asynchronous projection as an alternative.
+- [ ] Measure sustained mixed workloads with real tools and full native child conversations. Verify serving API, scheduler, cleanup and failover behavior during catch-up before adopting moving checkpoints or relaxed acknowledgements in the serving Projector.
 
 - [x] Attribute terminal delay before and after native Kafka delivery and measure predecessor PG work on the same partition. Verify the actual minimal projection statements and distinguish fresh admission from chained Session waits. [Attribution](reports/session-tail-attribution-20261119.md).
 

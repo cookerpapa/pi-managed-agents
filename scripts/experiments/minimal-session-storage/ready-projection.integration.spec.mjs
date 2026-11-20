@@ -229,6 +229,67 @@ it.skipIf(!url)(
   },
 );
 
+it.skipIf(!url)(
+  "keeps a mixed ready batch synchronous and resets the pooled setting after a pure history batch",
+  async () => {
+    await fixture(async ({ view, db, record, fold, notifications }) => {
+      view.configure(16, "selective");
+      const answer = (n) => {
+        const r = record(n);
+        r.fact.commit.writes = [
+          {
+            type: "entry",
+            value: {
+              model: [
+                {
+                  role: "assistant",
+                  stopReason: "stop",
+                  content: [{ type: "text", text: "answer" }],
+                },
+              ],
+            },
+          },
+        ];
+        return r;
+      };
+      const modes = [];
+      const c = await db.connect();
+      const borrow = async () => ({
+        async query(sql, args) {
+          const result = await c.query(sql, args);
+          modes.push(result.rows[0].mode);
+          return result;
+        },
+        release() {},
+      });
+      try {
+        await view.apply([record(0)], now, fold, undefined, borrow);
+        expect(
+          await view.apply(
+            [answer(1), record(2, "queued"), answer(3)],
+            now,
+            fold,
+            undefined,
+            borrow,
+          ),
+        ).toBe(2);
+        expect(notifications).toEqual(["fact-0", "fact-1", "fact-2"]);
+        await view.apply([answer(3), answer(4)], now, fold, undefined, borrow);
+        expect(modes).toEqual(["on", "on", "off"]);
+        expect((await c.query("show synchronous_commit")).rows[0].synchronous_commit).toBe("on");
+        const unsupported = record(5, "tool");
+        await expect(view.apply([unsupported], now, fold, undefined, borrow)).rejects.toThrow(
+          "retained native reference",
+        );
+        expect(view.canDeliver(unsupported)).toBe(false);
+        expect(modes).toHaveLength(3);
+      } finally {
+        c.release();
+      }
+    });
+  },
+);
+
 it.skipIf(!url || !brokers)(
   "recovers a pending dispatch before its Kafka grant and suppresses it after the grant",
   async () => {

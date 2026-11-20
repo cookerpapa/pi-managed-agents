@@ -20,13 +20,15 @@ const oneMessage = singleSql(messageSql(true), "$3", "$6"),
   oneInbox = singleSql(inboxSql(true), "$7", "$8");
 export const finishStatement = (
   head,
-) => `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=$5::jsonb" : ""}
-     where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running' returning id`;
+  releaseRecovery = false,
+) => `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=$5::jsonb" : ""}${releaseRecovery ? ",projection_state=null,projection_partition=null,projection_first=null,projection_pin=null" : ""}
+     where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running'${releaseRecovery ? " and projection_tools='{}'::jsonb" : ""} returning id`;
 
 export const projectionTemplates = {
   message: oneMessage,
   inbox: oneInbox,
   finish: finishStatement(true),
+  finishAndRelease: finishStatement(true, true),
   plainMessage: insertMessages,
   plainInbox: upsertInbox,
 };

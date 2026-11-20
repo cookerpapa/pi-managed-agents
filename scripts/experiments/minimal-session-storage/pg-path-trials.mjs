@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
-import { isPrefixStudy } from "./ready-projection.mjs";
+import { isPrefixStudy, isMovingStudy } from "./ready-projection.mjs";
 import { kubeconfig, namespace, podFor } from "../../lib/production-kubernetes.mjs";
 import {
   commitController,
@@ -252,6 +252,7 @@ export async function runPgPaths({
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
   const prefix = isPrefixStudy(profile);
+  const moving = isMovingStudy(profile);
   const commitStudy = isCommitStudy(profile);
   const asyncCommit = isAsyncStudy(profile);
   const peak = profile === "async-peak";
@@ -267,14 +268,15 @@ export async function runPgPaths({
       profile === "cpu-smoke" ||
       profile === "group-smoke" ||
       profile === "async-smoke" ||
-      profile === "prefix-smoke",
+      profile === "prefix-smoke" ||
+      profile === "moving-smoke",
     timing = profile === "timing";
   const prefixConfirm = profile === "prefix-confirm";
   const count = smoke
     ? cpuFixture
       ? 520
       : 320
-    : timing || confirm || peak || prefixConfirm
+    : timing || confirm || peak || prefixConfirm || moving
       ? 4160
       : 6240;
   const call = async (actor, command, response, args = {}) => {
@@ -295,7 +297,16 @@ export async function runPgPaths({
     sink: "single",
     concurrency: 384,
   };
-  const runLive = async (label, mode, rate, n, diagnostics, commitSetting, prefixWidth) => {
+  const runLive = async (
+    label,
+    mode,
+    rate,
+    n,
+    diagnostics,
+    commitSetting,
+    prefixWidth,
+    projectionPolicy,
+  ) => {
     const result = await wave({
       ...live,
       label,
@@ -303,7 +314,7 @@ export async function runPgPaths({
       count: n,
       pgPath: mode,
       pathDiagnostics: diagnostics,
-      ...(prefix ? { prefixWidth } : {}),
+      ...(prefix ? { prefixWidth, projectionPolicy } : {}),
       ...(commitSetting ? { commitSetting } : {}),
     });
     return {
@@ -312,7 +323,7 @@ export async function runPgPaths({
       offeredAt: result.offeredAt,
       runsPerSecond: result.runsPerSecond,
       measurement: result.pgPath,
-      ...(prefix ? { prefixWidth, prefix: result.prefix } : {}),
+      ...(prefix ? { prefixWidth, projectionPolicy, prefix: result.prefix } : {}),
       completed: result.completed,
       dropped: result.dropped,
       terminalMs: result.submitToTerminalMs,
@@ -356,7 +367,13 @@ export async function runPgPaths({
   };
   try {
     if (prefix) {
-      const candidate = { ...live, prefixWidth: 16, count: 2, concurrency: 2 };
+      const candidate = {
+        ...live,
+        prefixWidth: 16,
+        ...(moving ? { projectionPolicy: "selective" } : {}),
+        count: 2,
+        concurrency: 2,
+      };
       await wave({ ...candidate, label: "prefix-finish-held", holdFinish: true });
       for (const scene of ["follow", "steer", "late"])
         await wave({
@@ -404,45 +421,63 @@ export async function runPgPaths({
     assert.equal(tape.runs, count);
     assert.equal((await call(emitter, "loadPathFrames", "pathSourceReady")).frames, tape.frames);
     await save();
-    const cases = prefix
-      ? prefixCases(smoke, prefixConfirm)
-      : cpuFixture
-        ? commitStudy
-          ? replayCommitCases(smoke, peak || confirm)
-          : cpuReplayCases(smoke, reverse)
-        : smoke
-          ? [
-              [260, "direct"],
-              [260, "projector"],
-            ]
-          : timing
+    const cases = moving
+      ? movingCases(profile).map(([rate, width, policy]) => [
+          rate,
+          "projector",
+          true,
+          "open",
+          "default",
+          width,
+          policy,
+        ])
+      : prefix
+        ? prefixCases(smoke, prefixConfirm)
+        : cpuFixture
+          ? commitStudy
+            ? replayCommitCases(smoke, peak || confirm)
+            : cpuReplayCases(smoke, reverse)
+          : smoke
             ? [
                 [260, "direct"],
                 [260, "projector"],
-                [260, "projector"],
-                [260, "direct"],
-                [520, "direct"],
-                [520, "projector"],
               ]
-            : [
-                [116, "direct"],
-                [116, "projector"],
-                [260, "projector"],
-                [260, "direct"],
-                [260, "direct"],
-                [260, "projector"],
-                [390, "direct"],
-                [390, "projector"],
-                [390, "projector"],
-                [390, "direct"],
-                [520, "projector"],
-                [520, "direct"],
-                [116, "projector"],
-                [116, "direct"],
-                [260, "direct", false],
-                [260, "projector", false],
-              ];
-    for (const [rate, path, diagnostics = true, layout, commitSetting, prefixWidth] of cases) {
+            : timing
+              ? [
+                  [260, "direct"],
+                  [260, "projector"],
+                  [260, "projector"],
+                  [260, "direct"],
+                  [520, "direct"],
+                  [520, "projector"],
+                ]
+              : [
+                  [116, "direct"],
+                  [116, "projector"],
+                  [260, "projector"],
+                  [260, "direct"],
+                  [260, "direct"],
+                  [260, "projector"],
+                  [390, "direct"],
+                  [390, "projector"],
+                  [390, "projector"],
+                  [390, "direct"],
+                  [520, "projector"],
+                  [520, "direct"],
+                  [116, "projector"],
+                  [116, "direct"],
+                  [260, "direct", false],
+                  [260, "projector", false],
+                ];
+    for (const [
+      rate,
+      path,
+      diagnostics = true,
+      layout,
+      commitSetting,
+      prefixWidth,
+      projectionPolicy,
+    ] of cases) {
       const placement = cpuFixture ? await cpuFixture.pin(layout) : undefined;
       if (controller) await controller.apply(commitSetting);
       const { start } = await call(projector, "preparePaths", "pathReady", {
@@ -451,6 +486,7 @@ export async function runPgPaths({
         diagnostics,
         commitSetting,
         prefixWidth,
+        projectionPolicy,
       });
       const result = await observe(observer, logs, async () => {
         const pending = call(projector, "runPaths", "pathResult", { path });
@@ -466,6 +502,7 @@ export async function runPgPaths({
           diagnostics,
           commitSetting,
           prefixWidth,
+          projectionPolicy,
           source: emitted?.source ?? r.source,
           ...r.result,
         };
@@ -480,6 +517,7 @@ export async function runPgPaths({
           layout,
           commitSetting,
           prefixWidth,
+          projectionPolicy,
           rate,
           diagnostics,
           done: tape.runs,
@@ -490,11 +528,13 @@ export async function runPgPaths({
         }),
       );
     }
-    const liveSettings = prefix
-      ? prefixLiveCases(smoke, prefixConfirm)
-      : commitStudy
-        ? liveCommitCases(smoke, peak || confirm)
-        : undefined;
+    const liveSettings = moving
+      ? movingCases(profile, true).map(([rate, width, policy]) => [rate, "default", width, policy])
+      : prefix
+        ? prefixLiveCases(smoke, prefixConfirm)
+        : commitStudy
+          ? liveCommitCases(smoke, peak || confirm)
+          : undefined;
     const liveLayouts = liveSettings
       ? liveSettings.map(() => "open")
       : cpuFixture
@@ -506,7 +546,10 @@ export async function runPgPaths({
         : undefined;
     for (const i of liveLayouts ? liveLayouts.keys() : smoke ? [0] : timing ? [0, 1] : [0, 1, 2]) {
       const placement = liveLayouts ? await cpuFixture.pin(liveLayouts[i]) : undefined;
-      const [rate, commitSetting, prefixWidth] = liveSettings?.[i] ?? [260, undefined];
+      const [rate, commitSetting, prefixWidth, projectionPolicy] = liveSettings?.[i] ?? [
+        260,
+        undefined,
+      ];
       if (controller) await controller.apply(commitSetting);
       const result = await observe(observer, logs, () =>
         runLive(
@@ -519,12 +562,15 @@ export async function runPgPaths({
               : 320
             : rate === 10
               ? 200
-              : timing || cpuFixture
-                ? 10400
-                : 6500,
+              : moving
+                ? rate * 20
+                : timing || cpuFixture
+                  ? 10400
+                  : 6500,
           !!cpuFixture || i !== 2,
           commitSetting,
           prefixWidth,
+          projectionPolicy,
         ),
       );
       verifyPlacement(result, placement);
@@ -565,6 +611,54 @@ export function cpuReplayCases(smoke, reverse = false) {
   ];
 }
 
+export function movingCases(profile, live = false) {
+  const sync = "moving-sync",
+    async = "selective";
+  const rates = (r, pairs) => pairs.map(([width, policy]) => [r, width, policy]);
+  if (profile === "moving-finish")
+    return [
+      ...rates(520, [
+        [16, async],
+        [16, "replay-finish"],
+        [16, "replay-finish"],
+        [16, async],
+      ]),
+      ...rates(780, [
+        [16, "replay-finish"],
+        [16, async],
+        [16, async],
+        [16, "replay-finish"],
+      ]),
+    ];
+  if (profile === "moving-smoke")
+    return rates(260, [
+      [1, sync],
+      [1, async],
+      [16, sync],
+      [16, async],
+    ]);
+  const cases = [
+    ...rates(520, [
+      [1, sync],
+      [1, async],
+      [16, async],
+      [16, sync],
+    ]),
+    ...rates(780, [
+      [16, sync],
+      [16, async],
+      [16, async],
+      [16, sync],
+    ]),
+    ...(live
+      ? rates(10, [
+          [16, sync],
+          [16, async],
+        ])
+      : []),
+  ];
+  return profile === "moving-confirm" ? cases.reverse() : cases;
+}
 export function prefixCases(smoke, confirm) {
   const at = (rate, widths) =>
     widths.map((width) => [rate, "projector", true, "open", "default", width]);

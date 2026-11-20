@@ -166,14 +166,27 @@ export class KafkaLogConsumer<T> {
     this.#run = this.#runForever();
   }
 
+  /** Re-read the external recovery store after its connection or durable head changes. */
+  reloadRecoveryState(): void {
+    if (this.#closing || !this.#options.groupRecovery || !this.#options.replayOffsets) return;
+    this.#wake?.();
+  }
+
   async #runForever(): Promise<void> {
     while (!this.#closing) {
       let restart!: () => void;
+      let retired = false;
       const interrupted = new Promise<void>((resolve) => {
         restart = resolve;
-        this.#wake = resolve;
+        this.#wake = () => {
+          if (!retired) {
+            retired = true;
+            this.#ready = false;
+            this.#epoch++;
+          }
+          resolve();
+        };
       });
-      let retired = false;
       // The bounded reader reports background failure through this port. Never
       // leave an apparently connected consumer serving after its poller exits.
       const logger: KafkaTypes.Logger = {

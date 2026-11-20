@@ -42,12 +42,31 @@ for (const directory of directories) {
       assert.equal(txn, p.commits);
       assert(p.maxRecords <= r.prefixWidth);
     }
+    if (r.projectionPolicy) {
+      assert.equal(p.syncTransactions + p.asyncTransactions, txn);
+      assert(p.checkpointAdvances > 0);
+      if (r.projectionPolicy === "moving-sync") assert.equal(p.asyncTransactions, 0);
+      else if (r.projectionPolicy === "replay-finish") {
+        assert.equal(p.syncTransactions, 0);
+        assert.equal(p.asyncTransactions, txn);
+      } else assert(r.projectionPolicy === "selective" && p.asyncTransactions > 0);
+    }
     const wave = replay ? undefined : report.tests.find((t) => t.label === r.label);
     if (wave) assert.equal(wave.endKafkaLag, 0);
     return {
       source,
       rate: r.rate,
       width: r.prefixWidth,
+      ...(r.projectionPolicy
+        ? {
+            policy: r.projectionPolicy,
+            asyncTransactions: p.asyncTransactions,
+            syncTransactions: p.syncTransactions,
+            checkpointAdvances: p.checkpointAdvances,
+            firstPins: p.firstPins,
+            pinOnlyWrites: p.pinOnlyWrites,
+          }
+        : {}),
       completed: n,
       offered: wave?.count ?? n,
       dropped: r.dropped ?? 0,

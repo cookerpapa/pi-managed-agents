@@ -1,0 +1,179 @@
+{
+  "trials": [
+    {
+      "settings": {
+        "pg": "17.6",
+        "fsync": "on",
+        "sync": "on",
+        "crash_wal_writer_delay": "5s"
+      },
+      "width": 16,
+      "kafkaReplicas": 3,
+      "topicRetentionDays": 7,
+      "overlap": [
+        {
+          "settledBeforePartial": 32,
+          "stableRecordsReplayed": 0,
+          "partialSuffixRecords": 6,
+          "stableRecovery": {
+            "includingGroupRejoinMs": 3362,
+            "pgBootstrapMs": 1.63
+          },
+          "partialRecovery": {
+            "includingGroupRejoinMs": 4359,
+            "pgBootstrapMs": 1.75
+          },
+          "checkpointBytes": 390
+        },
+        {
+          "settledBeforePartial": 2048,
+          "stableRecordsReplayed": 0,
+          "partialSuffixRecords": 6,
+          "stableRecovery": {
+            "includingGroupRejoinMs": 3383,
+            "pgBootstrapMs": 1.6
+          },
+          "partialRecovery": {
+            "includingGroupRejoinMs": 3369,
+            "pgBootstrapMs": 1.5
+          },
+          "checkpointBytes": 399
+        }
+      ],
+      "pgCrashes": [
+        {
+          "groupNext": 2126,
+          "previousHead": 2101,
+          "acknowledged": 2126,
+          "recovered": 2101,
+          "lostIntent": true,
+          "lostRows": 24,
+          "dispatches": 1,
+          "restoredRows": 24,
+          "originalReplyConsumed": true
+        }
+      ],
+      "asynchronousCompletions": [
+        {
+          "previousHead": 2131,
+          "groupNext": 2133,
+          "acknowledged": {
+            "head": 2133,
+            "state": "completed",
+            "messages": 2
+          },
+          "rawAfterCrash": {
+            "head": 2131,
+            "state": "running",
+            "messages": 1
+          },
+          "schedulerAfterReplay": {
+            "head": 2133,
+            "state": "completed",
+            "messages": 2
+          }
+        }
+      ],
+      "beforeGrantDispatchCount": 1,
+      "afterGrantBeforeSendDispatchCount": 0,
+      "missingReplySettledAtOriginalDeadline": "tool_reply_timeout:unknown",
+      "retentionGapBlocked": true,
+      "lostPgReplyRecovered": true,
+      "connectionsResetToOn": 4,
+      "cleaned": true
+    },
+    {
+      "settings": {
+        "pg": "17.6",
+        "fsync": "on",
+        "sync": "on",
+        "crash_wal_writer_delay": "5s"
+      },
+      "width": 16,
+      "kafkaReplicas": 3,
+      "topicRetentionDays": 7,
+      "overlap": [
+        {
+          "settledBeforePartial": 32,
+          "stableRecordsReplayed": 0,
+          "partialSuffixRecords": 6,
+          "stableRecovery": {
+            "includingGroupRejoinMs": 3368,
+            "pgBootstrapMs": 1.84
+          },
+          "partialRecovery": {
+            "includingGroupRejoinMs": 4373,
+            "pgBootstrapMs": 1.42
+          },
+          "checkpointBytes": 390
+        },
+        {
+          "settledBeforePartial": 2048,
+          "stableRecordsReplayed": 0,
+          "partialSuffixRecords": 6,
+          "stableRecovery": {
+            "includingGroupRejoinMs": 3364,
+            "pgBootstrapMs": 1.47
+          },
+          "partialRecovery": {
+            "includingGroupRejoinMs": 3426,
+            "pgBootstrapMs": 1.49
+          },
+          "checkpointBytes": 399
+        }
+      ],
+      "pgCrashes": [
+        {
+          "groupNext": 2126,
+          "previousHead": 2101,
+          "acknowledged": 2126,
+          "recovered": 2118,
+          "lostIntent": false,
+          "lostRows": 8,
+          "dispatches": 1,
+          "restoredRows": 24,
+          "originalReplyConsumed": true
+        },
+        {
+          "groupNext": 2152,
+          "previousHead": 2127,
+          "acknowledged": 2152,
+          "recovered": 2127,
+          "lostIntent": true,
+          "lostRows": 24,
+          "dispatches": 1,
+          "restoredRows": 24,
+          "originalReplyConsumed": true
+        }
+      ],
+      "asynchronousCompletions": [
+        {
+          "previousHead": 2157,
+          "groupNext": 2159,
+          "acknowledged": {
+            "head": 2159,
+            "state": "completed",
+            "messages": 2
+          },
+          "rawAfterCrash": {
+            "head": 2157,
+            "state": "running",
+            "messages": 1
+          },
+          "schedulerAfterReplay": {
+            "head": 2159,
+            "state": "completed",
+            "messages": 2
+          }
+        }
+      ],
+      "beforeGrantDispatchCount": 1,
+      "afterGrantBeforeSendDispatchCount": 0,
+      "missingReplySettledAtOriginalDeadline": "tool_reply_timeout:unknown",
+      "retentionGapBlocked": true,
+      "lostPgReplyRecovered": true,
+      "connectionsResetToOn": 4,
+      "cleaned": true
+    }
+  ]
+}
