@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, measure the post-PG delivery of a matching native Tool start, full-trace batch coverage and the throughput of wider dispatch grants. [Width and traffic-mix measurements](reports/display-tool-batching-20261121.md).
+
 - [x] Under #52, compare individual PG projection against one transaction per admitted Tool prefix at the same Kafka grant width. Verify middle-row rollback, lost acknowledgements and a captured native waiting Task. [PG batching results and serving boundary](reports/pg-tool-intent-batch-20261121.md).
 
 - [x] Compare partition-local grants of up to 1, 8 and 32 admitted tools, including real consumer loss after a partial send. Measure separate 32/64-partition topic generations and compare 12/24 Projector PG connections at 64 partitions. [Projection, routing, pool and crash evidence](reports/partition-tool-grants-20261121.md).

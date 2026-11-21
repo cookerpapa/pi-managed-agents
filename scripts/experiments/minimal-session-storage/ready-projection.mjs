@@ -215,7 +215,7 @@ export class ReadyProjection {
   }
   async applyToolIntents(ready, current, process) {
     assert(
-      this.width && this.policy === "recorded-history" && ready.length > 0 && ready.length <= 32,
+      this.width && this.policy === "recorded-history" && ready.length > 0 && ready.length <= 128,
     );
     return this.#apply(ready, current, process, undefined, () => this.db.connect(), true);
   }
@@ -369,8 +369,7 @@ export class ReadyProjection {
             !draft.frame.rejected &&
             draft.frame.ops.length === 1 &&
             draft.frame.ops[0].kind === "tool" &&
-            !draft.frame.strict &&
-            draft.frame.history &&
+            (f.display?.length ? draft.frame.strict : !draft.frame.strict && draft.frame.history) &&
             !draft.barrier,
           "Invalid warm execution projection",
         );

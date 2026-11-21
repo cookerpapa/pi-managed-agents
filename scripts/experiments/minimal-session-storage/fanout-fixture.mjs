@@ -48,7 +48,7 @@ export function fanoutFixture(token) {
   });
   const op = (arm, index) => id(6, arm * 1000000 + index);
   const replyTopic = "pi-cloud.tool-replies.v4." + id(7, 0);
-  function frame(arm, index, seed) {
+  function frame(arm, index, seed, decorate) {
     const { scope, partition } = owners[index % targets],
       round = Math.floor(index / targets),
       taskId = 9 + round;
@@ -113,6 +113,7 @@ export function fanoutFixture(token) {
             },
           ],
     };
+    decorate?.(fact, index, seed);
     return {
       partition,
       session: scope.sessionId,

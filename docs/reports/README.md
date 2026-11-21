@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Native tool starts and grant width](display-tool-batching-20261121.md) measures actual batch membership on a complete Pi trace and separates arrival-limited throughput from backlog drain.
+
 - [Batching admitted Tool intents in PostgreSQL](pg-tool-intent-batch-20261121.md) compares paced dispatch and backlog drain at equal Kafka grant sizes, with native commit and failure checks.
 
 - [Partition-local Tool grants and partition count](partition-tool-grants-20261121.md) measures 32/64 partition generations and verifies a partly sent grant after a process kill.

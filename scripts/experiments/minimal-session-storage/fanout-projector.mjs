@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { FanoutSender } from "./fanout-network.mjs";
 import { fanoutFixture, offered, targets } from "./fanout-fixture.mjs";
+import { projectRecord } from "./project-record.mjs";
 import { operationsFor } from "./workspace-operations.mjs";
 import { prepareToolGrants } from "./tool-grant-prefix.mjs";
 import { pace, wall } from "./pg-path-replay.mjs";
@@ -93,6 +94,9 @@ export class FanoutProjector {
     this.commitStats = { calls: 0, positions: 0, callback: phase() };
     this.spec = spec;
     this.handled = 0;
+    this.finishedRuns = 0;
+    this.displayCounts = new Uint32Array(targets);
+    this.displayed = 0;
     this.prepared = new WeakSet();
     this.grantSizes = {};
     this.lastAck = 0;
@@ -108,7 +112,11 @@ export class FanoutProjector {
     this.sender.onAck = (t) => {
       this.lastAck = wall();
       this.phases.ack.add(this.lastAck - t.at);
-      if (!spec.preload && this.lastAck <= this.start + (spec.count * 1000) / offered)
+      if (
+        !spec.preload &&
+        !spec.liveSource &&
+        this.lastAck <= this.start + ((spec.recordCount ?? spec.count) * 1000) / offered
+      )
         this.atOfferEnd++;
     };
     this.timer = setInterval(() => {
@@ -145,6 +153,12 @@ export class FanoutProjector {
     });
   }
   async prepare(ready, current, grant, router) {
+    if (this.spec?.mixed && router.canBatch(ready[0].fact)) {
+      await this.gate.promise;
+      const n = await router.prepareHistory(ready, current);
+      if (current()) for (const r of ready.slice(0, n)) this.prepared.add(r.fact);
+      return n || 1;
+    }
     if (!(this.spec?.grantWidth > 1) || !router.canGroupOperation(ready[0])) return 1;
     await this.gate.promise;
     let prior = wall();
@@ -181,18 +195,43 @@ export class FanoutProjector {
     if (current()) for (const r of ready.slice(0, count)) this.prepared.add(r.fact);
     return count || 1;
   }
-  processed() {
-    if (++this.handled === this.spec.count) {
+  toolStarted(event, record) {
+    const i = this.bySession.get(event.sessionId),
+      previous = this.displayCounts[i];
+    assert(
+      this.spec.display &&
+        i !== undefined &&
+        event.turnId === record.fact.scope.turnId &&
+        record.fact.scope.sessionId === event.sessionId &&
+        (this.spec.mixed
+          ? previous === 0 && event.seq > 0 && event.payload.toolCallId === "task:11"
+          : event.seq === previous + 1 && event.payload.toolCallId === "task:" + (9 + previous)) &&
+        event.payload.input.command === "true",
+    );
+    this.displayCounts[i]++;
+    this.displayed++;
+  }
+  processed(record) {
+    this.handled++;
+    if (record.fact.kind === "work_finished") this.finishedRuns++;
+    if (
+      this.spec.mixed ? this.finishedRuns === this.spec.count : this.handled === this.spec.count
+    ) {
       this.processedAt = wall();
       this.waited.resolve();
     }
   }
   async handle(record, current, grant, router, nextOffsets) {
     if (this.prepared.delete(record.fact)) {
-      this.processed();
+      this.processed(record);
       return;
     }
     await this.gate.promise;
+    if (this.spec.mixed && !operationsFor(record.fact).length) {
+      await router.view.apply([record], current, (r, d) => projectRecord(r, d, router.env));
+      this.processed(record);
+      return;
+    }
     const index = this.bySession.get(record.fact.scope.piSessionId);
     assert(index !== undefined && operationsFor(record.fact).length === 1);
     const begin = wall(),
@@ -229,7 +268,7 @@ export class FanoutProjector {
     } finally {
       if (!t.op) this.sender.release(t);
     }
-    this.processed();
+    this.processed(record);
   }
   resolve(binding) {
     const i = this.byBinding.get(binding);
@@ -300,14 +339,21 @@ export class FanoutProjector {
     await this.sample();
     const internal = this.spec.mode.endsWith("-control");
     assert.equal(this.sender.acks, internal ? 0 : this.spec.count);
-    const dt = (internal ? this.processedAt : this.lastAck) - this.start,
+    const dt =
+        (this.spec.mixed
+          ? Math.max(this.processedAt, this.lastAck)
+          : internal
+            ? this.processedAt
+            : this.lastAck) - this.start,
       samples = this.samples;
     const result = {
+      displayed: this.displayed,
+      handled: this.handled,
       rps: (this.spec.count * 1000) / dt,
       elapsedMs: dt,
       startAt: this.start,
       lastAckAt: this.lastAck,
-      ackedByOfferEnd: this.spec.preload ? null : this.atOfferEnd,
+      ackedByOfferEnd: this.spec.preload || this.spec.liveSource ? null : this.atOfferEnd,
       cpu: process.cpuUsage(this.cpuBase),
       memoryEnd: process.memoryUsage(),
       acks: this.sender.acks,

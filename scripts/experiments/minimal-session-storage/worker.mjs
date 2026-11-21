@@ -45,6 +45,8 @@ import {
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { emitFrames } from "./pg-path-replay.mjs";
 import { fanoutReceiver } from "./fanout-network.mjs";
+import { mixedDisplayTape } from "./native-display-tape.mjs";
+import { attachStart, displayFanoutTemplate } from "./display-fanout.mjs";
 import { fanoutFixture, partitions } from "./fanout-fixture.mjs";
 import { messageTape } from "./complete-message-rate.mjs";
 
@@ -67,7 +69,7 @@ let capacity = 0,
   residence,
   prefixCache,
   expiryTimer;
-let pathFrames, guestMailbox, fanoutServer, fanoutSource;
+let pathFrames, guestMailbox, fanoutServer, fanoutSource, nativeFanoutTape;
 
 function startResidence() {
   const initial = process.memoryUsage(),
@@ -711,9 +713,39 @@ listen(
       send("fanoutArmed");
     },
     fanoutStats: (m) => send("fanoutStatsDone", { result: fanoutServer.stats(m.rounds) }),
-    fanoutTape: (m) => {
+    fanoutLiveTape: async (m) => {
       fanoutSource ??= fanoutFixture(topic.slice(-16));
-      pathFrames = Array.from({ length: m.count }, (_, n) => fanoutSource.frame(m.arm, n, m.seed));
+      assert(!nativeFanoutTape);
+      const until = m.start - Date.now();
+      if (until > 0) await new Promise((resolve) => setTimeout(resolve, until));
+      nativeFanoutTape = await mixedDisplayTape(fanoutSource, m.arm, (f) =>
+        producer.append(f.partition, { factId: f.id, sessionId: f.session, value: f.value }),
+      );
+      pathFrames = nativeFanoutTape.frames;
+      send("fanoutLiveDone", {
+        bytes: pathFrames.reduce((n, f) => n + Buffer.byteLength(f.value), 0),
+        mix: nativeFanoutTape.summary,
+        source: { frames: pathFrames.length, acknowledgedAt: Date.now() },
+      });
+    },
+    fanoutTape: async (m) => {
+      fanoutSource ??= fanoutFixture(topic.slice(-16));
+      if (m.mixed) {
+        nativeFanoutTape ??= await mixedDisplayTape(fanoutSource, m.arm);
+        pathFrames = nativeFanoutTape.frames;
+        send("fanoutTapeReady", {
+          bytes: pathFrames.reduce((n, f) => n + Buffer.byteLength(f.value), 0),
+          mix: nativeFanoutTape.summary,
+        });
+        return;
+      }
+      const template = m.displayRounds ? await displayFanoutTemplate() : undefined;
+      const decorate = template
+        ? (f, i, seed) => attachStart(f, i, seed, m.displayRounds, template)
+        : undefined;
+      pathFrames = Array.from({ length: m.count }, (_, n) =>
+        fanoutSource.frame(m.arm, n, m.seed, decorate),
+      );
       send("fanoutTapeReady", {
         bytes: pathFrames.reduce((n, f) => n + Buffer.byteLength(f.value), 0),
       });

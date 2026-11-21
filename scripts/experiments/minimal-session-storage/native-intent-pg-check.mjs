@@ -2,21 +2,6 @@
 // definition with an inert executor. No provider request or shell escapes the fixture.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
-import {
-  Harness,
-  MemoryStorage,
-  createRegistry,
-  defineExtension,
-} from "@earendil-works/pi-durable";
-import { createModels } from "@earendil-works/pi-ai/models";
-import {
-  fauxProvider,
-  fauxToolCall,
-  fauxAssistantMessage,
-} from "@earendil-works/pi-ai/providers/faux";
-import { durableToolState } from "@pi-cloud/protocol";
-import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 import { kafkaProducerLane } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
 import { FamilyPresentation } from "./family-presentation.mjs";
 import {
@@ -25,104 +10,24 @@ import {
   operationsFor,
 } from "./workspace-operations.mjs";
 import { prepareToolGrants } from "./tool-grant-prefix.mjs";
+import { nativeBashTrace, nativeBashFact } from "./native-bash-trace.mjs";
 
 async function capture(scope) {
-  const frames = [],
-    registry = createRegistry(),
-    models = createModels(),
-    fake = fauxProvider({ tokensPerSecond: 0 });
-  let reply;
-  class Observed extends MemoryStorage {
-    async commit(writes) {
-      const p = this.prepareCommit(writes);
-      frames.push({ seq: p.seq, nextId: this.nextId, writes: structuredClone(p.writes) });
-      return p.apply();
-    }
-  }
-  models.setProvider(fake.provider);
-  registry.install(
-    defineExtension({
-      name: "fixed-bash-study",
-      tools: [
-        {
-          ...fixedRemoteToolDefinitions().find((t) => t.name === "bash"),
-          execute: async (args) => {
-            assert.equal(args.timeout, 10);
-            return { content: [{ type: "text", text: "fixture" }] };
-          },
-        },
-      ],
-    }),
-  );
-  fake.setResponses([
-    fauxAssistantMessage(fauxToolCall("bash", { command: "true", timeout: "10" }), {
-      stopReason: "toolUse",
-    }),
-    fauxAssistantMessage("ok"),
-  ]);
-  const h = await Harness.open(
-    new Observed(),
-    { models, registry, settings: { retry: { maxRetries: 0 }, compaction: { enabled: false } } },
-    ctx,
-  );
-  try {
-    const m = fake.getModel(),
-      root = await h.root(ctx, { agent: { model: { provider: m.provider, modelId: m.id } } });
-    const sub = await root.submit(
-      { type: "input", requestId: scope.runId, content: "Run the fixed test tool." },
-      ctx,
-    );
-    await root.waitForIdle(ctx);
-    assert.equal((await sub.wait(ctx)).status, "done");
-  } finally {
-    await h.close(ctx);
-  }
+  const frames = await nativeBashTrace(scope);
   const presentation = new FamilyPresentation();
   presentation.bind(1, scope);
   const prefix = [];
   for (const commit of frames) {
     const d = presentation.prepare(commit);
     d.confirmed();
-    const task = commit.writes
-      .map((w) => w.type === "task" && durableToolState(w.value))
-      .find((t) => t?.intent);
-    const f = {
-      kind: "durable_commit",
+    const f = nativeBashFact(
       scope,
-      factId: randomUUID(),
-      occurredAt: new Date().toISOString(),
       commit,
-      origins: commit.writes
-        .filter((w) => ["task", "entry", "submission"].includes(w.type))
-        .map((w) => ({
-          recordId: w.value.id,
-          sessionId: scope.sessionId,
-          turnId: scope.turnId,
-          runId: scope.runId,
-        })),
-      display: [],
-      tools: [],
-      cancellations: [],
-    };
-    if (task) {
-      reply = {
-        topic: "pi-cloud.tool-replies.v4." + randomUUID(),
-        partition: 0,
-        offset: "0",
-        deadlineAt: Date.now() + 60000,
-        toolName: "bash",
-        toolCallId: task.intent.callId,
-      };
-      f.workspaceOperations = [
-        {
-          action: "execute",
-          operationId: randomUUID(),
-          taskId: task.id,
-          reply,
-          maximumOutputBytes: 51200,
-          timeoutMs: 10000,
-        },
-      ];
+      [],
+      randomUUID(),
+      "pi-cloud.tool-replies.v4." + randomUUID(),
+    );
+    if (f.workspaceOperations.length) {
       assert.deepEqual(commit.writes.map((w) => w.type).sort(), ["document.change", "task"]);
       const withDisplay = decodeWorkspaceFact(
         encodeWorkspaceFact({ ...f, display: d.display }),
@@ -141,6 +46,15 @@ export async function checkCapturedIntents(db, state, sender, seed, topic) {
   const { view, router } = state,
     records = [],
     bindings = new Map();
+  const displayed = [];
+  let commitBefore,
+    grantObtained = false;
+  router.onToolStart = (event, record) => {
+    assert.equal(view.stats.commits, commitBefore + 1);
+    assert(!grantObtained);
+    assert.equal(event.payload.input.timeout, 10);
+    displayed.push(record.fact.factId);
+  };
   let off = view.next.get(0);
   for (let i = 0; i < 2; i++) {
     let sessionId;
@@ -175,18 +89,95 @@ export async function checkCapturedIntents(db, state, sender, seed, topic) {
     const record = { topic, partition: 0, fact: intent };
     assert(router.canGroupOperation(record));
     assert(
-      !router.canGroupOperation({ ...record, fact: withDisplay }),
-      "Display must keep its delivery boundary",
+      router.canGroupOperation({ ...record, fact: withDisplay }),
+      "Matching native tool start must be eligible",
     );
-    records.push(record);
+    const other = {
+      ...withDisplay,
+      workspaceOperations: operationsFor(withDisplay).map(
+        ({ action, operationId, taskId, reply, maximumOutputBytes, timeoutMs }) => ({
+          action,
+          operationId,
+          taskId,
+          reply,
+          maximumOutputBytes,
+          timeoutMs,
+        }),
+      ),
+      display: withDisplay.display.map((d) => ({ ...d, coveredThrough: 999 })),
+    };
+    assert(
+      !router.canGroupOperation({
+        ...record,
+        fact: decodeWorkspaceFact(encodeWorkspaceFact(other)).fact,
+      }),
+    );
+    const wrongTask = structuredClone(other);
+    delete wrongTask.display[0].coveredThrough;
+    wrongTask.display[0].events[0].event.payload.toolCallId = "task:999";
+    assert(
+      !router.canGroupOperation({
+        ...record,
+        fact: decodeWorkspaceFact(encodeWorkspaceFact(wrongTask)).fact,
+      }),
+    );
+    const wrongRef = structuredClone(other);
+    delete wrongRef.display[0].coveredThrough;
+    wrongRef.display[0].events[0].source.ordinal = withDisplay.commit.writes.findIndex(
+      (w) => w.type === "document.change",
+    );
+    assert(
+      !router.canGroupOperation({
+        ...record,
+        fact: decodeWorkspaceFact(encodeWorkspaceFact(wrongRef)).fact,
+      }),
+    );
+    records.push({ ...record, fact: withDisplay });
   }
   for (const r of records) r.offset = off++;
   const calls = [],
     before = view.stats.commits;
+  commitBefore = before;
+  const priorRefs = await db.query("select projection_tools from runs where id=$1", [
+    records[1].fact.scope.runId,
+  ]);
+  const op = operationsFor(records[1].fact)[0];
+  await db.query(
+    "update runs set projection_tools=jsonb_build_object($2::text,'conflict'::text) where id=$1",
+    [records[1].fact.scope.runId, String(op.taskId)],
+  );
+  const options = {
+    batchProjection: true,
+    limit: 8,
+    sender,
+    router,
+    targetFor: (r) => r.fact.scope.sessionId,
+    prepareSend: () => assert.fail("wire prepared after failed PG"),
+  };
+  await assert.rejects(
+    prepareToolGrants(
+      records,
+      () => true,
+      () => assert.fail("grant after failed PG"),
+      options,
+    ),
+    { code: "PZ002" },
+  );
+  assert.deepEqual(displayed, []);
+  assert.equal(view.stats.commits, before);
+  await db.query("update runs set projection_tools=$2::jsonb where id=$1", [
+    records[1].fact.scope.runId,
+    JSON.stringify(priorRefs.rows[0].projection_tools),
+  ]);
   const n = await prepareToolGrants(
     records,
     () => true,
     async (count) => {
+      grantObtained = true;
+      assert.deepEqual(
+        displayed,
+        records.map((r) => r.fact.factId),
+      );
       assert.equal(count, 2);
       assert.equal(
         await db
@@ -212,6 +203,12 @@ export async function checkCapturedIntents(db, state, sender, seed, topic) {
     },
   );
   assert.equal(n, 2);
+  for (const r of records) await router.projectOperation(r, () => true);
+  assert.deepEqual(
+    displayed,
+    records.map((r) => r.fact.factId),
+    "replay must not repeat the start",
+  );
   assert.equal(view.stats.commits - before, 1);
   assert.deepEqual(
     calls,

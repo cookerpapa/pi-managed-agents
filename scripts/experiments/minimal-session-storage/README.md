@@ -478,5 +478,29 @@ PI_CLOUD_RUNTIME_LOAD_CHECK=1 PI_CLOUD_FANOUT_SUITE=grants-pg \
 Run `node --import tsx scripts/experiments/minimal-session-storage/run-intent-pg-faults.mjs`
 for the separate disposable-PG rollback, acknowledgement-loss, cancellation and stale
 writer checks. It also captures two fixed-Pi Bash intent commits and checks their
-original live document transitions. Presentation-bearing commits retain individual
+original live document transitions. Presentation events other than the separately tested matching Tool start retain individual
 processing. [Measurements and scope](../../../docs/reports/pg-tool-intent-batch-20261121.md).
+
+### Native tool starts and maximum grant size
+
+Use the same `workspace-fanout` driver and a different disposable output directory per invocation:
+
+| `PI_CLOUD_FANOUT_SUITE` | Input and goal |
+|---|---|
+| `grants-display-smoke` | 8,000 intent/receipt pairs at widths 1 and 8 |
+| `grants-display` | Paced 32,000-command arms at widths 4, 8, 16 and 32 in forward and reverse order |
+| `grants-display-backlog` | Preload the same number of commands; compare widths 4, 8, 16, 24 and 32 twice |
+| `grants-display-wide` | Separate preloaded generation at 32, 64 and 128, then reverse; retains the reader's existing 256 KiB ready-prefix budget |
+| `grants-display-mix` | Capture every native commit of 4,000 one-Bash Harness Runs, including the original start display, results and completion; replay the identical interleaving at limits 8 and 32 |
+| `grants-display-ackmix` | Run Pi with each Storage commit waiting for its real Kafka acknowledgement, measure live at 8, then replay the same captured mixed traffic at 8 and 32 |
+
+The intent-only sweep uses a captured native pending-to-running transition, real
+Runner display descriptions, pre-established routes, actual PG projection and
+RF3 dispatch grants. Display-bearing transactions retain synchronous PG commit.
+The synchronous display observer resolves the original argument reference and
+checks its destination and order after PG admission. The endpoint simulates a
+100 ms acknowledgement. The mixed trace also verifies settled PG rows and
+original Tool Result counts. The model and shell are deterministic fixtures;
+browser rendering and model tokens are outside the benchmark. Inspect
+`trial.mix.adjacent` for the upper bound on groupable intents and
+`count - result.grantSizes["1"]` for the number that actually shared a grant.

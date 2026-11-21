@@ -24,7 +24,8 @@ export async function fanoutReceiver(token, fail) {
     pending = 0,
     total = 0,
     peak = 0,
-    buckets;
+    buckets,
+    mixed;
   server.on("connection", (s, r) => {
     const [, path, slot] = r.url.split("/"),
       target = Number(slot);
@@ -50,7 +51,7 @@ export async function fanoutReceiver(token, fail) {
             q.command.scope.runId === expected.scope.runId &&
             q.command.scope.piSessionId === expected.scope.piSessionId &&
             q.command.scope.writerId === expected.scope.writerId &&
-            q.command.toolCallId === "task:" + (9 + counts[target]) &&
+            q.command.toolCallId === "task:" + (mixed ? 11 : 9 + counts[target]) &&
             q.command.request.toolCallId === "call-" + index &&
             q.reply.toolCallId === q.command.request.toolCallId &&
             BigInt(q.position.offset) > offsets[target] &&
@@ -86,6 +87,7 @@ export async function fanoutReceiver(token, fail) {
     arm(msg) {
       assert(!pending && sockets.size === targets);
       arm = msg.arm;
+      mixed = msg.mixed;
       delay = msg.delay;
       counts = new Uint32Array(targets);
       offsets = new BigInt64Array(targets).fill(-1n);

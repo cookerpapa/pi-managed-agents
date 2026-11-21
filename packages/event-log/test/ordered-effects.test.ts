@@ -548,32 +548,32 @@ it("surfaces a background client error and reconstructs the consumer instead of 
   }
 });
 
-it("grants only the fresh suffix and suppresses per-record redispatch after a rewind", async () => {
-  const sends: number[] = [];
-  const t = await fixture({
-    effectPrefixLimit: 8,
-    prepareReady: async (records, current, grant) => {
-      const from = await grant!(records.length);
-      for (const r of records.slice(from)) if (current()) sends.push(r.fact.n);
-      return records.length;
-    },
-  });
-  try {
-    const input: Array<[number, boolean]> = [
-      [1, true],
-      [2, true],
-      [3, true],
-      [4, true],
-    ];
-    await t.deliver(input);
-    await t.deliver(input);
-    expect(sends).toEqual([3, 4]);
-    expect(t.effects).toEqual([]);
-    expect(f.commit.mock.calls).toEqual([[{ topic: "log", partition: 0, offset: "5" }]]);
-  } finally {
-    await t.consumer.close();
-  }
-});
+it.each([8, 128])(
+  "grants only the fresh suffix and suppresses redispatch at width %i",
+  async (width) => {
+    const sends: number[] = [];
+    const t = await fixture({
+      effectPrefixLimit: width,
+      prepareReady: async (records, current, grant) => {
+        const from = await grant!(records.length);
+        for (const r of records.slice(from)) if (current()) sends.push(r.fact.n);
+        return records.length;
+      },
+    });
+    try {
+      const input = Array.from({ length: width }, (_, i): [number, boolean] => [i + 1, true]);
+      await t.deliver(input);
+      await t.deliver(input);
+      expect(sends).toEqual(input.slice(2).map(([n]) => n));
+      expect(t.effects).toEqual([]);
+      expect(f.commit.mock.calls).toEqual([
+        [{ topic: "log", partition: 0, offset: String(width + 1) }],
+      ]);
+    } finally {
+      await t.consumer.close();
+    }
+  },
+);
 
 it.each(["gap", "out-of-range", "lost-ack", "revoked"])(
   "does not send on %s during a prefix grant",

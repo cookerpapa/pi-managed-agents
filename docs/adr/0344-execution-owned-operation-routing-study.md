@@ -93,3 +93,19 @@ A native ToolTask may co-commit its own known
 install the new view after PG acknowledges the batch. Commits carrying
 presentation events, input receipts or other native transitions keep their
 existing delivery boundary. [Scope and measurements](../reports/pg-tool-intent-batch-20261121.md).
+
+### Tool-start presentation in the isolated grant study
+
+Allow a single derived tool.started description tied to the same native task,
+Conversation, argument write and scope to accompany an otherwise eligible
+intent. Resolve its original event and publish it only after PG admission, in
+partition order; a failed or already covered projection emits no fresh event.
+Other display events, coverage advances and controls remain boundaries. Keep
+the existing PG durability policy for display-bearing records. Measure eligible
+adjacency in complete native traffic separately from a saturated Tool-only
+dispatch population. Compare widths at 1–32, then use a separate opt-in trial
+for 64/128 with another width-32 control. The shared reader accepts these limits
+on the experiment branch. Serving compositions use their existing defaults.
+Keep the reader byte budget and sender capacity fixed across the trials.
+The mixed trace includes a capture whose Storage commits await actual RF3
+publication. [Measurements](../reports/display-tool-batching-20261121.md).

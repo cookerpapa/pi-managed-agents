@@ -1,15 +1,48 @@
 import assert from "node:assert/strict";
 import { isDeepStrictEqual } from "node:util";
+import { resolveDurableDisplay } from "@pi-cloud/protocol";
 import { foldLive } from "./moving-checkpoint.mjs";
 import { operationsFor } from "./workspace-operations.mjs";
 
+// A start description must refer to the exact argument write for this task.
+export function matchingToolStart(fact, op) {
+  const [group] = fact.display;
+  if (
+    fact.display.length !== 1 ||
+    group.coveredThrough !== undefined ||
+    group.events.length !== 1 ||
+    !isDeepStrictEqual(group.scope, op.scope)
+  )
+    return;
+  const [description] = group.events,
+    { event, source } = description;
+  if (
+    event.type !== "tool.started" ||
+    event.sessionId !== group.scope.sessionId ||
+    event.turnId !== group.scope.turnId ||
+    event.payload.toolName !== op.reply.toolName ||
+    event.payload.toolCallId !== `task:${op.taskId}` ||
+    source?.kind !== "write" ||
+    !isDeepStrictEqual(source.path, ["value", "state", "checkpoint", "arguments"])
+  )
+    return;
+  const write = fact.commit.writes[source.ordinal];
+  if (write?.type === "task" && write.value.id === op.taskId) return description;
+}
+
+export function resolveToolStart(fact, description) {
+  return resolveDurableDisplay(fact.commit, description, () =>
+    assert.fail("Tool start accessed another document"),
+  );
+}
+
 // Other native writes may carry a receipt, abort, policy change or order barrier.
-export function plainExecution(fact, liveDocs) {
+export function plainExecution(fact, liveDocs, allowDisplay = false) {
   if (
     fact.kind !== "durable_commit" ||
     fact.tools.length ||
     fact.cancellations.length ||
-    fact.display.length ||
+    (fact.display.length && !allowDisplay) ||
     fact.modelEvidence?.length ||
     fact.inputQueueSessions?.length
   )
@@ -21,6 +54,7 @@ export function plainExecution(fact, liveDocs) {
   const op = ops[0],
     task = writes.find((w) => w.type === "task");
   if (!task || task.value.id !== op.taskId || task.value.abortRequested) return;
+  if (fact.display.length && (writes.length !== 2 || !matchingToolStart(fact, op))) return;
   if (writes.length === 1) return op;
   // The native ToolTask can mark its own pi.live slot running in the intent
   // commit. Accept only that semantic change in its known Conversation document.

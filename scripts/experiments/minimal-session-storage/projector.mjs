@@ -107,7 +107,7 @@ const environment = {
   nextOffsets,
   account,
   send: (kind, data) => {
-    if (!messageMeter || kind !== "settled") send(kind, data);
+    if (kind !== "settled" || (!messageMeter && !stage?.fanout)) send(kind, data);
   },
   pathStudy,
   tailProbe,
@@ -145,6 +145,7 @@ const workspaceRouter = workspaceProfile
       pool,
       view: prefixStudy,
       env: environment,
+      ...(fanout ? { onToolStart: (event, r) => fanout.toolStarted(event, r) } : {}),
       select(scope) {
         assert(guestRoutes && stage.guestTools, "History selected a resource");
         return guestRoutes.select(scope);
@@ -165,7 +166,7 @@ const reader = new KafkaLogConsumer({
   clientId: group,
   groupRecovery: true,
   orderedEffects: workspaceProfile,
-  ...(fanout && __GRANT_STUDY__ ? { effectPrefixLimit: 32 } : {}),
+  ...(fanout && __GRANT_STUDY__ ? { effectPrefixLimit: __FANOUT_PREFIX_LIMIT__ } : {}),
   batchRead: process.argv[6] !== "single",
   replayOffsets: async (bounds) =>
     prefixStudy?.width
@@ -383,12 +384,13 @@ try {
         metrics = blank();
         send("fanoutResetDone");
       },
-      fanoutWarm: async () => {
+      fanoutWarm: async (m) => {
         const ends = await reader.captureEndOffsets();
         await reader.waitUntilInitialReplay(ends);
-        assert.equal(sessions.size, 4000);
+        assert.equal(sessions.size, m.mixed ? 0 : 4000);
         await fanout.warm(workspaceRouter, topic);
-        await verifyGroupPosition(ends, true);
+        // A complete mixed trace starts before any new seed records or grants.
+        if (!m.mixed) await verifyGroupPosition(ends, true);
         send("fanoutWarmDone");
       },
       fanoutBegin: (m) => {
@@ -407,7 +409,7 @@ try {
         send("fanoutReleased");
       },
       fanoutFinish: async () => {
-        const pgOnly = fanout.spec.mode === "pg-control";
+        const periodicTail = fanout.spec.mode === "pg-control" || fanout.spec.mixed;
         const result = await fanout.finish();
         result.pgTransactions = {
           poolLimit: pool.options.max,
@@ -420,7 +422,7 @@ try {
         };
         const ends = await reader.captureEndOffsets();
         await reader.waitUntilInitialReplay(ends);
-        await verifyGroupPosition(ends, pgOnly);
+        await verifyGroupPosition(ends, periodicTail);
         send("fanoutFinished", { result, ends: ends.map(String) });
       },
       guestAccepted: (m) => guestRoutes.accepted(m),

@@ -44,7 +44,7 @@ export async function runFanout({
     trials: [],
   });
   const owners = fixture.owners;
-  async function seed(arm) {
+  async function seed(arm, displayRounds, mixed) {
     await call(projector, "fanoutReset", "fanoutResetDone");
     await db.query("truncate workspace_route_spans,messages,inboxes,runs");
     await db.query(
@@ -66,9 +66,16 @@ export async function runFanout({
         owners.map((o) => o.binding),
       ],
     );
-    await call(emitter, "fanoutTape", "fanoutTapeReady", { arm, count: targets, seed: true });
-    await call(emitter, "emitMessages", "messagesEmitted", { start: wall(), frameRate: offered });
-    await call(projector, "fanoutWarm", "fanoutWarmDone");
+    if (!mixed) {
+      await call(emitter, "fanoutTape", "fanoutTapeReady", {
+        arm,
+        count: targets,
+        seed: true,
+        displayRounds,
+      });
+      await call(emitter, "emitMessages", "messagesEmitted", { start: wall(), frameRate: offered });
+    }
+    await call(projector, "fanoutWarm", "fanoutWarmDone", { mixed });
   }
   async function verify(arm, rounds) {
     const { rows } =
@@ -88,13 +95,24 @@ export async function runFanout({
   const suite = process.env.PI_CLOUD_FANOUT_SUITE ?? "matrix";
   for (const [
     i,
-    { mode, ms, rounds, preload = false, cap, grantWidth = 1, batchProjection = false },
+    {
+      mode,
+      ms,
+      rounds,
+      preload = false,
+      cap,
+      grantWidth = 1,
+      batchProjection = false,
+      display = false,
+      mixed = false,
+      liveSource = false,
+    },
   ] of cases(suite).entries()) {
-    const arm = i + 1,
+    const arm = mixed ? 1 : i + 1,
       count = rounds * targets;
-    if (mode !== "direct") await seed(arm);
-    await call(receiver, "fanoutArm", "fanoutArmed", { arm, delay: ms });
-    let source, result, bytes, ends;
+    if (mode !== "direct") await seed(arm, display ? rounds : 0, mixed);
+    await call(receiver, "fanoutArm", "fanoutArmed", { arm, delay: ms, mixed });
+    let source, result, bytes, ends, mix;
     if (mode === "direct") {
       ({ result } = await call(projector, "fanoutDirect", "fanoutDirectDone", {
         mode,
@@ -104,7 +122,13 @@ export async function runFanout({
         start: wall() + 150,
       }));
     } else {
-      ({ bytes } = await call(emitter, "fanoutTape", "fanoutTapeReady", { arm, count }));
+      if (!liveSource)
+        ({ bytes, mix } = await call(emitter, "fanoutTape", "fanoutTapeReady", {
+          arm,
+          count,
+          mixed,
+          displayRounds: display ? rounds : 0,
+        }));
       const start = wall() + 250;
       await call(projector, "fanoutBegin", "fanoutBegun", {
         mode,
@@ -112,15 +136,25 @@ export async function runFanout({
         count,
         start,
         preload,
+        recordCount: mix?.records,
+        liveSource,
+        mixed,
         grantWidth,
         batchProjection,
+        display,
         cap,
       });
-      ({ source } = await call(emitter, "emitMessages", "messagesEmitted", {
-        frameRate: offered,
-        start,
-      }));
-      source.rate = (count * 1000) / (source.acknowledgedAt - start);
+      if (liveSource)
+        ({ source, bytes, mix } = await call(emitter, "fanoutLiveTape", "fanoutLiveDone", {
+          arm,
+          start,
+        }));
+      else
+        ({ source } = await call(emitter, "emitMessages", "messagesEmitted", {
+          frameRate: offered,
+          start,
+        }));
+      source.rate = ((mix?.records ?? count) * 1000) / (source.acknowledgedAt - start);
       if (preload) await call(projector, "fanoutRelease", "fanoutReleased", { start: wall() });
       ({ result, ends } = await call(projector, "fanoutFinish", "fanoutFinished"));
       assert.equal(ends.length, partitions);
@@ -129,6 +163,22 @@ export async function runFanout({
           "select count(*)::int n from runs where projection_tools <> '{}'::jsonb",
         );
         assert.equal(rows[0].n, 0);
+      } else if (mixed) {
+        assert.equal(result.handled, mix.records);
+        if (study.trials.length) assert.equal(mix.hash, study.trials[0].mix.hash);
+        assert.equal(
+          (
+            await db.query(
+              "select count(*)::int n from runs where state='completed' and projection_tools='{}'::jsonb",
+            )
+          ).rows[0].n,
+          count,
+        );
+        assert.equal(
+          (await db.query("select count(*)::int n from messages where role='toolResult'")).rows[0]
+            .n,
+          count,
+        );
       } else await verify(arm, rounds);
     }
     const deliveryRounds = mode.endsWith("-control") ? 0 : rounds;
@@ -152,8 +202,18 @@ export async function runFanout({
           result.pgTransactions.openConnections <= report.projectorConnections,
       );
       const grants = Object.values(result.grantSizes).reduce((sum, n) => sum + n, 0);
-      assert.equal(result.pgTransactions.total, batchProjection ? grants : count);
-      assert.equal(result.pgTransactions.async, result.pgTransactions.total);
+      if (mixed)
+        assert(
+          count - (result.grantSizes[1] ?? 0) <= mix.adjacent,
+          "Batch crossed an intervening record",
+        );
+      if (!mixed) assert.equal(result.pgTransactions.total, batchProjection ? grants : count);
+      if (!mixed)
+        assert.equal(
+          result.pgTransactions[display ? "sync" : "async"],
+          result.pgTransactions.total,
+        );
+      assert.equal(result.displayed, display ? count : 0);
       assert(
         result.nativeCommits.positions >=
           Object.values(result.grantSizes).reduce((sum, n) => sum + n, 0),
@@ -162,6 +222,9 @@ export async function runFanout({
     const trial = {
       mode,
       delay: ms,
+      display,
+      liveSource,
+      mix,
       grantWidth,
       batchProjection,
       count,
@@ -197,6 +260,49 @@ export async function runFanout({
 
 function cases(suite) {
   const trial = (mode, ms, rounds, options) => ({ mode, ms, rounds, ...options });
+  if (suite === "grants-display-wide")
+    return [32, 64, 128, 128, 64, 32].map((grantWidth) =>
+      trial("concurrent", 100, 8, {
+        grantWidth,
+        batchProjection: true,
+        display: true,
+        preload: true,
+      }),
+    );
+  if (suite === "grants-display-ackmix")
+    return [
+      [8, true],
+      [8, false],
+      [32, false],
+    ].map(([grantWidth, liveSource]) =>
+      trial("concurrent", 100, 1, {
+        grantWidth,
+        liveSource,
+        batchProjection: true,
+        display: true,
+        mixed: true,
+      }),
+    );
+  if (suite === "grants-display-mix")
+    return [8, 32].map((grantWidth) =>
+      trial("concurrent", 100, 1, {
+        grantWidth,
+        batchProjection: true,
+        display: true,
+        mixed: true,
+      }),
+    );
+  if (suite === "grants-display-smoke")
+    return [1, 8].map((grantWidth) =>
+      trial("concurrent", 100, 2, { grantWidth, batchProjection: true, display: true }),
+    );
+  if (suite === "grants-display" || suite === "grants-display-backlog") {
+    const preload = suite.endsWith("backlog"),
+      widths = preload ? [4, 8, 16, 24, 32, 32, 24, 16, 8, 4] : [4, 8, 16, 32, 32, 16, 8, 4];
+    return widths.map((grantWidth) =>
+      trial("concurrent", 100, 8, { grantWidth, batchProjection: true, display: true, preload }),
+    );
+  }
   if (suite === "grants-pg-minute")
     return [false, true].map((batchProjection) =>
       trial("concurrent", 100, 69, { grantWidth: 8, batchProjection }),

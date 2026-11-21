@@ -6,12 +6,12 @@ import { operationalLog } from "@pi-cloud/observability";
 import { parseToolSandboxOperationRequest } from "@pi-cloud/protocol";
 import { WorkspaceRouteSpans } from "./workspace-route-spans.mjs";
 import { operationsFor } from "./workspace-operations.mjs";
-import { plainExecution } from "./tool-grant-prefix.mjs";
+import { plainExecution, matchingToolStart, resolveToolStart } from "./tool-grant-prefix.mjs";
 import { projectRecord } from "./project-record.mjs";
 
 export class WorkspaceOperationRouter {
-  constructor({ pool, view, env, select, resolve }) {
-    Object.assign(this, { pool, view, env, select, resolve });
+  constructor({ pool, view, env, select, resolve, onToolStart }) {
+    Object.assign(this, { pool, view, env, select, resolve, onToolStart });
     this.spans = new WorkspaceRouteSpans(pool);
   }
   async original(scope, op, position) {
@@ -135,18 +135,33 @@ export class WorkspaceOperationRouter {
       fact: { ...f, tools, cancellations: cancels.map(({ op }) => op) },
       workspaceBatch: true,
     };
-    return { candidate, commands, cancels };
+    const description =
+      !covered &&
+      this.onToolStart &&
+      ops.length === 1 &&
+      ops[0].action === "execute" &&
+      matchingToolStart(f, ops[0]);
+    const startEvent = description ? resolveToolStart(f, description) : undefined;
+    return { candidate, commands, cancels, startEvent };
   }
   async projectOperation(record, current, mark) {
-    const { candidate, commands, cancels } = await this.#routeOperation(record, current);
+    const { candidate, commands, cancels, startEvent } = await this.#routeOperation(
+      record,
+      current,
+    );
     mark?.("routeReady");
     await this.view.apply([candidate], current, (r, d) => projectRecord(r, d, this.env));
     mark?.("projected");
     if (!current() || !this.view.canDeliver(record)) return;
+    if (startEvent) this.onToolStart(startEvent, record);
     return { commands, cancels };
   }
   canGroupOperation(record) {
-    return plainExecution(record.fact, this.view.sessions.get(record.fact.scope?.runId)?.liveDocs);
+    return plainExecution(
+      record.fact,
+      this.view.sessions.get(record.fact.scope?.runId)?.liveDocs,
+      !!this.onToolStart,
+    );
   }
   async projectOperations(records, current, mark) {
     const first = records[0],
@@ -194,6 +209,8 @@ export class WorkspaceOperationRouter {
       candidates.every((r) => this.view.canDeliver(r)),
       "Incomplete tool prefix admission",
     );
+    for (const [i, plan] of routed.entries())
+      if (plan.startEvent) this.onToolStart(plan.startEvent, records[i]);
     return routed;
   }
   async consume(record, current, grant, mark) {

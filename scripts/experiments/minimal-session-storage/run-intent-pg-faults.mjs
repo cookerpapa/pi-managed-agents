@@ -242,7 +242,9 @@ try {
   assert.equal(delivered.at(-1), operationsFor(last[0].fact)[0].operationId);
   assert.equal(new Set(delivered).size, delivered.length);
   await checkCapturedIntents(db, state, sender, seed, topic);
-  console.log("Native Bash Task plus pi.live batched; display-bearing batch kept separate.");
+  console.log(
+    "Native Bash Task, pi.live and tool.started batched; failed and covered projections emitted no new start.",
+  );
   console.log(
     "Actual PG middle-row rollback, lost PG/Kafka ACK replay, operation receipts, cancelled and stale owner isolation passed.",
   );

@@ -117,6 +117,8 @@ const source = Object.fromEntries(
           packages: "external",
           define: {
             __FANOUT_PARTITIONS__: String(fanoutPartitions),
+            __FANOUT_PREFIX_LIMIT__:
+              process.env.PI_CLOUD_FANOUT_SUITE === "grants-display-wide" ? "128" : "32",
             __GRANT_STUDY__: String(
               process.env.PI_CLOUD_PG_PATH_PROFILE === "workspace-fanout" &&
                 [
@@ -125,6 +127,12 @@ const source = Object.fromEntries(
                   "grants-pg",
                   "grants-pg-backlog",
                   "grants-pg-minute",
+                  "grants-display-smoke",
+                  "grants-display",
+                  "grants-display-backlog",
+                  "grants-display-mix",
+                  "grants-display-ackmix",
+                  "grants-display-wide",
                 ].includes(process.env.PI_CLOUD_FANOUT_SUITE),
             ),
             __PG_PATH_STUDY__: String(mode === "wake-throughput" && suite === "pg-paths"),

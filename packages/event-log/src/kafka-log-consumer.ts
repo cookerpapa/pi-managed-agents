@@ -91,9 +91,9 @@ export class KafkaLogConsumer<T> {
         !options.prepareReady ||
         !Number.isInteger(options.effectPrefixLimit) ||
         options.effectPrefixLimit < 1 ||
-        options.effectPrefixLimit > 32)
+        options.effectPrefixLimit > 128)
     )
-      throw new Error("Effect prefixes require ordered preparation with a limit of 1 to 32");
+      throw new Error("Effect prefixes require ordered preparation with a limit of 1 to 128");
     if (options.orderedEffects && !options.groupRecovery)
       throw new Error("Ordered effects require durable group progress");
     if (
