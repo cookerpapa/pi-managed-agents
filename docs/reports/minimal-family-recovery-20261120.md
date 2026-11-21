@@ -12,6 +12,8 @@
 
 ## Worker 冷恢复的决策点
 
+后续已用独立 Worker 进程和真实 Cube 验证读取方案。[接手和 Kafka 保留期实验](retained-family-handoff-20261121.md)
+
 实测根的 `pi.agent` 文档在这段受保护的 Projector 后缀之前已创建。现有 PG 检查点可以重建队列和投影视图，但正文和 Inbox 没有完整记录父任务等谁、子 Conversation 归哪个 Task 所有、每个 Task 当前执行到哪个阶段。Worker 仅从这个后缀启动无法还原完整原生会话。服务版已有相应的原生状态和回复接管能力，参见 [#21](https://github.com/cookerpapa/pi-managed-agents/issues/21)。
 
 可以保留经提交的原生当前状态，或从可供 Worker 打开的稳定检查点加受保护的 Kafka 后缀恢复。前者需要测每次状态变化的额外写入，后者需要证明长 Run、日志保留边界、重放时间和原始副作用授权。原型的真实 Worker A → B 接手、沙箱执行唯一性、两个回包时序、Stop、迟到结果及 handoff P95 尚待验证。#53 的租约语义未作改动。

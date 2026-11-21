@@ -23,3 +23,22 @@ This decision covers the Inbox and root continuation head. A Projector checkpoin
 is not yet a complete Worker checkpoint. The new storage still needs a strategy
 for Conversation ownership/ancestry, outstanding Tasks and Submissions, mounted
 documents and original Tool/host-call bindings at takeover.
+
+## Retained-log read experiment
+
+For #52, first try the existing settled root's PG history, the accepted native
+commits of the interrupted Run up to its recoverable seal, and the original
+protected reply position. The experiment adds no serving schema, checkpoint or
+per-message projection write. The incoming actor uses a read-only PG connection.
+Only normal, newly committed Harness transitions after recovery publish again.
+
+The comparison is scoped to one interrupted writer epoch. A settled ordinary
+root predecessor can supply its existing history head and messages. Verify
+message bodies/positions, Inbox state, pending Tool identity and an accepted
+native-sequence witness in PG before resuming. Reject an incomplete native
+prefix or an ambiguous boundary. The reader never issues Tool effects or
+commits the Projector group's Kafka offsets. Its temporary consumer setup
+latency is part of the measurement. This experiment does not change the
+runtime's normal Worker admission or establish a permanent replay service.
+
+[Cube/Kafka handoff and retention results](../reports/retained-family-handoff-20261121.md).

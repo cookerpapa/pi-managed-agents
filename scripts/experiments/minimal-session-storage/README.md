@@ -329,3 +329,16 @@ original Kafka reply remains outstanding. In live model fixture stages,
 `finalModelOutputToRunSettlementMs` measures final provider stream completion
 to logical Run settlement. Recorded playback has no model-completion sample.
 [Results](../../../docs/reports/minimal-family-recovery-20261120.md).
+
+### Retained-log Worker handoff
+
+From an operator checkout connected to the development K3s cluster, run
+`PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/retained-family.json`.
+Set `PI_CLOUD_RUNTIME_DIRECTORY` to the installed runtime directory for an
+isolated worktree. The driver owns a disposable PG instance, fresh Worker
+processes, private RF3 Session/reply topics, and separate temporary Cube VMs.
+The installed fixed Guest returns through HTTPS completion. Only the owned
+Session topic is truncated in the retention experiments. One scenario keeps
+previous Run history in PG while dropping its entire Kafka prefix. Another
+removes records for a still-active family. No live Worker is stopped.
+[Coverage and remaining integration work](../../../docs/reports/retained-family-handoff-20261121.md).

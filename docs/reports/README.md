@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Child handoff from PG and retained Kafka](retained-family-handoff-20261121.md) tests a physical Worker exit, original Cube reply, prior Run rotation and an incomplete recovery base.
+
 - [Context status, gateway usage and PG contention](status-usage-contention-20261120.md) records the read paths and shared-instance controls.
 
 - [Current usage row and bulk writes](minimal-usage-bulk-20261120.md) measures grouped upserts and distinguishes cumulative spending from current-context compaction.
