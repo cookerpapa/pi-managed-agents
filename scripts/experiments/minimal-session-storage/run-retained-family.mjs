@@ -12,7 +12,8 @@ import { realpath } from "node:fs/promises";
 import { testKafka } from "../../lib/test-kafka.mjs";
 const output = process.argv[2],
   bashFields = process.argv[3] === "--bash-fields",
-  pgHandoff = bashFields || process.argv[3] === "--pg-handoff",
+  atomicHandoff = process.argv[3] === "--atomic-handoff",
+  pgHandoff = atomicHandoff || bashFields || process.argv[3] === "--pg-handoff",
   serving = pgHandoff || process.argv[3] === "--serving";
 let isolatedKafka;
 assert(output && process.env.PI_CLOUD_RUNTIME_LOAD_CHECK === "1");
@@ -30,6 +31,7 @@ try {
       dbUrl: pg.url,
       cube,
       servingBrokers: isolatedKafka?.brokers,
+      atomicHandoff,
       pgHandoff,
       bashFields,
       scene: process.argv[4],

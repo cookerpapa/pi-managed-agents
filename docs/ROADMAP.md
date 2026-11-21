@@ -10,6 +10,8 @@ The first implementation milestone for [#48](https://github.com/cookerpapa/pi-ma
 
 ## Ordered Session projection under load
 
+The [atomic cold-handoff slice](reports/atomic-family-handoff-20261122.md) connects the real Session Projector and Worker Session host in an isolated composition. The full serving storage cutover, later-epoch and compacted-family coverage remain open under #52/#48.
+
 The [storage review and bottom-up comparison](reports/projector-pg-review-20261118.md) records the bounded native head and the [initial binding repair](adr/0338-initial-world-and-run-binding.md).
 
 [Terminal queue attribution](reports/terminal-projector-queue-20261118.md) separates contention in short bursts from a native lookup whose cost grows with the Session's receipt history.

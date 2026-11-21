@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import pg from "pg";
+import { sql } from "kysely";
 import native from "@confluentinc/kafka-javascript";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import {
@@ -35,6 +36,7 @@ const {
   servingBrokers: brokers,
   cube,
   pgHandoff,
+  atomicHandoff,
   bashFields,
   scene,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
@@ -61,8 +63,12 @@ const replyAdmin = replies.admin(),
   replyCopies = replies.producer({ kafkaJS: { acks: -1, idempotent: true } });
 const replyBoots = new Set(),
   results = [];
-const topic = "pma-family-" + randomUUID();
-const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
+const initialProcess = process.argv[4] === "initial-projector";
+const topic = initialProcess
+  ? process.env.PMA_FAMILY_PROJECTOR_TOPIC
+  : "pma-family-" + randomUUID();
+assert(/^pma-family-[0-9a-f-]{36}$/.test(topic));
+let view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
 const metrics = {
   byPartition: [0],
   queries: 0,
@@ -84,7 +90,7 @@ const env = {
 const readerUrl = new URL(dbUrl);
 readerUrl.username = "family_reader";
 const cases = new Map();
-let projector, app, api, tenant;
+let projector, app, api, tenant, initialOwner;
 const resources = new Map();
 const probeMailbox = new KafkaToolReplyMailbox({
   brokers: replyBrokers,
@@ -131,8 +137,9 @@ async function scenario(guest, mode, replacement) {
     },
     probe: (...args) => dir.probe(...args),
   });
-  if (pgHandoff) state.study = new SealStudy();
+  if (pgHandoff && !atomicHandoff) state.study = new SealStudy();
   cases.set(runId, state);
+  await initialOwner?.register(runId, binding);
   let a, b, witness;
   const scopeOf = async (actor) => {
     const { scope, bootId } = await actor.wait("claimed");
@@ -151,6 +158,7 @@ async function scenario(guest, mode, replacement) {
       brokers,
       replyBrokers,
       pgHandoff,
+      atomicHandoff,
       bashFields,
       ...(pgHandoff ? { pgResume: !!seal } : { seal }),
     });
@@ -240,6 +248,33 @@ async function scenario(guest, mode, replacement) {
       const killed = Date.now();
       a.proc.kill("SIGKILL");
       assert.equal((await a.ended).signal, "SIGKILL");
+      if (atomicHandoff) {
+        await app.close();
+        await projector.close();
+        // Explicitly discard all candidate reconstruction state as on process loss.
+        assert(initialOwner);
+        state.killedProjectorPid = initialOwner.pid;
+        initialOwner = undefined;
+        state.seq = 0;
+        delete state.queuedId;
+        view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
+        view.configure(16, "recorded-history");
+        env.sessions = view.sessions;
+        env.nextOffsets = new Map();
+        const bounds = (await sessionAdmin.fetchTopicOffsets(topic)).map((b) => ({
+          partition: b.partition,
+          low: BigInt(b.low),
+          high: BigInt(b.high ?? b.offset),
+        }));
+        await view.recover(bounds);
+        router = newRouter();
+        await startProjector();
+        await wait(
+          () => state.seq >= queued.seq,
+          "replacement Projector reconstructed native prefix",
+        );
+        state.restarted = true;
+      }
       const reaper = new SessionExpiryReconciler(database);
       await wait(async () => (await reaper.sweep()).expiredAssignments === 1, "PG lease expiry");
       await wait(
@@ -267,17 +302,19 @@ async function scenario(guest, mode, replacement) {
       if (pgHandoff) {
         // Read the serving schema solely as an independent reference, from the
         // driver. Neither this receipt nor this DB role is passed to B's loader.
-        const {
-          rows: [legacy],
-        } = await pool.query(
-          `select exists(
+        if (!atomicHandoff) {
+          const {
+            rows: [legacy],
+          } = await pool.query(
+            `select exists(
           select 1 from public.pi_durable_records r join public.pi_durable_current c using(tenant_id,session_id,id)
           where r.kind='submission' and r.tenant_id=$1 and r.session_id=$2
           and c.body::jsonb#>>'{value,requestId}'=$3 and c.body::jsonb#>>'{value,status}'='queued'
         ) as has_request`,
-          [first.tenantId, first.piSessionId, state.queuedId],
-        );
-        assert(legacy.has_request);
+            [first.tenantId, first.piSessionId, state.queuedId],
+          );
+          assert(legacy.has_request);
+        }
         delete state.study;
         const low = BigInt(state.seal.offset) + 1n;
         await sessionAdmin.deleteTopicRecords({
@@ -341,12 +378,20 @@ async function scenario(guest, mode, replacement) {
         assert.equal(cold.requestHash, queued.requestHash);
         assert.equal(cold.oldWriter, first.writerId);
         assert.equal(cold.sealOffset, state.seal.offset);
-        assert.deepEqual(cold.candidateChild, {
-          id: child.executionId,
-          sourceTask: request.taskId,
-          childConversationId: child.conversationId,
-        });
-        assert(state.ambiguous && state.requestAbsentFromMemory && state.snapshotBytes > 0);
+        if (!atomicHandoff) {
+          assert.deepEqual(cold.candidateChild, {
+            id: child.executionId,
+            sourceTask: request.taskId,
+            childConversationId: child.conversationId,
+          });
+          assert(state.ambiguous && state.requestAbsentFromMemory && state.snapshotBytes > 0);
+        } else
+          assert(
+            state.restarted &&
+              state.atomicReady &&
+              state.rollbackVerified &&
+              state.snapshotBytes > 0,
+          );
       }
       if (mode !== "user-stop") {
         const wait = await b.wait("reattached");
@@ -386,6 +431,22 @@ async function scenario(guest, mode, replacement) {
     assert(JSON.stringify(childPage).includes("Run the gated Bash once."));
     assert(!history.turns.some((t) => t.prompt === "Run the gated Bash once."));
     assert(!JSON.stringify(childPage).includes(prompt));
+    if (atomicHandoff) {
+      const displayed = childPage.turns
+        .flatMap((t) => t.transcript?.items ?? [])
+        .filter((x) => x.kind === "tool" && x.toolName === "bash");
+      assert.equal(displayed.length, 1, "HTTP history duplicated the Bash call");
+      const count = await pool.query(
+        "select count(*)::int as n from messages where run_id=$1 and conversation_id=$2 and role='user' and content like '%queued-child-input%'",
+        [runId, child.conversationId],
+      );
+      assert.equal(count.rows[0].n, stopped ? 0 : 1, "Queued input placement changed");
+      const clean = await pool.query(
+        "select native_work_handoff is null as removed from public.runs where id=$1",
+        [runId],
+      );
+      assert.equal(clean.rows[0].removed, true);
+    }
     const relationship = await children.status(first.tenantId, child.executionId);
     assert.equal(relationship.conversationId, child.conversationId);
     if (["normal", "serving-pending", "already-returned"].includes(mode))
@@ -458,7 +519,18 @@ async function scenario(guest, mode, replacement) {
         ? { modelsAfterStop: outcome.models, childQueuedSubmissionAtStop: outcome.queuedStatus }
         : {}),
       replyAfterTerminal: mode === "reply-timeout",
-      ...(pgHandoff && b
+      ...(atomicHandoff && b
+        ? {
+            projectorColdRestart: true,
+            projectorSigkill: state.killedProjectorPid !== process.pid,
+            atomicHandoff: true,
+            rollbackVerified: state.rollbackVerified,
+            matchedOriginalRequestId: true,
+            sealedPrefixUnavailableBeforeB: true,
+            sealStateBytes: state.snapshotBytes,
+          }
+        : {}),
+      ...(pgHandoff && !atomicHandoff && b
         ? {
             candidateRowsIdenticalForDifferentRequestIds: state.ambiguous,
             requestIdAbsentFromExistingProjectorView: state.requestAbsentFromMemory,
@@ -477,46 +549,64 @@ async function scenario(guest, mode, replacement) {
     resources.delete(state.currentBinding);
   }
 }
-try {
-  await sessionAdmin?.connect();
-  await replyAdmin.connect();
-  await probeMailbox.start();
-  replyBoots.add(probeMailbox.topic.slice("pi-cloud.tool-replies.v4.".length));
-  await replyCopies.connect();
-  assert.equal(
-    (await pool.query("select count(*)::int n from pg_tables where schemaname='public'")).rows[0].n,
-    0,
+function makeApi(origin) {
+  return new PiCloudApi(
+    (path, opts) => fetch(new URL(path, origin), opts),
+    tenant.credential.token,
   );
-  await runMigrations(database, "up");
-  await pool.query(
-    "create schema candidate; alter table public.runs add column history_head jsonb",
-  );
-  const schema = await readFile(new URL("./schema.sql", import.meta.url), "utf8");
-  await pool.query(schema.slice(schema.indexOf("create table messages")));
-  await view.install();
-  await view.reset(new Map([[0, 0n]]), 16, "recorded-history");
-  await pool.query(`create role family_reader login; alter role family_reader set search_path=candidate,public;
-    grant usage on schema candidate to family_reader; grant select on all tables in schema candidate to family_reader;
-    grant select (id,tenant_id,session_id,state,lease_id,mailbox_position,history_head,projection_tools,projection_state) on public.runs to family_reader`);
-
-  assert.equal(
-    (
-      await pool.query(
-        "select has_table_privilege('family_reader','public.pi_durable_current','select') as allowed",
-      )
-    ).rows[0].allowed,
-    false,
-  );
-  await installWorkspaceRoutes(pool);
-  if (pgHandoff) await installStudyHandoff(pool);
-  tenant = await createPrivateTenant(database, {
-    slug: "family-study",
-    ownerDisplayName: "Family study",
-  });
+}
+function progress(state, fact) {
+  state.seq = fact.commit.seq;
+  if (initialProcess) process.send({ kind: "progress", run: fact.scope.runId, seq: state.seq });
+}
+async function startProjector() {
   projector = new SessionProjector(
     {
       database,
       publicationDatabase: database,
+      ...(atomicHandoff
+        ? {
+            recoveryCheckpoint: {
+              tracks: (scope) => cases.has(scope.runId) && scope.fencingToken === 1,
+              async advance(tx, f, pos, current, nativeSequence) {
+                const s = cases.get(f.scope.runId);
+                assert(s && current());
+                if (s.faultInjected && !s.rollbackVerified) {
+                  const {
+                    rows: [row],
+                  } = await pool.query(
+                    "select r.state,r.lease_id,r.native_work_handoff,h.next_offset from public.runs r join candidate.accepted_fact_projection_offsets h on h.topic=$2 and h.partition=$3 where r.id=$1",
+                    [f.scope.runId, pos.topic, pos.partition],
+                  );
+                  assert.notEqual(row.state, "queued");
+                  assert.equal(row.lease_id, f.scope.writerId);
+                  assert.equal(row.native_work_handoff, null);
+                  assert(BigInt(row.next_offset) <= pos.offset);
+                  s.rollbackVerified = true;
+                }
+                const expected = view.next.get(pos.partition);
+                assert(
+                  nativeSequence > 0 && nativeSequence === view.sessions.get(f.scope.runId)?.seq,
+                );
+                const advanced =
+                  await sql`update candidate.accepted_fact_projection_offsets set next_offset=${String(pos.offset + 1n)}
+          where topic=${pos.topic} and partition=${pos.partition} and next_offset=${String(expected)} returning topic`.execute(
+                    tx,
+                  );
+                assert.equal(advanced.rows.length, 1);
+                if (!s.faultInjected) {
+                  s.faultInjected = true;
+                  throw Error("Injected recoverable seal rollback after candidate checkpoint");
+                }
+                const saved =
+                  await sql`select octet_length(native_work_handoff->>'nativeText') as bytes from public.runs where id=${f.scope.runId}::uuid`.execute(
+                    tx,
+                  );
+                s.snapshotBytes = saved.rows[0].bytes;
+              },
+            },
+          }
+        : {}),
       notificationConnectionString: dbUrl,
       brokers,
       topic,
@@ -586,7 +676,7 @@ try {
               for (const r of records.slice(i, i + n)) {
                 const s = cases.get(r.fact.scope.runId);
                 if (s.study && !s.seal && r.fact.commit.seq > s.study.seq) s.study.observe(r.fact);
-                s.seq = r.fact.commit.seq;
+                progress(s, r.fact);
               }
               i += n;
             }
@@ -601,14 +691,14 @@ try {
               const q = f.commit.writes.find(
                 (w) => w.type === "submission" && w.value.status === "queued",
               );
-              if (q) {
+              if (q && !atomicHandoff) {
                 s.ambiguous = await compareQueuedRequests(pool, view, r, env, q.value);
                 s.queuedId = q.value.requestId;
               }
-              s.study.observe(f);
             }
             await router.consume(r, current, grant);
-            s.seq = f.commit.seq;
+            if (current() && s.study && !s.seal && f.commit.seq > s.study.seq) s.study.observe(f);
+            progress(s, f);
           } catch (e) {
             s.error = e;
             throw e;
@@ -623,7 +713,18 @@ try {
           try {
             if (f.kind === "work_finished" || f.kind === "execution_seal") {
               const from = view.next.get(0);
-              if (s.study && f.kind === "execution_seal") {
+              if (atomicHandoff && f.kind === "execution_seal" && f.recover) {
+                const {
+                  rows: [ready],
+                } = await pool.query(
+                  "select native_work_handoff->>'sealId' as seal from public.runs where id=$1",
+                  [f.scope.runId],
+                );
+                if (!s.seal) {
+                  assert.equal(ready.seal, f.factId);
+                  s.atomicReady = true;
+                }
+              } else if (s.study && f.kind === "execution_seal") {
                 const original = view.sessions.get(f.scope.runId);
                 assert(s.queuedId && original && original.seq === s.study.seq);
                 s.requestAbsentFromMemory = !JSON.stringify(original, (_, v) =>
@@ -637,7 +738,7 @@ try {
                       f.kind === "work_finished"
                         ? `with advance as (update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3 returning 1),
                       retired as (delete from workspace_route_spans where run_id=$4 and exists(select 1 from advance)),
-                      cleared as (update runs set cancel_positions='{}'::jsonb where id=$4 and cancel_positions<>'{}'::jsonb and exists(select 1 from advance))
+                      cleared as (update runs set cancel_positions='{}'::jsonb${atomicHandoff ? ",native_work_handoff=null" : ""} where id=$4 and (cancel_positions<>'{}'::jsonb${atomicHandoff ? " or native_work_handoff is not null" : ""}) and exists(select 1 from advance))
                       select * from advance`
                         : "update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3",
                       [
@@ -690,66 +791,164 @@ try {
   });
   await app.listen(0, "127.0.0.1");
   const origin = await app.getUrl();
-  api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), tenant.credential.token);
-  const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
-  const modes = bashFields
-    ? ["active-stop", "serving-pending", "user-stop"]
-    : pgHandoff
-      ? ["active-stop", ...handoffs]
-      : ["normal", "active-stop", ...handoffs];
-  if (scene) assert(modes.includes(scene), "Unknown scene for this study");
-  for (const mode of scene ? [scene] : modes) {
-    console.log("Starting " + mode);
-    results.push(
-      await withFamilyGuest(cube, (guest) =>
-        mode === "user-stop"
-          ? withFamilyGuest(cube, (other) => scenario(guest, mode, other))
-          : scenario(guest, mode),
-      ),
-    );
-    console.log(JSON.stringify(results.at(-1)));
-  }
-} finally {
+  if (!initialProcess) api = makeApi(origin);
+  return origin;
+}
+if (initialProcess) {
+  const pending = new Map();
+  process.on("disconnect", () => process.exit(1));
+  process.on("message", (m) => {
+    if (m.kind === "accepted") {
+      pending.get(m.op).resolve();
+      pending.delete(m.op);
+      return;
+    }
+    assert.equal(m.kind, "register");
+    cases.set(m.run, { currentBinding: m.binding, seq: 0 });
+    resources.set(m.binding, {
+      async submit(record, command, reply) {
+        const p = Promise.withResolvers();
+        pending.set(command.request.operationId, p);
+        process.send({
+          kind: "submit",
+          binding: m.binding,
+          record: { topic: record.topic, partition: record.partition, offset: record.offset },
+          command,
+          reply,
+        });
+        await p.promise;
+      },
+    });
+    process.send({ kind: "registered", run: m.run });
+  });
+  view.configure(16, "recorded-history");
+  // No Run was admitted for this case yet. A prior case has already settled.
+  const {
+    rows: [head],
+  } = await pool.query(
+    "select next_offset from candidate.accepted_fact_projection_offsets where topic=$1 and partition=0",
+    [topic],
+  );
+  view.next.set(0, BigInt(head.next_offset));
+  const origin = await startProjector();
+  process.send({ kind: "ready", origin });
+} else {
   try {
-    await app?.close();
-    await projector?.close();
-    await probeMailbox.shutdown();
+    await sessionAdmin?.connect();
+    await replyAdmin.connect();
+    await probeMailbox.start();
+    replyBoots.add(probeMailbox.topic.slice("pi-cloud.tool-replies.v4.".length));
+    await replyCopies.connect();
+    assert.equal(
+      (await pool.query("select count(*)::int n from pg_tables where schemaname='public'")).rows[0]
+        .n,
+      0,
+    );
+    await runMigrations(database, "up");
+    await pool.query(
+      "create schema candidate; alter table public.runs add column history_head jsonb",
+    );
+    const schema = await readFile(new URL("./schema.sql", import.meta.url), "utf8");
+    await pool.query(schema.slice(schema.indexOf("create table messages")));
+    await view.install();
+    await view.reset(new Map([[0, 0n]]), 16, "recorded-history");
+    await pool.query(`create role family_reader login; alter role family_reader set search_path=candidate,public;
+    grant usage on schema candidate to family_reader; grant select on all tables in schema candidate to family_reader;
+    grant select (id,tenant_id,session_id,state,lease_id,mailbox_position,history_head,projection_tools,projection_state) on public.runs to family_reader`);
+
+    assert.equal(
+      (
+        await pool.query(
+          "select has_table_privilege('family_reader','public.pi_durable_current','select') as allowed",
+        )
+      ).rows[0].allowed,
+      false,
+    );
+    await installWorkspaceRoutes(pool);
+    if (pgHandoff && !atomicHandoff) await installStudyHandoff(pool);
+    if (atomicHandoff)
+      await pool.query(`grant select(native_work_handoff,turn_id,fencing_token) on public.runs to family_reader;
+    grant select(tenant_id,pi_session_id,lease_id,fencing_token,writer_sealed_at,writer_failed_at,writer_seal_offset,released_at,valid_until) on public.session_leases to family_reader`);
+    tenant = await createPrivateTenant(database, {
+      slug: "family-study",
+      ownerDisplayName: "Family study",
+    });
+
+    const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
+    const modes = atomicHandoff
+      ? handoffs
+      : bashFields
+        ? ["active-stop", "serving-pending", "user-stop"]
+        : pgHandoff
+          ? ["active-stop", ...handoffs]
+          : ["normal", "active-stop", ...handoffs];
+    if (scene) assert(modes.includes(scene), "Unknown scene for this study");
+    if (!atomicHandoff) await startProjector();
+    for (const mode of scene ? [scene] : modes) {
+      if (atomicHandoff) {
+        await app?.close();
+        await projector?.close();
+        const { startInitialProjector } = await import("./family-projector-process.mjs");
+        initialOwner = await startInitialProjector(topic, resources, cases);
+        api = makeApi(initialOwner.origin);
+        app = { async close() {} };
+        projector = {
+          checkHealth: () => initialOwner.checkHealth(),
+          close: () => initialOwner?.kill(),
+        };
+      }
+      console.log("Starting " + mode);
+      results.push(
+        await withFamilyGuest(cube, (guest) =>
+          mode === "user-stop"
+            ? withFamilyGuest(cube, (other) => scenario(guest, mode, other))
+            : scenario(guest, mode),
+        ),
+      );
+      console.log(JSON.stringify(results.at(-1)));
+    }
   } finally {
     try {
-      const owned = [...replyBoots].map((id) => "pi-cloud.tool-replies.v4." + id),
-        topics = await replyAdmin.listTopics();
-      const existing = owned.filter((t) => topics.includes(t));
-      if (existing.length) await replyAdmin.deleteTopics({ topics: existing });
-      const groups = (await replyAdmin.listGroups()).groups
-        .map((g) => g.groupId)
-        .filter((g) => [...replyBoots].some((id) => g.includes(id)));
-      for (const group of groups)
-        await until(
-          async () => {
-            try {
-              await replyAdmin.deleteGroups([group]);
-              return true;
-            } catch {
-              return !(await replyAdmin.listGroups()).groups.some((g) => g.groupId === group);
-            }
-          },
-          "reply group deletion",
-          70000,
-        );
-      await until(
-        async () => !(await replyAdmin.listTopics()).some((t) => owned.includes(t)),
-        "reply topic deletion",
-      );
+      await app?.close();
+      await projector?.close();
+      await probeMailbox.shutdown();
     } finally {
-      await replyCopies.disconnect();
-      await replyAdmin.disconnect();
-      await sessionAdmin?.disconnect();
-      await database.destroy();
-      await pool.end();
+      try {
+        const owned = [...replyBoots].map((id) => "pi-cloud.tool-replies.v4." + id),
+          topics = await replyAdmin.listTopics();
+        const existing = owned.filter((t) => topics.includes(t));
+        if (existing.length) await replyAdmin.deleteTopics({ topics: existing });
+        const groups = (await replyAdmin.listGroups()).groups
+          .map((g) => g.groupId)
+          .filter((g) => [...replyBoots].some((id) => g.includes(id)));
+        for (const group of groups)
+          await until(
+            async () => {
+              try {
+                await replyAdmin.deleteGroups([group]);
+                return true;
+              } catch {
+                return !(await replyAdmin.listGroups()).groups.some((g) => g.groupId === group);
+              }
+            },
+            "reply group deletion",
+            70000,
+          );
+        await until(
+          async () => !(await replyAdmin.listTopics()).some((t) => owned.includes(t)),
+          "reply topic deletion",
+        );
+      } finally {
+        await replyCopies.disconnect();
+        await replyAdmin.disconnect();
+        await sessionAdmin?.disconnect();
+        await database.destroy();
+        await pool.end();
+      }
     }
   }
+  await writeFile(
+    process.argv[3],
+    JSON.stringify({ results, cleanupVerified: true }, null, 2) + "\n",
+  );
 }
-await writeFile(
-  process.argv[3],
-  JSON.stringify({ results, cleanupVerified: true }, null, 2) + "\n",
-);

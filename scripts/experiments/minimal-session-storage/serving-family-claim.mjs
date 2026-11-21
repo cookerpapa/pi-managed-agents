@@ -49,10 +49,11 @@ export async function claimRun(connectionString, runId) {
   assert.equal(piConversationId, 1);
   const identity = await owner.heartbeatIdentity();
   let timer,
+    nativeHost,
     renewalError,
     closed = false;
   async function renew() {
-    const response = await owner.renewFromHeartbeat({
+    const heartbeat = {
       protocolVersion: 1,
       type: "supervisor.heartbeat",
       messageId: randomUUID(),
@@ -71,7 +72,10 @@ export async function claimRun(connectionString, runId) {
           },
         ],
       },
-    });
+    };
+    const at = performance.now();
+    const response = await owner.renewFromHeartbeat(heartbeat);
+    nativeHost?.observeLeaseRenewals(heartbeat, response, at);
     assert(response.payload.familyLeaseRenewals?.length === 1, "Lease renewal was not accepted");
     if (!closed)
       timer = setTimeout(
@@ -85,6 +89,9 @@ export async function claimRun(connectionString, runId) {
   await renew();
   return {
     scope,
+    attachNativeHost(host) {
+      nativeHost = host;
+    },
     bootId: identity.bootId,
     request,
     async cancel(abort) {

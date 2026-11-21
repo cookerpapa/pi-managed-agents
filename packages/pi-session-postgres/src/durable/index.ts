@@ -57,3 +57,5 @@ export {
   type HistoryDirectoryStore,
 } from "./history-directory.ts";
 export { collectInputConfirmations } from "./input-confirmations.ts";
+export { readSealedFamily, saveSealedFamily, hydrateSealedFamily } from "./sealed-family.ts";
+export { AcceptedFamilyCheckpoint, type SealedNativeState } from "./accepted-family-checkpoint.ts";

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Atomic recovery after Worker and Projector process loss](atomic-family-handoff-20261122.md) verifies the new store, original reply, public family history and a rolled-back recovery seal.
+
 - [Projector capacity for 20- and 200-tool Runs](tool-loop-capacity-20261121.md) compares million-Run daily demand and peak loads, separating Kafka records, history messages and tool pairs.
 
 - [Native tool starts and grant width](display-tool-batching-20261121.md) measures actual batch membership on a complete Pi trace and separates arrival-limited throughput from backlog drain.

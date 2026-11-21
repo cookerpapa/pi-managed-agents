@@ -537,3 +537,24 @@ on every native commit. PG Run rows and routes are prepared before timing;
 the rates describe the Session Projector and warm tool dispatch. Each arm
 verifies completion, original ordered call/result pairs, displays, receipts
 and committed partition positions.
+
+### Atomic handoff after loss of the Worker and Session Projector (#52)
+
+Run `PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/atomic-handoff.json --atomic-handoff`
+with the same isolated-cluster and Cube fixture prerequisites as the other family
+studies. An optional final argument selects `serving-pending`, `already-returned`,
+`reply-timeout` or `user-stop`. Each case uses a new pre-crash Projector process:
+after the Guest's marker and the queued edit, terminate A and this Projector with
+SIGKILL. A fresh owner rebuilds through its ordinary Session Kafka group. A
+deliberate statement-boundary failure rolls back the first recoverable seal;
+the retry observes the old Run lease, the unadvanced candidate head and the
+absent handoff before it commits. Remove the old Session prefix before B claims.
+
+B uses RunExecutor, PostgresDurableSessionHost.open, the candidate cold data
+role and the original reply mailbox. The matched native storage adapter and
+tool publisher are supplied by this isolated composition. The Session API still
+uses the serving read model. Check the independent candidate result, HTTP parent
+and child histories, queued input placement, physical execution count, and
+removal of the handoff after closure. A second Guest witnesses exact cancellation
+in the Stop case. Neither the deployed Worker configuration nor its live
+Projector is switched by this command.

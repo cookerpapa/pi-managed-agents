@@ -53,3 +53,33 @@ snapshot. Use two otherwise identical native queued submissions with different
 opaque request IDs to test whether the original state is uniquely recoverable.
 This study adds no serving migration. Its scratch snapshot, memory retention and
 single-epoch readiness boundary are experimental, not a choice of production format.
+
+## Atomic recoverable seal in the candidate composition
+
+A recoverable seal may publish a new-storage handoff inside the existing PG
+transaction that seals the old writer and returns the same Run to the claim
+queue. The replacement may observe either the unclaimed old state or the
+committed handoff and a claimable Run. A checkpoint write failure aborts the
+transition. No additional PG write is required for an ordinary native commit.
+The steady serving composition retains its existing recovery store until cutover.
+
+Exercise a cold Session Projector before the seal, including the loss of its
+candidate native fold, route cache and Kafka assignment. Rebuild the admitted
+native prefix using the existing partition consumer. If the native prefix is
+incomplete the handoff fails closed. For the first fresh-Session slice the
+checkpoint contains current non-Entry family records and display sequences.
+PG messages and current Inboxes supply their own bodies and the original tool
+reply reference remains in the Run. The Worker reads under the new lease;
+sandbox target selection stays private to execution. Verify the original reply
+after the sealed Session log has been rotated. Later epochs, arbitrary
+point-in-time reads and the final storage cutover require separate coverage.
+
+The candidate stores small native head-marker coordinates alongside the
+current family records. On replacement, compute each active Conversation's
+nearest visible head using its own ancestry cutoff. Read the kept suffix from
+PG plus direct Entry references of outstanding native work. Reconstruct
+current Inbox documents from their existing rows; a missing pinned entry or
+original tool task/reply match rejects recovery. Preserve otherwise unallocated
+native IDs and the commit head through Pi's public embedded storage methods.
+The recovery seal forces synchronous commit for this transaction. Historical
+read APIs and further handoffs of the same Run are outside this first slice.

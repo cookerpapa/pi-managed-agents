@@ -1,3 +1,4 @@
+import { AcceptedFamilyCheckpoint, saveSealedFamily } from "@pi-cloud/pi-session-postgres/durable";
 import type { Database } from "@pi-cloud/database";
 import type { Kysely } from "kysely";
 import { KafkaLogConsumer } from "@pi-cloud/event-log";
@@ -11,8 +12,13 @@ import {
   ExecutionStreamProjector,
   factEvents,
   type ExecutionProjectionResult,
+  type RecoverySealCheckpoint,
 } from "./execution-stream-projection.ts";
-import { isHistoryOnlyCommit, type AcceptedExecutionSealFact } from "./accepted-fact.ts";
+import {
+  isHistoryOnlyCommit,
+  type AcceptedExecutionSealFact,
+  type AcceptedFactScope,
+} from "./accepted-fact.ts";
 import type { PublicationAvailability, SessionControlChange } from "@pi-cloud/protocol";
 import { assertCommittedControlChange } from "./session-control-outbox.ts";
 import type { ProducerCapacity } from "@pi-cloud/event-log";
@@ -70,6 +76,12 @@ export class SessionProjector {
       advertisedBaseUrl: string;
       publicationToken: string;
       modelAccounting?: ModelAccountingPort;
+      recoveryCheckpoint?: {
+        tracks(scope: AcceptedFactScope): boolean;
+        advance(
+          ...args: [...Parameters<RecoverySealCheckpoint>, nativeSequence: number]
+        ): Promise<void>;
+      };
       projectionGate?: { run<T>(operation: () => Promise<T>): Promise<T> };
       controlChanges?: {
         load(partitions: readonly number[], current: () => boolean): Promise<void>;
@@ -151,7 +163,24 @@ export class SessionProjector {
     this.observations = new RunObservations(this.eventHub);
     this.#observationSweep = setInterval(() => this.observations.sweep(), 60_000);
     this.#observationSweep.unref();
-    this.#projection = new ExecutionStreamProjector(options.database, options.modelAccounting);
+    const recovery = options.recoveryCheckpoint;
+    const families = recovery ? new Map<string, AcceptedFamilyCheckpoint>() : undefined;
+    this.#projection = new ExecutionStreamProjector(
+      options.database,
+      options.modelAccounting,
+      undefined,
+      recovery && families
+        ? async (tx, fact, position, current) => {
+            if (!recovery.tracks(fact.scope)) return;
+            const family = families.get(fact.scope.writerId);
+            if (!family)
+              throw Error("Accepted native family prefix was not reconstructed before handoff");
+            const state = family.snapshot();
+            await saveSealedFamily(tx, fact.scope, position, fact.factId, state);
+            await recovery.advance(tx, fact, position, current, state.seq);
+          }
+        : undefined,
+    );
     let currentControlAssignment: () => boolean = () => false;
     const groupId = "pi-cloud-session-projector-v2";
     const batches = options.controlTools?.historyBatch;
@@ -185,6 +214,7 @@ export class SessionProjector {
         return plan.starts;
       },
       onReset: () => {
+        families?.clear();
         this.#projection.reset();
         this.eventStore.reset();
         this.observations.reset();
@@ -194,6 +224,7 @@ export class SessionProjector {
         options.controlChanges?.reset();
       },
       onRevoked: () => {
+        families?.clear();
         this.#availabilityEpoch++;
         this.#availabilityCache = undefined;
         currentControlAssignment = () => false;
@@ -351,6 +382,17 @@ export class SessionProjector {
                     await timing.measure("tool_route", () =>
                       options.toolCommands.consume({ ...record, fact: command }, current),
                     );
+              }
+              if (families && recovery && current?.() !== false) {
+                if (fact.kind === "durable_commit" && recovery.tracks(fact.scope)) {
+                  let family = families.get(fact.scope.writerId);
+                  if (!family) {
+                    family = new AcceptedFamilyCheckpoint();
+                    families.set(fact.scope.writerId, family);
+                  }
+                  family.observe(fact);
+                } else if (fact.kind === "work_finished" || fact.kind === "execution_seal")
+                  families.delete(fact.scope.writerId);
               }
               if (options.nativeChanges)
                 await timing.measure("view_notify", () =>

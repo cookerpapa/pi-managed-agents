@@ -2,7 +2,7 @@
 // no Kafka client. Worker recovery can access the original reply mailbox separately.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { applyImmutableBatches } from "@earendil-works/chord/delta";
+import { AcceptedFamilyCheckpoint } from "@pi-cloud/pi-session-postgres/durable";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { projectRecord } from "./project-record.mjs";
@@ -100,71 +100,10 @@ export async function compareQueuedRequests(pool, view, r, env, submission) {
   }
 }
 
-export class SealStudy {
-  records = new Map();
-  sequences = new Map();
-  seq = 0;
-  nextId = 2;
-  observe(f) {
-    const batch = f.commit;
-    assert.equal(batch.seq, this.seq + 1, "Incomplete study state");
-    this.seq = batch.seq;
-    this.nextId = batch.nextId;
-    for (const w of batch.writes) {
-      switch (w.type) {
-        case "entry":
-          break; // candidate.messages already owns this body
-        case "conversation":
-        case "submission":
-        case "task":
-          this.records.set(w.value.id, { seq: batch.seq, write: w });
-          break;
-        case "document.create":
-          assert.equal(w.content.kind, "base");
-          this.records.set(
-            w.record.id,
-            w.record.kind === "pi.inbox"
-              ? { inbox: true }
-              : { seq: batch.seq, write: structuredClone(w) },
-          );
-          break;
-        case "document.change": {
-          const row = this.records.get(w.id);
-          assert(row);
-          if (row.inbox) break;
-          const old = row.write.content;
-          row.write.content =
-            w.content.kind === "base"
-              ? structuredClone(w.content)
-              : {
-                  kind: "base",
-                  version: w.content.version,
-                  value: applyImmutableBatches(old.value, [w.content.ops]),
-                };
-          break;
-        }
-        default:
-          throw Error("Unmeasured native write in seal study: " + w.type);
-      }
-    }
-    for (const d of f.display)
-      this.sequences.set(
-        d.scope.sessionId,
-        Math.max(
-          this.sequences.get(d.scope.sessionId) ?? 0,
-          d.coveredThrough ?? 0,
-          ...d.events.map((e) => e.event.seq),
-        ),
-      );
-  }
+export class SealStudy extends AcceptedFamilyCheckpoint {
   async seal(db, r, from, bashFields) {
     const { fact: f } = r;
-    const state = {
-      seq: this.seq,
-      nextId: this.nextId,
-      records: [...this.records.values()].filter((v) => !v.inbox),
-      sequences: [...this.sequences],
-    };
+    const state = this.snapshot();
     if (bashFields) {
       const { omitVerifiedBashWait } = await import("./bash-wait-fields.mjs");
       await omitVerifiedBashWait(db, f.scope.runId, state);

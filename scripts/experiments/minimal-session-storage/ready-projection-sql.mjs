@@ -9,7 +9,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
   ) => `(${row}->>'tenant')::uuid,(${row}->>'session')::uuid,(${row}->>'conversation')::bigint,
     (${row}->>'document')::bigint,(${row}->>'seq')::bigint,(${row}->>'ordinal')::int,${row}->'value'`;
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
-    alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,
+    alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,add column native_work_handoff jsonb,
       add column cancel_positions jsonb not null default '{}',add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
     create index active_projection_start on runs(projection_partition,projection_first) where state in ('running','cancel_requested') and projection_first is not null;
     create function prefix_message(uuid,uuid,uuid,bigint,text,uuid) returns table(accepted boolean,writes int)

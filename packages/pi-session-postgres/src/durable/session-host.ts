@@ -1,3 +1,4 @@
+import { readSealedFamily, type SealedFamilyRead } from "./sealed-family.ts";
 import { NativeProjectionProgress } from "../native-projection-progress.ts";
 import { nativeRead } from "./read-lifetime.ts";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -29,7 +30,11 @@ import type { ImageAttachmentCodec } from "@pi-cloud/session-attachments";
 import type { ActiveExecutionAuthority } from "../execution-authority.ts";
 import { PostgresSessionLeaseObserver } from "../postgres-session-lease-observer.ts";
 import { DurablePostgresProjection } from "./postgres-projection.ts";
-import { PublishedDurableStorage, type NativeDocumentChange } from "./published-storage.ts";
+import {
+  PublishedDurableStorage,
+  type NativeDocumentChange,
+  type DurableStorageOptions,
+} from "./published-storage.ts";
 import { sql } from "kysely";
 import { type ConversationWorkView } from "@pi-cloud/protocol";
 
@@ -107,9 +112,11 @@ function remoteReplySources(metadata: {
     ...(metadata.controlTools ?? []).filter((t) => t.replyRecovery),
   ];
 }
+type NativeOwnerStorage = import("@earendil-works/pi-durable").Storage &
+  Pick<PublishedDurableStorage, "committedSequence" | "recordSequence">;
 type Owner = {
   authority: ActiveExecutionAuthority & { start(): void; assertActive(): void };
-  storage: Promise<PublishedDurableStorage>;
+  storage: Promise<NativeOwnerStorage>;
   runs: Map<number, DurableSessionOpen>;
   bindings: Map<number, DurableRunBinding>;
   runtime?: Promise<ManagedNativeRuntime>;
@@ -161,6 +168,16 @@ export class PostgresDurableSessionHost {
       leaseDatabase?: Kysely<Database>;
       images?: ImageAttachmentCodec;
       onReadStart?: import("./published-storage.ts").DurableStorageOptions["onReadStart"];
+      /** Matched candidate composition for reopening a sealed family. The selected
+       * native store owns subsequent publications; the host owns lease and mailbox lifetime. */
+      sealedRecovery?: {
+        topic: string;
+        hydrate(
+          family: SealedFamilyRead,
+          authority: ActiveExecutionAuthority,
+          publish: DurableStorageOptions["publish"],
+        ): Promise<NativeOwnerStorage>;
+      };
       restoreReplies?: (
         references: readonly PendingToolReplyRecovery[],
         signal: AbortSignal,
@@ -660,160 +677,195 @@ export class PostgresDurableSessionHost {
       };
       const readSignal = authority.signal;
       const readFailed = (error: Error) => interruption.abort(error);
-      const projection = new DurablePostgresProjection(
-        this.options.database,
-        { tenantId: binding.tenantId, sessionId: binding.piSessionId },
-        this.options.images,
-      );
       const runs = new Map<number, DurableSessionOpen>(),
         bindings = new Map<number, DurableRunBinding>();
       const recoveredOperations: Owner["recoveredOperations"] = new Map();
       const recoveredControlTools: Owner["recoveredControlTools"] = new Map();
-      const progress = new NativeProjectionProgress({
-        initialThrough: 0,
-        assertCurrent: () => authority.assertCurrent(),
-        read: () => nativeRead(async () => (await projection.head()).seq, readSignal, readFailed),
-      });
       const storage = (async () => {
         await authority.assertCurrent();
         // Watch ownership while the cold head is still loading, not only after
         // it returns. The separate lease pool can revoke a blocked data read.
         authority.start();
+        const publish: DurableStorageOptions["publish"] = (
+          batch,
+          inputConversations = [],
+          documents = [],
+        ) =>
+          this.#serialize(this.#owners.get(key)!, async () => {
+            await authority.assertCurrent();
+            const active = runs.values().next().value as DurableSessionOpen | undefined;
+            if (!active)
+              throw new PublicationNotSentError(
+                "Native Session has no admitted publication anchor",
+              );
+            const commit = batch as unknown as DurableSessionCommit;
+            const preparation = this.#owners.get(key)?.prepare?.(commit);
+            const modelEvidence = [...this.#owners.get(key)!.modelEvidence.values()].map(
+              (prepare) => prepare(commit),
+            );
+            const recoveryCancellations: import("@pi-cloud/protocol").CandidateToolCancellation[] =
+              [];
+            const completedRecoveries: number[] = [];
+            for (const write of commit.writes) {
+              if (write.type !== "task") continue;
+              const task = durableToolState(write.value);
+              if (task?.terminal && recoveredControlTools.has(task.id))
+                completedRecoveries.push(task.id);
+              const original = task && recoveredOperations.get(task.id);
+              if (!task || !original) continue;
+              if (task.aborted)
+                recoveryCancellations.push({
+                  executionReference: active.binding.executionReference,
+                  conversationId: active.binding.conversationId,
+                  activationId: original.activationId,
+                  operationId: original.operationId,
+                  originalWriterId: original.writerId,
+                  ...(original.target === "executor" ? { target: "executor" as const } : {}),
+                });
+              if (task.terminal) completedRecoveries.push(task.id);
+            }
+            const display = [...this.#owners.get(key)!.display].map(
+              ([conversationId, prepare]) => ({
+                executionReference: bindings.get(conversationId)!.executionReference,
+                conversationId,
+                prepared: prepare(commit, documents),
+              }),
+            );
+            const origins = batch.writes.flatMap((write) => {
+              if (!("value" in write) || !("conversationId" in write.value)) return [];
+              const origin = bindings.get(write.value.conversationId);
+              return origin
+                ? [
+                    {
+                      recordId: write.value.id,
+                      sessionId: origin.sessionId,
+                      turnId: origin.turnId,
+                      runId: origin.runId,
+                    },
+                  ]
+                : [];
+            });
+            let acknowledged = false;
+            try {
+              await active.publish({
+                commit,
+                origins,
+                ...(modelEvidence.some((prepared) => prepared.evidence.length)
+                  ? { modelEvidence: modelEvidence.flatMap((prepared) => prepared.evidence) }
+                  : {}),
+                ...(inputConversations.length
+                  ? {
+                      inputQueueSessions: [
+                        ...new Set(
+                          inputConversations.flatMap((id) => {
+                            const binding = bindings.get(id);
+                            return binding ? [binding.sessionId] : [];
+                          }),
+                        ),
+                      ],
+                    }
+                  : {}),
+                tools: preparation?.tools ?? [],
+                cancellations: [
+                  ...new Map(
+                    [...(preparation?.cancellations ?? []), ...recoveryCancellations].map(
+                      (cancel) => [cancel.operationId, cancel],
+                    ),
+                  ).values(),
+                ],
+                display: display.flatMap(({ executionReference, conversationId, prepared }) =>
+                  prepared.events.length || prepared.coveredThrough !== undefined
+                    ? [
+                        {
+                          executionReference,
+                          conversationId,
+                          events: prepared.events,
+                          ...(prepared.coveredThrough === undefined
+                            ? {}
+                            : { coveredThrough: prepared.coveredThrough }),
+                        },
+                      ]
+                    : [],
+                ),
+              });
+              acknowledged = true;
+              preparation?.confirmed();
+              for (const prepared of modelEvidence) prepared.confirmed();
+              for (const id of completedRecoveries) {
+                recoveredOperations.delete(id);
+                recoveredControlTools.delete(id);
+              }
+              for (const { prepared } of display) prepared.confirmed();
+            } catch (cause) {
+              if (!acknowledged && cause instanceof PublicationNotSentError) {
+                // Native fault settlement can itself be refused. Give Kafka
+                // ACKs and lease timers an IO turn before Pi handles the error;
+                // do not resubmit the batch or wait for queue capacity here.
+                await yieldToIo();
+                throw cause;
+              }
+              const failure = Object.assign(
+                new Error(
+                  acknowledged
+                    ? "Native Session acknowledgement adoption failed"
+                    : "Native Session publication failed",
+                  { cause },
+                ),
+                { code: "writer_publication_failed" },
+              );
+              interruption.abort(failure);
+              // Even a typed no-send exception after ACK is now uncertain to
+              // native memory. Never let Storage treat it as a rejected draft.
+              throw failure;
+            }
+          });
+        if (this.options.sealedRecovery) {
+          const source = this.options.sealedRecovery;
+          const family = await nativeRead(
+            () =>
+              readSealedFamily(
+                this.options.database,
+                { ...binding, fencingToken: identity.fencingToken },
+                source.topic,
+              ),
+            readSignal,
+            readFailed,
+          );
+          const store = await source.hydrate(family, authority, publish);
+          try {
+            await authority.assertCurrent();
+            if (!input.stopOnResume && family.intents.length) {
+              if (!this.options.restoreReplies)
+                throw Error("Remote Tool reply recovery is not configured");
+              await this.options.restoreReplies(
+                family.intents.map(({ operationId, reply }) => ({ operationId, reply })),
+                readSignal,
+              );
+            }
+            await authority.assertCurrent();
+            return store;
+          } catch (error) {
+            await store.close(BACKGROUND_CONTEXT);
+            throw error;
+          }
+        }
+        const projection = new DurablePostgresProjection(
+          this.options.database,
+          { tenantId: binding.tenantId, sessionId: binding.piSessionId },
+          this.options.images,
+        );
+        const progress = new NativeProjectionProgress({
+          initialThrough: 0,
+          assertCurrent: () => authority.assertCurrent(),
+          read: () => nativeRead(async () => (await projection.head()).seq, readSignal, readFailed),
+        });
         const store = await PublishedDurableStorage.open({
           projection,
           ...(this.options.onReadStart ? { onReadStart: this.options.onReadStart } : {}),
           signal: readSignal,
           onReadFailure: readFailed,
           assertCurrent: () => authority.assertCurrent(),
-          publish: (batch, inputConversations = [], documents = []) =>
-            this.#serialize(this.#owners.get(key)!, async () => {
-              await authority.assertCurrent();
-              const active = runs.values().next().value as DurableSessionOpen | undefined;
-              if (!active)
-                throw new PublicationNotSentError(
-                  "Native Session has no admitted publication anchor",
-                );
-              const commit = batch as unknown as DurableSessionCommit;
-              const preparation = this.#owners.get(key)?.prepare?.(commit);
-              const modelEvidence = [...this.#owners.get(key)!.modelEvidence.values()].map(
-                (prepare) => prepare(commit),
-              );
-              const recoveryCancellations: import("@pi-cloud/protocol").CandidateToolCancellation[] =
-                [];
-              const completedRecoveries: number[] = [];
-              for (const write of commit.writes) {
-                if (write.type !== "task") continue;
-                const task = durableToolState(write.value);
-                if (task?.terminal && recoveredControlTools.has(task.id))
-                  completedRecoveries.push(task.id);
-                const original = task && recoveredOperations.get(task.id);
-                if (!task || !original) continue;
-                if (task.aborted)
-                  recoveryCancellations.push({
-                    executionReference: active.binding.executionReference,
-                    conversationId: active.binding.conversationId,
-                    activationId: original.activationId,
-                    operationId: original.operationId,
-                    originalWriterId: original.writerId,
-                    ...(original.target === "executor" ? { target: "executor" as const } : {}),
-                  });
-                if (task.terminal) completedRecoveries.push(task.id);
-              }
-              const display = [...this.#owners.get(key)!.display].map(
-                ([conversationId, prepare]) => ({
-                  executionReference: bindings.get(conversationId)!.executionReference,
-                  conversationId,
-                  prepared: prepare(commit, documents),
-                }),
-              );
-              const origins = batch.writes.flatMap((write) => {
-                if (!("value" in write) || !("conversationId" in write.value)) return [];
-                const origin = bindings.get(write.value.conversationId);
-                return origin
-                  ? [
-                      {
-                        recordId: write.value.id,
-                        sessionId: origin.sessionId,
-                        turnId: origin.turnId,
-                        runId: origin.runId,
-                      },
-                    ]
-                  : [];
-              });
-              let acknowledged = false;
-              try {
-                await active.publish({
-                  commit,
-                  origins,
-                  ...(modelEvidence.some((prepared) => prepared.evidence.length)
-                    ? { modelEvidence: modelEvidence.flatMap((prepared) => prepared.evidence) }
-                    : {}),
-                  ...(inputConversations.length
-                    ? {
-                        inputQueueSessions: [
-                          ...new Set(
-                            inputConversations.flatMap((id) => {
-                              const binding = bindings.get(id);
-                              return binding ? [binding.sessionId] : [];
-                            }),
-                          ),
-                        ],
-                      }
-                    : {}),
-                  tools: preparation?.tools ?? [],
-                  cancellations: [
-                    ...new Map(
-                      [...(preparation?.cancellations ?? []), ...recoveryCancellations].map(
-                        (cancel) => [cancel.operationId, cancel],
-                      ),
-                    ).values(),
-                  ],
-                  display: display.flatMap(({ executionReference, conversationId, prepared }) =>
-                    prepared.events.length || prepared.coveredThrough !== undefined
-                      ? [
-                          {
-                            executionReference,
-                            conversationId,
-                            events: prepared.events,
-                            ...(prepared.coveredThrough === undefined
-                              ? {}
-                              : { coveredThrough: prepared.coveredThrough }),
-                          },
-                        ]
-                      : [],
-                  ),
-                });
-                acknowledged = true;
-                preparation?.confirmed();
-                for (const prepared of modelEvidence) prepared.confirmed();
-                for (const id of completedRecoveries) {
-                  recoveredOperations.delete(id);
-                  recoveredControlTools.delete(id);
-                }
-                for (const { prepared } of display) prepared.confirmed();
-              } catch (cause) {
-                if (!acknowledged && cause instanceof PublicationNotSentError) {
-                  // Native fault settlement can itself be refused. Give Kafka
-                  // ACKs and lease timers an IO turn before Pi handles the error;
-                  // do not resubmit the batch or wait for queue capacity here.
-                  await yieldToIo();
-                  throw cause;
-                }
-                const failure = Object.assign(
-                  new Error(
-                    acknowledged
-                      ? "Native Session acknowledgement adoption failed"
-                      : "Native Session publication failed",
-                    { cause },
-                  ),
-                  { code: "writer_publication_failed" },
-                );
-                interruption.abort(failure);
-                // Even a typed no-send exception after ACK is now uncertain to
-                // native memory. Never let Storage treat it as a rejected draft.
-                throw failure;
-              }
-            }),
+          publish,
           waitProjected: (through) => progress.wait(through, authority.signal),
         });
         await this.#restoreReplies(

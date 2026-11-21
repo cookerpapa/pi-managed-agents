@@ -24,6 +24,15 @@ import { ExecutionPrefix } from "./execution-prefix.ts";
 import { projectionTransaction } from "./projection-transaction.ts";
 import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
+/** Install a replacement-readable checkpoint before its Run becomes claimable.
+ * Only database work participates here; the seal transaction owns the writer. */
+export type RecoverySealCheckpoint = (
+  transaction: Transaction<Database>,
+  fact: AcceptedExecutionSealFact & { recover: true },
+  position: FactPosition,
+  current: () => boolean,
+) => Promise<void>;
+
 export type ExecutionProjectionResult = {
   admitted?: boolean;
   inputConfirmations?: NativeInputConfirmation[];
@@ -49,6 +58,7 @@ export class ExecutionStreamProjector {
     database: Kysely<Database>,
     readonly modelAccounting?: ModelAccountingPort,
     boundaryLimits?: BoundaryCacheLimits,
+    private readonly recoveryCheckpoint?: RecoverySealCheckpoint,
   ) {
     this.#database = database;
     this.#boundary = new ExecutionStreamBoundary(database, boundaryLimits);
@@ -495,6 +505,8 @@ export class ExecutionStreamProjector {
         await releaseIdleSessionLease(transaction, fact.scope.writerId, new Date());
       }
       if (fact.recover) {
+        await this.recoveryCheckpoint?.(transaction, fact, position, current);
+        if (!current()) throw new Error("Recovery seal assignment changed");
         const now = new Date(),
           through = Math.max(fact.baseSequence, prefix?.highWaterMark ?? 0);
         // Release/count the old incarnation before clearing its binding. The

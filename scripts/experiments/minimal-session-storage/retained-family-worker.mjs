@@ -1,7 +1,11 @@
 // Disposable A/B actors for the retained-log experiment. Each has independent
 // Pi, model client, producer and reply mailbox memory.
 import { FamilyPresentation } from "./family-presentation.mjs";
-import { durableToolState, MAX_TOOL_EXECUTION_TIMEOUT_MS } from "@pi-cloud/protocol";
+import {
+  createExecutionReference,
+  durableToolState,
+  MAX_TOOL_EXECUTION_TIMEOUT_MS,
+} from "@pi-cloud/protocol";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
@@ -62,6 +66,10 @@ let runtime,
   cancellationCount = 0,
   childModelCalls = 0,
   parentModelCalls = 0;
+let sessionHost,
+  sessionHandle,
+  coldDb,
+  mailboxRestoreMs = 0;
 const operations = new Map(),
   cancelledTasks = new Set();
 const textOf = (m) =>
@@ -70,6 +78,7 @@ const textOf = (m) =>
     .map((x) => x.text)
     .join("") ?? "";
 async function publish(fact) {
+  await sessionHandle?.authority.assertCurrent();
   await producer.append(0, {
     sessionId: scope.piSessionId,
     factId: fact.factId,
@@ -77,12 +86,43 @@ async function publish(fact) {
   });
 }
 class Published extends MemoryStorage {
+  nativePositions = new Map();
+  get committedSequence() {
+    return this.nextSeq - 1;
+  }
+  async recordSequence(id) {
+    return this.nativePositions.get(id);
+  }
+  indexPositions(writes, seq) {
+    for (const w of writes) this.nativePositions.set(w.value?.id ?? w.record?.id ?? w.id, seq);
+  }
   async commit(writes) {
     const p = this.prepareCommit(writes),
       commit = { seq: p.seq, nextId: this.nextId, writes: p.writes };
+    let display;
+    if (this.hostPublish) {
+      await this.hostPublish(commit, [], []);
+      display = this.stagedDisplay;
+      this.stagedDisplay = undefined;
+    } else display = await this.publishNativeBatch(commit);
+    const seq = p.apply();
+    if (init.atomicHandoff) this.indexPositions(p.writes, seq);
+    for (const w of p.writes) {
+      const t = w.type === "task" && durableToolState(w.value);
+      if (t?.terminal) {
+        operations.get(t.id)?.controller?.abort();
+        operations.delete(t.id);
+        cancelledTasks.delete(t.id);
+      }
+    }
+    display?.confirmed();
+    publications++;
+    return seq;
+  }
+  async publishNativeBatch(commit) {
     const display = presentation?.prepare(commit);
     const workspaceOperations = [];
-    for (const write of p.writes) {
+    for (const write of commit.writes) {
       const task = write.type === "task" && durableToolState(write.value);
       if (!task) continue;
       let op = operations.get(task.id);
@@ -154,7 +194,7 @@ class Published extends MemoryStorage {
         cancellations: [],
         workspaceOperations,
         display: display?.display ?? [],
-        origins: p.writes
+        origins: commit.writes
           .filter((w) => ["entry", "task", "submission"].includes(w.type))
           .map((w) => ({
             recordId: w.value.id,
@@ -167,18 +207,7 @@ class Published extends MemoryStorage {
       life.abort(error);
       throw error;
     }
-    const seq = p.apply();
-    for (const w of p.writes) {
-      const t = w.type === "task" && durableToolState(w.value);
-      if (t?.terminal) {
-        operations.get(t.id)?.controller?.abort();
-        operations.delete(t.id);
-        cancelledTasks.delete(t.id);
-      }
-    }
-    display?.confirmed();
-    publications++;
-    return seq;
+    return display;
   }
 }
 const store = new Published(),
@@ -437,13 +466,99 @@ const workspaceBash = {
 };
 try {
   await db.connect();
+  if (init.atomicHandoff && takeover) {
+    const {
+      rows: [rights],
+    } =
+      await db.query(`select bool_or(has_table_privilege(current_user,'public.'||name,'select')) as legacy
+      from unnest(array['pi_durable_commits','pi_durable_records','pi_durable_log','pi_durable_current']) as t(name)`);
+    assert.equal(rights.legacy, false, "Cold data role can read the old native store");
+  }
   await producer.start();
   await mailbox.start();
   const prior = await loadPriorRoot(db, scope, store);
   if (takeover) {
     const start = performance.now();
     let pgEvidence = {};
-    if (init.pgHandoff) {
+    if (init.atomicHandoff) {
+      const { createDatabase } = await import("@pi-cloud/database");
+      const { PostgresDurableSessionHost, hydrateSealedFamily } =
+        await import("@pi-cloud/pi-session-postgres/durable");
+      coldDb = createDatabase({ connectionString: dbUrl, maxConnections: 2 });
+      sessionHost = new PostgresDurableSessionHost({
+        database: coldDb,
+        sealedRecovery: {
+          topic,
+          async hydrate(rows, authority, publishThroughOwner) {
+            store.hostPublish = publishThroughOwner;
+            store.nativePositions = await hydrateSealedFamily(rows, store);
+            const native = rows.handoff.state;
+            assert.equal(store.committedSequence, native.seq);
+            assert.equal(store.nextId, native.nextId);
+            presentation.sequences = new Map(native.sequences);
+            for (const { write } of native.records)
+              if (write.record?.kind === "pi.live")
+                presentation.live[write.record.id] = {
+                  conversation: write.record.scope.conversationId,
+                  value: write.content.value,
+                };
+            const [pending] = rows.intents;
+            const [input] = (
+              await store.scanSubmissions(
+                { conversationId: pending.conversationId, status: "queued" },
+                2,
+                undefined,
+                ctx,
+              )
+            ).items;
+            assert(
+              input &&
+                (await store.submissionByRequest(pending.conversationId, input.requestId, ctx))
+                  .id === input.id,
+            );
+            queuedKey = input.requestId;
+            pgEvidence = {
+              oldWriter: rows.handoff.scope.writerId,
+              sealOffset: rows.handoff.offset,
+              requestHash: hashKey(queuedKey),
+            };
+            restored = {
+              intents: rows.intents,
+              stats: {
+                candidateEntries: rows.entries.length,
+                sealNativeSeq: native.seq,
+                source: "worker-session-host/sealed-candidate-pg",
+              },
+            };
+            return store;
+          },
+        },
+        restoreReplies: async (refs, signal) => {
+          const begin = performance.now();
+          await mailbox.restore(refs, signal);
+          mailboxRestoreMs = performance.now() - begin;
+        },
+      });
+      claim.attachNativeHost(sessionHost);
+      sessionHandle = await sessionHost.open({
+        binding: {
+          ...scope,
+          executionReference: createExecutionReference(
+            scope.writerId,
+            scope.runId,
+            scope.fencingToken,
+          ),
+          conversationId: 1,
+        },
+        stopOnResume: claim.request.stopOnResume,
+        signal: life.signal,
+        publish: async ({ commit }) => {
+          store.stagedDisplay = await store.publishNativeBatch(commit);
+        },
+      });
+      assert.equal(sessionHandle.storage, store);
+      assert.equal(sessionHandle.committedSequence(), restored.stats.sealNativeSeq);
+    } else if (init.pgHandoff) {
       const { readFamilyPgControl } = await import("./pg-family-reader.mjs");
       const pgOnly = await readFamilyPgControl({
         db,
@@ -492,22 +607,29 @@ try {
     assert.equal((await store.task(rootGeneration.state.on[0], ctx)).kind, "pi.tool");
 
     const replyStart = performance.now();
-    await mailbox.restore(
-      restored.intents.map(({ operationId, reply }) => ({ operationId, reply })),
-      life.signal,
-    );
+    if (!sessionHandle)
+      await mailbox.restore(
+        restored.intents.map(({ operationId, reply }) => ({ operationId, reply })),
+        life.signal,
+      );
     send("cold", {
       ...pgEvidence,
-      stats: { ...restored.stats, ...prior, mailboxRestoreMs: performance.now() - replyStart },
+      stats: {
+        ...restored.stats,
+        ...prior,
+        mailboxRestoreMs: sessionHandle ? mailboxRestoreMs : performance.now() - replyStart,
+      },
       coldMs: performance.now() - start,
     });
   }
-  runtime = await DurableAgentSession.open(store, {
-    models,
-    remoteTools: [],
-    infrastructureTools: [delegate, workspaceBash],
-    settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
-  });
+  const openRuntime = () =>
+    DurableAgentSession.open(sessionHandle?.storage ?? store, {
+      models,
+      remoteTools: [],
+      infrastructureTools: [delegate, workspaceBash],
+      settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
+    });
+  runtime = sessionHandle ? await sessionHandle.runtime(openRuntime) : await openRuntime();
   const root = await runtime.bind(configuration(1), takeover ? "reattach" : "initialize");
   let stopWork;
   let modelsBeforeStop;
@@ -664,8 +786,11 @@ try {
 } finally {
   life.abort();
   try {
-    await runtime?.close();
+    if (sessionHandle) await sessionHandle.close();
+    else await runtime?.close();
   } finally {
+    await sessionHost?.close();
+    await coldDb?.destroy();
     await mailbox.shutdown();
     await producer.close();
     await db.end();

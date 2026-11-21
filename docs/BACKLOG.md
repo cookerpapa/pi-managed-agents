@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, make the recovery checkpoint and release to the queue atomic for the first active child Bash handoff. Cold-restart the actual Projector and verify the replacement Worker Session host with the legacy native tables denied. [Failure acceptance and remaining scope](reports/atomic-family-handoff-20261122.md).
+
 - [x] Under #52, compare the daily average and peak loads for one million 20-tool Runs. [Daily-load study](reports/tool-loop-capacity-20261121.md#每天百万-run每个-run-20-次工具调用).
 
 - [x] Under #52, measure verified projection throughput for 200-call Runs with native tool intents, results, compaction and closure. [Mixed long-Run capacity](reports/tool-loop-capacity-20261121.md).
@@ -20,7 +22,7 @@
 
 - [x] Check preferred Worker continuation after an idle directory, compute or Workspace change, including cold fallback and the provider-facing native context. Compare execution-side history batching with single-record projection on real Kafka. [Study and remaining load boundary](reports/workspace-continuation-rate-20261121.md).
 
-- [ ] **P0 · first implementation milestone.** [#52](https://github.com/cookerpapa/pi-managed-agents/issues/52) — cold-open the same Run on a replacement Worker while a child Conversation is waiting for a real sandbox Tool. Verify the original reply, deadline, single execution and parent continuation before implementing the database placement alternatives in [#51](https://github.com/cookerpapa/pi-managed-agents/issues/51).
+- [ ] **P0 · first implementation milestone.** [#52](https://github.com/cookerpapa/pi-managed-agents/issues/52) — the first active child Bash handoff is verified. Extend the same entry points to successive writer epochs and compacted, multi-tool families. Check the native-state memory cost and serving-history independence before cutting over or evaluating the [#51 database placement alternatives](https://github.com/cookerpapa/pi-managed-agents/issues/51).
 
 - [x] Route prototype Workspace execution, Stop and reply recovery by operation identity. [Execution-owned routing](adr/0344-execution-owned-operation-routing-study.md).
 
