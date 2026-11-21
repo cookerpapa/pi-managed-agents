@@ -18,6 +18,12 @@ Pi Managed Agents is a personal infrastructure project with integration and fail
 acceptance on a single-host K3s deployment. It has not been validated at fleet
 scale or as a highly available production service.
 
+In a single-host benchmark, one prototype Projector processed session logs and
+tool dispatches for **17–18 Agent Runs per second** with 20 tool calls per Run.
+That rate extrapolates to about **1.5 million Runs per day**. The short test used
+Pi, Kafka and PostgreSQL with simulated model and sandbox endpoints.
+[Benchmark setup and results](https://github.com/cookerpapa/pi-managed-agents/blob/97fc0407bae6f73fcceaf6014769b08bb3d1cc2b/docs/reports/tool-loop-capacity-20261121.md#每天百万-run每个-run-20-次工具调用)
+
 [Alternate runtime acceptance](docs/reports/alternate-runtimes-20261112.md) covers
 an explicit stock BoxLite backend and Android operator targets. Linux providers
 share the fixed Guest; device operations share the original-reply recovery and
