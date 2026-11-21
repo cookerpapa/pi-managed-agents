@@ -66,7 +66,7 @@ export function singleBashRecords({ entries, ops }) {
   ];
 }
 
-export async function omitVerifiedBashWait(db, runId, writerId, state) {
+export async function omitVerifiedBashWait(db, runId, state) {
   const {
     rows: [r],
   } = await db.query("select projection_tools from runs where id=$1", [runId]);
@@ -88,13 +88,4 @@ export async function omitVerifiedBashWait(db, runId, writerId, state) {
     );
     state.records.splice(index, 1);
   }
-  const [target] = state.targets;
-  assert.equal(state.targets.length, 1);
-  assert.deepEqual(target, {
-    taskId: ops[0].taskId,
-    operationId: ops[0].operationId,
-    writerId,
-    activationId: target.activationId,
-  });
-  state.targets = [{ taskId: target.taskId, activationId: target.activationId }];
 }

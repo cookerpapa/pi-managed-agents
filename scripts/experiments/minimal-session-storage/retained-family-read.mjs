@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-consumer.ts";
-import { decodeSessionLogFact } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
+import { decodeWorkspaceFact, operationsFor } from "./workspace-operations.mjs";
 import { InboxDoc } from "@earendil-works/pi-durable";
 
 import { openingHead, priorState, readPrefix, restoreSettled } from "./session-prefix.mjs";
@@ -82,7 +82,7 @@ export async function readRetainedFamily(
   const pgReadMs = performance.now() - pgStart;
   const intents = Object.values(owner.projection_tools);
   const pendingIds = new Set(intents.map((op) => op.operationId));
-  const originalTargets = new Map();
+  const witnessed = new Map();
   const entries = new Map(rows.map((r) => [r.id, r]));
   const id = randomUUID(),
     originalWriter = seal.writerId;
@@ -110,7 +110,7 @@ export async function readRetainedFamily(
           return [b.partition, b.low];
         }),
       ),
-    decode: (v) => decodeSessionLogFact(v).fact,
+    decode: (v) => decodeWorkspaceFact(v).fact,
     handler: async (r) => {
       if (r.offset > cut || failure) return;
       try {
@@ -152,17 +152,19 @@ export async function readRetainedFamily(
           return;
         }
         const { seq, nextId, writes } = f.commit;
-        if (seq === count && isDeepStrictEqual(f, lastAccepted)) return;
+        if (
+          seq === count &&
+          isDeepStrictEqual(f, lastAccepted) &&
+          isDeepStrictEqual(operationsFor(f), operationsFor(lastAccepted))
+        )
+          return;
         if (seq !== count + 1)
           throw Error(
             "Incomplete accepted native prefix: expected " + (count + 1) + ", got " + seq,
           );
-        for (const tool of f.tools) {
-          if (tool.target === "cube" && pendingIds.has(tool.request.operationId))
-            originalTargets.set(tool.request.operationId, {
-              activationId: tool.request.activationId,
-              writerId: f.scope.writerId,
-            });
+        for (const op of operationsFor(f)) {
+          if (op.action === "execute" && pendingIds.has(op.operationId))
+            witnessed.set(op.operationId, op);
         }
         const recovered = writes.map((w, ordinal) => {
           if (w.type !== "entry") return w;
@@ -239,9 +241,10 @@ export async function readRetainedFamily(
   }
   return {
     intents: intents.map((op) => {
-      const target = originalTargets.get(op.operationId);
-      assert(target, "Missing original dispatch target");
-      return { ...op, ...target };
+      const wire = witnessed.get(op.operationId);
+      assert(wire && wire.taskId === op.taskId && wire.conversationId === op.conversationId);
+      assert.deepEqual(wire.reply, op.reply);
+      return op;
     }),
     stats: {
       firstAvailable: String(low),

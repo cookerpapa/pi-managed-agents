@@ -17,7 +17,13 @@ export async function installStudyHandoff(db) {
     grant select (tenant_id,id,root_run_id,parent_session_id,parent_tool_call_id,child_session_id,child_turn_id,source_kind,source_record_id)
       on public.subagent_conversations to family_reader;
     grant select (tenant_id,id,pi_conversation_id) on public.sessions to family_reader;
-    grant select (id,tenant_id,aggregate_type,payload,published_at) on public.outbox to family_reader;
+    create view candidate.family_recovery_seals as
+      select id, tenant_id, payload#>>'{scope,runId}' as run, payload#>>'{scope,sessionId}' as session,
+        payload#>>'{scope,piSessionId}' as physical_session, payload#>>'{scope,writerId}' as writer,
+        payload#>>'{scope,fencingToken}' as epoch
+      from public.outbox where aggregate_type='session_terminal_event' and published_at is not null
+        and payload->>'kind'='execution_seal' and payload->>'recover'='true';
+    grant select on candidate.family_recovery_seals to family_reader;
     grant select (tenant_id,pi_session_id,lease_id,fencing_token,writer_seal_offset,writer_sealed_at)
       on public.session_leases to family_reader`);
 }
@@ -96,7 +102,6 @@ export async function compareQueuedRequests(pool, view, r, env, submission) {
 
 export class SealStudy {
   records = new Map();
-  targets = new Map();
   sequences = new Map();
   seq = 0;
   nextId = 2;
@@ -113,8 +118,6 @@ export class SealStudy {
         case "submission":
         case "task":
           this.records.set(w.value.id, { seq: batch.seq, write: w });
-          if (w.type === "task" && ["completing", "terminal"].includes(w.value.state.status))
-            this.targets.delete(w.value.id);
           break;
         case "document.create":
           assert.equal(w.content.kind, "base");
@@ -144,15 +147,6 @@ export class SealStudy {
           throw Error("Unmeasured native write in seal study: " + w.type);
       }
     }
-    for (const t of f.tools) {
-      assert.equal(t.target, "cube");
-      this.targets.set(t.taskId, {
-        taskId: t.taskId,
-        operationId: t.request.operationId,
-        activationId: t.request.activationId,
-        writerId: f.scope.writerId,
-      });
-    }
     for (const d of f.display)
       this.sequences.set(
         d.scope.sessionId,
@@ -169,12 +163,11 @@ export class SealStudy {
       seq: this.seq,
       nextId: this.nextId,
       records: [...this.records.values()].filter((v) => !v.inbox),
-      targets: [...this.targets.values()],
       sequences: [...this.sequences],
     };
     if (bashFields) {
       const { omitVerifiedBashWait } = await import("./bash-wait-fields.mjs");
-      await omitVerifiedBashWait(db, f.scope.runId, f.scope.writerId, state);
+      await omitVerifiedBashWait(db, f.scope.runId, state);
     }
     const result = await db.query(
       `with advanced as (

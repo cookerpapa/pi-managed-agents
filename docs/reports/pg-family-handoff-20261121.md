@@ -44,6 +44,8 @@ A 使用 Pi 的原生提交接口，用一个随机请求 ID 提交子 follow-up
 
 ## 单次 Bash 等待具体用到哪些字段
 
+以下结果对应提交 6d1c2566。后续原型把原 Guest 绑定移到了执行侧，见[按操作编号路由的验证](workspace-operation-routing-20261121.md)。
+
 字段核对限定为固定 Pi 1.0.0、同一轮只有一个已派发的 Bash、工具尚未收到原生取消标记、第一次 writer 交接。父 Agent 的委派、子 Conversation、Submission 和原生文档沿用上一组对照。此次专门检验子 Agent 的 Bash Task 及直接等待它的 generation Task，两者在封口时都从实验交接记录中移除。
 
 | Pi 或执行层需要的值 | 现有来源及适用条件 |

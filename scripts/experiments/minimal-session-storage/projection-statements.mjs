@@ -28,7 +28,7 @@ const settledHead = `case when $5::jsonb ? 'recount' then ($5::jsonb - 'recount'
 export const finishStatement = (
   head,
   releaseRecovery = false,
-) => `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=" + settledHead : ""}${releaseRecovery ? ",projection_state=null,projection_partition=null,projection_first=null,projection_pin=null" : ""}
+) => `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=" + settledHead : ""}${releaseRecovery ? ",projection_state=null,projection_partition=null,projection_first=null,projection_pin=null,cancel_positions='{}'::jsonb" : ""}
      where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running'${releaseRecovery ? " and projection_tools='{}'::jsonb" : ""} returning id`;
 
 export const projectionTemplates = {

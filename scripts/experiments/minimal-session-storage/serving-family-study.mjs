@@ -17,6 +17,10 @@ import { SessionProjector } from "../../../packages/runtime-core/src/session-pro
 import { createExecutionReference } from "@pi-cloud/protocol";
 import { PostgresSubagentConversations } from "../../../packages/subagent-control/src/postgres-subagent-conversations.ts";
 import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
+import { KafkaToolReplyMailbox } from "../../../packages/event-log/src/tool-replies.ts";
+import { decodeWorkspaceFact, operationsFor } from "./workspace-operations.mjs";
+import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
+import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-consumer.ts";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -32,6 +36,7 @@ const {
   cube,
   pgHandoff,
   bashFields,
+  scene,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
 assert(
   brokers.length === 3 &&
@@ -80,16 +85,52 @@ const readerUrl = new URL(dbUrl);
 readerUrl.username = "family_reader";
 const cases = new Map();
 let projector, app, api, tenant;
-async function scenario(guest, mode) {
+const resources = new Map();
+const probeMailbox = new KafkaToolReplyMailbox({
+  brokers: replyBrokers,
+  bootId: randomUUID(),
+  replicas: 3,
+});
+const newRouter = () =>
+  new WorkspaceOperationRouter({
+    pool,
+    view,
+    env,
+    select: (scope) => cases.get(scope.runId).currentBinding,
+    resolve: (id) => resources.get(id),
+  });
+let router = newRouter();
+async function scenario(guest, mode, replacement) {
   const prompt = "Delegate to the child " + randomUUID(),
     project = await api.createProject(mode),
     session = await api.createSession(project.projectId, project.workspaceId, mode, "elastic"),
     input = await api.acceptTurn(session.sessionId, prompt, randomUUID());
   assert(input.runId && input.state === "queued");
+  const stopped = mode === "user-stop" || mode === "active-stop";
   const runId = input.runId,
     binding = randomUUID(),
     dir = await guest.directory(binding),
-    state = { dir, mode, binding, dispatches: 0, cancels: 0, probes: 0 };
+    state = { mode, currentBinding: binding, dispatches: 0, cancels: 0, probes: 0 };
+  resources.set(binding, {
+    async submit(r, cmd, ref) {
+      assert.equal(++state.dispatches, 1);
+      state.ref = ref;
+      state.operation = cmd.request.operationId;
+      await dir.submit(
+        r,
+        cmd,
+        ref,
+        mode === "reply-timeout" ? Date.now() + 120000 : ref.deadlineAt,
+      );
+    },
+    async cancel(r, request) {
+      assert.equal(request.operationId, state.operation);
+      assert.equal(request.originalWriterId, state.firstWriter);
+      await dir.cancel(r, request);
+      state.cancels++;
+    },
+    probe: (...args) => dir.probe(...args),
+  });
   if (pgHandoff) state.study = new SealStudy();
   cases.set(runId, state);
   let a, b, witness;
@@ -109,7 +150,6 @@ async function scenario(guest, mode) {
       topic,
       brokers,
       replyBrokers,
-      ...(pgHandoff && seal ? {} : { binding }),
       pgHandoff,
       bashFields,
       ...(pgHandoff ? { pgResume: !!seal } : { seal }),
@@ -127,6 +167,7 @@ async function scenario(guest, mode) {
   try {
     a = spawn();
     const first = await scopeOf(a);
+    state.firstWriter = first.writerId;
     a.proc.send({ kind: "start" });
     const request = await a.wait("delegateRequest");
     await wait(() => state.seq >= request.sequence, "accepted parent task");
@@ -189,7 +230,11 @@ async function scenario(guest, mode) {
     await witness.start();
     await witness.waitUntilAssigned(25000);
     let expiryToSeal, cold;
-    if (mode === "normal") {
+    if (mode === "active-stop") {
+      const c = await api.cancelTurn(session.sessionId, input.turnId, randomUUID());
+      state.stopReceipt = c.controlRequestId;
+      a.proc.send({ kind: "stop" });
+    } else if (mode === "normal") {
       await dir.release();
     } else {
       const killed = Date.now();
@@ -257,8 +302,35 @@ async function scenario(guest, mode) {
         });
         await witness.waitUntilInitialReplay(await witness.captureEndOffsets());
       }
+      // Forget the dispatch adapter. A newer resource may now serve this Run.
+      router = newRouter();
+      if (replacement) {
+        state.currentBinding = randomUUID();
+        const newer = await replacement.directory(state.currentBinding);
+        state.replacementMarker = newer.marker;
+        resources.set(state.currentBinding, {
+          async submit() {
+            throw Error("Old operation was started on the replacement Guest");
+          },
+          async cancel() {
+            throw Error("Old operation was cancelled on the replacement Guest");
+          },
+        });
+      }
       b = spawn(state.seal);
       const second = await scopeOf(b);
+      if (replacement) {
+        await router.spans.activate(
+          { ...second, sessionId: child.childSessionId, turnId: child.childTurnId },
+          child.conversationId,
+          { topic, partition: 0, offset: BigInt(state.seal.offset) + 1n },
+          state.currentBinding,
+          () => projector.ownsPartition(0),
+        );
+        // The new selector has no old in-memory operation/route state.
+        router = newRouter();
+      }
+      state.probeRecipient = { scope: second, proc: b.proc };
       assert.notEqual(first.writerId, second.writerId);
       assert.equal(second.fencingToken, first.fencingToken + 1);
       assert.equal((await b.wait("claimed")).stopOnResume, mode === "user-stop");
@@ -285,9 +357,9 @@ async function scenario(guest, mode) {
       }
     }
     const active = b ?? a;
-    const outcome = await active.wait(mode === "user-stop" ? "stopped" : "finished");
-    if (mode === "user-stop") {
-      assert.equal((await b.wait("stopAcknowledged")).receipt, state.stopReceipt);
+    const outcome = await active.wait(stopped ? "stopped" : "finished");
+    if (stopped) {
+      assert.equal((await active.wait("stopAcknowledged")).receipt, state.stopReceipt);
       assert.equal(outcome.models, 0);
       assert.equal(outcome.cancellations, 1);
     }
@@ -296,7 +368,7 @@ async function scenario(guest, mode) {
       assert(unknown.at >= unknown.deadline);
       assert.equal(unknown.deadline, state.ref.deadlineAt);
     }
-    const terminal = mode === "user-stop" ? "cancelled" : "completed";
+    const terminal = stopped ? "cancelled" : "completed";
     await wait(
       async () => state.end && (await api.getRun(runId)).state === terminal,
       "HTTP terminal",
@@ -307,6 +379,7 @@ async function scenario(guest, mode) {
       await dir.release();
     }
     await wait(() => reply, "original Guest reply");
+    assert(!JSON.stringify(reply).includes(binding), "Guest reply disclosed its binding");
     const history = await api.getConversation(session.sessionId);
     assert(JSON.stringify(history).includes(prompt));
     const childPage = await api.getConversation(child.childSessionId);
@@ -319,7 +392,7 @@ async function scenario(guest, mode) {
       assert(JSON.stringify(history).includes(await dir.result()));
     if (mode === "reply-timeout")
       assert(JSON.stringify(history).includes("PARENT CHILD UNKNOWN tool_reply_timeout"));
-    if (mode === "user-stop") assert.equal(state.cancels, 1);
+    if (stopped) assert.equal(state.cancels, 1);
     const canonical = await pool.query(
       "select content from messages where run_id=$1 and conversation_id=$2 and role='toolResult'",
       [runId, child.conversationId],
@@ -327,7 +400,7 @@ async function scenario(guest, mode) {
     const toolResults = canonical.rows
       .map((r) => JSON.parse(r.content).model[0])
       .filter((m) => m.toolName === "bash");
-    if (mode !== "user-stop") {
+    if (!stopped) {
       assert.equal(toolResults.length, 1);
       assert.equal(Boolean(toolResults[0].isError), mode === "reply-timeout");
     }
@@ -340,7 +413,7 @@ async function scenario(guest, mode) {
       );
       assert(!JSON.stringify(toolResults).includes(await dir.result()));
     }
-    if (mode === "user-stop") {
+    if (stopped) {
       const receipt = await database
         .selectFrom("turn_control_requests")
         .select(["state", "acknowledged_at", "completed_at"])
@@ -350,6 +423,19 @@ async function scenario(guest, mode) {
     }
     const check = await pool.query("select projection_tools from runs where id=$1", [runId]);
     assert.deepEqual(check.rows[0].projection_tools, {});
+    assert.deepEqual(
+      (await pool.query("select cancel_positions from runs where id=$1", [runId])).rows[0]
+        .cancel_positions,
+      {},
+    );
+    assert.equal(
+      (await pool.query("select 1 from workspace_route_spans where run_id=$1", [runId])).rowCount,
+      0,
+    );
+    if (replacement) {
+      assert.notEqual(state.currentBinding, binding);
+      assert.equal(await state.replacementMarker(), "");
+    }
     assert.equal((await api.getRun(runId)).state, terminal);
     assert.equal(state.dispatches, 1);
     assert.equal(await dir.marker(), "once");
@@ -358,6 +444,7 @@ async function scenario(guest, mode) {
       terminal,
       publicChildView: true,
       originalRunReclaimed: !!b,
+      ...(replacement ? { changedGuestBeforeStop: true, cancelledOriginalGuestOnly: true } : {}),
       physicalDispatches: state.dispatches,
       guestExecutions: 1,
       cancelCommands: state.cancels,
@@ -367,11 +454,11 @@ async function scenario(guest, mode) {
       readinessProbes: state.probes,
       finalOutputToProjectionMs: outcome.finalModelAt ? state.endAt - outcome.finalModelAt : null,
       replacementBashIntents: b ? outcome.newIntents : null,
-      ...(mode === "user-stop"
+      ...(stopped
         ? { modelsAfterStop: outcome.models, childQueuedSubmissionAtStop: outcome.queuedStatus }
         : {}),
       replyAfterTerminal: mode === "reply-timeout",
-      ...(pgHandoff
+      ...(pgHandoff && b
         ? {
             candidateRowsIdenticalForDifferentRequestIds: state.ambiguous,
             requestIdAbsentFromExistingProjectorView: state.requestAbsentFromMemory,
@@ -386,11 +473,15 @@ async function scenario(guest, mode) {
     await a?.close();
     await b?.close();
     await witness?.close();
+    resources.delete(binding);
+    resources.delete(state.currentBinding);
   }
 }
 try {
   await sessionAdmin?.connect();
   await replyAdmin.connect();
+  await probeMailbox.start();
+  replyBoots.add(probeMailbox.topic.slice("pi-cloud.tool-replies.v4.".length));
   await replyCopies.connect();
   assert.equal(
     (await pool.query("select count(*)::int n from pg_tables where schemaname='public'")).rows[0].n,
@@ -416,75 +507,80 @@ try {
     ).rows[0].allowed,
     false,
   );
+  await installWorkspaceRoutes(pool);
   if (pgHandoff) await installStudyHandoff(pool);
   tenant = await createPrivateTenant(database, {
     slug: "family-study",
     ownerDisplayName: "Family study",
   });
-  projector = new SessionProjector({
-    database,
-    publicationDatabase: database,
-    notificationConnectionString: dbUrl,
-    brokers,
-    topic,
-    clientId: topic,
-    partitions: 1,
-    replicas: 3,
-    retentionMs: 604800000,
-    publicationToken: randomUUID() + randomUUID(),
-    advertisedBaseUrl: "http://127.0.0.1:9",
-    executionProbes: {
-      reset() {},
-      consume(f, current) {
-        const s = cases.get(f.scope.runId);
-        assert(
-          current() &&
-            s &&
-            s.mode === "reply-timeout" &&
-            f.execution.bindings[0].bindingId === s.binding,
-        );
-        s.probes++;
-        void s.dir.probe(f).catch((e) => {
-          s.error = e;
-        });
+  projector = new SessionProjector(
+    {
+      database,
+      publicationDatabase: database,
+      notificationConnectionString: dbUrl,
+      brokers,
+      topic,
+      clientId: topic,
+      partitions: 1,
+      replicas: 3,
+      retentionMs: 604800000,
+      publicationToken: randomUUID() + randomUUID(),
+      advertisedBaseUrl: "http://127.0.0.1:9",
+      executionProbes: {
+        reset() {
+          router.spans.reset();
+        },
+        consume(f, current) {
+          const s = cases.get(f.scope.runId);
+          if (!s || !current()) return;
+          void (async () => {
+            const [op] = operationsFor(f);
+            assert.equal(op.action, "probe");
+            const route = await router.original(f.scope, op, { topic, partition: 0 });
+            const recipient = s.probeRecipient;
+            const valid = () =>
+              current() &&
+              s.probeRecipient === recipient &&
+              recipient?.scope.writerId === f.scope.writerId &&
+              recipient?.scope.fencingToken === f.scope.fencingToken &&
+              recipient.proc.connected;
+            if (!valid()) return;
+            let ready = false;
+            if (route && resources.has(route.bindingId)) {
+              const signal = AbortSignal.timeout(10000);
+              const echo = probeMailbox.waitProbe(f.factId, route.bindingId, signal);
+              const [proof] = await Promise.all([
+                echo,
+                resources
+                  .get(route.bindingId)
+                  .probe({ ...f, execution: { replyTopic: probeMailbox.topic } }),
+              ]);
+              ready = proof.evidence.bindingId === route.bindingId && valid();
+            }
+            if (valid())
+              recipient.proc.send({
+                kind: "probeVerdict",
+                probeId: f.factId,
+                operationId: op.operationId,
+                ready,
+              });
+            s.probes++;
+          })().catch((e) => {
+            s.error = e;
+          });
+        },
       },
-    },
-    toolCommands: {
-      async consume(r) {
-        const f = r.fact,
-          s = cases.get(f.scope?.runId);
-        if (!s) return;
-        try {
-          if (f.kind === "tool_command") {
-            assert.equal(++s.dispatches, 1);
-            s.ref = f.replyRecovery;
-            s.operation = f.request.operationId;
-            await s.dir.submit(
-              r,
-              f,
-              s.ref,
-              s.mode === "reply-timeout" ? Date.now() + 120000 : s.ref.deadlineAt,
-            );
-          }
-          if (f.kind === "tool_cancel") {
-            assert.equal(f.request.operationId, s.operation);
-            assert.equal(f.request.originalWriterId, s.seal.writerId);
-            await s.dir.cancel(r, f.request);
-            s.cancels++;
-          }
-        } catch (e) {
-          s.error = e;
-          throw e;
-        }
+      toolCommands: {
+        async consume(r) {
+          assert(["execution_seal", "work_finished"].includes(r.fact.kind));
+        },
       },
-    },
-    nativeChanges: {
-      async consume(r, current) {
-        const f = r.fact,
-          s = cases.get(f.scope.runId);
-        if (!s) return;
-        try {
-          if (f.kind === "durable_commit") {
+      controlTools: {
+        async consume(r, current, grant) {
+          const f = r.fact,
+            s = cases.get(f.scope.runId);
+          if (!s || f.kind !== "durable_commit") return;
+          try {
             if (s.study && !s.seal) {
               const q = f.commit.writes.find(
                 (w) => w.type === "submission" && w.value.status === "queued",
@@ -495,47 +591,77 @@ try {
               }
               s.study.observe(f);
             }
-            await view.apply([r], current, (item, d) => projectRecord(item, d, env));
+            await router.consume(r, current, grant);
             s.seq = f.commit.seq;
-          } else if (f.kind === "execution_seal" || f.kind === "work_finished") {
-            const from = view.next.get(0);
-            if (s.study && f.kind === "execution_seal") {
-              const original = view.sessions.get(f.scope.runId);
-              assert(s.queuedId && original && original.seq === s.study.seq);
-              s.requestAbsentFromMemory = !JSON.stringify(original, (_, v) =>
-                typeof v === "bigint" ? String(v) : v,
-              ).includes(s.queuedId);
-              s.snapshotBytes = await s.study.seal(pool, r, from, bashFields);
-            } else
-              assert.equal(
-                (
-                  await pool.query(
-                    "update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3",
-                    [String(r.offset + 1n), topic, String(from)],
-                  )
-                ).rowCount,
-                1,
-              );
-            view.next.set(0, r.offset + 1n);
-            if (f.kind === "execution_seal")
-              s.seal = {
-                factId: f.factId,
-                offset: String(r.offset),
-                writerId: f.scope.writerId,
-                epoch: f.scope.fencingToken,
-              };
-            if (f.kind === "work_finished") {
-              s.end = f.terminal.type;
-              s.endAt = Date.now();
-            }
+          } catch (e) {
+            s.error = e;
+            throw e;
           }
-        } catch (e) {
-          s.error = e;
-          throw e;
-        }
+        },
+      },
+      nativeChanges: {
+        async consume(r, current) {
+          const f = r.fact,
+            s = cases.get(f.scope.runId);
+          if (!s) return;
+          try {
+            if (f.kind === "work_finished" || f.kind === "execution_seal") {
+              const from = view.next.get(0);
+              if (s.study && f.kind === "execution_seal") {
+                const original = view.sessions.get(f.scope.runId);
+                assert(s.queuedId && original && original.seq === s.study.seq);
+                s.requestAbsentFromMemory = !JSON.stringify(original, (_, v) =>
+                  typeof v === "bigint" ? String(v) : v,
+                ).includes(s.queuedId);
+                s.snapshotBytes = await s.study.seal(pool, r, from, bashFields);
+              } else
+                assert.equal(
+                  (
+                    await pool.query(
+                      f.kind === "work_finished"
+                        ? `with advance as (update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3 returning 1),
+                      retired as (delete from workspace_route_spans where run_id=$4 and exists(select 1 from advance)),
+                      cleared as (update runs set cancel_positions='{}'::jsonb where id=$4 and cancel_positions<>'{}'::jsonb and exists(select 1 from advance))
+                      select * from advance`
+                        : "update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3",
+                      [
+                        String(r.offset + 1n),
+                        topic,
+                        String(from),
+                        ...(f.kind === "work_finished" ? [f.scope.runId] : []),
+                      ],
+                    )
+                  ).rowCount,
+                  1,
+                );
+              view.next.set(0, r.offset + 1n);
+              if (f.kind === "execution_seal")
+                s.seal = {
+                  factId: f.factId,
+                  offset: String(r.offset),
+                  writerId: f.scope.writerId,
+                  epoch: f.scope.fencingToken,
+                };
+              if (f.kind === "work_finished") {
+                router.spans.forget(f.scope);
+                s.end = f.terminal.type;
+                s.endAt = Date.now();
+              }
+            }
+          } catch (e) {
+            s.error = e;
+            throw e;
+          }
+        },
       },
     },
-  });
+    (bytes) => {
+      const wire = bytes.toString();
+      for (const id of resources.keys())
+        assert(!wire.includes(id), "Execution-private binding escaped into the Session log");
+      return decodeWorkspaceFact(bytes);
+    },
+  );
   await projector.start();
   await until(() => projector.ownsPartition(0), "serving assignment");
   app = await createControlPlaneApplication({
@@ -550,19 +676,28 @@ try {
   const origin = await app.getUrl();
   api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), tenant.credential.token);
   const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
-  for (const mode of bashFields
-    ? ["serving-pending", "user-stop"]
+  const modes = bashFields
+    ? ["active-stop", "serving-pending", "user-stop"]
     : pgHandoff
-      ? handoffs
-      : ["normal", ...handoffs]) {
+      ? ["active-stop", ...handoffs]
+      : ["normal", "active-stop", ...handoffs];
+  if (scene) assert(modes.includes(scene), "Unknown scene for this study");
+  for (const mode of scene ? [scene] : modes) {
     console.log("Starting " + mode);
-    results.push(await withFamilyGuest(cube, (guest) => scenario(guest, mode)));
+    results.push(
+      await withFamilyGuest(cube, (guest) =>
+        mode === "user-stop"
+          ? withFamilyGuest(cube, (other) => scenario(guest, mode, other))
+          : scenario(guest, mode),
+      ),
+    );
     console.log(JSON.stringify(results.at(-1)));
   }
 } finally {
   try {
     await app?.close();
     await projector?.close();
+    await probeMailbox.shutdown();
   } finally {
     try {
       const owned = [...replyBoots].map((id) => "pi-cloud.tool-replies.v4." + id),

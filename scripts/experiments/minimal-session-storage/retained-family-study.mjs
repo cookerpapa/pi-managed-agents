@@ -5,11 +5,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import pg from "pg";
 import native from "@confluentinc/kafka-javascript";
 import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-consumer.ts";
-import {
-  encodeSessionLogFact,
-  decodeSessionLogFact,
-} from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
-import { toolCommandsForFact } from "../../../packages/runtime-core/src/tool-invocation-fact.ts";
+import { encodeSessionLogFact } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
+import { decodeWorkspaceFact } from "./workspace-operations.mjs";
+import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
+import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectRecord } from "./project-record.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -136,6 +135,22 @@ async function scenario(guest, mode) {
     );
     view.next.set(0, r.offset + 1n);
   }
+  const router = new WorkspaceOperationRouter({
+    pool: db,
+    view,
+    env,
+    select: () => binding,
+    resolve: (id) => {
+      assert.equal(id, binding);
+      return {
+        async submit(r, cmd, ref) {
+          assert.equal(++dispatchCount, 1, "Duplicate physical dispatch");
+          await dir.submit(r, cmd, ref);
+          dispatch = { ref, op: cmd.request.operationId, offset: r.offset };
+        },
+      };
+    },
+  });
   const reader = new KafkaLogConsumer({
     brokers,
     topic,
@@ -143,7 +158,7 @@ async function scenario(guest, mode) {
     groupId: topic,
     orderedEffects: true,
     groupRecovery: true,
-    decode: (v) => decodeSessionLogFact(v).fact,
+    decode: (v) => decodeWorkspaceFact(v).fact,
     handler: async (r, current, grant) => {
       if (failed) throw failed;
       try {
@@ -194,7 +209,8 @@ async function scenario(guest, mode) {
           await advance(r);
           return;
         }
-        await view.apply([r], current, (item, d) => projectRecord(item, d, env));
+        if (f.kind === "durable_commit") await router.consume(r, current, grant);
+        else await view.apply([r], current, (item, d) => projectRecord(item, d, env));
         if (f.kind === "durable_commit") {
           const creation = f.commit.writes.find(
             (w) =>
@@ -205,18 +221,13 @@ async function scenario(guest, mode) {
             childCreationOffset = r.offset;
         }
         if (f.kind === "work_finished") {
+          await db.query(
+            "delete from workspace_route_spans where run_id=$1 and exists(select 1 from runs where id=$1 and state='completed')",
+            [f.scope.runId],
+          );
+          router.spans.forget(f.scope);
           settledAt = Date.now();
           return;
-        }
-        if (view.canDeliver(r)) {
-          assert(current() && (await grant()));
-          const [cmd] = toolCommandsForFact(f);
-          assert(cmd?.request.toolName === "bash");
-          dispatchCount++;
-          assert.equal(dispatchCount, 1, "Duplicate physical dispatch");
-          const ref = f.tools[0].replyRecovery;
-          await dir.submit(r, cmd, ref);
-          dispatch = { ref, op: cmd.request.operationId, offset: r.offset };
         }
       } catch (e) {
         failed = e;
@@ -246,7 +257,7 @@ async function scenario(guest, mode) {
       cancellations: [],
     };
     if (prior) {
-      old = worker({ dbUrl, brokers, topic, scope: prior, binding, mode: "seed" });
+      old = worker({ dbUrl, brokers, topic, scope: prior, mode: "seed" });
       await old.wait("seedFinished");
       assert.equal((await old.ended).code, 0);
       await reader.waitUntilInitialReplay(await reader.captureEndOffsets());
@@ -266,7 +277,7 @@ async function scenario(guest, mode) {
     const wrongWriter = { ...first, writerId: randomUUID() };
     await send(topic, { ...decoy, scope: wrongWriter, factId: randomUUID() });
     note("starting-A");
-    old = worker({ dbUrl, brokers, topic, scope: first, binding, mode });
+    old = worker({ dbUrl, brokers, topic, scope: first, mode });
     await until(() => checked(() => !!dispatch), "original dispatch", 55000);
     await until(() => checked(async () => (await dir.marker()) === "once"), "Guest marker");
     old.proc.send({ kind: "queue" });
@@ -365,7 +376,7 @@ async function scenario(guest, mode) {
       });
     }
     note("starting-B");
-    successor = worker({ dbUrl, brokers, topic, scope: second, binding, seal, mode });
+    successor = worker({ dbUrl, brokers, topic, scope: second, seal, mode });
     if (mode === "expired") {
       const gap = await successor.wait("expired");
       assert.equal(gap.writes, 0);
@@ -454,6 +465,7 @@ try {
   await db.query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
   const setup = new ReadyProjection(db, "unused", new Map(), projectionTemplates);
   await setup.install();
+  await installWorkspaceRoutes(db);
   await admin.connect();
   await producer.connect();
   for (const mode of ["already-returned", "pending", "prior-rotated", "expired"]) {

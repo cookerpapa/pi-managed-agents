@@ -10,11 +10,9 @@ async function readCandidateAtSeal(db, scope, topic) {
     `select r.projection_state,r.projection_tools,
       l.writer_seal_offset::text,l.lease_id as old_writer,o.id as seal_id,h.next_offset::text
     from public.runs r join public.session_leases l on l.tenant_id=r.tenant_id and l.pi_session_id=$5
-    join public.outbox o on o.tenant_id=r.tenant_id and o.aggregate_type='session_terminal_event' and o.published_at is not null
-      and o.payload->>'kind'='execution_seal' and o.payload->>'recover'='true'
-      and o.payload#>>'{scope,writerId}'=l.lease_id::text and o.payload#>>'{scope,runId}'=r.id::text
-      and o.payload#>>'{scope,piSessionId}'=l.pi_session_id and o.payload#>>'{scope,sessionId}'=r.session_id::text
-      and o.payload#>>'{scope,fencingToken}'=l.fencing_token::text
+    join candidate.family_recovery_seals o on o.tenant_id=r.tenant_id and o.run=r.id::text
+      and o.session=r.session_id::text and o.writer=l.lease_id::text
+      and o.physical_session=l.pi_session_id and o.epoch=l.fencing_token::text
     join candidate.accepted_fact_projection_offsets h on h.topic=$4 and h.partition=0
     where r.id=$1 and r.lease_id=$2 and l.fencing_token=$3 and l.writer_sealed_at is not null`,
     [scope.runId, scope.writerId, scope.fencingToken - 1, topic, scope.piSessionId],
@@ -147,7 +145,7 @@ export async function readFamilyPgControl({
     await partial.close();
   }
   const denied = await db.query(
-    "select has_table_privilege(current_user,'candidate.study_family_handoffs','select') or has_table_privilege(current_user,'public.pi_durable_current','select') as leaked",
+    "select has_table_privilege(current_user,'candidate.study_family_handoffs','select') or has_table_privilege(current_user,'public.pi_durable_current','select') or has_column_privilege(current_user,'public.runs','cancel_positions','select') or has_table_privilege(current_user,'candidate.workspace_route_spans','select') or has_column_privilege(current_user,'public.outbox','payload','select') as leaked",
   );
   assert.equal(denied.rows[0].leaked, false);
 
@@ -177,9 +175,6 @@ export async function readFamilyPgControl({
       );
       state.records.push(row);
     }
-    const sealed = state.targets.find((t) => t.taskId === original.taskId);
-    assert.deepEqual(Object.keys(sealed).sort(), ["activationId", "taskId"]);
-    Object.assign(sealed, { operationId: original.operationId, writerId: rows.owner.old_writer });
   }
   importFamily(store, rows, state, presentation);
   const sub = await store.submission(rows.queued.id, ctx);
@@ -189,12 +184,10 @@ export async function readFamilyPgControl({
     (await store.submissionByRequest(original.conversationId, queuedKey, ctx)).id,
     sub.id,
   );
-  const target = state.targets.find((t) => t.taskId === original.taskId);
-  assert.equal(target.operationId, original.operationId);
-  assert.equal(target.writerId, rows.owner.old_writer);
+  assert(!("targets" in state));
   const tasks = (await store.scanTasks({}, 100, undefined, ctx)).items;
   const restored = {
-    intents: [{ ...original, ...target }],
+    intents: rows.ops,
     stats: {
       ...(bashFields ? { nativeTaskRecordsRebuiltFromCandidate: 2 } : {}),
       candidateOnlyTasksVisibleToPi: inspected,

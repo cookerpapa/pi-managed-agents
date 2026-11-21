@@ -4,6 +4,8 @@
 
 - [ ] **P0 · first implementation milestone.** [#52](https://github.com/cookerpapa/pi-managed-agents/issues/52) — cold-open the same Run on a replacement Worker while a child Conversation is waiting for a real sandbox Tool. Verify the original reply, deadline, single execution and parent continuation before implementing the database placement alternatives in [#51](https://github.com/cookerpapa/pi-managed-agents/issues/51).
 
+- [x] Route prototype Workspace execution, Stop and reply recovery by operation identity. [Execution-owned routing](adr/0344-execution-owned-operation-routing-study.md).
+
 - [x] Identify and verify the PG fields for a single fixed Bash task and its waiting generation under #52. [Field comparison](reports/pg-family-handoff-20261121.md#单次-bash-等待具体用到哪些字段).
 
 - [x] Compare candidate-only PG reads with a seal-time state capture, including native input identity and original Guest reply recovery. [PG-only study](reports/pg-family-handoff-20261121.md).

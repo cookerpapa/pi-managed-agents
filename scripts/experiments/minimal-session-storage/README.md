@@ -361,3 +361,14 @@ Use `--bash-fields` for the focused pending-reply and Stop checks. The seal
 writer compares the fixed Bash task and its one-call generation with records
 derived from candidate PG rows, then omits both. The replacement reconstructs
 them again from those rows. The other family state stays in the control snapshot.
+
+The #52 family studies now use the prototype Workspace-operation protocol.
+The Session Kafka record carries the native batch and logical execute/cancel
+metadata. Execution selects the Guest and resolves prior operation positions.
+Run `node --import tsx scripts/experiments/minimal-session-storage/workspace-routing-recovery.mjs`
+to verify a PG restart, replay across a binding transition and cancellation from
+a fresh routing adapter. The check owns a disposable PG; its Kafka grant is
+controlled. The existing `--pg-handoff` and `--bash-fields` studies exercise
+real Kafka, Cube, active Stop and Stop after replacement with a second live VM.
+[Ownership and release scope](../../../docs/adr/0344-execution-owned-operation-routing-study.md).
+For a single case, append its name after the mode, for example `--serving normal`.

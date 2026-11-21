@@ -49,7 +49,11 @@ export type PreparedSessionLogFact = Readonly<{
 }>;
 
 export function decodeSessionLogFact(value: string | Buffer): PreparedSessionLogFact {
-  const parsed = expandSessionLogEnvelope(JSON.parse(value.toString()));
+  return decodeSessionLogEnvelope(JSON.parse(value.toString()));
+}
+
+export function decodeSessionLogEnvelope(value: unknown): PreparedSessionLogFact {
+  const parsed = expandSessionLogEnvelope(value);
   return parsed?.kind === "control_change"
     ? { fact: parseSessionControlChange(parsed), tools: [] }
     : prepareAcceptedFact(parsed);

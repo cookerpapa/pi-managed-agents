@@ -188,6 +188,8 @@ means routing admission; neither it nor an absent binding diagnoses VM health or
 checks whether a directory still exists. No provider endpoint or credential is
 exposed. Physical observations remain disposable and separate from this read.
 
+The #52 storage prototype separately validates execution-owned original operation routing. Its Worker-facing protocol and experiment boundaries are described in [ADR-0344](adr/0344-execution-owned-operation-routing-study.md).
+
 The Worker uses public Pi Tool hooks to prepare a reply waiter and an immutable
 logical environment (Workspace, compute scope, requested binding ID and execution
 identity). Native intent and dispatch share one Session commit. The execution

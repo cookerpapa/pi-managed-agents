@@ -104,6 +104,7 @@ export class SessionProjector {
         close?(): Promise<void>;
       };
     },
+    decode: typeof decodeSessionLogFact = decodeSessionLogFact,
   ) {
     const topic = options.topic ?? ACCEPTED_FACT_TOPIC;
     this.#topic = new ExecutionLogTopic(options);
@@ -148,7 +149,7 @@ export class SessionProjector {
       groupRecovery: true,
       orderedEffects: true,
       batchRead: true,
-      decode: decodeSessionLogFact,
+      decode,
       replayOffsets: async (bounds) => {
         // Kafka bounds were captured before PG. Read the routing snapshot AFTER
         // choosing the recovery floor: later changes are necessarily replayed.

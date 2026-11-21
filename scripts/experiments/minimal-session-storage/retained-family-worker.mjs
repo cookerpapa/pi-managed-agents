@@ -1,12 +1,12 @@
 // Disposable A/B actors for the retained-log experiment. Each has independent
 // Pi, model client, producer and reply mailbox memory.
 import { FamilyPresentation } from "./family-presentation.mjs";
-import { durableToolState } from "@pi-cloud/protocol";
+import { durableToolState, MAX_TOOL_EXECUTION_TIMEOUT_MS } from "@pi-cloud/protocol";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
 import { MemoryStorage, InboxDoc } from "@earendil-works/pi-durable";
-import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT as ctx, awaitWithContext } from "@earendil-works/chord/context";
 import { Type } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import {
@@ -18,12 +18,13 @@ import { DurableAgentSession } from "../../../packages/sandbox-supervisor/src/du
 import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 import { KafkaWorkerProducer } from "../../../packages/event-log/src/kafka-worker-producer.ts";
 import { KafkaToolReplyMailbox } from "../../../packages/event-log/src/tool-replies.ts";
-import { encodeSessionLogFact } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
+import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 
 import { loadPriorRoot, readRetainedFamily } from "./retained-family-read.mjs";
 
 const init = await new Promise((resolve) => process.once("message", resolve));
-const { topic, brokers, dbUrl, binding, mode } = init;
+const { topic, brokers, dbUrl, mode } = init;
+assert(!("binding" in init || "activationId" in init));
 const takeover = init.pgResume || !!init.seal;
 const send = (kind, properties = {}) => process.send({ kind, ...properties });
 const claim = init.controlUrl
@@ -49,6 +50,7 @@ const mailbox = new KafkaToolReplyMailbox({
 const presentation = claim ? new FamilyPresentation() : undefined;
 const life = new AbortController();
 let queuedKey = "queued-child-input";
+let restoredIdFloor = Infinity;
 const hashKey = (v) => createHash("sha256").update(v).digest("hex");
 let runtime,
   restored,
@@ -57,6 +59,7 @@ let runtime,
   finalModelAt,
   publications = 0,
   newIntents = 0,
+  cancellationCount = 0,
   childModelCalls = 0,
   parentModelCalls = 0;
 const operations = new Map(),
@@ -70,7 +73,7 @@ async function publish(fact) {
   await producer.append(0, {
     sessionId: scope.piSessionId,
     factId: fact.factId,
-    value: encodeSessionLogFact(fact),
+    value: encodeWorkspaceFact(fact),
   });
 }
 class Published extends MemoryStorage {
@@ -78,59 +81,101 @@ class Published extends MemoryStorage {
     const p = this.prepareCommit(writes),
       commit = { seq: p.seq, nextId: this.nextId, writes: p.writes };
     const display = presentation?.prepare(commit);
-    const effects = runtime?.preparePublication(commit);
-    const tools = (effects?.tools ?? []).map(({ taskId, command }) => {
-      assert(command.request?.operation === "tool.execute");
-      const { args, toolCallId, ...request } = command.request;
-      newIntents++;
-      return {
-        target: "cube",
-        taskId,
-        scope: scopeFor(
-          p.writes.find((w) => w.type === "task" && w.value.id === taskId).value.conversationId,
-        ),
-        request,
-        replyRecovery: command.replyRecovery,
-        replyTopic: command.replyRecovery.topic,
-        occurredAt: command.occurredAt,
-      };
-    });
-    await publish({
-      kind: "durable_commit",
-      scope,
-      commit,
-      factId: randomUUID(),
-      occurredAt: new Date().toISOString(),
-      tools,
-      cancellations: p.writes.flatMap((w) => {
-        const task = w.type === "task" && durableToolState(w.value),
-          op = task && operations.get(task.id);
-        if (!task?.aborted || !op || cancelledTasks.has(task.id)) return [];
+    const workspaceOperations = [];
+    for (const write of p.writes) {
+      const task = write.type === "task" && durableToolState(write.value);
+      if (!task) continue;
+      let op = operations.get(task.id);
+      if (task.intent && !op) {
+        const stored = await this.entry(write.value.input.assistant, ctx);
+        const call = stored?.entry.model?.[0]?.content.find(
+          (block) => block.type === "toolCall" && block.id === task.intent.callId,
+        );
+        assert(call, "Tool intent has no matching native assistant Entry");
+        if (call.name !== "bash") continue;
+        assert(
+          !takeover || task.id >= restoredIdFloor,
+          "Restored Bash lacks its original operation",
+        );
+        const controller = new AbortController(),
+          operationId = randomUUID(),
+          reply = {
+            ...(await mailbox.replyPosition()),
+            toolName: "bash",
+            toolCallId: call.id,
+            deadlineAt: Date.now() + (mode === "reply-timeout" ? 18000 : 120000),
+          };
+        const wait = mailbox.wait(
+          operationId,
+          call.id,
+          "bash",
+          AbortSignal.any([controller.signal, life.signal]),
+        );
+        op = {
+          operationId,
+          taskId: task.id,
+          conversationId: task.conversationId,
+          reply,
+          controller,
+          wait,
+        };
+        operations.set(task.id, op);
+        newIntents++;
+        workspaceOperations.push({
+          action: "execute",
+          taskId: task.id,
+          operationId,
+          reply,
+          timeoutMs:
+            task.intent.arguments.timeout === undefined
+              ? MAX_TOOL_EXECUTION_TIMEOUT_MS
+              : task.intent.arguments.timeout * 1000,
+          maximumOutputBytes: 51200,
+        });
+      }
+      if (task?.aborted && op && !op.wait?.executionSettled() && !cancelledTasks.has(task.id)) {
         cancelledTasks.add(task.id);
-        return [
-          {
-            kind: "tool_cancel",
-            scope: scopeFor(task.conversationId),
-            request: {
-              activationId: op.activationId,
-              operationId: op.operationId,
-              originalWriterId: op.writerId,
-            },
-          },
-        ];
-      }),
-      display: display?.display ?? [],
-      origins: p.writes
-        .filter((w) => ["entry", "task", "submission"].includes(w.type))
-        .map((w) => ({
-          recordId: w.value.id,
-          sessionId: scopeFor(w.value.conversationId).sessionId,
-          runId: scope.runId,
-          turnId: scopeFor(w.value.conversationId).turnId,
-        })),
-    });
+        cancellationCount++;
+        workspaceOperations.push({
+          action: "cancel",
+          taskId: task.id,
+          operationId: op.operationId,
+        });
+      }
+    }
+    try {
+      await publish({
+        kind: "durable_commit",
+        scope,
+        commit,
+        factId: randomUUID(),
+        occurredAt: new Date().toISOString(),
+        tools: [],
+        cancellations: [],
+        workspaceOperations,
+        display: display?.display ?? [],
+        origins: p.writes
+          .filter((w) => ["entry", "task", "submission"].includes(w.type))
+          .map((w) => ({
+            recordId: w.value.id,
+            sessionId: scopeFor(w.value.conversationId).sessionId,
+            runId: scope.runId,
+            turnId: scopeFor(w.value.conversationId).turnId,
+          })),
+      });
+    } catch (error) {
+      life.abort(error);
+      throw error;
+    }
     const seq = p.apply();
-    effects?.confirmed();
+    for (const w of p.writes) {
+      const t = w.type === "task" && durableToolState(w.value);
+      if (t?.terminal) {
+        operations.get(t.id)?.controller?.abort();
+        operations.delete(t.id);
+        cancelledTasks.delete(t.id);
+      }
+    }
     display?.confirmed();
     publications++;
     return seq;
@@ -302,93 +347,94 @@ function configuration(id) {
     model: m,
     agent: { instructions: root ? "parent instructions" : "retained child instructions" },
     context: { sessionId: scopeFor(id).sessionId, turnId: scopeFor(id).turnId },
-    tools: root ? [delegate] : [],
-    remoteTools: () => (root ? [] : ["bash"]),
+    tools: root ? [delegate] : [workspaceBash],
+    remoteTools: () => [],
     assertCurrent: async () => life.signal.throwIfAborted(),
     openModel: async (req) => ({ model: m, options: req.options, release() {} }),
-    prepareRemote: async (inv) => {
-      assert.equal(inv.toolName, "bash");
-      assert.equal(inv.args.command, command);
-      let op, ref, wait;
-      if (inv.recovery) {
-        op = operations.get(inv.taskId);
-        assert(
-          op && op.conversationId === id && op.reply.toolCallId === inv.callId,
-          "Unknown saved wait",
-        );
-        ref = op.reply;
-        wait = mailbox.resumeWait(op.operationId, ref, life.signal);
-        send("reattached", {
-          deadline: ref.deadlineAt,
-          operationId: op.operationId,
-          originalTopic: ref.topic,
-        });
-      } else {
-        assert(!takeover, "Replacement attempted a new Bash");
-        ref = {
-          ...(await mailbox.replyPosition()),
-          toolName: "bash",
-          toolCallId: inv.callId,
-          deadlineAt: Date.now() + (mode === "reply-timeout" ? 18000 : 120000),
-        };
-        op = { operationId: randomUUID(), taskId: inv.taskId, conversationId: id, reply: ref };
-        wait = mailbox.wait(op.operationId, inv.callId, "bash", life.signal);
-      }
-      return {
-        command: {
-          executionReference: "fixture",
-          toolCallId: "task:" + inv.taskId,
-          occurredAt: new Date().toISOString(),
-          replyTopic: ref.topic,
-          replyRecovery: ref,
-          request: {
-            type: "tool_sandbox.operation",
-            toolBrokerProtocolVersion: 1,
-            operation: "tool.execute",
-            activationId: op.activationId ?? binding,
-            operationId: op.operationId,
-            toolCallId: inv.callId,
-            toolName: "bash",
-            args: inv.args,
-            timeoutMs: 90000,
-            maximumOutputBytes: 51200,
-          },
-        },
-        result: async () => {
-          let r;
-          try {
-            r = await wait.result;
-          } catch (e) {
-            if (mode === "reply-timeout") {
-              assert.equal(e.code, "tool_reply_timeout");
-              assert.equal(e.effect, "unknown");
-              const at = Date.now(),
-                probeId = randomUUID(),
-                signal = AbortSignal.timeout(10000);
-              const echo = mailbox.waitProbe(probeId, op.activationId, signal);
-              await publish({
-                kind: "path_probe",
-                factId: probeId,
-                scope,
-                occurredAt: new Date(at).toISOString(),
-                execution: {
-                  replyTopic: mailbox.topic,
-                  bindings: [{ bindingId: op.activationId, scope: scopeFor(id), probe: true }],
-                },
-              });
-              assert.equal((await echo).evidence.bindingId, op.activationId);
-              send("unknown", { code: e.code, effect: e.effect, at, deadline: ref.deadlineAt });
-            }
-            throw e;
-          }
-          return { ...r.result, isError: r.isError };
-        },
-        completed: () => wait.executionSettled(),
-        dispose() {},
-      };
+    prepareRemote: async () => {
+      throw Error("Workspace tools use the prototype operation port");
     },
   };
 }
+const workspaceBash = {
+  ...tool,
+  async execute(args, api, context) {
+    assert.equal(args.command, command);
+    const op = operations.get(api.taskId);
+    assert(
+      op && op.reply.toolCallId === api.callId && op.conversationId === api.conversationId,
+      "Missing original native operation",
+    );
+    if (!op.wait) {
+      op.controller = new AbortController();
+      op.wait = mailbox.resumeWait(
+        op.operationId,
+        op.reply,
+        AbortSignal.any([op.controller.signal, life.signal]),
+      );
+      send("reattached", {
+        deadline: op.reply.deadlineAt,
+        operationId: op.operationId,
+        originalTopic: op.reply.topic,
+      });
+    }
+    try {
+      const r = await awaitWithContext(op.wait.result, context);
+      return { ...r.result, isError: r.isError };
+    } catch (e) {
+      if (mode === "reply-timeout" && !context.abortSignal?.aborted) {
+        assert.equal(e.code, "tool_reply_timeout");
+        assert.equal(e.effect, "unknown");
+        const at = Date.now(),
+          probeId = randomUUID(),
+          signal = AbortSignal.timeout(10000);
+        const echo = new Promise((resolve, reject) => {
+          const done = (m) => {
+            if (
+              m.kind === "probeVerdict" &&
+              m.probeId === probeId &&
+              m.operationId === op.operationId
+            ) {
+              cleanup();
+              resolve(m.ready);
+            }
+          };
+          const abort = () => {
+            cleanup();
+            reject(signal.reason);
+          };
+          const cleanup = () => {
+            process.off("message", done);
+            signal.removeEventListener("abort", abort);
+          };
+          process.on("message", done);
+          signal.addEventListener("abort", abort, { once: true });
+        });
+        const [, ready] = await Promise.all([
+          publish({
+            kind: "path_probe",
+            factId: probeId,
+            scope,
+            occurredAt: new Date(at).toISOString(),
+            workspaceOperations: [
+              {
+                action: "probe",
+                taskId: api.taskId,
+                operationId: op.operationId,
+                conversationId: api.conversationId,
+              },
+            ],
+          }),
+          echo,
+        ]);
+        assert.equal(ready, true);
+
+        send("unknown", { code: e.code, effect: e.effect, at, deadline: op.reply.deadlineAt });
+      }
+      throw e;
+    }
+  },
+};
 try {
   await db.connect();
   await producer.start();
@@ -429,6 +475,7 @@ try {
     if (mode === "expired") {
       throw Error("Incomplete prefix unexpectedly restored");
     }
+    restoredIdFloor = store.nextId;
     for (const op of restored.intents) operations.set(op.taskId, op);
     assert.equal(operations.size, 1);
     const tasks = (await store.scanTasks({ status: "waiting" }, 10, undefined, ctx)).items;
@@ -457,11 +504,20 @@ try {
   }
   runtime = await DurableAgentSession.open(store, {
     models,
-    remoteTools: [tool],
-    infrastructureTools: [delegate],
+    remoteTools: [],
+    infrastructureTools: [delegate, workspaceBash],
     settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
   });
   const root = await runtime.bind(configuration(1), takeover ? "reattach" : "initialize");
+  let stopWork;
+  let modelsBeforeStop;
+  function stop() {
+    modelsBeforeStop = childModelCalls + parentModelCalls;
+    stopWork ??= claim
+      .cancel(() => root.abort(ctx))
+      .then((receipt) => send("stopAcknowledged", { receipt }));
+    return stopWork;
+  }
   if (takeover) {
     const id = restored.intents[0].conversationId;
     if (claim) {
@@ -480,17 +536,24 @@ try {
     child = await runtime.bind(configuration(id), "reattach");
     assert.equal((await runtime.harness.snapshot(InboxDoc, id, ctx)).items.length, 1);
     if (claim?.request.stopOnResume) {
-      const receipt = await claim.cancel(async () => {
-        await child.abort(ctx);
-        await root.abort(ctx);
-      });
-      send("stopAcknowledged", { receipt });
+      modelsBeforeStop = childModelCalls + parentModelCalls;
+      stopWork = claim
+        .cancel(async () => {
+          await child.abort(ctx);
+          await root.abort(ctx);
+        })
+        .then((receipt) => send("stopAcknowledged", { receipt }));
+      await stopWork;
     }
     runtime.harness.resume();
   } else {
     process.on("message", async (m) => {
-      if (m.kind !== "queue") return;
       try {
+        if (m.kind === "stop") {
+          await stop();
+          return;
+        }
+        if (m.kind !== "queue") return;
         if (init.pgHandoff) queuedKey = randomUUID();
         await child.submit(
           {
@@ -525,8 +588,9 @@ try {
     );
   }
   await root.waitForIdle(ctx);
-  assert(takeover || normal || mode === "seed", "Initial Worker finished unexpectedly");
-  if (!claim?.request.stopOnResume) {
+  await stopWork;
+  assert(takeover || normal || stopWork || mode === "seed", "Initial Worker finished unexpectedly");
+  if (!stopWork) {
     const last = (await root.context(ctx)).messages.at(-1);
     assert.equal(last?.role, "assistant", "Pi has no final parent assistant answer");
     assert.equal(
@@ -554,16 +618,16 @@ try {
       occurredAt: new Date().toISOString(),
       terminal,
     });
-  if (claim) await claim.finish(finish);
+  if (claim) await claim.finish(finish, !!stopWork);
   else await finish({ type: "turn.completed", payload: { stopReason: "stop" } });
-  if (claim?.request.stopOnResume) {
-    assert.equal(childModelCalls + parentModelCalls, 0);
+  if (stopWork) {
+    assert.equal(childModelCalls + parentModelCalls, modelsBeforeStop);
     const queued = await store.submissionByRequest(child.id, queuedKey, ctx);
     send("stopped", {
       queuedStatus: queued.status,
       newIntents,
-      models: childModelCalls + parentModelCalls,
-      cancellations: cancelledTasks.size,
+      models: childModelCalls + parentModelCalls - modelsBeforeStop,
+      cancellations: cancellationCount,
     });
   } else if (mode === "seed") {
     send("seedFinished");

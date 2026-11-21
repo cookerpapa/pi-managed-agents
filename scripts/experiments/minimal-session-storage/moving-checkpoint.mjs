@@ -150,7 +150,7 @@ export function useSynchronousPolicy(fact, recoverableTools = false) {
 
 // The canonical native Task supplies the identity. Its original reply
 // descriptor is current recovery data. Kafka group progress fences execution.
-export function foldToolReferences(view, previous, frame, fact, offset) {
+export function foldToolReferences(view, previous, frame, fact, offset, workspaceBatch) {
   const pending = { ...previous?.pendingTools };
   const writes = fact.commit.writes
     .filter((w) => w.type === "task" && w.value.kind === "pi.tool")
@@ -187,10 +187,34 @@ export function foldToolReferences(view, previous, frame, fact, offset) {
     frame.ops.push({ kind: "tool", args: [...scope, task.id, value], count: 1 });
     registered++;
   }
+  // A native abort can precede the terminal task write. Keep a durable
+  // boundary for the idempotent cancellation even when there is no new Entry.
+  if (workspaceBatch)
+    for (const cancel of fact.cancellations) {
+      assert(writes.some((t) => t.id === cancel.taskId && t.abortRequested));
+      frame.ops.push({
+        kind: "cancel",
+        args: [...scope, cancel.operationId, cancel.taskId],
+        count: 1,
+      });
+      frame.strict = true;
+    }
   for (const task of writes) {
     const original = pending[task.id];
     if (original && ["completing", "terminal"].includes(task.state.status)) {
-      frame.ops.push({ kind: "tool-settled", args: [...scope, task.id, original], count: 1 });
+      frame.ops.push({
+        kind: "tool-settled",
+        args: [
+          ...scope,
+          task.id,
+          original,
+          ...(workspaceBatch &&
+          fact.cancellations.some((c) => c.operationId === original.operationId)
+            ? [true]
+            : []),
+        ],
+        count: 1,
+      });
       frame.strict = true;
       delete pending[task.id];
     }

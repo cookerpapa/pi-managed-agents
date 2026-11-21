@@ -113,12 +113,11 @@ export async function claimRun(connectionString, runId) {
       assert.equal(result.status, "cancelled");
       return result.controlRequestId;
     },
-    async finish(write) {
+    async finish(write, stopped = request.stopOnResume) {
       if (renewalError) throw renewalError;
       lifecycle.executionExited();
       lifecycle.publicationReady({ close: async () => {}, finish: write });
-      if (request.stopOnResume)
-        completed.reject(new TurnExecutionCancelledError("user_request", false));
+      if (stopped) completed.reject(new TurnExecutionCancelledError("user_request", false));
       else completed.resolve({ stopReason: "stop" });
       await running;
     },

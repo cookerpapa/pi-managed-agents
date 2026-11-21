@@ -76,6 +76,7 @@ try {
       servingBrokers: isolatedKafka?.brokers,
       pgHandoff,
       bashFields,
+      scene: process.argv[4],
     }),
     { mode: 0o600 },
   );

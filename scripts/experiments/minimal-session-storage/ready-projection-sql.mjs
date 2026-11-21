@@ -10,7 +10,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
     (${row}->>'document')::bigint,(${row}->>'seq')::bigint,(${row}->>'ordinal')::int,${row}->'value'`;
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
     alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,
-      add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
+      add column cancel_positions jsonb not null default '{}',add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
     create index active_projection_start on runs(projection_partition,projection_first) where state in ('running','cancel_requested') and projection_first is not null;
     create function prefix_message(uuid,uuid,uuid,bigint,text,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${message} $fn$;
@@ -54,9 +54,19 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
               if (snap is not null and snap is distinct from (a->5)) or (op->>'kind'='tool-settled' and snap is null)
                 then raise exception 'Conflicting native task reference' using errcode='PZ002'; end if;
               update runs set projection_tools=case when op->>'kind'='tool'
-                then jsonb_set(projection_tools,array[a->>4],a->5) else projection_tools-(a->>4) end where id=(a->>2)::uuid;
+                then jsonb_set(projection_tools,array[a->>4],a->5) else projection_tools-(a->>4) end,
+                cancel_positions=case when op->>'kind'='tool-settled' and a->6 is null then cancel_positions-(a#>>'{5,operationId}') else cancel_positions end where id=(a->>2)::uuid;
               n:=1;
             end if;
+          when 'cancel' then
+            update runs set cancel_positions=case when projection_tools->(a->>5)->>'operationId'=a->>4 then
+                jsonb_set(cancel_positions,array[a->>4],jsonb_build_object('taskId',a->5,'operationId',a->4,
+                  'conversationId',projection_tools->(a->>5)->'conversationId','offset',projection_tools->(a->>5)->'offset'))
+                else cancel_positions end
+              where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid
+                and lease_id=(a->>3)::uuid and state in ('running','cancel_requested')
+                and (not (cancel_positions ? (a->>4)) or cancel_positions->(a->>4)->'taskId'=a->5);
+            ok:=found; n:=1;
           when 'anchor' then
             update runs set projection_first=(frame->>'offset')::bigint,projection_partition=p_partition
               where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid

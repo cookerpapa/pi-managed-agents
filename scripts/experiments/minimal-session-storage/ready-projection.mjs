@@ -284,7 +284,14 @@ export class ReadyProjection {
           view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
           if (covered && owner?.projection_pin != null)
             view.pinOffset = BigInt(owner.projection_pin);
-          const registered = foldToolReferences(view, previous, draft.frame, f, r.offset);
+          const registered = foldToolReferences(
+            view,
+            previous,
+            draft.frame,
+            f,
+            r.offset,
+            r.workspaceBatch,
+          );
           if (f.tools?.length && !registered)
             throw new Error(
               "Moving projection requires a retained native reference for every dispatched Tool",
