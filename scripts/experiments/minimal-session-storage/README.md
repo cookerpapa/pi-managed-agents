@@ -349,3 +349,10 @@ creates a separate three-broker Session Kafka cluster and a disposable PG with
 both projections. The candidate cold reader has a restricted database role.
 The development cluster serves only the temporary Guests and their private
 reply mailboxes. [Integration results](../../../docs/reports/serving-family-handoff-20261121.md).
+
+Use `--pg-handoff` in place of `--serving` for the isolated PG-only control.
+The replacement discovers the previous seal in PG. Its existing-store reader
+and its seal-snapshot reader have distinct database privileges. Before B is
+started the driver verifies the old Session prefix has been removed from the
+private Kafka cluster. Original reply mailboxes remain available.
+[Evidence and scope](../../../docs/reports/pg-family-handoff-20261121.md).

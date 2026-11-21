@@ -42,3 +42,14 @@ latency is part of the measurement. This experiment does not change the
 runtime's normal Worker admission or establish a permanent replay service.
 
 [Cube/Kafka handoff and retention results](../reports/retained-family-handoff-20261121.md).
+
+## Isolated PG-only falsification test
+
+Compare the existing candidate rows with a control that folds the same accepted
+native changes in Projector memory and saves their current non-Entry state once
+at the old writer's seal. Use the existing Entry and Inbox rows for their bodies.
+Run the candidate-only read before giving the replacement access to the control
+snapshot. Use two otherwise identical native queued submissions with different
+opaque request IDs to test whether the original state is uniquely recoverable.
+This study adds no serving migration. Its scratch snapshot, memory retention and
+single-epoch readiness boundary are experimental, not a choice of production format.

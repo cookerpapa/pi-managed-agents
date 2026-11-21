@@ -21,6 +21,7 @@ import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-cons
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { projectRecord } from "./project-record.mjs";
+import { compareQueuedRequests, installStudyHandoff, SealStudy } from "./pg-family-handoff.mjs";
 import { familyWorker, until } from "./family-process.mjs";
 import { withFamilyGuest } from "./retained-family-cube.mjs";
 
@@ -29,6 +30,7 @@ const {
   brokers: replyBrokers,
   servingBrokers: brokers,
   cube,
+  pgHandoff,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
 assert(
   brokers.length === 3 &&
@@ -44,6 +46,11 @@ const pool = new pg.Pool({
 const replies = new native.KafkaJS.Kafka({
   kafkaJS: { brokers: replyBrokers, logLevel: native.KafkaJS.logLevel.NOTHING },
 });
+const sessionAdmin = pgHandoff
+  ? new native.KafkaJS.Kafka({
+      kafkaJS: { brokers, logLevel: native.KafkaJS.logLevel.NOTHING },
+    }).admin()
+  : undefined;
 const replyAdmin = replies.admin(),
   replyCopies = replies.producer({ kafkaJS: { acks: -1, idempotent: true } });
 const replyBoots = new Set(),
@@ -82,6 +89,7 @@ async function scenario(guest, mode) {
     binding = randomUUID(),
     dir = await guest.directory(binding),
     state = { dir, mode, binding, dispatches: 0, cancels: 0, probes: 0 };
+  if (pgHandoff) state.study = new SealStudy();
   cases.set(runId, state);
   let a, b, witness;
   const scopeOf = async (actor) => {
@@ -100,8 +108,9 @@ async function scenario(guest, mode) {
       topic,
       brokers,
       replyBrokers,
-      binding,
-      seal,
+      ...(pgHandoff && seal ? {} : { binding }),
+      pgHandoff,
+      ...(pgHandoff ? { pgResume: !!seal } : { seal }),
     });
   }
   async function wait(check, label) {
@@ -148,7 +157,9 @@ async function scenario(guest, mode) {
     assert(child.conversationId > 1);
     await wait(async () => state.ref && (await dir.marker()) === "once", "first dispatch");
     a.proc.send({ kind: "queue" });
-    await a.wait("queued");
+    const queued = await a.wait("queued");
+    if (pgHandoff)
+      await wait(() => state.seq >= queued.seq, "projected edit after queued submission");
     await wait(
       async () =>
         (
@@ -206,6 +217,31 @@ async function scenario(guest, mode) {
         .executeTakeFirstOrThrow();
       assert(outbox.published_at);
       expiryToSeal = Date.now() - killed;
+      if (pgHandoff) {
+        // Read the serving schema solely as an independent reference, from the
+        // driver. Neither this receipt nor this DB role is passed to B's loader.
+        const {
+          rows: [legacy],
+        } = await pool.query(
+          `select exists(
+          select 1 from public.pi_durable_records r join public.pi_durable_current c using(tenant_id,session_id,id)
+          where r.kind='submission' and r.tenant_id=$1 and r.session_id=$2
+          and c.body::jsonb#>>'{value,requestId}'=$3 and c.body::jsonb#>>'{value,status}'='queued'
+        ) as has_request`,
+          [first.tenantId, first.piSessionId, state.queuedId],
+        );
+        assert(legacy.has_request);
+        delete state.study;
+        const low = BigInt(state.seal.offset) + 1n;
+        await sessionAdmin.deleteTopicRecords({
+          topic,
+          partitions: [{ partition: 0, offset: String(low) }],
+        });
+        await until(
+          async () => BigInt((await sessionAdmin.fetchTopicOffsets(topic))[0].low) >= low,
+          "sealed prefix physically outside Kafka read range",
+        );
+      }
       if (mode === "user-stop") {
         const c = await api.cancelTurn(session.sessionId, input.turnId, randomUUID());
         state.stopReceipt = c.controlRequestId;
@@ -227,6 +263,17 @@ async function scenario(guest, mode) {
       view.sessions.get(runId).writer = second.writerId;
       b.proc.send({ kind: "start" });
       cold = await b.wait("cold");
+      if (pgHandoff) {
+        assert.equal(cold.requestHash, queued.requestHash);
+        assert.equal(cold.oldWriter, first.writerId);
+        assert.equal(cold.sealOffset, state.seal.offset);
+        assert.deepEqual(cold.candidateChild, {
+          id: child.executionId,
+          sourceTask: request.taskId,
+          childConversationId: child.conversationId,
+        });
+        assert(state.ambiguous && state.requestAbsentFromMemory && state.snapshotBytes > 0);
+      }
       if (mode !== "user-stop") {
         const wait = await b.wait("reattached");
         assert.equal(wait.originalTopic, state.ref.topic);
@@ -322,6 +369,16 @@ async function scenario(guest, mode) {
         ? { modelsAfterStop: outcome.models, childQueuedSubmissionAtStop: outcome.queuedStatus }
         : {}),
       replyAfterTerminal: mode === "reply-timeout",
+      ...(pgHandoff
+        ? {
+            candidateRowsIdenticalForDifferentRequestIds: state.ambiguous,
+            requestIdAbsentFromExistingProjectorView: state.requestAbsentFromMemory,
+            sealStateBytes: state.snapshotBytes,
+            matchedOriginalRequestId: true,
+            sealedPrefixUnavailableBeforeB: true,
+            servingPgHasOriginalRequest: true,
+          }
+        : {}),
     };
   } finally {
     await a?.close();
@@ -330,6 +387,7 @@ async function scenario(guest, mode) {
   }
 }
 try {
+  await sessionAdmin?.connect();
   await replyAdmin.connect();
   await replyCopies.connect();
   assert.equal(
@@ -356,6 +414,7 @@ try {
     ).rows[0].allowed,
     false,
   );
+  if (pgHandoff) await installStudyHandoff(pool);
   tenant = await createPrivateTenant(database, {
     slug: "family-study",
     ownerDisplayName: "Family study",
@@ -424,19 +483,37 @@ try {
         if (!s) return;
         try {
           if (f.kind === "durable_commit") {
+            if (s.study && !s.seal) {
+              const q = f.commit.writes.find(
+                (w) => w.type === "submission" && w.value.status === "queued",
+              );
+              if (q) {
+                s.ambiguous = await compareQueuedRequests(pool, view, r, env, q.value);
+                s.queuedId = q.value.requestId;
+              }
+              s.study.observe(f);
+            }
             await view.apply([r], current, (item, d) => projectRecord(item, d, env));
             s.seq = f.commit.seq;
           } else if (f.kind === "execution_seal" || f.kind === "work_finished") {
             const from = view.next.get(0);
-            assert.equal(
-              (
-                await pool.query(
-                  "update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3",
-                  [String(r.offset + 1n), topic, String(from)],
-                )
-              ).rowCount,
-              1,
-            );
+            if (s.study && f.kind === "execution_seal") {
+              const original = view.sessions.get(f.scope.runId);
+              assert(s.queuedId && original && original.seq === s.study.seq);
+              s.requestAbsentFromMemory = !JSON.stringify(original, (_, v) =>
+                typeof v === "bigint" ? String(v) : v,
+              ).includes(s.queuedId);
+              s.snapshotBytes = await s.study.seal(pool, r, from);
+            } else
+              assert.equal(
+                (
+                  await pool.query(
+                    "update accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=0 and next_offset=$3",
+                    [String(r.offset + 1n), topic, String(from)],
+                  )
+                ).rowCount,
+                1,
+              );
             view.next.set(0, r.offset + 1n);
             if (f.kind === "execution_seal")
               s.seal = {
@@ -470,13 +547,8 @@ try {
   await app.listen(0, "127.0.0.1");
   const origin = await app.getUrl();
   api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), tenant.credential.token);
-  for (const mode of [
-    "normal",
-    "serving-pending",
-    "already-returned",
-    "reply-timeout",
-    "user-stop",
-  ]) {
+  const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
+  for (const mode of pgHandoff ? handoffs : ["normal", ...handoffs]) {
     console.log("Starting " + mode);
     results.push(await withFamilyGuest(cube, (guest) => scenario(guest, mode)));
     console.log(JSON.stringify(results.at(-1)));
@@ -514,6 +586,7 @@ try {
     } finally {
       await replyCopies.disconnect();
       await replyAdmin.disconnect();
+      await sessionAdmin?.disconnect();
       await database.destroy();
       await pool.end();
     }

@@ -1,0 +1,275 @@
+{
+  "results": [
+    {
+      "mode": "serving-pending",
+      "terminal": "completed",
+      "publicChildView": true,
+      "originalRunReclaimed": true,
+      "physicalDispatches": 1,
+      "guestExecutions": 1,
+      "cancelCommands": 0,
+      "workerKillToProjectedSealMs": 10318,
+      "coldMs": 3119,
+      "cold": {
+        "candidateOnlyTasksVisibleToPi": 0,
+        "candidateOnlyReattachRejected": true,
+        "candidateEntries": 6,
+        "inboxes": 2,
+        "storedToolRefs": 1,
+        "projectorCheckpointSeq": 7,
+        "sealNativeSeq": 20,
+        "nativeTasks": [
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          },
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          }
+        ],
+        "documents": [
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.run",
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.conversation-creation",
+          "pi-cloud.run"
+        ],
+        "submissions": 3,
+        "candidateReadMs": 12.322734999999739,
+        "snapshotReadAndImportMs": 11.255079999999907,
+        "baseSequence": 0,
+        "priorPgEntries": 0,
+        "priorPgReadMs": 11.223954000000049,
+        "mailboxRestoreMs": 3084.7279799999997
+      },
+      "canonicalBashResults": 1,
+      "readinessProbes": 0,
+      "finalOutputToProjectionMs": 303,
+      "replacementBashIntents": 0,
+      "replyAfterTerminal": false,
+      "candidateRowsIdenticalForDifferentRequestIds": true,
+      "requestIdAbsentFromExistingProjectorView": true,
+      "sealStateBytes": 7943,
+      "matchedOriginalRequestId": true,
+      "sealedPrefixUnavailableBeforeB": true,
+      "servingPgHasOriginalRequest": true
+    },
+    {
+      "mode": "already-returned",
+      "terminal": "completed",
+      "publicChildView": true,
+      "originalRunReclaimed": true,
+      "physicalDispatches": 1,
+      "guestExecutions": 1,
+      "cancelCommands": 0,
+      "workerKillToProjectedSealMs": 10506,
+      "coldMs": 4144,
+      "cold": {
+        "candidateOnlyTasksVisibleToPi": 0,
+        "candidateOnlyReattachRejected": true,
+        "candidateEntries": 6,
+        "inboxes": 2,
+        "storedToolRefs": 1,
+        "projectorCheckpointSeq": 7,
+        "sealNativeSeq": 20,
+        "nativeTasks": [
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          },
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          }
+        ],
+        "documents": [
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.run",
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.conversation-creation",
+          "pi-cloud.run"
+        ],
+        "submissions": 3,
+        "candidateReadMs": 15.285855000000083,
+        "snapshotReadAndImportMs": 13.187966000000415,
+        "baseSequence": 0,
+        "priorPgEntries": 0,
+        "priorPgReadMs": 13.330735999999888,
+        "mailboxRestoreMs": 4102.356253
+      },
+      "canonicalBashResults": 1,
+      "readinessProbes": 0,
+      "finalOutputToProjectionMs": 407,
+      "replacementBashIntents": 0,
+      "replyAfterTerminal": false,
+      "candidateRowsIdenticalForDifferentRequestIds": true,
+      "requestIdAbsentFromExistingProjectorView": true,
+      "sealStateBytes": 7941,
+      "matchedOriginalRequestId": true,
+      "sealedPrefixUnavailableBeforeB": true,
+      "servingPgHasOriginalRequest": true
+    },
+    {
+      "mode": "reply-timeout",
+      "terminal": "completed",
+      "publicChildView": true,
+      "originalRunReclaimed": true,
+      "physicalDispatches": 1,
+      "guestExecutions": 1,
+      "cancelCommands": 0,
+      "workerKillToProjectedSealMs": 10159,
+      "coldMs": 3091,
+      "cold": {
+        "candidateOnlyTasksVisibleToPi": 0,
+        "candidateOnlyReattachRejected": true,
+        "candidateEntries": 6,
+        "inboxes": 2,
+        "storedToolRefs": 1,
+        "projectorCheckpointSeq": 7,
+        "sealNativeSeq": 20,
+        "nativeTasks": [
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          },
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          }
+        ],
+        "documents": [
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.run",
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.conversation-creation",
+          "pi-cloud.run"
+        ],
+        "submissions": 3,
+        "candidateReadMs": 15.489504000000125,
+        "snapshotReadAndImportMs": 12.928971999999703,
+        "baseSequence": 0,
+        "priorPgEntries": 0,
+        "priorPgReadMs": 12.955431999999746,
+        "mailboxRestoreMs": 3048.539748
+      },
+      "canonicalBashResults": 1,
+      "readinessProbes": 1,
+      "finalOutputToProjectionMs": 293,
+      "replacementBashIntents": 0,
+      "replyAfterTerminal": true,
+      "candidateRowsIdenticalForDifferentRequestIds": true,
+      "requestIdAbsentFromExistingProjectorView": true,
+      "sealStateBytes": 7945,
+      "matchedOriginalRequestId": true,
+      "sealedPrefixUnavailableBeforeB": true,
+      "servingPgHasOriginalRequest": true
+    },
+    {
+      "mode": "user-stop",
+      "terminal": "cancelled",
+      "publicChildView": true,
+      "originalRunReclaimed": true,
+      "physicalDispatches": 1,
+      "guestExecutions": 1,
+      "cancelCommands": 1,
+      "workerKillToProjectedSealMs": 10232,
+      "coldMs": 3143,
+      "cold": {
+        "candidateOnlyTasksVisibleToPi": 0,
+        "candidateOnlyReattachRejected": true,
+        "candidateEntries": 6,
+        "inboxes": 2,
+        "storedToolRefs": 1,
+        "projectorCheckpointSeq": 7,
+        "sealNativeSeq": 20,
+        "nativeTasks": [
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          },
+          {
+            "kind": "pi.generation",
+            "status": "waiting"
+          },
+          {
+            "kind": "pi.tool",
+            "status": "running"
+          }
+        ],
+        "documents": [
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.run",
+          "pi.live",
+          "pi.usage",
+          "pi.agent",
+          "pi-cloud.conversation-creation",
+          "pi-cloud.run"
+        ],
+        "submissions": 3,
+        "candidateReadMs": 12.771031000000221,
+        "snapshotReadAndImportMs": 12.141880999999557,
+        "baseSequence": 0,
+        "priorPgEntries": 0,
+        "priorPgReadMs": 9.464226000000053,
+        "mailboxRestoreMs": 3106.827668
+      },
+      "canonicalBashResults": 1,
+      "readinessProbes": 0,
+      "finalOutputToProjectionMs": null,
+      "replacementBashIntents": 0,
+      "modelsAfterStop": 0,
+      "childQueuedSubmissionAtStop": "unanswered",
+      "replyAfterTerminal": false,
+      "candidateRowsIdenticalForDifferentRequestIds": true,
+      "requestIdAbsentFromExistingProjectorView": true,
+      "sealStateBytes": 7945,
+      "matchedOriginalRequestId": true,
+      "sealedPrefixUnavailableBeforeB": true,
+      "servingPgHasOriginalRequest": true
+    }
+  ],
+  "cleanupVerified": true
+}

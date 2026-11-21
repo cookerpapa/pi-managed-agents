@@ -3,7 +3,7 @@
 import { FamilyPresentation } from "./family-presentation.mjs";
 import { durableToolState } from "@pi-cloud/protocol";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
 import { MemoryStorage, InboxDoc } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
@@ -19,10 +19,12 @@ import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor
 import { KafkaWorkerProducer } from "../../../packages/event-log/src/kafka-worker-producer.ts";
 import { KafkaToolReplyMailbox } from "../../../packages/event-log/src/tool-replies.ts";
 import { encodeSessionLogFact } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
+
 import { loadPriorRoot, readRetainedFamily } from "./retained-family-read.mjs";
 
 const init = await new Promise((resolve) => process.once("message", resolve));
-const { topic, brokers, dbUrl, binding, seal, mode } = init;
+const { topic, brokers, dbUrl, binding, mode } = init;
+const takeover = init.pgResume || !!init.seal;
 const send = (kind, properties = {}) => process.send({ kind, ...properties });
 const claim = init.controlUrl
   ? await (await import("./serving-family-claim.mjs")).claimRun(init.controlUrl, init.runId)
@@ -46,6 +48,8 @@ const mailbox = new KafkaToolReplyMailbox({
 });
 const presentation = claim ? new FamilyPresentation() : undefined;
 const life = new AbortController();
+let queuedKey = "queued-child-input";
+const hashKey = (v) => createHash("sha256").update(v).digest("hex");
 let runtime,
   restored,
   child,
@@ -220,12 +224,12 @@ function finishChild(context) {
   );
 }
 parentModel.setResponses([
-  ...(seal ? [] : [beginParent]),
-  ...(seal || normal ? [finishParent] : []),
+  ...(takeover ? [] : [beginParent]),
+  ...(takeover || normal ? [finishParent] : []),
 ]);
 childModel.setResponses([
-  ...(seal ? [] : [beginChild]),
-  ...(seal || normal ? [finishChild, finishChild] : []),
+  ...(takeover ? [] : [beginChild]),
+  ...(takeover || normal ? [finishChild, finishChild] : []),
 ]);
 const delegate = {
   name: "delegate",
@@ -234,7 +238,7 @@ const delegate = {
   replay: "safe",
   async execute(_args, api) {
     let requestId = randomUUID();
-    if (seal) {
+    if (takeover) {
       const { items } = await store.scanDocuments(
         { scope: { kind: "session" }, kind: "pi-cloud.conversation-creation", at: "current" },
         10,
@@ -246,7 +250,7 @@ const delegate = {
       assert.equal(doc.value.ownerTaskId, api.taskId);
       requestId = items[0].key;
     }
-    if (claim && !seal) {
+    if (claim && !takeover) {
       const start = new Promise((resolve) => {
         const handle = (m) => {
           if (m.kind === "startChild") {
@@ -266,7 +270,7 @@ const delegate = {
       parentConversationId: 1,
       ...(childView ? { view: childView } : {}),
     });
-    if (!seal) {
+    if (!takeover) {
       child = await runtime.bind(configuration(id));
       await child.submit(
         { type: "input", requestId: scope.runId, content: "Run the gated Bash once." },
@@ -317,7 +321,7 @@ function configuration(id) {
           originalTopic: ref.topic,
         });
       } else {
-        assert(!seal, "Replacement attempted a new Bash");
+        assert(!takeover, "Replacement attempted a new Bash");
         ref = {
           ...(await mailbox.replyPosition()),
           toolName: "bash",
@@ -338,7 +342,7 @@ function configuration(id) {
             type: "tool_sandbox.operation",
             toolBrokerProtocolVersion: 1,
             operation: "tool.execute",
-            activationId: binding,
+            activationId: op.activationId ?? binding,
             operationId: op.operationId,
             toolCallId: inv.callId,
             toolName: "bash",
@@ -387,9 +391,37 @@ try {
   await producer.start();
   await mailbox.start();
   const prior = await loadPriorRoot(db, scope, store);
-  if (seal) {
+  if (takeover) {
     const start = performance.now();
-    restored = await readRetainedFamily(db, brokers, topic, seal, scope, store, ctx, presentation);
+    let pgEvidence = {};
+    if (init.pgHandoff) {
+      const { readFamilyPgControl } = await import("./pg-family-reader.mjs");
+      const pgOnly = await readFamilyPgControl({
+        db,
+        dbUrl,
+        scope,
+        topic,
+        store,
+        ctx,
+        presentation,
+        models,
+        rootConfig: configuration(1),
+      });
+      restored = pgOnly.restored;
+      queuedKey = pgOnly.queuedKey;
+      pgEvidence = { ...pgOnly.evidence, requestHash: hashKey(queuedKey) };
+      assert.equal(publications + newIntents + childModelCalls + parentModelCalls, 0);
+    } else
+      restored = await readRetainedFamily(
+        db,
+        brokers,
+        topic,
+        init.seal,
+        scope,
+        store,
+        ctx,
+        presentation,
+      );
     if (mode === "expired") {
       throw Error("Incomplete prefix unexpectedly restored");
     }
@@ -414,6 +446,7 @@ try {
       life.signal,
     );
     send("cold", {
+      ...pgEvidence,
       stats: { ...restored.stats, ...prior, mailboxRestoreMs: performance.now() - replyStart },
       coldMs: performance.now() - start,
     });
@@ -424,8 +457,8 @@ try {
     infrastructureTools: [delegate],
     settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
   });
-  const root = await runtime.bind(configuration(1), seal ? "reattach" : "initialize");
-  if (seal) {
+  const root = await runtime.bind(configuration(1), takeover ? "reattach" : "initialize");
+  if (takeover) {
     const id = restored.intents[0].conversationId;
     if (claim) {
       const receipt = (
@@ -454,16 +487,26 @@ try {
     process.on("message", async (m) => {
       if (m.kind !== "queue") return;
       try {
+        if (init.pgHandoff) queuedKey = randomUUID();
         await child.submit(
           {
             type: "input",
-            requestId: "queued-child-input",
+            requestId: queuedKey,
             whenBusy: "followUp",
-            content: "queued-child-input",
+            content: init.pgHandoff ? "before edit" : "queued-child-input",
           },
           ctx,
         );
-        send("queued");
+        if (init.pgHandoff)
+          await child.commit(async (tx) => {
+            const inbox = await tx.doc(InboxDoc, child.id);
+            assert.equal(inbox.items.length, 1);
+            inbox.items[0].content = "queued-child-input";
+          }, ctx);
+        send(
+          "queued",
+          init.pgHandoff ? { requestHash: hashKey(queuedKey), seq: store.nextSeq - 1 } : {},
+        );
       } catch (e) {
         send("error", { message: e.message });
       }
@@ -478,7 +521,7 @@ try {
     );
   }
   await root.waitForIdle(ctx);
-  assert(seal || normal || mode === "seed", "Initial Worker finished unexpectedly");
+  assert(takeover || normal || mode === "seed", "Initial Worker finished unexpectedly");
   if (!claim?.request.stopOnResume) {
     const last = (await root.context(ctx)).messages.at(-1);
     assert.equal(last?.role, "assistant", "Pi has no final parent assistant answer");
@@ -511,7 +554,7 @@ try {
   else await finish({ type: "turn.completed", payload: { stopReason: "stop" } });
   if (claim?.request.stopOnResume) {
     assert.equal(childModelCalls + parentModelCalls, 0);
-    const queued = await store.submissionByRequest(child.id, "queued-child-input", ctx);
+    const queued = await store.submissionByRequest(child.id, queuedKey, ctx);
     send("stopped", {
       queuedStatus: queued.status,
       newIntents,
@@ -532,10 +575,7 @@ try {
     assert.equal(newIntents, normal ? 1 : 0);
     assert.equal(childModelCalls, normal ? 3 : 2);
     assert.equal(parentModelCalls, normal ? 2 : 1);
-    assert.equal(
-      (await store.submissionByRequest(child.id, "queued-child-input", ctx)).status,
-      "done",
-    );
+    assert.equal((await store.submissionByRequest(child.id, queuedKey, ctx)).status, "done");
     send("finished", {
       finalModelAt,
       parentText: textOf(rootHistory.at(-1)),

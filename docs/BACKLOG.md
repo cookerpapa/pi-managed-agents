@@ -4,6 +4,8 @@
 
 - [ ] **P0 · first implementation milestone.** [#52](https://github.com/cookerpapa/pi-managed-agents/issues/52) — cold-open the same Run on a replacement Worker while a child Conversation is waiting for a real sandbox Tool. Verify the original reply, deadline, single execution and parent continuation before implementing the database placement alternatives in [#51](https://github.com/cookerpapa/pi-managed-agents/issues/51).
 
+- [x] Compare candidate-only PG reads with a seal-time state capture, including native input identity and original Guest reply recovery. [PG-only study](reports/pg-family-handoff-20261121.md).
+
 - [x] Verify HTTP admission, real expiry and ordered reclaim, late or missing Guest replies and Stop on the candidate with separate parent/child history. [Integration evidence](reports/serving-family-handoff-20261121.md).
 
 - [x] Exercise read-only cold handoff under #52 with two Worker processes, a gated Cube Guest and the original RF3 mailbox. Check both reply orders and retained versus expired native state. [Evidence](reports/retained-family-handoff-20261121.md).

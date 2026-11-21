@@ -16,7 +16,8 @@ import { nativeCubeLifecycleOptions } from "../../lib/cube-native-lifecycle-opti
 import { realpath } from "node:fs/promises";
 import { testKafka } from "../../lib/test-kafka.mjs";
 const output = process.argv[2],
-  serving = process.argv[3] === "--serving";
+  pgHandoff = process.argv[3] === "--pg-handoff",
+  serving = pgHandoff || process.argv[3] === "--serving";
 let isolatedKafka;
 assert(output && process.env.PI_CLOUD_RUNTIME_LOAD_CHECK === "1");
 process.umask(0o077);
@@ -72,6 +73,7 @@ try {
       dbUrl: pg.url,
       cube,
       servingBrokers: isolatedKafka?.brokers,
+      pgHandoff,
     }),
     { mode: 0o600 },
   );
