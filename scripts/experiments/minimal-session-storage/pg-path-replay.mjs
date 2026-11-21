@@ -56,5 +56,5 @@ export async function emitFrames(frames, producer, rate, start) {
   });
   await Promise.all(pending);
   if (error) throw error;
-  return result;
+  return { ...result, acknowledgedAt: wall() };
 }

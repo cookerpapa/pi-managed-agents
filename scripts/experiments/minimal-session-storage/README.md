@@ -372,3 +372,19 @@ controlled. The existing `--pg-handoff` and `--bash-fields` studies exercise
 real Kafka, Cube, active Stop and Stop after replacement with a second live VM.
 [Ownership and release scope](../../../docs/adr/0344-execution-owned-operation-routing-study.md).
 For a single case, append its name after the mode, for example `--serving normal`.
+
+For the #52 Workspace routing study, run each of the following profiles separately
+with `PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs <new-private-output-directory> <profile>`.
+The cluster and isolated-fixture prerequisites above apply.
+
+- `workspace-continuation` checks the first provider request after an idle environment edit,
+  with two available Workers and with the previous Worker drained. It verifies the PG claim,
+  prefix reads, native system entries and model input independently.
+- `workspace-rate` pairs per-record routing with immediately ready, same-partition history
+  batches. It verifies recorded history hashes and independently times actual Pi Runs using
+  the deterministic provider.
+- `workspace-rate-confirm` compares the previous direct projection and execution-side
+  history batching at the same offered rate. Use the measured producer ACK rate, projection
+  rate and lag samples to interpret generator backpressure.
+- `workspace-rate-input` holds projection until every Kafka ACK returns at a target of 4,630
+  counted entries per second, then drains and verifies the same history.

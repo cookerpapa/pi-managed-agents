@@ -8,7 +8,8 @@ const priorJoin = `left join runs prior on r.mailbox_position>1 and prior.tenant
  and prior.session_id=r.session_id and prior.mailbox_position=r.mailbox_position-1 and prior.state='completed'
  left join inboxes i on prior.id is not null and i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id and i.conversation_id=1`;
 const columns = "prior.history_head as prior_head,i.doc_id as inbox_id,i.items as inbox_items";
-const withHead = (sql) => `with taken as (${sql}) select r.*, ${columns} from taken r ${priorJoin}`;
+const withHead = (sql) =>
+  `with taken as (${sql}) select r.*, prior.environment_snapshot as previous_environment, ${columns} from taken r ${priorJoin}`;
 export const claimWithHead = withHead(claimBatchSql);
 export const claimPreferredWithHead = withHead(
   hintedClaimSql(

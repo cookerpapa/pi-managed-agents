@@ -1,3 +1,4 @@
+import { isHistoryOnlyCommit } from "../../../packages/runtime-core/src/accepted-fact.ts";
 // The admitted partition owner selects the resource. An operation retains its
 // Session offset; only execution resolves that position against durable bindings.
 import assert from "node:assert/strict";
@@ -44,6 +45,17 @@ export class WorkspaceOperationRouter {
       conversationId: locator.conversationId,
       offset: locator.offset,
     };
+  }
+  // Input receipts, commands, controls and terminal records keep their original
+  // per-record order. A stored tool proposal/result alone has no dispatch effect.
+  canBatch(f) {
+    return isHistoryOnlyCommit(f) && !operationsFor(f).length;
+  }
+  async prepareHistory(records, current) {
+    let n = 0;
+    while (n < records.length && n < this.view.width && this.canBatch(records[n].fact)) n++;
+    if (!n) return 0;
+    return this.view.apply(records.slice(0, n), current, (r, d) => projectRecord(r, d, this.env));
   }
   async consume(record, current, grant) {
     const f = record.fact,

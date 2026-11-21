@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Check preferred Worker continuation after an idle directory, compute or Workspace change, including cold fallback and the provider-facing native context. Compare execution-side history batching with single-record projection on real Kafka. [Study and remaining load boundary](reports/workspace-continuation-rate-20261121.md).
+
 - [ ] **P0 · first implementation milestone.** [#52](https://github.com/cookerpapa/pi-managed-agents/issues/52) — cold-open the same Run on a replacement Worker while a child Conversation is waiting for a real sandbox Tool. Verify the original reply, deadline, single execution and parent continuation before implementing the database placement alternatives in [#51](https://github.com/cookerpapa/pi-managed-agents/issues/51).
 
 - [x] Route prototype Workspace execution, Stop and reply recovery by operation identity. [Execution-owned routing](adr/0344-execution-owned-operation-routing-study.md).

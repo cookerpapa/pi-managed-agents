@@ -252,8 +252,15 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
+  if (profile === "workspace-continuation") {
+    const { runContinuationCases } = await import("./continuation-cases.mjs");
+    return runContinuationCases(wave, forkPool);
+  }
   if (
     [
+      "workspace-rate",
+      "workspace-rate-confirm",
+      "workspace-rate-input",
       "message-rate",
       "message-rate-smoke",
       "message-rate-confirm",
@@ -271,7 +278,19 @@ export async function runPgPaths({
   ) {
     const { messageTrials } = await import("./complete-message-rate.mjs");
     return messageTrials(
-      { projector, emitter, configure, guard, observer, forkPool, report, save, cpuFixture, token },
+      {
+        wave,
+        projector,
+        emitter,
+        configure,
+        guard,
+        observer,
+        forkPool,
+        report,
+        save,
+        cpuFixture,
+        token,
+      },
       profile,
     );
   }

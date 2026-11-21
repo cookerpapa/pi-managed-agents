@@ -129,6 +129,20 @@ export type AcceptedFact =
 /** Session control references share transport/order, but never native history. */
 export type SessionLogFact = AcceptedFact | import("@pi-cloud/protocol").SessionControlChange;
 
+/** Native history that can share a transaction without advancing across an effect or user receipt. */
+export function isHistoryOnlyCommit(fact: SessionLogFact): fact is AcceptedDurableCommitFact {
+  return (
+    fact.kind === "durable_commit" &&
+    !fact.tools.length &&
+    !fact.cancellations.length &&
+    !fact.display.length &&
+    !fact.inputQueueSessions?.length &&
+    !fact.modelEvidence?.length &&
+    fact.commit.writes.length > 0 &&
+    fact.commit.writes.every((write) => write.type === "entry")
+  );
+}
+
 export type AcceptedFactReceipt = Readonly<{
   factId: string;
   durable: true;

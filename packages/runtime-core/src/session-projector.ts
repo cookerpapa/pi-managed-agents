@@ -7,8 +7,12 @@ import {
   decodeSessionLogFact,
   type PreparedSessionLogFact,
 } from "./kafka-accepted-fact.ts";
-import { ExecutionStreamProjector, factEvents } from "./execution-stream-projection.ts";
-import type { AcceptedExecutionSealFact } from "./accepted-fact.ts";
+import {
+  ExecutionStreamProjector,
+  factEvents,
+  type ExecutionProjectionResult,
+} from "./execution-stream-projection.ts";
+import { isHistoryOnlyCommit, type AcceptedExecutionSealFact } from "./accepted-fact.ts";
 import type { PublicationAvailability, SessionControlChange } from "@pi-cloud/protocol";
 import { assertCommittedControlChange } from "./session-control-outbox.ts";
 import type { ProducerCapacity } from "@pi-cloud/event-log";
@@ -31,6 +35,8 @@ import type {
 import { ProjectionTiming } from "./projection-timing.ts";
 import { RunObservations } from "./run-observations.ts";
 import type { ModelAccountingPort } from "./model-accounting-port.ts";
+
+type ProjectionDecision = { projected: ExecutionProjectionResult | undefined; applicable: boolean };
 
 const PREFIX = "pi-cloud-projector@";
 export class SessionProjector {
@@ -96,6 +102,15 @@ export class SessionProjector {
         close?(): Promise<void>;
       };
       controlTools?: {
+        /** Optional batch form of this same consumer for effect-free history.
+         * Normal per-record notifications follow successful materialization. */
+        historyBatch?: {
+          accepts(record: KafkaAcceptedFactRecord): boolean;
+          consume(
+            records: readonly KafkaAcceptedFactRecord[],
+            current: () => boolean,
+          ): Promise<void>;
+        };
         consume(
           record: KafkaAcceptedFactRecord,
           current?: () => boolean,
@@ -139,6 +154,8 @@ export class SessionProjector {
     this.#projection = new ExecutionStreamProjector(options.database, options.modelAccounting);
     let currentControlAssignment: () => boolean = () => false;
     const groupId = "pi-cloud-session-projector-v2";
+    const batches = options.controlTools?.historyBatch;
+    const staged = batches ? new WeakMap<PreparedSessionLogFact, ProjectionDecision>() : undefined;
     this.#consumer = new KafkaLogConsumer({
       brokers: options.brokers,
       topic,
@@ -198,6 +215,39 @@ export class SessionProjector {
           this.publication.installPartition(partition, writer);
         }
       },
+      ...(batches && staged
+        ? {
+            prepareReady: async (records, current) =>
+              this.#throughGate(async () => {
+                const prefix = [];
+                for (const item of records) {
+                  const f = item.fact.fact;
+                  if (item.fact.tools.length || !isHistoryOnlyCommit(f)) break;
+                  const record = { ...item, fact: f };
+                  if (!batches.accepts(record)) break;
+                  prefix.push({ key: item.fact, record });
+                  if (prefix.length === 16) break;
+                }
+                if (prefix.length < 2) return 1;
+                const admitted: KafkaAcceptedFactRecord[] = [];
+                const decisions = new Map<PreparedSessionLogFact, ProjectionDecision>();
+                for (const item of prefix) {
+                  if (!current()) return 1;
+                  const decision = await this.#projectForDelivery(
+                    item.record,
+                    current,
+                    new ProjectionTiming(options.metrics),
+                  );
+                  if (decision.applicable) admitted.push(item.record);
+                  decisions.set(item.key, decision);
+                }
+                if (!current()) return 1;
+                if (admitted.length) await batches.consume(admitted, current);
+                if (current()) for (const [key, decision] of decisions) staged.set(key, decision);
+                return prefix.length;
+              }),
+          }
+        : {}),
       handler: (decoded, current, commitBeforeEffect) =>
         this.#throughGate(async () => {
           const prepared = decoded.fact;
@@ -266,15 +316,9 @@ export class SessionProjector {
             }
             if (fact.kind === "work_finished" || fact.kind === "execution_seal")
               options.runtimeRetention?.forget(fact.scope.writerId);
-            const projected = await timing.measure("projection", () =>
-              this.#projection.project(record, current ?? (() => true)),
-            );
-            if (current?.() === false) return;
-            const applicable =
-              fact.kind === "execution_seal" ||
-              fact.kind === "work_finished" ||
-              (projected?.admitted !== false &&
-                (await timing.measure("boundary", () => this.#projection.accepts(record))));
+            const previous = staged?.get(prepared);
+            const { projected, applicable } =
+              previous ?? (await this.#projectForDelivery(record, current ?? (() => true), timing));
             if (current?.() === false) return;
             if (projected?.terminal)
               this.eventStore.accept(fact.scope.tenantId, projected.terminal);
@@ -299,7 +343,7 @@ export class SessionProjector {
               let dispatchAdmission: Promise<boolean> | undefined;
               const admitEffects = () =>
                 (dispatchAdmission ??= timing.measure("dispatch_commit", commitBeforeEffect!));
-              await options.controlTools?.consume(record, current, admitEffects);
+              if (!previous) await options.controlTools?.consume(record, current, admitEffects);
               const commands = prepared.tools;
               if (commands.length) {
                 if ((await admitEffects()) && current?.() !== false)
@@ -337,6 +381,22 @@ export class SessionProjector {
     });
     this.#retention = new KafkaSafeRetention({ ...options, topic, graceMs: options.retentionMs });
     this.eventStore.owner = (tenant, session) => this.owner(tenant, session);
+  }
+  async #projectForDelivery(
+    record: KafkaAcceptedFactRecord,
+    current: () => boolean,
+    timing: ProjectionTiming,
+  ) {
+    const projected = await timing.measure("projection", () =>
+      this.#projection.project(record, current),
+    );
+    const applicable =
+      current() &&
+      (record.fact.kind === "execution_seal" ||
+        record.fact.kind === "work_finished" ||
+        (projected?.admitted !== false &&
+          (await timing.measure("boundary", () => this.#projection.accepts(record)))));
+    return { projected, applicable };
   }
   #throughGate<T>(operation: () => Promise<T>): Promise<T> {
     return this.options.projectionGate ? this.options.projectionGate.run(operation) : operation();

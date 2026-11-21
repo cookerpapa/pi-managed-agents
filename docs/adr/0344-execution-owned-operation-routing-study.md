@@ -25,3 +25,21 @@ handles public Run/lease, native presentation and ordered closure. Execution-sid
 and routing use the same admitted partition callback. The isolated prototype selects its decoder at composition;
 the deployed decoder still accepts only its original protocol. Production Workflow, upload and readiness API
 migration remain separate. [Scope and fault evidence](../reports/workspace-operation-routing-20261121.md).
+
+## Batched history and continuation controls
+
+In the isolated candidate, immediately available stable Entries from the same partition may share
+one PG projection. Stop before an operation, input mutation, seal, control change or terminal
+boundary. Keep the original per-record grant before external dispatch. In the dual-store comparison,
+native admission must succeed for each record before the secondary projection batches it; publish
+live notifications and resolve Kafka delivery only after the candidate batch returns.
+
+A preferred Worker reuses immutable history under the settled version. New Run environment facts
+are frozen at admission under the same selection lock as an idle edit. A successful normal
+predecessor supplies the previous snapshot in the claim. The native named prompt section
+sets the current directory and distinguishes a directory move, a confirmed change of compute
+generation within retained storage and selection of a different Workspace. The logical generation
+is the last confirmed change, independent of availability polls. User-visible context carries
+the consequences; Guest routing and provider identities remain at execution.
+This control covers successive normal Runs. Recovery within an existing Run retains the
+original pending operation targets under the protocol above.

@@ -12,6 +12,11 @@ const f = vi.hoisted(() => ({
   start: vi.fn<(resource: string, partitions?: number) => void>(),
   close: vi.fn<(resource: string) => Promise<void>>(),
   decode: undefined as undefined | ((value: Buffer) => any),
+  prepareReady: undefined as
+    undefined | ((records: any[], current: () => boolean) => Promise<number>),
+  decodedHandler: undefined as
+    | undefined
+    | ((record: any, current: () => boolean, grant: () => Promise<boolean>) => Promise<void>),
   handler: undefined as
     | undefined
     | ((record: any, current?: () => boolean, commit?: () => Promise<boolean>) => Promise<void>),
@@ -19,7 +24,13 @@ const f = vi.hoisted(() => ({
 vi.mock("@pi-cloud/event-log", async (original) => ({
   ...(await original<typeof import("@pi-cloud/event-log")>()),
   KafkaLogConsumer: class {
-    constructor(options: { handler: typeof f.handler; decode: typeof f.decode }) {
+    constructor(options: {
+      handler: typeof f.handler;
+      decode: typeof f.decode;
+      prepareReady?: typeof f.prepareReady;
+    }) {
+      f.prepareReady = options.prepareReady;
+      f.decodedHandler = options.handler;
       f.handler = (record, current, commit) =>
         options.handler!(
           {
@@ -152,6 +163,71 @@ function deferred<T>() {
 }
 
 describe("Unified Projector handoff boundaries (transport/PG simulated)", () => {
+  it("materializes the admitted history prefix before delivery and leaves the following Tool to its own grant", async () => {
+    const ordinary = vi.fn(),
+      batch = vi.fn(async (_records: readonly unknown[], _current: () => boolean) => {}),
+      notify = vi.fn(),
+      grant = vi.fn(async () => true),
+      current = () => true;
+    const options = projector.options;
+    await projector.close();
+    projector = new SessionProjector({
+      ...options,
+      nativeChanges: { consume: notify },
+      controlTools: { consume: ordinary, historyBatch: { accepts: () => true, consume: batch } },
+    });
+    const { fact: tool } = toolInvocationFixture();
+    const entry = {
+      ...tool,
+      tools: [],
+      commit: { ...tool.commit, writes: [{ type: "entry", value: { id: 4, conversationId: 1 } }] },
+    };
+    const decoded = (offset: bigint, fact: typeof tool | typeof entry) => ({
+      ...record(),
+      offset,
+      fact: { fact, tools: fact === tool ? toolCommandsForFact(tool) : [] },
+    });
+    const first = decoded(10n, entry),
+      stale = decoded(11n, entry),
+      last = decoded(12n, entry),
+      effect = decoded(13n, tool);
+    f.project
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ admitted: false })
+      .mockResolvedValueOnce(undefined);
+    batch.mockRejectedValueOnce(new Error("candidate unavailable"));
+    await expect(f.prepareReady!([first, stale, last, effect], current)).rejects.toThrow(
+      "candidate unavailable",
+    );
+    expect(notify).not.toHaveBeenCalled();
+    expect(grant).not.toHaveBeenCalled();
+    f.project
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ admitted: false })
+      .mockResolvedValueOnce(undefined);
+    expect(await f.prepareReady!([first, stale, last, effect], current)).toBe(3);
+    expect(batch.mock.lastCall?.[0]).toEqual([
+      expect.objectContaining({ offset: 10n }),
+      expect.objectContaining({ offset: 12n }),
+    ]);
+    for (const r of [first, stale, last]) await f.decodedHandler!(r, current, grant);
+    expect(f.project).toHaveBeenCalledTimes(6);
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(ordinary).not.toHaveBeenCalled();
+    expect(grant).not.toHaveBeenCalled();
+    expect(await f.prepareReady!([effect, last], current)).toBe(1);
+    await f.decodedHandler!(effect, current, grant);
+    expect(ordinary).toHaveBeenCalledOnce();
+    expect(grant).toHaveBeenCalledOnce();
+    expect(route).toHaveBeenCalledOnce();
+
+    let assigned = true;
+    f.project.mockImplementationOnce(async () => {
+      assigned = false;
+    });
+    expect(await f.prepareReady!([first, last], () => assigned)).toBe(1);
+    expect(batch).toHaveBeenCalledTimes(2);
+  });
   it("admits Session activity through the epoch view without native projection or a Tool dispatch receipt", async () => {
     const consume = vi.fn(),
       commit = vi.fn(async () => true);

@@ -32,7 +32,8 @@ import {
   fauxProvider,
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
-import { Type } from "@earendil-works/pi-ai";
+import { continuationPrompt, environmentSection } from "./continuation-environment.mjs";
+import { Type, getCurrentSystemMessage } from "@earendil-works/pi-ai";
 import { KafkaWorkerProducer } from "@pi-cloud/event-log";
 import {
   encodeSessionLogFact,
@@ -149,6 +150,7 @@ async function execute(row, claimMs, claimReason) {
   let allocation = head.nextId,
     observed,
     observedTools,
+    observedEnvironment,
     toolExecutions = 0,
     firstModelAt,
     finalModelOutputAt;
@@ -298,6 +300,7 @@ async function execute(row, claimMs, claimReason) {
             restoredMs,
             observed,
             observedTools,
+            observedEnvironment,
             toolExecutions,
             firstModelAt,
             baseSeq: head.seq,
@@ -402,6 +405,20 @@ async function execute(row, claimMs, claimReason) {
   });
   if (previous) restoreSettled(store, row, head, previous.records);
   const registry = createRegistry();
+  const environment = row.environment_snapshot;
+  if (environment)
+    registry.install(
+      defineExtension({
+        name: "study-workspace-environment",
+        sections: [
+          {
+            key: environmentSection,
+            tag: false,
+            render: () => continuationPrompt(row.previous_environment, environment),
+          },
+        ],
+      }),
+    );
   if (sc.scene === "steer")
     registry.install(
       defineExtension({
@@ -428,6 +445,10 @@ async function execute(row, claimMs, claimReason) {
     modelCalls++;
     if (sc.integrated) {
       firstModelAt = Date.now();
+      if (environment)
+        observedEnvironment = getCurrentSystemMessage(context.messages)?.sections?.[
+          environmentSection
+        ];
       observed = modelWitness(context.messages, sc.verifyFull);
       if (sc.verifyFull && sc.scene === "steer") observedTools = toolEvidence(context.messages);
     }
@@ -474,12 +495,13 @@ async function execute(row, claimMs, claimReason) {
   );
   let harnessClosed = false;
   try {
-    const model = fake.getModel(),
-      root = await harness.root(ctx, {
-        agent: { model: { provider: model.provider, modelId: model.id } },
-      });
-    if (head.version)
-      await root.configure({ model: { provider: model.provider, modelId: model.id } }, ctx);
+    const model = fake.getModel();
+    const agent = {
+      model: { provider: model.provider, modelId: model.id },
+      ...(environment ? { cwd: environment.cwd } : {}),
+    };
+    const root = await harness.root(ctx, { agent });
+    if (head.version) await root.configure(agent, ctx);
     const initial = await root.submit(
       { type: "input", content: [{ type: "text", text: row.initial_input }], requestId: id },
       ctx,

@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { isPrefixStudy } from "./ready-projection.mjs";
+import { environmentSection } from "./continuation-environment.mjs";
+import { selectEnvironment } from "./continuation-cases.mjs";
 import { answer, claimSql, claimBatchSql, claimHintedBatchSql } from "./fixture.mjs";
 import { runWakeTrials, waitForWakeState, wakeNetwork } from "./wake-trials.mjs";
 import { measureClaimPreference, runSizingTrials } from "./wake-sizing.mjs";
@@ -236,6 +238,16 @@ function receive(a, m) {
       );
       assert.equal(r.state, "running");
       assert.equal(r.depth, 0);
+      if (wakeStage?.environmentCases) {
+        await assert.rejects(
+          selectEnvironment(db, tenant, e.session, {
+            workspace: "blocked",
+            cwd: "/unavailable",
+            processGeneration: 1,
+          }),
+          /Session must be quiescent/,
+        );
+      }
       e.checked = true;
       e.worker.write({ kind: "checked", id: e.id });
     })().catch(fatal);
@@ -420,13 +432,17 @@ const intakeSql = `with admitted as (insert into runs(id,tenant_id,session_id,ma
  on conflict(tenant_id,session_id,idempotency_key) do update set idempotency_key=excluded.idempotency_key
  where runs.initial_input=excluded.initial_input returning id) select id,pg_notify('session_bench_work','') from admitted`;
 const quietIntake = intakeSql.replace(",pg_notify('session_bench_work','')", "");
-const localityIntake = `with prior as materialized (select mailbox_position,history_head from runs where
+const localityIntakeSql = (
+  environment,
+) => `with prior as materialized (select mailbox_position,history_head from runs where
  tenant_id=$2 and session_id=$3 order by mailbox_position desc limit 1), admitted as
- (insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state)
- select $1,$2,$3,coalesce((select mailbox_position from prior),0)+1,$4,$5,$6,'queued'
+ (insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state${environment ? ",environment_snapshot" : ""})
+ select $1,$2,$3,coalesce((select mailbox_position from prior),0)+1,$4,$5,$6,'queued'${environment ? ",$7::jsonb" : ""}
  on conflict(tenant_id,session_id,idempotency_key) do update set idempotency_key=excluded.idempotency_key
  where runs.initial_input=excluded.initial_input and runs.model_ref=excluded.model_ref returning id,mailbox_position)
  select a.id,p.history_head from admitted a left join prior p on a.mailbox_position=p.mailbox_position+1`;
+const localityIntake = localityIntakeSql(false),
+  environmentIntake = localityIntakeSql(true);
 let notifyJob,
   notifyGeneration = 0,
   wakeCount = 0,
@@ -470,17 +486,31 @@ async function intake(e, sc = {}) {
       const acquired = performance.now();
       let rows;
       try {
-        ({ rows } = await client.query(
-          sc.integrated ? localityIntake : sc.omitNotify ? quietIntake : intakeSql,
-          [
-            e.id,
-            tenant,
-            e.session,
-            e.key,
-            e.text,
-            ...(sc.integrated ? [e.modelRef ?? "local-load"] : []),
-          ],
-        ));
+        let environment;
+        let statement = sc.integrated ? localityIntake : sc.omitNotify ? quietIntake : intakeSql;
+        if (sc.environmentCases) {
+          await client.query("begin");
+          const selected = await client.query(
+            "select value from study_session_environments where tenant=$1 and session=$2 for share",
+            [tenant, e.session],
+          );
+          assert.equal(selected.rowCount, 1);
+          environment = selected.rows[0].value;
+          statement = environmentIntake;
+        }
+        ({ rows } = await client.query(statement, [
+          e.id,
+          tenant,
+          e.session,
+          e.key,
+          e.text,
+          ...(sc.integrated ? [e.modelRef ?? "local-load"] : []),
+          ...(environment ? [environment] : []),
+        ]));
+        if (sc.environmentCases) await client.query("commit");
+      } catch (error) {
+        if (sc.environmentCases) await client.query("rollback");
+        throw error;
       } finally {
         client.release();
       }
@@ -627,6 +657,26 @@ async function verify(sc, records, cohort) {
       if (sc.inspect || sc.holdFinish) assert(r.checked);
     }
   }
+  if (sc.environmentCases) {
+    const byId = new Map(rr.map((r) => [r.id, r]));
+    let last;
+    for (const run of records) {
+      const desired = sc.environmentCases[run.index];
+      assert.deepEqual(byId.get(run.id).environment_snapshot, desired);
+      const updates = (byRun.get(run.id) ?? [])
+        .flatMap((m) => JSON.parse(m.content).model ?? [])
+        .filter(
+          (m) => m.role === "system" && m.sections && Object.hasOwn(m.sections, environmentSection),
+        )
+        .map((m) => m.sections[environmentSection]);
+      assert.deepEqual(
+        updates,
+        last === run.work.observedEnvironment ? [] : [run.work.observedEnvironment],
+        "PG must retain the exact environment update seen by the model",
+      );
+      last = run.work.observedEnvironment;
+    }
+  }
   if (sc.integrated) verifyModelHistory(sc, rr, records, cohort, byRun);
   return {
     messages: msgs.length,
@@ -714,6 +764,17 @@ async function wave(spec) {
           workers[1].write({ kind: "join" });
           await waitForWakeState(routerState, (s) => s.online === 1 && s.waiting === 1);
         }
+        if (sc.joinIdleAt === index) {
+          workers[1].write({ kind: "join" });
+          await waitForWakeState(routerState, (s) => s.online === 2 && s.waiting === 2);
+        }
+        if (
+          sc.environmentCases &&
+          (index === 0 ||
+            JSON.stringify(sc.environmentCases[index]) !==
+              JSON.stringify(sc.environmentCases[index - 1]))
+        )
+          await selectEnvironment(db, tenant, e.session, sc.environmentCases[index]);
         e.sentAt = Date.now();
         const accepted = await intake(e, sc);
         assert.equal(accepted, id);
@@ -795,6 +856,16 @@ async function wave(spec) {
   const elapsed = load.elapsedMs;
   const result = {
     ...sc,
+    ...(sc.environmentCases
+      ? {
+          environmentTrace: items.map((i) => ({
+            worker: i.work.actor,
+            prefix: i.work.prefixStatus,
+            readBytes: i.work.readBytes,
+            prompt: i.work.observedEnvironment,
+          })),
+        }
+      : {}),
     completed: complete,
     dropped: load.dropped.length,
     ...(sc.integrated

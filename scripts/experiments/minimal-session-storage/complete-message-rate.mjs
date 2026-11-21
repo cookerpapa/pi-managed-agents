@@ -159,7 +159,8 @@ export function messageTape(tenantId, perPartition, encode, lane, withUsage = fa
 }
 
 export class MessageRateMeter {
-  constructor(owners, rate, backlog) {
+  constructor(owners, rate, backlog, captureLagSamples = false) {
+    this.lagSamples = captureLagSamples ? [] : undefined;
     this.index = new Map(owners.map((s, i) => [s.runId, i]));
     this.count = owners.length * framesPerRun;
     this.rate = rate;
@@ -178,6 +179,7 @@ export class MessageRateMeter {
       this.sample = lag()
         .then((m) => {
           this.peakLag = Math.max(this.peakLag, m.lag);
+          this.lagSamples?.push({ atMs: Math.round(wall() - at), lag: m.lag });
         })
         .catch((e) => {
           this.error = e;
@@ -205,6 +207,8 @@ export class MessageRateMeter {
     if (++this.delivered === this.count) {
       assert.equal(this.latency.length, this.index.size * middle);
       this.done.resolve({
+        settledAt: now,
+        lagSamples: this.lagSamples,
         rps: (this.latency.length * 1000) / (now - this.at),
         elapsedMs: now - this.at,
         ...(this.backlog
@@ -219,9 +223,23 @@ export class MessageRateMeter {
 }
 
 export async function messageTrials(
-  { projector, emitter, configure, guard, observer, forkPool, report, save, cpuFixture, token },
+  {
+    projector,
+    emitter,
+    configure,
+    guard,
+    observer,
+    forkPool,
+    report,
+    save,
+    cpuFixture,
+    token,
+    wave,
+  },
   profile,
 ) {
+  const workspace = profile.startsWith("workspace-rate");
+  const inputControl = profile === "workspace-rate-input";
   const withUsage = profile.startsWith("usage-rate");
   const smoke = profile.endsWith("-smoke"),
     confirm = profile === "message-rate-confirm";
@@ -239,7 +257,7 @@ export async function messageTrials(
   const { owners } = await request(emitter, "makeMessages", "messageTape", {
     tenantId: randomUUID(),
     withUsage,
-    perPartition: smoke ? 1 : confirm ? 24 : 8,
+    perPartition: workspace ? 24 : smoke ? 1 : confirm ? 24 : 8,
   });
   const expected = owners.map((o) => [o.runId, o.digest]).sort();
   const count = owners.length * middle;
@@ -278,15 +296,32 @@ export async function messageTrials(
           [2315, true],
           [4630, true],
         ];
-  const trials =
-    usage?.cases ??
-    fork?.cases ??
-    pairs.flatMap(([rate, reverse]) =>
-      (reverse ? ["recorded-history", "moving-sync"] : ["moving-sync", "recorded-history"]).map(
-        (policy) => ({ rate, policy }),
-      ),
-    );
-  for (const { rate, policy, layout, persistUsage, bulkUsage } of trials) {
+  // Independent repetitions reverse the order. Reuse exactly the same payloads.
+  const trials = inputControl
+    ? [0, 0].map((rate) => ({ rate, workspaceMode: "batch", policy: "recorded-history" }))
+    : profile === "workspace-rate-confirm"
+      ? ["direct", "batch", "batch", "direct"].map((workspaceMode) => ({
+          rate: 4630,
+          workspaceMode,
+          policy: "recorded-history",
+        }))
+      : workspace
+        ? [4630, 0, 0, 4630].flatMap((rate, i) =>
+            (i % 2 ? ["single", "batch"] : ["batch", "single"]).map((workspaceMode) => ({
+              rate,
+              workspaceMode,
+              policy: "recorded-history",
+            })),
+          )
+        : (usage?.cases ??
+          fork?.cases ??
+          pairs.flatMap(([rate, reverse]) =>
+            (reverse
+              ? ["recorded-history", "moving-sync"]
+              : ["moving-sync", "recorded-history"]
+            ).map((policy) => ({ rate, policy })),
+          ));
+  for (const { rate, policy, layout, persistUsage, bulkUsage, workspaceMode } of trials) {
     if (usage) await usage.before();
     else if (fork) await fork.before(layout);
     else await observer.query("truncate messages,inboxes,runs");
@@ -302,6 +337,7 @@ export async function messageTrials(
     );
     await request(projector, "prepareMessages", "messagesReady", {
       owners: owners.map((o) => ({ runId: o.runId })),
+      workspaceMode,
       rate,
       policy,
       persistUsage,
@@ -320,7 +356,11 @@ export async function messageTrials(
       if (rate) await request(projector, "releaseMessages", "messagesReleased", { start });
       sent = await request(emitter, "emitMessages", "messagesEmitted", {
         start,
-        frameRate: rate ? (rate * framesPerRun) / middle : 25000,
+        frameRate: inputControl
+          ? (4630 * framesPerRun) / middle
+          : rate
+            ? (rate * framesPerRun) / middle
+            : 25000,
       });
       if (!rate) {
         stopTraffic = fork?.start(layout, Date.now());
@@ -381,13 +421,22 @@ export async function messageTrials(
         multiUsageStatements: stats.multiUsageStatements,
       };
     }
+    const { settledAt, lagSamples, ...timings } = result;
     const trial = {
       ...usageStorage,
+      ...(workspaceMode ? { workspaceMode } : {}),
       rate: rate || "preloaded",
       policy,
       ...(fork ? { layout, ...traffic, walBytes } : {}),
       ...(usage ? { persistUsage, usageRows, usageUpserts: stats.usageUpserts, walBytes } : {}),
-      ...result,
+      ...timings,
+      ...(workspace && (rate || inputControl)
+        ? {
+            inputAckRps: (count * 1000) / (sent.source.acknowledgedAt - start),
+            afterLastAckMs: Math.max(0, settledAt - sent.source.acknowledgedAt),
+            lagSamples,
+          }
+        : {}),
       sourceLateP95Ms: sent.source.lateMs.p95,
       transactions: stats.commits,
       syncTransactions: stats.syncTransactions,
@@ -400,7 +449,30 @@ export async function messageTrials(
     };
     report.completeMessages.trials.push(trial);
     await save();
-    console.log(JSON.stringify(trial));
+    console.log(JSON.stringify({ ...trial, lagSamples: undefined }));
+  }
+  if (profile === "workspace-rate") {
+    for (const [i, workspaceMode] of ["single", "batch", "batch", "single"].entries()) {
+      await wave({
+        label: "workspace-live-" + workspaceMode + "-" + i,
+        workspaceMode,
+        scene: "plain",
+        integrated: true,
+        cacheMode: "off",
+        wakeMode: "directed",
+        batch: 32,
+        slots: 128,
+        omitNotify: true,
+        probeUnlisted: true,
+        windowMs: 5,
+        tickMs: 200,
+        sink: "single",
+        prefixWidth: 16,
+        projectionPolicy: "recorded-history",
+        count: 192,
+        concurrency: 64,
+      });
+    }
   }
   if (fork) {
     report.forkStudy = await fork.finish();

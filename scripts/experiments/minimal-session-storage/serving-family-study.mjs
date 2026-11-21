@@ -576,6 +576,22 @@ try {
         },
       },
       controlTools: {
+        historyBatch: {
+          accepts: (r) => cases.has(r.fact.scope.runId) && router.canBatch(r.fact),
+          consume: async (records, current) => {
+            for (let i = 0; i < records.length && current();) {
+              const n = await router.prepareHistory(records.slice(i), current);
+              assert(n > 0);
+              if (!current()) return;
+              for (const r of records.slice(i, i + n)) {
+                const s = cases.get(r.fact.scope.runId);
+                if (s.study && !s.seal && r.fact.commit.seq > s.study.seq) s.study.observe(r.fact);
+                s.seq = r.fact.commit.seq;
+              }
+              i += n;
+            }
+          },
+        },
         async consume(r, current, grant) {
           const f = r.fact,
             s = cases.get(f.scope.runId);

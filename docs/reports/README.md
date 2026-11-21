@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Warm continuation and execution-side history batching](workspace-continuation-rate-20261121.md) checks the first model request after an environment change and measures input, projection and terminal rates separately.
+
 - [Execution-owned Workspace routing](workspace-operation-routing-20261121.md) verifies operation-only Stop and original Guest selection across replacement.
 
 - [PG-only family handoff](pg-family-handoff-20261121.md) compares the existing rows with one experimental seal-time capture after removing the old Session log prefix.

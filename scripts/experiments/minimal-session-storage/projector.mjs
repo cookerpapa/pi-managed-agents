@@ -13,6 +13,8 @@ import { ReadyProjection, isMovingStudy, recoveryConnectionError } from "./ready
 import { projectRecord } from "./project-record.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
+import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
+import { decodeWorkspaceFact } from "./workspace-operations.mjs";
 import { MessageRateMeter } from "./complete-message-rate.mjs";
 
 let resetAssignment;
@@ -114,12 +116,34 @@ const environment = {
   },
 };
 const processRecord = (record, draft) => projectRecord(record, draft, environment);
+const workspaceProfile = [
+  "workspace-rate",
+  "workspace-rate-confirm",
+  "workspace-rate-input",
+  "workspace-continuation",
+].includes(process.argv[8]);
+const workspaceRouter = workspaceProfile
+  ? new WorkspaceOperationRouter({
+      pool,
+      view: prefixStudy,
+      env: environment,
+      select() {
+        throw Error("History selected a resource");
+      },
+      resolve() {
+        throw Error("History dispatched a tool");
+      },
+    })
+  : undefined;
+let workspaceMode = "batch";
+const preparedHistory = new WeakSet();
 const reader = new KafkaLogConsumer({
   brokers,
   topic,
   groupId: group,
   clientId: group,
   groupRecovery: true,
+  orderedEffects: workspaceProfile,
   batchRead: process.argv[6] !== "single",
   replayOffsets: async (bounds) =>
     prefixStudy?.width
@@ -130,6 +154,12 @@ const reader = new KafkaLogConsumer({
         prepareReady: async (records, current) => {
           try {
             if (messageMeter && messageMeter.at === undefined) await messageMeter.gate.promise;
+            if (workspaceRouter && workspaceMode !== "direct") {
+              if (workspaceMode === "single") return 1;
+              const n = await workspaceRouter.prepareHistory(records, current);
+              for (let i = 0; i < n; i++) preparedHistory.add(records[i].fact);
+              return n || 1;
+            }
             return await prefixStudy.apply(
               records,
               current,
@@ -148,14 +178,23 @@ const reader = new KafkaLogConsumer({
       }
     : {}),
   decode: (v) => {
-    const f = decodeSessionLogFact(v).fact;
+    const f = (workspaceProfile ? decodeWorkspaceFact : decodeSessionLogFact)(v).fact;
     pathStudy?.decoded(f, v);
     return f;
   },
-  handler: async (record) => {
+  handler: async (record, current, grant) => {
     try {
       if (pathStudy?.mode) pathStudy.before(record);
       if (!prefixStudy?.width) await processRecord(record);
+      else if (
+        workspaceRouter &&
+        workspaceMode !== "direct" &&
+        !preparedHistory.delete(record.fact)
+      ) {
+        if (record.fact.kind === "durable_commit")
+          await workspaceRouter.consume(record, current, grant);
+        else await prefixStudy.apply([record], current, processRecord);
+      }
       if (pathStudy?.mode) pathStudy.applied(record.fact);
       messageMeter?.apply(record.fact);
     } catch (e) {
@@ -251,6 +290,7 @@ try {
       stage: async (m) => {
         assert.equal(sessions.size, 0);
         stage = m;
+        workspaceMode = m.workspaceMode ?? "batch";
         await resetPrefix(m.prefixWidth, m.projectionPolicy);
         cpuAt = process.cpuUsage();
         eluAt = performance.eventLoopUtilization();
@@ -267,7 +307,8 @@ try {
         await resetPrefix(16, m.policy);
         prefixStudy.persistUsage = m.persistUsage;
         prefixStudy.bulkUsage = m.bulkUsage;
-        messageMeter = new MessageRateMeter(m.owners, m.rate, !m.rate);
+        workspaceMode = m.workspaceMode ?? "batch";
+        messageMeter = new MessageRateMeter(m.owners, m.rate, !m.rate, workspaceProfile);
         send("messagesReady");
       },
       releaseMessages: (m) => {
