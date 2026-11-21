@@ -201,9 +201,12 @@ function finishParent(context) {
 }
 function beginChild() {
   childModelCalls++;
-  return fauxAssistantMessage(fauxToolCall("bash", { command, timeout: 90 }), {
-    stopReason: "toolUse",
-  });
+  return fauxAssistantMessage(
+    fauxToolCall("bash", { command, timeout: init.bashFields ? "90" : 90 }),
+    {
+      stopReason: "toolUse",
+    },
+  );
 }
 function finishChild(context) {
   childModelCalls++;
@@ -406,6 +409,7 @@ try {
         presentation,
         models,
         rootConfig: configuration(1),
+        bashFields: init.bashFields,
       });
       restored = pgOnly.restored;
       queuedKey = pgOnly.queuedKey;

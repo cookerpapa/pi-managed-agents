@@ -356,3 +356,8 @@ and its seal-snapshot reader have distinct database privileges. Before B is
 started the driver verifies the old Session prefix has been removed from the
 private Kafka cluster. Original reply mailboxes remain available.
 [Evidence and scope](../../../docs/reports/pg-family-handoff-20261121.md).
+
+Use `--bash-fields` for the focused pending-reply and Stop checks. The seal
+writer compares the fixed Bash task and its one-call generation with records
+derived from candidate PG rows, then omits both. The replacement reconstructs
+them again from those rows. The other family state stays in the control snapshot.

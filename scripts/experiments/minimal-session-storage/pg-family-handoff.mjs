@@ -163,7 +163,7 @@ export class SealStudy {
         ),
       );
   }
-  async seal(db, r, from) {
+  async seal(db, r, from, bashFields) {
     const { fact: f } = r;
     const state = {
       seq: this.seq,
@@ -172,6 +172,10 @@ export class SealStudy {
       targets: [...this.targets.values()],
       sequences: [...this.sequences],
     };
+    if (bashFields) {
+      const { omitVerifiedBashWait } = await import("./bash-wait-fields.mjs");
+      await omitVerifiedBashWait(db, f.scope.runId, f.scope.writerId, state);
+    }
     const result = await db.query(
       `with advanced as (
       update candidate.accepted_fact_projection_offsets set next_offset=$1 where topic=$2 and partition=$3 and next_offset=$4 returning topic)

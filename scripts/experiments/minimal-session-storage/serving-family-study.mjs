@@ -31,6 +31,7 @@ const {
   servingBrokers: brokers,
   cube,
   pgHandoff,
+  bashFields,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
 assert(
   brokers.length === 3 &&
@@ -110,6 +111,7 @@ async function scenario(guest, mode) {
       replyBrokers,
       ...(pgHandoff && seal ? {} : { binding }),
       pgHandoff,
+      bashFields,
       ...(pgHandoff ? { pgResume: !!seal } : { seal }),
     });
   }
@@ -503,7 +505,7 @@ try {
               s.requestAbsentFromMemory = !JSON.stringify(original, (_, v) =>
                 typeof v === "bigint" ? String(v) : v,
               ).includes(s.queuedId);
-              s.snapshotBytes = await s.study.seal(pool, r, from);
+              s.snapshotBytes = await s.study.seal(pool, r, from, bashFields);
             } else
               assert.equal(
                 (
@@ -548,7 +550,11 @@ try {
   const origin = await app.getUrl();
   api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), tenant.credential.token);
   const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
-  for (const mode of pgHandoff ? handoffs : ["normal", ...handoffs]) {
+  for (const mode of bashFields
+    ? ["serving-pending", "user-stop"]
+    : pgHandoff
+      ? handoffs
+      : ["normal", ...handoffs]) {
     console.log("Starting " + mode);
     results.push(await withFamilyGuest(cube, (guest) => scenario(guest, mode)));
     console.log(JSON.stringify(results.at(-1)));

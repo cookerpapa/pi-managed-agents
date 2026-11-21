@@ -42,6 +42,25 @@ A 使用 Pi 的原生提交接口，用一个随机请求 ID 提交子 follow-up
 
 [本次聚合数据](pg-family-handoff-20261121.json)
 
+## 单次 Bash 等待具体用到哪些字段
+
+字段核对限定为固定 Pi 1.0.0、同一轮只有一个已派发的 Bash、工具尚未收到原生取消标记、第一次 writer 交接。父 Agent 的委派、子 Conversation、Submission 和原生文档沿用上一组对照。此次专门检验子 Agent 的 Bash Task 及直接等待它的 generation Task，两者在封口时都从实验交接记录中移除。
+
+| Pi 或执行层需要的值 | 现有来源及适用条件 |
+|---|---|
+| Bash 的任务 ID、Conversation、原模型调用 ID | 已有 `runs.projection_tools` 的 `taskId`、`conversationId`、`reply.toolCallId`。 |
+| 原操作、回包 Topic、分区、起始位置、绝对截止时间 | 已有 `operationId` 和 `reply`。就接回同一操作的结果而言，这些定位字段已齐全。 |
+| `input.assistant` 和 Bash 的 `owner` | 在相同 Conversation 的稳定正文中找到发起调用的助手 Entry。它的 `id` 就是 `input.assistant`；它的 `byTaskId` 就是创建该工具的 generation ID。只接受唯一匹配，且 Entry 提交位置早于或等于工具意图。通用实现可直接保留 `input.assistant` 作引用。 |
+| Bash 的任务种类、版本、状态和检查点 | 此例是前台、未取消的 `pi.tool` v1，状态为 `running`，阶段为 `execute`。固定 Bash 代理的 `replay` 为 `safe`，会重新挂原 waiter。正文里 timeout 是字符串 `"90"`，使用同版本 Bash schema 执行 Pi 的参数校验后得到数字 `90`，与原生 `checkpoint.arguments` 一致。 |
+| generation 正在等待哪项工作 | 此例是 Conversation 拥有的 `pi.generation` v1，`state.status=waiting`、`policy=allSettled`、`on=[同一工具任务 ID]`；检查点是 `phase=tools`、同一助手 Entry、`tools=[同一工具任务 ID]`、`pending=[]`。 |
+| 取消原进程时的执行目标 | Guest 接口使用原操作 ID、原 `activationId` 和原 `writerId`。首次交接可从匹配封口取得原 writer。交接记录中只保留了以工具任务 ID 为键的原 `activationId`。业务绑定表按绑定及 writer 管理目标，待回包行没有记录每个操作采用了哪个绑定。连续换 Worker 时要保留发起操作的 writer 身份。 |
+
+封口前，将上述两条重建记录（含原生提交序号）与 Pi 实际提交的完整记录做深比较。仅当两者分别相等才移除原件。B 使用候选正文和待回包行重新生成这两条记录。原 Session Kafka 前缀在 B 启动前已不可读取。等回包和交接期间 Stop 两例均通过：每例物理执行一次，B 新发 Bash 均为零；第一例父 Agent 收到 VM 生成的值，第二例只向原操作派发了一次取消。其余家族交接内容保留，整份实验交接记录在两例中均为 7,042 字节。
+
+通用路径要区分三类变化。第一，原生工具校验或 beforeTool 可以更改参数，执行时的策略也可能与恢复时的工具定义不同；应保留当时的最终参数、重放策略或能确定性重建它们的版本和差异。第二，`abortRequested` 是可变的原生任务标记，单凭“仍有待回包引用”无法判定；当前固定 Bash 代理不写任务 `memos`，使用该能力的任务还要保留实际 memo。第三，多工具轮的 `checkpoint.tools` 记录已创建的任务（包括已完成的），`checkpoint.pending` 记录尚未启动的模型调用，`state.on` 表示本次要等哪些任务。三个列表不一定相同；只读当前待回包集合不足以填出全部列表。字段实验对不唯一的助手 Entry 和多工具轮都拒绝猜测。
+
+[重建与逐字段比对](../../scripts/experiments/minimal-session-storage/bash-wait-fields.mjs) · [字段边界测试](../../scripts/experiments/minimal-session-storage/bash-wait-fields.test.mjs) · [固定 Bash 代理](../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts) · [按原操作接回结果](../../packages/sandbox-supervisor/src/trusted-remote-tools.ts)
+
 ## 边界
 
 这个实验验证一轮 Run 在一个旧身份之后的当前状态恢复。交接记录包含 2 个 Conversation、4 个 Task、3 个 Submission，以及 pi.agent、pi.live 等当前文档。这个保守的对照会保留已见过的 Task 和 Submission 的当前值，尚无清理已结束工作所需的完整依赖分析。部分字段可能可以从已有控制记录推导。没有证明每种文档都必须复制，也没有验证任意历史时刻的文档版本。计量大小使用 PG 中 JSON 文本的字节数，实际占盘和 WAL 写入量会不同。

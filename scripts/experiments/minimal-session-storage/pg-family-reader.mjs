@@ -117,6 +117,7 @@ export async function readFamilyPgControl({
   presentation,
   models,
   rootConfig,
+  bashFields,
 }) {
   const readStart = performance.now();
   const rows = await readCandidateAtSeal(db, scope, topic);
@@ -165,6 +166,21 @@ export async function readFamilyPgControl({
   } finally {
     await snapDb.end();
   }
+  if (bashFields) {
+    const { singleBashRecords } = await import("./bash-wait-fields.mjs");
+    const rebuilt = singleBashRecords(rows);
+    for (const row of rebuilt) {
+      assert(
+        !state.records.some(
+          (saved) => saved.write.type === "task" && saved.write.value.id === row.write.value.id,
+        ),
+      );
+      state.records.push(row);
+    }
+    const sealed = state.targets.find((t) => t.taskId === original.taskId);
+    assert.deepEqual(Object.keys(sealed).sort(), ["activationId", "taskId"]);
+    Object.assign(sealed, { operationId: original.operationId, writerId: rows.owner.old_writer });
+  }
   importFamily(store, rows, state, presentation);
   const sub = await store.submission(rows.queued.id, ctx);
   assert.equal(sub.status, "queued");
@@ -180,6 +196,7 @@ export async function readFamilyPgControl({
   const restored = {
     intents: [{ ...original, ...target }],
     stats: {
+      ...(bashFields ? { nativeTaskRecordsRebuiltFromCandidate: 2 } : {}),
       candidateOnlyTasksVisibleToPi: inspected,
       candidateOnlyReattachRejected: true,
       candidateEntries: rows.entries.length,
