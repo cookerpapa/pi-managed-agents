@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, measure verified projection throughput for 200-call Runs with native tool intents, results, compaction and closure. [Mixed long-Run capacity](reports/tool-loop-capacity-20261121.md).
+
 - [x] Under #52, measure the post-PG delivery of a matching native Tool start, full-trace batch coverage and the throughput of wider dispatch grants. [Width and traffic-mix measurements](reports/display-tool-batching-20261121.md).
 
 - [x] Under #52, compare individual PG projection against one transaction per admitted Tool prefix at the same Kafka grant width. Verify middle-row rollback, lost acknowledgements and a captured native waiting Task. [PG batching results and serving boundary](reports/pg-tool-intent-batch-20261121.md).

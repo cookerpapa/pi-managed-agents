@@ -19,6 +19,7 @@ export async function fanoutReceiver(token, fail) {
     delay,
     counts,
     offsets,
+    taskIds,
     firstAt,
     lastAt,
     pending = 0,
@@ -46,12 +47,17 @@ export async function fanoutReceiver(token, fail) {
         const q = JSON.parse(raw),
           index = counts[target] * targets + target,
           expected = fixture.owners[target];
+        const task = Number(q.command.toolCallId.split(":")[1]);
         assert(
           q.command.request.activationId === expected.binding &&
             q.command.scope.runId === expected.scope.runId &&
             q.command.scope.piSessionId === expected.scope.piSessionId &&
             q.command.scope.writerId === expected.scope.writerId &&
-            q.command.toolCallId === "task:" + (mixed ? 11 : 9 + counts[target]) &&
+            (mixed
+              ? Number.isSafeInteger(task) &&
+                q.command.toolCallId === "task:" + task &&
+                task > taskIds[target]
+              : q.command.toolCallId === "task:" + (9 + counts[target])) &&
             q.command.request.toolCallId === "call-" + index &&
             q.reply.toolCallId === q.command.request.toolCallId &&
             BigInt(q.position.offset) > offsets[target] &&
@@ -61,6 +67,7 @@ export async function fanoutReceiver(token, fail) {
             q.reply.topic === fixture.replyTopic,
           "Wrong target, duplicate or out-of-order delivery",
         );
+        taskIds[target] = task;
         offsets[target] = BigInt(q.position.offset);
         counts[target]++;
         total++;
@@ -90,6 +97,7 @@ export async function fanoutReceiver(token, fail) {
       mixed = msg.mixed;
       delay = msg.delay;
       counts = new Uint32Array(targets);
+      taskIds = new Float64Array(targets);
       offsets = new BigInt64Array(targets).fill(-1n);
       firstAt = lastAt = undefined;
       total = 0;

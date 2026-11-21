@@ -1,5 +1,6 @@
 /** Isolated test of the two-table lifecycle. Run through the maintained development cluster. */
 import assert from "node:assert/strict";
+import { fanoutTargets } from "./fanout-fixture.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { isPrefixStudy } from "./ready-projection.mjs";
 import { environmentSection } from "./continuation-environment.mjs";
@@ -117,6 +118,7 @@ const source = Object.fromEntries(
           packages: "external",
           define: {
             __FANOUT_PARTITIONS__: String(fanoutPartitions),
+            __FANOUT_TARGETS__: String(fanoutTargets(process.env.PI_CLOUD_FANOUT_SUITE)),
             __FANOUT_PREFIX_LIMIT__:
               process.env.PI_CLOUD_FANOUT_SUITE === "grants-display-wide" ? "128" : "32",
             __GRANT_STUDY__: String(
@@ -133,6 +135,7 @@ const source = Object.fromEntries(
                   "grants-display-mix",
                   "grants-display-ackmix",
                   "grants-display-wide",
+                  "grants-tool-loop",
                 ].includes(process.env.PI_CLOUD_FANOUT_SUITE),
             ),
             __PG_PATH_STUDY__: String(mode === "wake-throughput" && suite === "pg-paths"),

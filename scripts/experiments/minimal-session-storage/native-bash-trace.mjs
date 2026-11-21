@@ -1,7 +1,7 @@
 // Capture unmodified commits from the pinned Harness and use the real fixed Bash
 // definition with an inert executor. No provider request or shell escapes the fixture.
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { durableToolState } from "@pi-cloud/protocol";
 import { setTimeout as delay } from "node:timers/promises";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
@@ -19,10 +19,18 @@ import {
 } from "@earendil-works/pi-ai/providers/faux";
 import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 export async function nativeBashTrace(scope, onCommit, options = {}) {
+  const callsPerRun = options.callsPerRun ?? 1;
   const frames = [],
     registry = createRegistry(),
     models = createModels(),
-    fake = fauxProvider({ tokensPerSecond: 0 });
+    fake = fauxProvider({
+      tokensPerSecond: 0,
+      ...(callsPerRun > 1
+        ? { models: [{ id: "loop-model", contextWindow: 32768, maxTokens: 512 }] }
+        : {}),
+    });
+  let issued = 0,
+    executed = 0;
   class Observed extends MemoryStorage {
     #published = Promise.resolve();
     async commit(writes) {
@@ -33,7 +41,8 @@ export async function nativeBashTrace(scope, onCommit, options = {}) {
     async observe(writes) {
       const p = this.prepareCommit(writes);
       const frame = { seq: p.seq, nextId: this.nextId, writes: structuredClone(p.writes) };
-      frames.push(frame);
+      if (options.onlyLatest) frames[0] = frame;
+      else frames.push(frame);
       const sent = onCommit?.(frame);
       if (sent) await sent;
       return p.apply();
@@ -49,26 +58,61 @@ export async function nativeBashTrace(scope, onCommit, options = {}) {
           execute: async (args) => {
             if (options.toolDelay) await delay(options.toolDelay);
             assert.equal(args.timeout, 10);
-            return { content: [{ type: "text", text: "fixture" }] };
+            const result =
+              callsPerRun > 1
+                ? createHash("shake256", { outputLength: 512 })
+                    .update(options.callIdAt(executed))
+                    .digest("hex")
+                : "fixture";
+            executed++;
+            return { content: [{ type: "text", text: result }] };
           },
         },
       ],
     }),
   );
-  const first = fauxAssistantMessage(
-    fauxToolCall("bash", { command: "true", timeout: "10" }, { id: options.callId }),
-    { stopReason: "toolUse" },
-  );
-  fake.setResponses([
-    async () => {
+  if (callsPerRun > 1) {
+    const respond = async (context) => {
+      if (context.messages.at(-1)?.content?.[0]?.text?.startsWith("<conversation>"))
+        return fauxAssistantMessage(
+          "Earlier checks completed successfully. Continue the remaining checks.",
+        );
+      if (issued === callsPerRun) return fauxAssistantMessage("ok");
+      const callId = options.callIdAt(issued++);
       if (options.modelDelay) await delay(options.modelDelay);
-      return first;
-    },
-    fauxAssistantMessage("ok"),
-  ]);
+      return fauxAssistantMessage(
+        fauxToolCall("bash", { command: "true", timeout: "10" }, { id: callId }),
+        { stopReason: "toolUse" },
+      );
+    };
+    // This profile expects one summary and one final response in addition to the tool requests.
+    fake.setResponses(Array(callsPerRun + 2).fill(respond));
+  } else {
+    const first = fauxAssistantMessage(
+      fauxToolCall("bash", { command: "true", timeout: "10" }, { id: options.callId }),
+      { stopReason: "toolUse" },
+    );
+    fake.setResponses([
+      async () => {
+        if (options.modelDelay) await delay(options.modelDelay);
+        return first;
+      },
+      fauxAssistantMessage("ok"),
+    ]);
+  }
   const h = await Harness.open(
     new Observed(),
-    { models, registry, settings: { retry: { maxRetries: 0 }, compaction: { enabled: false } } },
+    {
+      models,
+      registry,
+      settings: {
+        retry: { maxRetries: 0 },
+        compaction:
+          callsPerRun > 1
+            ? { enabled: true, reserveTokens: 1024, keepRecentTokens: 512, backgroundTokens: 0 }
+            : { enabled: false },
+      },
+    },
     ctx,
   );
   try {
@@ -80,6 +124,7 @@ export async function nativeBashTrace(scope, onCommit, options = {}) {
     );
     await root.waitForIdle(ctx);
     assert.equal((await sub.wait(ctx)).status, "done");
+    assert.equal(executed, callsPerRun);
   } finally {
     await h.close(ctx);
   }

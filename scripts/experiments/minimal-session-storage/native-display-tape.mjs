@@ -7,12 +7,13 @@ import { decodeWorkspaceFact, encodeWorkspaceFact } from "./workspace-operations
 
 // Capture all native writes in their observed order across concurrent Harnesses.
 // Reuse the identical tape for both width trials; scheduling is outside measurement.
-export async function mixedDisplayTape(fixture, arm, publish) {
+export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
   const frames = [],
     hash = createHash("sha256");
   let index = 0,
     intents = 0;
-  const kinds = {},
+  const entries = {},
+    kinds = {},
     previous = new Map(),
     adjacentSizes = [];
   function append(owner, f, intent = false, before) {
@@ -47,16 +48,19 @@ export async function mixedDisplayTape(fixture, arm, publish) {
         scope,
         (commit) => {
           const d = presentation.prepare(commit);
+          for (const w of commit.writes)
+            if (w.type === "entry") entries[w.value.kind] = (entries[w.value.kind] ?? 0) + 1;
+          const indexOfCall = starts * fixture.owners.length + i;
           const f = nativeBashFact(
             scope,
             commit,
             d.display,
-            fixture.op(arm, i),
+            fixture.op(arm, indexOfCall),
             fixture.replyTopic,
           );
           const [operation] = f.workspaceOperations;
           if (operation) {
-            assert(++starts === 1 && operation.reply.toolCallId === "call-" + i);
+            assert(++starts <= callsPerRun && operation.reply.toolCallId === "call-" + indexOfCall);
             intents++;
           }
           for (const group of d.display)
@@ -67,12 +71,15 @@ export async function mixedDisplayTape(fixture, arm, publish) {
         },
         {
           waitForCommit: !!publish,
+          onlyLatest: true,
+          callsPerRun,
+          callIdAt: (n) => "call-" + (n * fixture.owners.length + i),
           callId: "call-" + i,
           modelDelay: 10 + ((i * 109) % 75),
           toolDelay: 60 + ((i * 79) % 80),
         },
       );
-      assert.equal(starts, 1);
+      assert.equal(starts, callsPerRun);
       await append(owner, {
         kind: "work_finished",
         scope,
@@ -87,12 +94,14 @@ export async function mixedDisplayTape(fixture, arm, publish) {
   }
   await Promise.all(Array.from({ length: 128 }, captureNext));
   for (const n of previous.values()) if (n) adjacentSizes.push(n);
-  assert.equal(intents, fixture.owners.length);
+  assert.equal(intents, fixture.owners.length * callsPerRun);
   return {
     frames,
     summary: {
       intents,
       kinds,
+      entries,
+      runs: fixture.owners.length,
       records: frames.length,
       hash: hash.digest("hex"),
       adjacent: adjacentSizes.reduce((s, n) => s + (n > 1 ? n : 0), 0),

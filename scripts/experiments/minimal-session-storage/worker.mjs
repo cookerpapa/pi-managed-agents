@@ -718,8 +718,11 @@ listen(
       assert(!nativeFanoutTape);
       const until = m.start - Date.now();
       if (until > 0) await new Promise((resolve) => setTimeout(resolve, until));
-      nativeFanoutTape = await mixedDisplayTape(fanoutSource, m.arm, (f) =>
-        producer.append(f.partition, { factId: f.id, sessionId: f.session, value: f.value }),
+      nativeFanoutTape = await mixedDisplayTape(
+        fanoutSource,
+        m.arm,
+        (f) => producer.append(f.partition, { factId: f.id, sessionId: f.session, value: f.value }),
+        m.callsPerRun,
       );
       pathFrames = nativeFanoutTape.frames;
       send("fanoutLiveDone", {
@@ -731,7 +734,7 @@ listen(
     fanoutTape: async (m) => {
       fanoutSource ??= fanoutFixture(topic.slice(-16));
       if (m.mixed) {
-        nativeFanoutTape ??= await mixedDisplayTape(fanoutSource, m.arm);
+        nativeFanoutTape ??= await mixedDisplayTape(fanoutSource, m.arm, undefined, m.callsPerRun);
         pathFrames = nativeFanoutTape.frames;
         send("fanoutTapeReady", {
           bytes: pathFrames.reduce((n, f) => n + Buffer.byteLength(f.value), 0),

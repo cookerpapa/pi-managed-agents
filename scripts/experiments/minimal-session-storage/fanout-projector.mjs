@@ -96,6 +96,7 @@ export class FanoutProjector {
     this.handled = 0;
     this.finishedRuns = 0;
     this.displayCounts = new Uint32Array(targets);
+    this.displaySequences = new Array(targets).fill(0);
     this.displayed = 0;
     this.prepared = new WeakSet();
     this.grantSizes = {};
@@ -115,7 +116,8 @@ export class FanoutProjector {
       if (
         !spec.preload &&
         !spec.liveSource &&
-        this.lastAck <= this.start + ((spec.recordCount ?? spec.count) * 1000) / offered
+        this.lastAck <=
+          this.start + ((spec.recordCount ?? spec.count) * 1000) / (spec.rate ?? offered)
       )
         this.atOfferEnd++;
     };
@@ -198,25 +200,27 @@ export class FanoutProjector {
   toolStarted(event, record) {
     const i = this.bySession.get(event.sessionId),
       previous = this.displayCounts[i];
+    const operation = this.spec.mixed ? operationsFor(record.fact)[0] : undefined;
     assert(
       this.spec.display &&
         i !== undefined &&
         event.turnId === record.fact.scope.turnId &&
         record.fact.scope.sessionId === event.sessionId &&
         (this.spec.mixed
-          ? previous === 0 && event.seq > 0 && event.payload.toolCallId === "task:11"
+          ? event.seq > this.displaySequences[i] &&
+            operation?.reply.toolCallId === "call-" + (previous * targets + i) &&
+            event.payload.toolCallId === "task:" + operation.taskId
           : event.seq === previous + 1 && event.payload.toolCallId === "task:" + (9 + previous)) &&
         event.payload.input.command === "true",
     );
+    this.displaySequences[i] = event.seq;
     this.displayCounts[i]++;
     this.displayed++;
   }
   processed(record) {
     this.handled++;
     if (record.fact.kind === "work_finished") this.finishedRuns++;
-    if (
-      this.spec.mixed ? this.finishedRuns === this.spec.count : this.handled === this.spec.count
-    ) {
+    if (this.spec.mixed ? this.finishedRuns === this.spec.runs : this.handled === this.spec.count) {
       this.processedAt = wall();
       this.waited.resolve();
     }
@@ -353,6 +357,7 @@ export class FanoutProjector {
       elapsedMs: dt,
       startAt: this.start,
       lastAckAt: this.lastAck,
+      processedAt: this.processedAt,
       ackedByOfferEnd: this.spec.preload || this.spec.liveSource ? null : this.atOfferEnd,
       cpu: process.cpuUsage(this.cpuBase),
       memoryEnd: process.memoryUsage(),

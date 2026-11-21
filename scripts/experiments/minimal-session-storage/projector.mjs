@@ -16,7 +16,7 @@ import { projectionTemplates } from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { decodeWorkspaceFact, operationsFor } from "./workspace-operations.mjs";
-import { partitions } from "./fanout-fixture.mjs";
+import { partitions, targets } from "./fanout-fixture.mjs";
 import { FanoutProjector } from "./fanout-projector.mjs";
 import { MessageRateMeter } from "./complete-message-rate.mjs";
 
@@ -387,7 +387,7 @@ try {
       fanoutWarm: async (m) => {
         const ends = await reader.captureEndOffsets();
         await reader.waitUntilInitialReplay(ends);
-        assert.equal(sessions.size, m.mixed ? 0 : 4000);
+        assert.equal(sessions.size, m.mixed ? 0 : targets);
         await fanout.warm(workspaceRouter, topic);
         // A complete mixed trace starts before any new seed records or grants.
         if (!m.mixed) await verifyGroupPosition(ends, true);

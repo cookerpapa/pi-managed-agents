@@ -504,3 +504,22 @@ original Tool Result counts. The model and shell are deterministic fixtures;
 browser rendering and model tokens are outside the benchmark. Inspect
 `trial.mix.adjacent` for the upper bound on groupable intents and
 `count - result.grantSizes["1"]` for the number that actually shared a grant.
+
+### Tool-dominated Run throughput
+
+Use `PI_CLOUD_FANOUT_SUITE=grants-tool-loop` with the same `workspace-fanout`
+driver. This suite uses 128 active destinations across all 32 partitions and
+an eight-intent grant limit. Each real Pi Run makes 200 sequential fixed Bash
+calls with deterministic 1,024-byte text results, one threshold compaction and
+one final assistant response. The live source awaits actual Kafka acknowledgement.
+A captured, hash-checked tape is replayed at several input rates and with a
+preloaded backlog. The fake tool result is generated in the Harness fixture;
+the separate network receiver checks the actual dispatch and simulates its
+100 ms acknowledgement. The model and external shell are outside this measurement.
+
+Each arm validates the identities, order and sizes of all PG tool-call/result
+pairs, per-kind history counts, settled Runs, displays, receiver counts and
+Kafka positions. After the driver exits, run
+`node scripts/experiments/minimal-session-storage/summarize-tool-loop.mjs <output-directory>`
+to get Kafka records, completed history rows and tool pairs per second, plus
+lag at four points in the input window and time to drain after the producer.

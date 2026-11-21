@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Projector capacity for 200-tool Runs](tool-loop-capacity-20261121.md) separates Kafka records, history messages and tool pairs under live, paced and preloaded traffic.
+
 - [Native tool starts and grant width](display-tool-batching-20261121.md) measures actual batch membership on a complete Pi trace and separates arrival-limited throughput from backlog drain.
 
 - [Batching admitted Tool intents in PostgreSQL](pg-tool-intent-batch-20261121.md) compares paced dispatch and backlog drain at equal Kafka grant sizes, with native commit and failure checks.

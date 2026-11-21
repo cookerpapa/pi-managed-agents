@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { kafkaProducerLane } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
-export const targets = 4000,
+export function fanoutTargets(suite) {
+  return suite === "grants-tool-loop" ? 128 : 4000;
+}
+export const targets =
+    typeof __FANOUT_TARGETS__ === "number"
+      ? __FANOUT_TARGETS__
+      : fanoutTargets(process.env.PI_CLOUD_FANOUT_SUITE),
   partitions =
     typeof __FANOUT_PARTITIONS__ === "number"
       ? __FANOUT_PARTITIONS__

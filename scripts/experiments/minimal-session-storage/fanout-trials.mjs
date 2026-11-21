@@ -106,6 +106,7 @@ export async function runFanout({
       display = false,
       mixed = false,
       liveSource = false,
+      rate = offered,
     },
   ] of cases(suite).entries()) {
     const arm = mixed ? 1 : i + 1,
@@ -127,6 +128,7 @@ export async function runFanout({
           arm,
           count,
           mixed,
+          callsPerRun: rounds,
           displayRounds: display ? rounds : 0,
         }));
       const start = wall() + 250;
@@ -137,6 +139,8 @@ export async function runFanout({
         start,
         preload,
         recordCount: mix?.records,
+        runs: targets,
+        rate,
         liveSource,
         mixed,
         grantWidth,
@@ -147,11 +151,12 @@ export async function runFanout({
       if (liveSource)
         ({ source, bytes, mix } = await call(emitter, "fanoutLiveTape", "fanoutLiveDone", {
           arm,
+          callsPerRun: rounds,
           start,
         }));
       else
         ({ source } = await call(emitter, "emitMessages", "messagesEmitted", {
-          frameRate: offered,
+          frameRate: rate,
           start,
         }));
       source.rate = ((mix?.records ?? count) * 1000) / (source.acknowledgedAt - start);
@@ -172,13 +177,14 @@ export async function runFanout({
               "select count(*)::int n from runs where state='completed' and projection_tools='{}'::jsonb",
             )
           ).rows[0].n,
-          count,
+          targets,
         );
         assert.equal(
           (await db.query("select count(*)::int n from messages where role='toolResult'")).rows[0]
             .n,
           count,
         );
+        if (rounds > 1) await verifyLoopHistory(db, owners, mix, rounds);
       } else await verify(arm, rounds);
     }
     const deliveryRounds = mode.endsWith("-control") ? 0 : rounds;
@@ -222,6 +228,7 @@ export async function runFanout({
     const trial = {
       mode,
       delay: ms,
+      rate,
       display,
       liveSource,
       mix,
@@ -258,8 +265,57 @@ export async function runFanout({
   }
 }
 
+// These independent database checks run after the timed projection and receipt window.
+async function verifyLoopHistory(db, owners, mix, rounds) {
+  const count = rounds * owners.length;
+
+  const counts = Object.fromEntries(
+    (
+      await db.query("select content::jsonb->>'kind' k,count(*)::int n from messages group by 1")
+    ).rows.map((r) => [r.k, r.n]),
+  );
+  assert.deepEqual(counts, mix.entries);
+  assert.equal(counts["pi.assistant"], count + targets);
+  assert.equal(counts["pi.user"], targets);
+  assert.equal(counts["pi.compaction"], targets);
+  const pairs = await db.query(`with history as (
+            select run_id,commit_seq,ordinal,role,content::jsonb->'model'->0 msg from messages where role in ('assistant','toolResult')
+          ), calls as (select run_id,commit_seq,ordinal,msg->'content'->0->>'id' id from history where role='assistant' and msg->'content'->0->>'type'='toolCall'),
+          replies as (select run_id,commit_seq,ordinal,msg->>'toolCallId' id,length(msg->'content'->0->>'text') size from history where role='toolResult')
+          select calls.run_id as run,count(*)::int n,md5(string_agg(calls.id,',' order by calls.commit_seq,calls.ordinal)) digest
+          from calls join replies using(run_id,id) where (replies.commit_seq,replies.ordinal)>(calls.commit_seq,calls.ordinal) and size=1024 group by calls.run_id`);
+  assert.equal(pairs.rowCount, targets);
+  const byRun = new Map(pairs.rows.map((r) => [r.run, r]));
+  for (const [i, owner] of owners.entries()) {
+    const pair = byRun.get(owner.scope.runId);
+    assert.equal(pair?.n, rounds);
+    assert.equal(
+      pair.digest,
+      md5(Array.from({ length: rounds }, (_, r) => "call-" + (targets * r + i)).join(",")),
+    );
+  }
+}
+
 function cases(suite) {
   const trial = (mode, ms, rounds, options) => ({ mode, ms, rounds, ...options });
+  if (suite === "grants-tool-loop")
+    return [
+      { liveSource: true },
+      { rate: 2500 },
+      { rate: 3500 },
+      { rate: 4600 },
+      { rate: 6500 },
+      { preload: true },
+      { rate: 3500 },
+    ].map((options) =>
+      trial("concurrent", 100, 200, {
+        grantWidth: 8,
+        batchProjection: true,
+        display: true,
+        mixed: true,
+        ...options,
+      }),
+    );
   if (suite === "grants-display-wide")
     return [32, 64, 128, 128, 64, 32].map((grantWidth) =>
       trial("concurrent", 100, 8, {
