@@ -44,6 +44,8 @@ import {
 } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { emitFrames } from "./pg-path-replay.mjs";
+import { fanoutReceiver } from "./fanout-network.mjs";
+import { fanoutFixture } from "./fanout-fixture.mjs";
 import { messageTape } from "./complete-message-rate.mjs";
 
 const pool = await openPool(5),
@@ -65,7 +67,7 @@ let capacity = 0,
   residence,
   prefixCache,
   expiryTimer;
-let pathFrames, guestMailbox;
+let pathFrames, guestMailbox, fanoutServer, fanoutSource;
 
 function startResidence() {
   const initial = process.memoryUsage(),
@@ -700,6 +702,22 @@ listen(
       send("configured", { stage: msg.stage });
     },
     join: () => joinDirected(),
+    fanoutListen: async () => {
+      fanoutServer = await fanoutReceiver(topic.slice(-16), fail);
+      send("fanoutListening", { url: fanoutServer.url });
+    },
+    fanoutArm: (m) => {
+      fanoutServer.arm(m);
+      send("fanoutArmed");
+    },
+    fanoutStats: (m) => send("fanoutStatsDone", { result: fanoutServer.stats(m.rounds) }),
+    fanoutTape: (m) => {
+      fanoutSource ??= fanoutFixture(topic.slice(-16));
+      pathFrames = Array.from({ length: m.count }, (_, n) => fanoutSource.frame(m.arm, n, m.seed));
+      send("fanoutTapeReady", {
+        bytes: pathFrames.reduce((n, f) => n + Buffer.byteLength(f.value), 0),
+      });
+    },
     makeMessages: (m) => {
       assert.equal(active.size, 0);
       const { frames, owners } = messageTape(
@@ -759,6 +777,7 @@ listen(
       assert(Date.now() < deadline, "Experimental Worker did not drain before producer shutdown");
       await delay(10);
     }
+    await fanoutServer?.close();
     await guestMailbox?.shutdown();
     await producer.close();
     notifications.release();

@@ -242,6 +242,7 @@ export async function runPgPaths({
   guestEndpoints,
   projector,
   emitter,
+  receiver,
   wave,
   configure,
   guard,
@@ -253,6 +254,20 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
+  if (profile === "workspace-fanout") {
+    const { runFanout } = await import("./fanout-trials.mjs");
+    return runFanout({
+      projector,
+      emitter,
+      receiver,
+      configure,
+      guard,
+      db: forkPool,
+      report,
+      save,
+      token,
+    });
+  }
   if (profile === "workspace-guest-mix") {
     const { runGuestMix } = await import("./guest-mix-study.mjs");
     return runGuestMix(wave, forkPool, guestEndpoints, report, save);

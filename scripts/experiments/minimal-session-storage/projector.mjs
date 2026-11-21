@@ -16,6 +16,7 @@ import { projectionTemplates } from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { decodeWorkspaceFact, operationsFor } from "./workspace-operations.mjs";
+import { FanoutProjector } from "./fanout-projector.mjs";
 import { MessageRateMeter } from "./complete-message-rate.mjs";
 
 let resetAssignment;
@@ -69,6 +70,7 @@ const blank = () => ({
 });
 metrics = blank();
 function account(kind, start, poolMs, pgMs, wireMs) {
+  if (stage?.fanout) return; // The fan-out recorder keeps fixed-size phase histograms.
   const m = (metrics.byKind[kind] ??= { wall: [], pool: [], pg: [], wire: [] });
   m.wall.push(performance.now() - start);
   m.pool.push(poolMs);
@@ -118,6 +120,7 @@ const environment = {
 };
 const processRecord = (record, draft) => projectRecord(record, draft, environment);
 const workspaceProfile = [
+  "workspace-fanout",
   "workspace-rate",
   "workspace-rate-confirm",
   "workspace-rate-input",
@@ -131,6 +134,11 @@ const guestRoutes = ["workspace-guest-continuation", "workspace-guest-mix"].incl
 )
   ? continuationGuestRoutes(pool, send)
   : undefined;
+const fanout =
+  process.argv[8] === "workspace-fanout"
+    ? new FanoutProjector(topic.slice(-16), lag, () => reader.statistics())
+    : undefined;
+fanout?.observeCommits(native, group);
 const workspaceRouter = workspaceProfile
   ? new WorkspaceOperationRouter({
       pool,
@@ -141,6 +149,7 @@ const workspaceRouter = workspaceProfile
         return guestRoutes.select(scope);
       },
       resolve(binding) {
+        if (fanout?.spec) return fanout.resolve(binding);
         assert(guestRoutes && stage.guestTools, "History dispatched a tool");
         return guestRoutes.resolve(binding);
       },
@@ -164,6 +173,7 @@ const reader = new KafkaLogConsumer({
     ? {
         prepareReady: async (records, current) => {
           try {
+            if (fanout?.spec) return 1;
             if (messageMeter && messageMeter.at === undefined) await messageMeter.gate.promise;
             if (workspaceRouter && workspaceMode !== "direct") {
               if (workspaceMode === "single") return 1;
@@ -195,6 +205,8 @@ const reader = new KafkaLogConsumer({
   },
   handler: async (record, current, grant) => {
     try {
+      if (fanout?.spec)
+        return await fanout.handle(record, current, grant, workspaceRouter, nextOffsets);
       if (pathStudy?.mode) pathStudy.before(record);
       if (!prefixStudy?.width) await processRecord(record);
       else if (
@@ -260,6 +272,7 @@ async function lag() {
   }
   return {
     lag: sum,
+    ...(fanout ? { endSum: ends.reduce((n, p) => n + Number(p.high ?? p.offset), 0) } : {}),
     partitionLagMax: max,
     poolWaiting: pool.waitingCount,
     queued: reader.statistics().queuedRecords,
@@ -273,6 +286,7 @@ async function cleanup() {
         await messageMeter.stop();
       }
     } finally {
+      await fanout?.close();
       await reader.close();
     }
   } finally {
@@ -333,6 +347,67 @@ try {
   await reader.waitUntilAssigned(45000);
   listen(
     {
+      fanoutConnect: async (m) => {
+        const before = process.memoryUsage(),
+          at = performance.now();
+        await fanout.sender.connect(m.url);
+        send("fanoutConnected", {
+          before,
+          after: process.memoryUsage(),
+          elapsedMs: performance.now() - at,
+        });
+      },
+      fanoutDirect: async (m) => send("fanoutDirectDone", { result: await fanout.direct(m) }),
+      fanoutReset: async () => {
+        await resetPrefix(16, "recorded-history");
+        stage = { fanout: true, integrated: true, sink: "single", scene: "plain" };
+        metrics = blank();
+        send("fanoutResetDone");
+      },
+      fanoutWarm: async () => {
+        const ends = await reader.captureEndOffsets();
+        await reader.waitUntilInitialReplay(ends);
+        assert.equal(sessions.size, 4000);
+        await fanout.warm(workspaceRouter, topic);
+        send("fanoutWarmDone");
+      },
+      fanoutBegin: (m) => {
+        fanout.pgAtStart = {
+          commits: prefixStudy.stats.commits,
+          sync: prefixStudy.stats.syncTransactions,
+          async: prefixStudy.stats.asyncTransactions,
+        };
+        fanout.begin(m);
+        send("fanoutBegun");
+      },
+      fanoutRelease: (m) => {
+        fanout.release(m.start);
+        send("fanoutReleased");
+      },
+      fanoutFinish: async () => {
+        const pgOnly = fanout.spec.mode === "pg-control";
+        const result = await fanout.finish();
+        result.pgTransactions = {
+          total: prefixStudy.stats.commits - fanout.pgAtStart.commits,
+          sync: prefixStudy.stats.syncTransactions - fanout.pgAtStart.sync,
+          async: prefixStudy.stats.asyncTransactions - fanout.pgAtStart.async,
+        };
+        const ends = await reader.captureEndOffsets();
+        await reader.waitUntilInitialReplay(ends);
+        const deadline = Date.now() + 5000;
+        for (;;) {
+          const offsets = (await admin.fetchOffsets({ groupId: group, topics: [topic] }))[0]
+            .partitions;
+          if (
+            offsets.length === 32 &&
+            offsets.every((row) => BigInt(row.offset) === ends[row.partition])
+          )
+            break;
+          assert(pgOnly && Date.now() < deadline, "Committed offsets did not cover verified input");
+          await delay(80);
+        }
+        send("fanoutFinished", { result, ends: ends.map(String) });
+      },
       guestAccepted: (m) => guestRoutes.accepted(m),
       stage: async (m) => {
         for (const boot of m.guestBoots ?? [])

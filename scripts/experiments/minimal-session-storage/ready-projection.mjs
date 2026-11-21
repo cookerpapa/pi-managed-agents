@@ -28,6 +28,7 @@ export const isMovingStudy = (name) =>
     "moving-study",
     "moving-confirm",
     "moving-finish",
+    "workspace-fanout",
     "workspace-rate",
     "workspace-rate-confirm",
     "workspace-rate-input",

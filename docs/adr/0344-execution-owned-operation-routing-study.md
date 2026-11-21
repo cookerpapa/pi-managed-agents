@@ -51,3 +51,13 @@ its original route boundary. The physical target stays private to execution. The
 sends the native command, operation identity and scoped reply position, with no path override
 added to its Tool transport. Verify actual cwd and distinct same-path Workspace content
 through the original HTTPS/Kafka reply and Pi's canonical Tool Result.
+
+### Fan-out measurement boundary
+
+In the isolated dispatch assay, use warm, pre-bound routes and one independent socket per
+logical target. The comparison keeps the real PG projection and per-command Kafka group
+grant. Reserve bounded count and bytes before obtaining that grant. A target admits at
+most one outstanding request, while other targets can overlap their receipt waits. A lost
+assignment prevents any new send from that assignment; an already issued call is never
+retried. The assay handles execute intents only. It does not select a production policy
+for ordered cancellation, closure, persistent handoff or device reconnection.

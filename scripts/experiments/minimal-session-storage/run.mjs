@@ -1376,6 +1376,7 @@ try {
           guestEndpoints,
           projector,
           emitter: workers[0],
+          receiver: workers[1],
           wave,
           configure,
           guard,

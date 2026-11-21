@@ -411,3 +411,25 @@ execution multiset per VM, and final Kafka lag.
 serially. The report includes per-operation latency distributions, lag samples and
 Guest resource counts. The failed-arm report is a snapshot of outstanding work at
 interruption. A missing acceptance ACK stops the trial and is never retried.
+
+### Projector dispatch to 4,000 destinations
+
+Run the `workspace-fanout` profile via `run-cpu-placement.mjs` in fresh private
+output directories. The source, Projector and endpoint simulator are separate
+processes. Existing authenticated cluster access and the disposable PG/Pod
+prerequisites above apply. No VM or paid model is required.
+
+`PI_CLOUD_FANOUT_SUITE=matrix` measures direct WebSocket transport and paired
+serial/concurrent projection at 0, 20, 100 and 500 ms of added receipt delay,
+plus paced and preloaded controls. `sustain` measures longer offers, isolates
+PG and Kafka commit work without external sends, and forces dispatch backpressure.
+`smoke` runs a shorter 0/20 ms check. `confirm` reverses the no-send controls and checks the saturated bounded sender again. Run the profiles serially.
+
+Each trial uses all 32 partitions, one warm existing binding per Session and
+one socket per target. Real execute-intent records enter the RF3 Session log.
+Receiver checks cover destination, operation identity, order and complete counts.
+The driver compares PG operation hashes and committed Kafka positions before
+resetting. Network-only calibration and no-send controls are explicitly labelled.
+The report retains source ACK rates, receiver arrival buckets, phase distributions,
+RSS/heap samples and dispatch reservations. No script executes the payload or
+returns a canonical Tool Result.
