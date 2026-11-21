@@ -380,6 +380,11 @@ The cluster and isolated-fixture prerequisites above apply.
 - `workspace-continuation` checks the first provider request after an idle environment edit,
   with two available Workers and with the previous Worker drained. It verifies the PG claim,
   prefix reads, native system entries and model input independently.
+- `workspace-guest-continuation` repeats the directory and Workspace switches using two disposable Cube
+  Guests and their fixed Bash implementation. The test verifies the first provider prompt, physical
+  cwd and file marker, the second provider request and the projected Tool Result. The resource fixture
+  owns the private provider client. Replies travel via the maintained HTTPS completion service and
+  real per-Worker Kafka mailboxes. Requires an operational Cube cluster and its configured template.
 - `workspace-rate` pairs per-record routing with immediately ready, same-partition history
   batches. It verifies recorded history hashes and independently times actual Pi Runs using
   the deterministic provider.

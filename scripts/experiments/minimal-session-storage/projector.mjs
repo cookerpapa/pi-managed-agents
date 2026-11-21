@@ -7,6 +7,7 @@ import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-cons
 import { decodeSessionLogFact } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { distribution } from "../../lib/runtime-load-scheduler.mjs";
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
+import { continuationGuestRoutes } from "./continuation-guest-routes.mjs";
 import { installTailProbe } from "./tail-probe.mjs";
 import { PgPathStudy } from "./pg-path-study.mjs";
 import { ReadyProjection, isMovingStudy, recoveryConnectionError } from "./ready-projection.mjs";
@@ -121,17 +122,25 @@ const workspaceProfile = [
   "workspace-rate-confirm",
   "workspace-rate-input",
   "workspace-continuation",
+  "workspace-guest-continuation",
 ].includes(process.argv[8]);
+const ownedReplyTopics = new Set();
+const guestRoutes =
+  process.argv[8] === "workspace-guest-continuation"
+    ? continuationGuestRoutes(pool, send)
+    : undefined;
 const workspaceRouter = workspaceProfile
   ? new WorkspaceOperationRouter({
       pool,
       view: prefixStudy,
       env: environment,
-      select() {
-        throw Error("History selected a resource");
+      select(scope) {
+        assert(guestRoutes && stage.guestTools, "History selected a resource");
+        return guestRoutes.select(scope);
       },
-      resolve() {
-        throw Error("History dispatched a tool");
+      resolve(binding) {
+        assert(guestRoutes && stage.guestTools, "History dispatched a tool");
+        return guestRoutes.resolve(binding);
       },
     })
   : undefined;
@@ -242,9 +251,11 @@ async function cleanup() {
   } finally {
     try {
       if (created) {
-        await admin.deleteTopics({ topics: [topic] });
+        const existing = await admin.listTopics();
+        const owned = [topic, ...ownedReplyTopics].filter((t) => existing.includes(t));
+        if (owned.length) await admin.deleteTopics({ topics: owned });
         const end = Date.now() + 30000;
-        while ((await admin.listTopics()).includes(topic)) {
+        while ((await admin.listTopics()).some((t) => owned.includes(t))) {
           assert(Date.now() < end);
           await delay(150);
         }
@@ -287,7 +298,10 @@ try {
   await reader.waitUntilAssigned(45000);
   listen(
     {
+      guestAccepted: (m) => guestRoutes.accepted(m),
       stage: async (m) => {
+        for (const boot of m.guestBoots ?? [])
+          ownedReplyTopics.add("pi-cloud.tool-replies.v4." + boot);
         assert.equal(sessions.size, 0);
         stage = m;
         workspaceMode = m.workspaceMode ?? "batch";

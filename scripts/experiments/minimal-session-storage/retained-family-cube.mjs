@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { OfficialCubeSandboxRuntimeClient } from "../../../packages/sandbox-control/src/cubesandbox-runtime-client.ts";
 import { executionTargetId } from "../../../packages/sandbox-control/src/sandbox-execution.ts";
+import { FixedGuestToolExecutor } from "../../../packages/sandbox-control/src/fixed-guest-tool-executor.ts";
 import { ToolCompletionIssuer } from "../../../packages/sandbox-control/src/tool-completion-issuer.ts";
 
 // Fixed Guest and maintained HTTPS completion, using one owned VM with no Volume.
@@ -34,7 +35,33 @@ export async function withFamilyGuest(config, run) {
       assert.equal(r.exitCode, 0, "Owned VM command failed");
       return r.stdout.trim();
     }
+    // Ordinary results in the candidate carry only logical Tool correlation.
+    // The execution-owned probe below still receives its physical evidence.
+    const executor = new FixedGuestToolExecutor(client, {
+      issue({ context, ...grant }) {
+        const { execution, ...reply } = context;
+        assert(execution);
+        return issuer.issue({ ...grant, context: reply });
+      },
+    });
+    function submitAt(attachment, r, cmd, ref, deliveryExpiry = ref.deadlineAt) {
+      assert.equal(attachment.binding, cmd.request.activationId);
+      return executor.submit(
+        {
+          bindingId: attachment.binding,
+          descriptor: {
+            target,
+            attachment: { activationId: attachment.binding, toolRoot: attachment.cwd },
+          },
+          snapshot: { physicalActivationId: fixture },
+        },
+        { ...cmd, replyTopic: ref.topic, replyRecovery: { ...ref, deadlineAt: deliveryExpiry } },
+        { topic: r.topic, partition: r.partition, offset: String(r.offset) },
+      );
+    }
     return await run({
+      command,
+      submitAt,
       async directory(id) {
         assert(/^[a-f\d-]{36}$/.test(id));
         const root = "/tmp/pma-family-" + id;
@@ -48,33 +75,8 @@ export async function withFamilyGuest(config, run) {
             "/result",
         );
         return {
-          async submit(r, cmd, ref, deliveryExpiry = ref.deadlineAt) {
-            await client.submitTool(target, {
-              source: { topic: r.topic, partition: 0, offset: String(r.offset) },
-              operationId: cmd.request.operationId,
-              executionScopeId: cmd.request.activationId,
-              writerId: cmd.scope.writerId,
-              timeoutMs: 105000,
-              payload: {
-                toolWorkerProtocolVersion: 7,
-                type: "worker.operation",
-                attachment: { activationId: cmd.request.activationId, toolRoot: root },
-                request: cmd.request,
-                delivery: await issuer.issue({
-                  operationId: cmd.request.operationId,
-                  expiresAt: deliveryExpiry,
-                  context: {
-                    scope: cmd.scope,
-                    replyTopic: ref.topic,
-                    toolCallId: cmd.toolCallId,
-                    nativeToolCallId: cmd.request.toolCallId,
-                    toolName: "bash",
-                    partition: 0,
-                  },
-                }),
-              },
-            });
-          },
+          submit: (r, cmd, ref, expiry) =>
+            submitAt({ binding: id, cwd: root }, r, cmd, ref, expiry),
           async probe(f) {
             const sentAt = Date.parse(f.occurredAt);
             await client.submitProbe(target, {

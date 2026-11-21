@@ -195,8 +195,8 @@ export function verifyModelHistory(sc, rows, records, cohort, byRun) {
     leases.add(r.lease_id);
     const e = request.get(r.id),
       s = sessions.get(r.session_id) ?? { position: 0, witness: "" };
-    if (sc.scene === "steer") {
-      assert.equal(e.work.toolExecutions, 1);
+    if (sc.scene === "steer" || sc.guestTools) {
+      if (!sc.guestTools) assert.equal(e.work.toolExecutions, 1);
       if (sc.verifyFull) {
         s.tools ??= [];
         assert.deepEqual(
@@ -220,12 +220,12 @@ export function verifyModelHistory(sc, rows, records, cohort, byRun) {
     s.witness = extendWitness(
       expected,
       "assistant",
-      sc.scene === "steer" ? "" : answer(e.id, 1),
+      sc.scene === "steer" || sc.guestTools ? "" : answer(e.id, 1),
       sc.verifyFull,
     );
     for (const item of e.work.inputs)
       if (!item.withdrawn) s.witness = extendWitness(s.witness, "user", item.text, sc.verifyFull);
-    if (sc.scene !== "plain")
+    if (sc.scene !== "plain" || sc.guestTools)
       s.witness = extendWitness(s.witness, "assistant", answer(e.id, 2), sc.verifyFull);
     s.position++;
     sessions.set(r.session_id, s);

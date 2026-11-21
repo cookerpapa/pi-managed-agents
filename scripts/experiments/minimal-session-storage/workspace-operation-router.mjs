@@ -80,7 +80,7 @@ export class WorkspaceOperationRouter {
             op.scope,
             op.conversationId,
             record,
-            this.select(op.scope, op.conversationId),
+            await this.select(op.scope, op.conversationId),
             current,
           );
         }

@@ -35,10 +35,14 @@ export async function selectEnvironment(db, tenant, session, value) {
   }
 }
 
-export async function runContinuationCases(wave, db) {
+export async function installContinuationEnvironments(db) {
   await db.query(
     "create table study_session_environments(tenant uuid, session uuid, value jsonb not null, primary key(tenant,session))",
   );
+}
+
+export async function runContinuationCases(wave, db) {
+  await installContinuationEnvironments(db);
   for (const handoff of [false, true]) {
     const result = await wave({
       label: handoff ? "continuation-cold-replacement" : "continuation-preferred",

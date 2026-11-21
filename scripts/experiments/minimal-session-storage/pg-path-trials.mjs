@@ -239,6 +239,7 @@ async function observe(pool, logs, work) {
   };
 }
 export async function runPgPaths({
+  guestEndpoints,
   projector,
   emitter,
   wave,
@@ -252,6 +253,10 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
+  if (profile === "workspace-guest-continuation") {
+    const { runGuestContinuation } = await import("./guest-continuation-study.mjs");
+    return runGuestContinuation(wave, forkPool, guestEndpoints);
+  }
   if (profile === "workspace-continuation") {
     const { runContinuationCases } = await import("./continuation-cases.mjs");
     return runContinuationCases(wave, forkPool);

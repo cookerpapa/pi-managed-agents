@@ -43,3 +43,11 @@ is the last confirmed change, independent of availability polls. User-visible co
 the consequences; Guest routing and provider identities remain at execution.
 This control covers successive normal Runs. Recovery within an existing Run retains the
 original pending operation targets under the protocol above.
+
+
+For the continuation Guest acceptance, the admitted environment also selects the execution
+side's attachment and tool root. A cold route may read that Run snapshot once to install
+its original route boundary. The physical target stays private to execution. The Worker
+sends the native command, operation identity and scoped reply position, with no path override
+added to its Tool transport. Verify actual cwd and distinct same-path Workspace content
+through the original HTTPS/Kafka reply and Pi's canonical Tool Result.

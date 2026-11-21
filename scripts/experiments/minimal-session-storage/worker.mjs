@@ -32,6 +32,9 @@ import {
   fauxProvider,
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
+import { continuationBash } from "./continuation-bash.mjs";
+import { encodeWorkspaceFact } from "./workspace-operations.mjs";
+import { KafkaToolReplyMailbox } from "../../../packages/event-log/src/tool-replies.ts";
 import { continuationPrompt, environmentSection } from "./continuation-environment.mjs";
 import { Type, getCurrentSystemMessage } from "@earendil-works/pi-ai";
 import { KafkaWorkerProducer } from "@pi-cloud/event-log";
@@ -62,7 +65,7 @@ let capacity = 0,
   residence,
   prefixCache,
   expiryTimer;
-let pathFrames;
+let pathFrames, guestMailbox;
 
 function startResidence() {
   const initial = process.memoryUsage(),
@@ -143,6 +146,8 @@ async function execute(row, claimMs, claimReason) {
   const started = performance.now(),
     sc = stage,
     id = row.id;
+  const bash = sc.guestTools ? continuationBash(guestMailbox, id) : undefined;
+  let observedBash;
   send("claim", { id, actor, at: Date.now() });
   const head = sc.integrated ? priorState(row) : EMPTY_HEAD;
   const previous = sc.integrated ? await readPrefix(pool, row, head, prefixCache) : undefined;
@@ -220,7 +225,7 @@ async function execute(row, claimMs, claimReason) {
       lastNative = fact;
       if (captured) captured.push(fact);
     }
-    const payload = encodeSessionLogFact(fact);
+    const payload = bash ? encodeWorkspaceFact(fact) : encodeSessionLogFact(fact);
     bytes += Buffer.byteLength(payload);
     const start = performance.now();
     await producer.append(partition, {
@@ -301,6 +306,7 @@ async function execute(row, claimMs, claimReason) {
             observed,
             observedTools,
             observedEnvironment,
+            observedBash,
             toolExecutions,
             firstModelAt,
             baseSeq: head.seq,
@@ -369,6 +375,7 @@ async function execute(row, claimMs, claimReason) {
         factId: randomUUID(),
         occurredAt: new Date().toISOString(),
         commit: batch,
+        ...(bash ? { workspaceOperations: await bash.intents(ready.writes) } : {}),
         origins: ready.writes
           .filter((w) => w.type === "entry" || w.type === "submission" || w.type === "task")
           .map((w) => ({ recordId: w.value.id, sessionId: row.session_id, runId: id, turnId: id })),
@@ -419,6 +426,7 @@ async function execute(row, claimMs, claimReason) {
         ],
       }),
     );
+  if (bash) registry.install(defineExtension({ name: "study-guest", tools: [bash.tool] }));
   if (sc.scene === "steer")
     registry.install(
       defineExtension({
@@ -450,10 +458,15 @@ async function execute(row, claimMs, claimReason) {
           environmentSection
         ];
       observed = modelWitness(context.messages, sc.verifyFull);
-      if (sc.verifyFull && sc.scene === "steer") observedTools = toolEvidence(context.messages);
+      if (sc.verifyFull && (sc.scene === "steer" || bash))
+        observedTools = toolEvidence(context.messages);
     }
     if (residence) await residence.wait(context);
     if (sc.modelDelayMs) await delay(sc.modelDelayMs);
+    if (bash)
+      return fauxAssistantMessage(fauxToolCall("bash", { command: bash.command, timeout: 10 }), {
+        stopReason: "toolUse",
+      });
     if (steer) return fauxAssistantMessage(fauxToolCall("check", {}), { stopReason: "toolUse" });
     if (mixed && !late) {
       gate.resolve();
@@ -463,6 +476,17 @@ async function execute(row, claimMs, claimReason) {
   };
   const second = async (context) => {
     modelCalls++;
+    if (bash) {
+      const result = context.messages.at(-1);
+      assert(
+        result?.role === "toolResult" && result.toolName === "bash" && !result.isError,
+        "Missing successful Guest Bash result in the second model request",
+      );
+      observedBash = result.content
+        .map((b) => b.text)
+        .join("")
+        .trimEnd();
+    }
     const texts = context.messages
       .filter((m) => m.role === "user")
       .flatMap((m) =>
@@ -478,7 +502,7 @@ async function execute(row, claimMs, claimReason) {
     }
     return fauxAssistantMessage(answer(id, 2));
   };
-  fake.setResponses(mixed ? [first, second] : [first]);
+  fake.setResponses(mixed || bash ? [first, second] : [first]);
   const harness = await Harness.open(
     store,
     {
@@ -588,7 +612,7 @@ async function execute(row, claimMs, claimReason) {
     }
     await inputs;
     assert.equal((await initial.wait(ctx)).status, "done");
-    assert.equal(modelCalls, mixed ? 2 : 1);
+    assert.equal(modelCalls, mixed || bash ? 2 : 1);
     assert.equal((await harness.snapshot(InboxDoc, root.id, ctx)).items.length, 0);
     if (late) assert(rechecks >= 1);
     await harness.close(ctx);
@@ -596,6 +620,7 @@ async function execute(row, claimMs, claimReason) {
     await finish();
   } finally {
     active.delete(id);
+    bash?.close();
     if (!harnessClosed) await harness.close(ctx);
   }
 }
@@ -636,6 +661,10 @@ listen(
       const previous = directedConfig;
       directedConfig = msg.wakeUrl ? msg : undefined;
       stage = msg;
+      if (msg.guestTools && !guestMailbox) {
+        guestMailbox = new KafkaToolReplyMailbox({ brokers, bootId: msg.replyBootId, replicas: 3 });
+        await guestMailbox.start();
+      }
       clearInterval(expiryTimer);
       prefixCache =
         msg.integrated && msg.cacheMode !== "off"
@@ -721,6 +750,7 @@ listen(
       assert(Date.now() < deadline, "Experimental Worker did not drain before producer shutdown");
       await delay(10);
     }
+    await guestMailbox?.shutdown();
     await producer.close();
     notifications.release();
     await pool.end();

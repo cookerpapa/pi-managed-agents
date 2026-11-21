@@ -6,13 +6,8 @@ import { tmpdir } from "node:os";
 import { resolve, join, dirname } from "node:path";
 import { spawn } from "node:child_process";
 import { testPostgres } from "../../lib/test-postgres.mjs";
-import {
-  kubectl,
-  runtimeDirectory,
-  serviceAddress,
-  repositoryRoot,
-} from "../../lib/production-kubernetes.mjs";
-import { nativeCubeLifecycleOptions } from "../../lib/cube-native-lifecycle-options.mjs";
+import { serviceAddress, repositoryRoot } from "../../lib/production-kubernetes.mjs";
+import { studyCubeConfig } from "./study-cube-config.mjs";
 import { realpath } from "node:fs/promises";
 import { testKafka } from "../../lib/test-kafka.mjs";
 const output = process.argv[2],
@@ -22,46 +17,7 @@ const output = process.argv[2],
 let isolatedKafka;
 assert(output && process.env.PI_CLOUD_RUNTIME_LOAD_CHECK === "1");
 process.umask(0o077);
-const cfg = JSON.parse(await readFile(join(runtimeDirectory, "cubesandbox/cluster.json"), "utf8"));
-const template = JSON.parse(
-  await readFile(join(runtimeDirectory, "cubesandbox/template.json"), "utf8"),
-).agent.templateId;
-const runtime = JSON.parse(kubectl(["get", "deployment/pi-cloud-session-runtime", "-o", "json"]));
-const completionUrl = runtime.spec.template.spec.containers[0].env.find(
-  (e) => e.name === "PI_CLOUD_TOOL_COMPLETION_URL",
-).value;
-const completionIp = serviceAddress("tool-completion");
-const secret = async (name) =>
-  (await readFile(join(runtimeDirectory, "secrets", name), "utf8")).trim();
-const cube = {
-  templateId: template,
-  client: {
-    ...nativeCubeLifecycleOptions(),
-    apiUrl: "http://" + cfg.api.host + ":" + cfg.api.port,
-    apiKey: await secret("cubesandbox-api-key"),
-    proxyNodeIp: cfg.proxy.host,
-    proxyPort: cfg.proxy.port,
-    proxyScheme: "http",
-    sandboxDomain: cfg.sandboxDomain,
-    egressProxyIp: "10.255.255.254",
-    completionIp,
-  },
-  issuer: {
-    url: completionUrl,
-    address: completionIp,
-    secret: await secret("supervisor-management-token"),
-    ca: Buffer.from(
-      kubectl([
-        "get",
-        "secret",
-        "pi-cloud-tool-completion-tls",
-        "-o",
-        "jsonpath={.data.ca\\.crt}",
-      ]).trim(),
-      "base64",
-    ).toString(),
-  },
-};
+const cube = await studyCubeConfig();
 const tmp = await mkdtemp(join(tmpdir(), "pma-family-")),
   pg = await testPostgres({});
 try {

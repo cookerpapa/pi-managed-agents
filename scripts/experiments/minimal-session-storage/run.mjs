@@ -160,6 +160,8 @@ process.on("SIGTERM", () => fatal(new Error("Terminated")));
 const actors = [],
   workers = [],
   entries = new Map();
+const guestEndpoints = new Map();
+const guestBoots = { w0: randomUUID(), w1: randomUUID() };
 let projector, fixture, router, network, wakeUrl, wakeStage, transition;
 function receive(a, m) {
   if (m.kind === "stopped") {
@@ -170,6 +172,25 @@ function receive(a, m) {
     void publishWakeBursts(m)
       .then((measurement) => a.write({ kind: "published", measurement }))
       .catch(fatal);
+    return;
+  }
+  if (m.kind === "guestCommand") {
+    assert(a === projector && wakeStage?.guestTools);
+    const { cmd, ref, position, attachment } = m;
+    const endpoint = guestEndpoints.get(attachment.target);
+    const entry = entries.get(cmd.scope.runId);
+    assert(
+      endpoint && position.topic === topic && entry && !entry.guestOperationId,
+      "Unexpected or duplicate Guest dispatch",
+    );
+    entry.guestOperationId = cmd.request.operationId;
+    void endpoint.submitAt(attachment, position, cmd, ref).then(
+      () => a.write({ kind: "guestAccepted", op: cmd.request.operationId, ok: true }),
+      (error) => {
+        a.write({ kind: "guestAccepted", op: cmd.request.operationId, ok: false });
+        fatal(error);
+      },
+    );
     return;
   }
   if (m.kind === "fixture") {
@@ -355,6 +376,7 @@ async function startActor(role, id, pod, ...roleArgs) {
 }
 async function configure(sc) {
   const options = { ...sc, kind: "stage", stage: sc.label, ...(sc.replay ? { fixture } : {}) };
+  delete options.environmentCases;
   if (sc.replay) assert(fixture);
   wakeStage = ["directed", "broadcast"].includes(sc.wakeMode) ? sc : undefined;
   transition = undefined;
@@ -364,7 +386,15 @@ async function configure(sc) {
       .filter((a) => a !== router)
       .map(async (a) => {
         const response = a.wait("configured" + sc.label);
-        a.write({ ...options, ...(wakeStage && workers.includes(a) ? { wakeUrl } : {}) });
+        a.write({
+          ...options,
+          ...(sc.guestTools
+            ? a === projector
+              ? { guestBoots: Object.values(guestBoots) }
+              : { replyBootId: guestBoots[a.id] }
+            : {}),
+          ...(wakeStage && workers.includes(a) ? { wakeUrl } : {}),
+        });
         await guard(response, 15000);
       }),
   );
@@ -591,6 +621,7 @@ function milliseconds(row) {
   return row.settled_at - row.created_at;
 }
 async function verify(sc, records, cohort) {
+  const answerCount = sc.scene === "plain" && !sc.guestTools ? 1 : 2;
   const ids = records.map((r) => r.id);
   const rr = (await db.query("select * from runs where id=any($1::uuid[])", [ids])).rows;
   const msgs = (
@@ -629,7 +660,26 @@ async function verify(sc, records, cohort) {
         users.flatMap((m) => JSON.parse(m.content).model[0].content.map((c) => c.text)),
         [r.text, ...extras.map((i) => i.text)],
       );
-      assert.equal(answers.length, sc.scene === "plain" ? 1 : 2);
+      assert.equal(answers.length, answerCount);
+      if (sc.guestTools) {
+        assert(r.guestOperationId, "Missing Guest dispatch");
+        assert.deepEqual(
+          history.map((m) => m.role),
+          ["user", "assistant", "toolResult", "assistant"],
+        );
+        const call = JSON.parse(history[1].content).model[0].content.find(
+          (b) => b.type === "toolCall",
+        );
+        const result = JSON.parse(history[2].content).model[0];
+        assert(call.name === "bash" && result.toolCallId === call.id && !result.isError);
+        assert.equal(
+          result.content
+            .map((b) => b.text)
+            .join("")
+            .trimEnd(),
+          r.work.observedBash,
+        );
+      }
       if (sc.scene === "steer") {
         assert.deepEqual(
           history.map((m) => m.role),
@@ -641,7 +691,7 @@ async function verify(sc, records, cohort) {
       const body = JSON.parse(history.at(-1).content).model[0];
       if (sc.integrated) assert.equal(body.model, r.modelRef ?? "local-load");
       assert.equal(body.stopReason, "stop");
-      assert.equal(body.content[0].text, answer(r.id, sc.scene === "plain" ? 1 : 2));
+      assert.equal(body.content[0].text, answer(r.id, answerCount));
       if (sc.scene === "follow" || sc.scene === "late")
         assert.equal(JSON.parse(answers[0].content).model[0].content[0].text, answer(r.id, 1));
       if (sc.scene === "steer") {
@@ -651,9 +701,7 @@ async function verify(sc, records, cohort) {
         assert.equal(JSON.parse(history[2].content).model[0].toolCallId, call.id);
       }
       assert.equal(body.content[0].text.length, 4096);
-      assert(
-        body.content[0].text.startsWith(r.id + " answer " + (sc.scene === "plain" ? 1 : 2) + " "),
-      );
+      assert(body.content[0].text.startsWith(r.id + " answer " + answerCount + " "));
       if (sc.inspect || sc.holdFinish) assert(r.checked);
     }
   }
@@ -863,6 +911,7 @@ async function wave(spec) {
             prefix: i.work.prefixStatus,
             readBytes: i.work.readBytes,
             prompt: i.work.observedEnvironment,
+            ...(sc.guestTools ? { bash: i.work.observedBash, runId: i.id } : {}),
           })),
         }
       : {}),
@@ -1251,6 +1300,7 @@ try {
         assert.equal(readerMode, "batch");
         const { runPgPaths } = await import("./pg-path-trials.mjs");
         await runPgPaths({
+          guestEndpoints,
           projector,
           emitter: workers[0],
           wave,
