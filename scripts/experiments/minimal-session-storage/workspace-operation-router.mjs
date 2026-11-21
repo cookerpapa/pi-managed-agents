@@ -6,6 +6,7 @@ import { operationalLog } from "@pi-cloud/observability";
 import { parseToolSandboxOperationRequest } from "@pi-cloud/protocol";
 import { WorkspaceRouteSpans } from "./workspace-route-spans.mjs";
 import { operationsFor } from "./workspace-operations.mjs";
+import { plainExecution } from "./tool-grant-prefix.mjs";
 import { projectRecord } from "./project-record.mjs";
 
 export class WorkspaceOperationRouter {
@@ -57,7 +58,7 @@ export class WorkspaceOperationRouter {
     if (!n) return 0;
     return this.view.apply(records.slice(0, n), current, (r, d) => projectRecord(r, d, this.env));
   }
-  async projectOperation(record, current, mark) {
+  async #routeOperation(record, current, warmOnly = false) {
     const f = record.fact,
       ops = operationsFor(f);
     const covered = record.offset < this.view.next.get(record.partition);
@@ -76,6 +77,7 @@ export class WorkspaceOperationRouter {
       else {
         let span = await this.spans.at(op.scope, op.conversationId, record);
         if (!span || span.writerId !== op.scope.writerId) {
+          if (warmOnly) return;
           span = await this.spans.activate(
             op.scope,
             op.conversationId,
@@ -133,11 +135,66 @@ export class WorkspaceOperationRouter {
       fact: { ...f, tools, cancellations: cancels.map(({ op }) => op) },
       workspaceBatch: true,
     };
+    return { candidate, commands, cancels };
+  }
+  async projectOperation(record, current, mark) {
+    const { candidate, commands, cancels } = await this.#routeOperation(record, current);
     mark?.("routeReady");
     await this.view.apply([candidate], current, (r, d) => projectRecord(r, d, this.env));
     mark?.("projected");
     if (!current() || !this.view.canDeliver(record)) return;
     return { commands, cancels };
+  }
+  canGroupOperation(record) {
+    return plainExecution(record.fact, this.view.sessions.get(record.fact.scope?.runId)?.liveDocs);
+  }
+  async projectOperations(records, current, mark) {
+    const first = records[0],
+      routed = [],
+      runs = new Set(),
+      bindings = new Set();
+    for (const r of records) {
+      if (!current()) return [];
+      const f = r.fact;
+      const previous = this.view.sessions.get(f.scope.runId);
+      if (
+        !this.canGroupOperation(r) ||
+        r.topic !== first.topic ||
+        r.partition !== first.partition ||
+        r.offset !== this.view.next.get(r.partition) + BigInt(routed.length) ||
+        runs.has(f.scope.runId) ||
+        previous?.writer !== f.scope.writerId ||
+        previous.seq + 1 !== f.commit.seq
+      )
+        break;
+      const plan = await this.#routeOperation(r, current, true);
+      if (!plan) break;
+      assert(plan.commands.length === 1 && !plan.cancels.length);
+      const binding = plan.commands[0].route.bindingId;
+      if (bindings.has(binding)) break;
+      bindings.add(binding);
+      runs.add(f.scope.runId);
+      routed.push(plan);
+    }
+    if (!routed.length) {
+      if (!current()) return [];
+      const one = await this.projectOperation(first, current, mark);
+      return one ? [one] : [];
+    }
+    mark?.("routeReady");
+    const candidates = routed.map((p) => p.candidate);
+    const n = await this.view.applyToolIntents(candidates, current, (r, d) =>
+      projectRecord(r, d, this.env),
+    );
+    mark?.("projected");
+    if (!current()) return [];
+    assert.equal(n, routed.length);
+    if (n === 1 && !this.view.canDeliver(first)) return [];
+    assert(
+      candidates.every((r) => this.view.canDeliver(r)),
+      "Incomplete tool prefix admission",
+    );
+    return routed;
   }
   async consume(record, current, grant, mark) {
     const prepared = await this.projectOperation(record, current, mark);

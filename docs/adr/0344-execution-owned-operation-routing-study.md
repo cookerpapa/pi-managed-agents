@@ -76,3 +76,20 @@ accepted tradeoff is up to the actual prefix length of uncertain operations per
 interrupted partition grant. The ordinary per-record shipping path stays the
 default. Partition-count comparisons create separate generations so the Session
 key, replay positions and binding boundaries stay consistent within each trial.
+
+### One PG round trip per tool-intent prefix
+
+In the isolated #52 comparison, the existing grant prefix may project its
+already validated, fresh execute intents in a single call to the existing
+partition projection function. Limit this to warm original bindings and distinct
+Runs and targets. Keep one recovery reference per operation. The single PG
+transaction commits all references and the partition head before the unchanged
+Kafka grant. A failing member rolls back the batch. If PG observes a cancelled
+or obsolete owner, isolate it on redelivery before allowing other sends.
+Cold starts, covered records and control barriers retain their individual
+admission/replay paths.
+A native ToolTask may co-commit its own known
+`pi.live` slot's pending-to-running change. Fold that change intact and
+install the new view after PG acknowledges the batch. Commits carrying
+presentation events, input receipts or other native transitions keep their
+existing delivery boundary. [Scope and measurements](../reports/pg-tool-intent-batch-20261121.md).

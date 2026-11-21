@@ -119,7 +119,13 @@ const source = Object.fromEntries(
             __FANOUT_PARTITIONS__: String(fanoutPartitions),
             __GRANT_STUDY__: String(
               process.env.PI_CLOUD_PG_PATH_PROFILE === "workspace-fanout" &&
-                ["grants", "grants-long"].includes(process.env.PI_CLOUD_FANOUT_SUITE),
+                [
+                  "grants",
+                  "grants-long",
+                  "grants-pg",
+                  "grants-pg-backlog",
+                  "grants-pg-minute",
+                ].includes(process.env.PI_CLOUD_FANOUT_SUITE),
             ),
             __PG_PATH_STUDY__: String(mode === "wake-throughput" && suite === "pg-paths"),
             __READY_STUDY__: String(

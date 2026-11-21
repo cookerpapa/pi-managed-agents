@@ -86,9 +86,10 @@ export async function runFanout({
     }
   }
   const suite = process.env.PI_CLOUD_FANOUT_SUITE ?? "matrix";
-  for (const [i, { mode, ms, rounds, preload = false, cap, grantWidth = 1 }] of cases(
-    suite,
-  ).entries()) {
+  for (const [
+    i,
+    { mode, ms, rounds, preload = false, cap, grantWidth = 1, batchProjection = false },
+  ] of cases(suite).entries()) {
     const arm = i + 1,
       count = rounds * targets;
     if (mode !== "direct") await seed(arm);
@@ -112,6 +113,7 @@ export async function runFanout({
         start,
         preload,
         grantWidth,
+        batchProjection,
         cap,
       });
       ({ source } = await call(emitter, "emitMessages", "messagesEmitted", {
@@ -149,19 +151,34 @@ export async function runFanout({
         result.pgTransactions.openConnections > 0 &&
           result.pgTransactions.openConnections <= report.projectorConnections,
       );
-      assert.equal(result.pgTransactions.total, count);
+      const grants = Object.values(result.grantSizes).reduce((sum, n) => sum + n, 0);
+      assert.equal(result.pgTransactions.total, batchProjection ? grants : count);
+      assert.equal(result.pgTransactions.async, result.pgTransactions.total);
       assert(
         result.nativeCommits.positions >=
           Object.values(result.grantSizes).reduce((sum, n) => sum + n, 0),
       );
     }
-    const trial = { mode, delay: ms, grantWidth, count, preload, bytes, source, result, network };
+    const trial = {
+      mode,
+      delay: ms,
+      grantWidth,
+      batchProjection,
+      count,
+      preload,
+      bytes,
+      source,
+      result,
+      network,
+    };
     study.trials.push(trial);
     await save();
     console.log(
       JSON.stringify({
         mode,
         grantWidth,
+        batchProjection,
+        transactions: result.pgTransactions?.total,
         ms,
         count,
         preload,
@@ -180,6 +197,26 @@ export async function runFanout({
 
 function cases(suite) {
   const trial = (mode, ms, rounds, options) => ({ mode, ms, rounds, ...options });
+  if (suite === "grants-pg-minute")
+    return [false, true].map((batchProjection) =>
+      trial("concurrent", 100, 69, { grantWidth: 8, batchProjection }),
+    );
+  if (suite === "grants-pg" || suite === "grants-pg-backlog") {
+    const preload = suite === "grants-pg-backlog";
+    const paired = [
+      [8, false],
+      [8, true],
+      [32, true],
+      [32, false],
+      [32, false],
+      [32, true],
+      [8, true],
+      [8, false],
+    ];
+    return (preload ? paired.slice(0, 4) : paired).map(([grantWidth, batchProjection]) =>
+      trial("concurrent", 100, 23, { grantWidth, batchProjection, preload }),
+    );
+  }
   if (suite === "grants" || suite === "grants-long") {
     const widths = suite === "grants" ? [1, 8, 32, 32, 8, 1] : [8, 32];
     return widths.map((grantWidth) =>

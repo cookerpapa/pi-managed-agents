@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { FanoutSender } from "./fanout-network.mjs";
 import { fanoutFixture, offered, targets } from "./fanout-fixture.mjs";
 import { operationsFor } from "./workspace-operations.mjs";
-import { prepareToolGrants, plainExecution } from "./tool-grant-prefix.mjs";
+import { prepareToolGrants } from "./tool-grant-prefix.mjs";
 import { pace, wall } from "./pg-path-replay.mjs";
 
 function phase() {
@@ -145,11 +145,12 @@ export class FanoutProjector {
     });
   }
   async prepare(ready, current, grant, router) {
-    if (!(this.spec?.grantWidth > 1) || !plainExecution(ready[0].fact)) return 1;
+    if (!(this.spec?.grantWidth > 1) || !router.canGroupOperation(ready[0])) return 1;
     await this.gate.promise;
     let prior = wall();
     const count = await prepareToolGrants(ready, current, grant, {
       limit: this.spec.grantWidth,
+      batchProjection: this.spec.batchProjection,
       sender: this.sender,
       router,
       targetFor: (r) => {

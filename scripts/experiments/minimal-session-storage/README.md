@@ -454,3 +454,29 @@ Run `node --import tsx scripts/experiments/minimal-session-storage/run-grant-cra
 separately for an isolated three-broker and PG fault trial. Its PG delivery
 witness permits duplicates so that re-execution would be visible. A replacement
 rewinds from offset zero after the first process dies with six unsent commands.
+
+### Projecting consecutive Tool intents in one PG transaction
+
+Use the same `workspace-fanout` driver, with 32 partitions and 12 Projector
+connections. Select `PI_CLOUD_FANOUT_SUITE=grants-pg` for the reversed 92,000-intent
+comparisons at Kafka grant limits 8 and 32, `grants-pg-backlog` for a preloaded
+queue, or `grants-pg-minute` for paired 276,000-intent paced trials at limit 8.
+Use a new output directory for each invocation. Each trial asserts the full receiver
+count, per-target order, PG operation references and Kafka positions. Compare input
+rate as well as confirmed sends including final drain. Trial output records the PG
+transaction count and actual grant distribution. In the grouped arm the PG phase
+timers measure elapsed time per projected prefix.
+
+For example, with the fixture prerequisites above and an unused output path:
+
+```sh
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 PI_CLOUD_FANOUT_SUITE=grants-pg \
+  node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs \
+  /tmp/pma-intent-comparison workspace-fanout
+```
+
+Run `node --import tsx scripts/experiments/minimal-session-storage/run-intent-pg-faults.mjs`
+for the separate disposable-PG rollback, acknowledgement-loss, cancellation and stale
+writer checks. It also captures two fixed-Pi Bash intent commits and checks their
+original live document transitions. Presentation-bearing commits retain individual
+processing. [Measurements and scope](../../../docs/reports/pg-tool-intent-batch-20261121.md).

@@ -211,13 +211,22 @@ export class ReadyProjection {
   }
   async apply(ready, current, process, witness, connect = () => this.db.connect()) {
     if (!this.width) return 1;
+    return this.#apply(ready.slice(0, this.width), current, process, witness, connect, false);
+  }
+  async applyToolIntents(ready, current, process) {
+    assert(
+      this.width && this.policy === "recorded-history" && ready.length > 0 && ready.length <= 32,
+    );
+    return this.#apply(ready, current, process, undefined, () => this.db.connect(), true);
+  }
+  async #apply(candidates, current, process, witness, connect, intentPrefix) {
     const generation = this.generation;
     const owned = () => current() && this.generation === generation;
-    const partition = ready[0].partition,
+    const partition = candidates[0].partition,
       expected = this.next.get(partition);
     assert(expected !== undefined && owned(), "Missing projection assignment");
-    const covered = ready[0].offset < expected;
-    const candidates = ready.slice(0, this.width);
+    const covered = candidates[0].offset < expected;
+    if (intentPrefix) assert(!covered && candidates[0].offset === expected);
     const draft = new Draft(this.sessions, this.templates, covered ? undefined : witness, covered);
     const effects = new Set();
     this.effects.delete(partition);
@@ -228,6 +237,11 @@ export class ReadyProjection {
     for (const r of candidates) {
       if (r.offset < expected !== covered) break;
       assert.equal(r.partition, partition);
+      if (intentPrefix)
+        assert(
+          r.topic === this.topic && r.offset === expected + BigInt(kept.length),
+          "Noncontiguous PG tool prefix",
+        );
       draft.begin(r);
       kept.push(r);
       const f = r.fact;
@@ -346,6 +360,22 @@ export class ReadyProjection {
             (registered && !draft.frame.strict && !draft.frame.anchor);
         }
       }
+      if (intentPrefix) {
+        assert(
+          r.workspaceBatch &&
+            f.tools?.length === 1 &&
+            !f.cancellations?.length &&
+            !opened &&
+            !draft.frame.rejected &&
+            draft.frame.ops.length === 1 &&
+            draft.frame.ops[0].kind === "tool" &&
+            !draft.frame.strict &&
+            draft.frame.history &&
+            !draft.barrier,
+          "Invalid warm execution projection",
+        );
+        draft.frame.intentPrefix = true;
+      }
       if (hasEffect && !draft.frame.rejected) {
         assert(
           draft.frame.ops.some((op) => op.kind !== "anchor" && op.kind !== "pin"),
@@ -356,7 +386,7 @@ export class ReadyProjection {
       if (
         draft.barrier ||
         f.kind !== "durable_commit" ||
-        f.tools?.length ||
+        (f.tools?.length && !intentPrefix) ||
         f.cancellations?.length ||
         f.commit.writes.some(
           (w) =>

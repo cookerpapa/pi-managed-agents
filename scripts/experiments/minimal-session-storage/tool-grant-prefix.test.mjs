@@ -100,3 +100,30 @@ test("revocation between confirmed sends leaves the unsent suffix untouched", as
   assert.deepEqual(sent, [1n]);
   assert.equal(sender.count, 0);
 });
+
+test("grouped projection can stop at a cold route and release the unused reservations", async () => {
+  const { options, sender, sent } = setup();
+  options.batchProjection = true;
+  options.router.projectOperation = () => assert.fail("unexpected serial projection");
+  options.router.projectOperations = async (records) => {
+    assert.deepEqual(
+      records.map((r) => r.offset),
+      [0n, 1n, 2n],
+    );
+    assert.equal(sender.count, 3);
+    return [{ commands: [{}], cancels: [] }];
+  };
+  const count = await prepareToolGrants(
+    [record(0), record(1), record(2)],
+    () => true,
+    async (n) => {
+      assert.equal(n, 1);
+      return 0;
+    },
+    options,
+  );
+  assert.equal(count, 1);
+  assert.deepEqual(sent, [0n]);
+  assert.equal(sender.count, 0);
+  assert.equal(sender.bytes, 0);
+});

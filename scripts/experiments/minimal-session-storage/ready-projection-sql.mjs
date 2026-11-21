@@ -50,7 +50,12 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
               and session_id=(a->>1)::uuid and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for no key update;
             ok:=found; n:=0;
             if ok then
-              if op->>'kind'='tool' and owner_state='cancel_requested' then suppress_dispatch:=true; end if;
+              if op->>'kind'='tool' and owner_state='cancel_requested' then
+                if frame?'intentPrefix' and jsonb_array_length(p_frames)>1 then
+                  raise exception 'Isolate cancelling tool owner' using errcode='PZ001';
+                end if;
+                suppress_dispatch:=true;
+              end if;
               if (snap is not null and snap is distinct from (a->5)) or (op->>'kind'='tool-settled' and snap is null)
                 then raise exception 'Conflicting native task reference' using errcode='PZ002'; end if;
               update runs set projection_tools=case when op->>'kind'='tool'
