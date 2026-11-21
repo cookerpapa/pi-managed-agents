@@ -584,3 +584,74 @@ it.skipIf(!url)(
       }, runId);
   },
 );
+
+it.skipIf(!url)(
+  "records an owned native intent during Stop without granting its physical dispatch, including replay",
+  async () => {
+    await fixture(async ({ view, db, scope, record, fold, cursor }) => {
+      view.configure(16, "recorded-history");
+      await db.query("update runs set state='cancel_requested' where id=$1", [scope.runId]);
+      const intent = record(0, "tool");
+      const operationId = randomUUID(),
+        taskId = 13,
+        callId = "original";
+      const reply = {
+        topic: "pi-cloud.tool-replies.v4." + randomUUID(),
+        partition: 0,
+        offset: "0",
+        deadlineAt: Date.now() + 30000,
+        toolCallId: callId,
+        toolName: "bash",
+      };
+      intent.fact.commit.writes = [
+        {
+          type: "task",
+          value: {
+            id: taskId,
+            conversationId: 1,
+            kind: "pi.tool",
+            input: { callId },
+            state: { status: "running", checkpoint: { phase: "execute" } },
+          },
+        },
+      ];
+      intent.fact.tools = [
+        {
+          target: "cube",
+          scope,
+          taskId,
+          replyRecovery: reply,
+          replyTopic: reply.topic,
+          request: { operation: "tool.execute", toolName: "bash", operationId },
+        },
+      ];
+      await view.apply([intent], now, fold);
+      expect(await cursor()).toBe(1n);
+      expect(
+        (await db.query("select projection_tools from runs where id=$1", [scope.runId])).rows[0]
+          .projection_tools[taskId].operationId,
+      ).toBe(operationId);
+      expect(view.canDeliver(intent)).toBe(false);
+      await view.apply([intent], now, fold);
+      expect(view.canDeliver(intent)).toBe(false);
+      const closing = record(1);
+      closing.fact.commit.writes = [
+        {
+          type: "task",
+          value: { id: taskId, conversationId: 1, kind: "pi.tool", state: { status: "terminal" } },
+        },
+      ];
+      // Preserve the previous native state in this fixture's otherwise synthetic fold.
+      const continued = async (r, d) => {
+        const previous = d.views.get(scope.runId);
+        await fold(r, d);
+        d.views.set(scope.runId, { ...previous, ...d.views.get(scope.runId) });
+      };
+      await view.apply([closing], now, continued);
+      expect(await cursor()).toBe(2n);
+      expect(
+        (await db.query("select state,projection_tools from runs where id=$1", [scope.runId])).rows,
+      ).toEqual([{ state: "cancel_requested", projection_tools: {} }]);
+    });
+  },
+);

@@ -148,7 +148,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
           rows: [row],
         } = await pool.query(openingHead, [runId, tenantId, piSessionId]);
         metrics.queries++;
-        if (row?.state !== "running" || row.lease_id !== writerId) {
+        if (!["running", "cancel_requested"].includes(row?.state) || row.lease_id !== writerId) {
           metrics.stale++;
           measure("obsolete");
           return;
@@ -164,7 +164,10 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
           [tenantId, piSessionId, runId],
         );
         metrics.queries++;
-        if (prior.rows[0]?.state !== "running" || prior.rows[0]?.lease_id !== writerId) {
+        if (
+          !["running", "cancel_requested"].includes(prior.rows[0]?.state) ||
+          prior.rows[0]?.lease_id !== writerId
+        ) {
           metrics.stale++;
           measure("obsolete");
           return;
@@ -292,7 +295,7 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       } else {
         await query("begin");
         const owner = await query(
-          "select id from runs where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running' for share",
+          "select id from runs where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state in ('running','cancel_requested') for share",
           [tenantId, piSessionId, runId, writerId],
         );
         if (!owner.rowCount) {

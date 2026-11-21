@@ -324,8 +324,7 @@ verifies 2,048 receipt events per concurrent sample and reads the expected Sessi
 Pi's real Storage commits. On a pending parent delegation and child Tool it
 replaces the Projector, replays the protected suffix and checks both queues,
 native owner identity, input placement and root-only history bounds. The fixture
-uses local deterministic tools. The integrated Worker/Guest takeover with an
-original Kafka reply remains outstanding. In live model fixture stages,
+uses local deterministic tools. The Worker/Guest study below covers takeover with an original Kafka reply. In live model fixture stages,
 `finalModelOutputToRunSettlementMs` measures final provider stream completion
 to logical Run settlement. Recorded playback has no model-completion sample.
 [Results](../../../docs/reports/minimal-family-recovery-20261120.md).
@@ -342,3 +341,11 @@ Session topic is truncated in the retention experiments. One scenario keeps
 previous Run history in PG while dropping its entire Kafka prefix. Another
 removes records for a still-active family. No live Worker is stopped.
 [Coverage and remaining integration work](../../../docs/reports/retained-family-handoff-20261121.md).
+
+
+Add `--serving` after the output path to run HTTP admission, real lease expiry,
+Outbox publication, the serving Projector and Worker reacquisition. This mode
+creates a separate three-broker Session Kafka cluster and a disposable PG with
+both projections. The candidate cold reader has a restricted database role.
+The development cluster serves only the temporary Guests and their private
+reply mailboxes. [Integration results](../../../docs/reports/serving-family-handoff-20261121.md).

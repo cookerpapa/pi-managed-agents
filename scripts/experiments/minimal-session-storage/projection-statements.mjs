@@ -14,7 +14,7 @@ const inboxSql = (
 const insertMessages = messageSql(false),
   upsertInbox = inboxSql(false);
 function singleSql(mutation, run, lease) {
-  return `with owner as materialized (select id from runs where tenant_id=$1 and session_id=$2 and id=${run} and lease_id=${lease} and state='running' for share), changed as (${mutation}) select exists(select 1 from owner) as accepted, (select count(*)::int from changed) as writes`;
+  return `with owner as materialized (select id from runs where tenant_id=$1 and session_id=$2 and id=${run} and lease_id=${lease} and state in ('running','cancel_requested') for share), changed as (${mutation}) select exists(select 1 from owner) as accepted, (select count(*)::int from changed) as writes`;
 }
 const oneMessage = singleSql(messageSql(true), "$3", "$6"),
   oneInbox = singleSql(inboxSql(true), "$8", "$9");

@@ -252,7 +252,7 @@ export async function movingStarts(db, topic, bounds) {
   const { rows } = await db.query(
     `select h.partition,h.next_offset,r.id,r.lease_id,r.projection_first,r.projection_state,r.projection_pin
     from accepted_fact_projection_offsets h left join runs r on r.projection_partition=h.partition
-      and r.state='running' and r.projection_first is not null
+      and r.state in ('running','cancel_requested') and r.projection_first is not null
     where h.topic=$1 and h.partition=any($2::int[])`,
     [topic, bounds.map((b) => b.partition)],
   );

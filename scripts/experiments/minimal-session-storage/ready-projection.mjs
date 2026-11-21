@@ -238,7 +238,12 @@ export class ReadyProjection {
         continue;
       if (covered && previous && f.kind === "durable_commit" && f.commit.seq <= previous.seq) {
         if (f.commit.seq === previous.seq) assert.equal(f.factId, previous.lastFact);
-        if (hasEffect && f.commit.seq === previous.seq && previous.lastOffset === r.offset) {
+        if (
+          hasEffect &&
+          (!f.tools?.length || owner.state === "running") &&
+          f.commit.seq === previous.seq &&
+          previous.lastOffset === r.offset
+        ) {
           effects.add(r.offset);
           break;
         }
@@ -332,7 +337,7 @@ export class ReadyProjection {
           draft.frame.ops.some((op) => op.kind !== "anchor" && op.kind !== "pin"),
           "Tool requires stable native intent",
         );
-        effects.add(r.offset);
+        if (!covered || !f.tools?.length || owner.state === "running") effects.add(r.offset);
       }
       if (
         draft.barrier ||
@@ -378,6 +383,12 @@ export class ReadyProjection {
             : []),
         ]);
         outcome = row.outcome;
+        if (outcome === "recorded_without_dispatch") {
+          // Tool intent terminates the ready prefix. Preserve the ordered writes,
+          // while withholding the permission to start the physical operation.
+          effects.delete(kept.at(-1).offset);
+          outcome = "applied";
+        }
         if (outcome === "applied" && moving) {
           assert.equal(row.mode, relaxed ? "off" : "on", "PG transaction policy mismatch");
           this.stats[row.mode === "off" ? "asyncTransactions" : "syncTransactions"]++;
@@ -437,8 +448,8 @@ export class ReadyProjection {
   async activeRuns(partition, records) {
     const ids = [...new Set(records.map((r) => r.fact.scope.runId))];
     const { rows } = await this.db.query(
-      `select id,tenant_id,session_id,lease_id,projection_first,projection_pin from runs
-      where state='running' and projection_partition=$1 and projection_first is not null and id=any($2::uuid[])`,
+      `select id,tenant_id,session_id,lease_id,state,projection_first,projection_pin from runs
+      where state in ('running','cancel_requested') and projection_partition=$1 and projection_first is not null and id=any($2::uuid[])`,
       [partition, ids],
     );
     return new Map(rows.map((row) => [row.id, row]));

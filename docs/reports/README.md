@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Session API and lease-driven family handoff](serving-family-handoff-20261121.md) follows HTTP admission, ordered expiry, original-deadline recovery and user Stop through a real Guest.
+
 - [Child handoff from PG and retained Kafka](retained-family-handoff-20261121.md) tests a physical Worker exit, original Cube reply, prior Run rotation and an incomplete recovery base.
 
 - [Context status, gateway usage and PG contention](status-usage-contention-20261120.md) records the read paths and shared-instance controls.

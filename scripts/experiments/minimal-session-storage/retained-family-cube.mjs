@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { OfficialCubeSandboxRuntimeClient } from "../../../packages/sandbox-control/src/cubesandbox-runtime-client.ts";
+import { executionTargetId } from "../../../packages/sandbox-control/src/sandbox-execution.ts";
 import { ToolCompletionIssuer } from "../../../packages/sandbox-control/src/tool-completion-issuer.ts";
 
 // Fixed Guest and maintained HTTPS completion, using one owned VM with no Volume.
@@ -47,7 +48,7 @@ export async function withFamilyGuest(config, run) {
             "/result",
         );
         return {
-          async submit(r, cmd, ref) {
+          async submit(r, cmd, ref, deliveryExpiry = ref.deadlineAt) {
             await client.submitTool(target, {
               source: { topic: r.topic, partition: 0, offset: String(r.offset) },
               operationId: cmd.request.operationId,
@@ -61,7 +62,7 @@ export async function withFamilyGuest(config, run) {
                 request: cmd.request,
                 delivery: await issuer.issue({
                   operationId: cmd.request.operationId,
-                  expiresAt: ref.deadlineAt,
+                  expiresAt: deliveryExpiry,
                   context: {
                     scope: cmd.scope,
                     replyTopic: ref.topic,
@@ -74,6 +75,34 @@ export async function withFamilyGuest(config, run) {
               },
             });
           },
+          async probe(f) {
+            const sentAt = Date.parse(f.occurredAt);
+            await client.submitProbe(target, {
+              probeId: f.factId,
+              delivery: await issuer.issue({
+                operationId: f.factId,
+                expiresAt: sentAt + 10000,
+                context: {
+                  kind: "execution_probe",
+                  sentAt,
+                  replyTopic: f.execution.replyTopic,
+                  bindingIds: [id],
+                  execution: {
+                    bindingId: id,
+                    targetId: executionTargetId(target),
+                    bootId: target.bootId,
+                  },
+                },
+              }),
+            });
+          },
+          cancel: (r, request) =>
+            client.cancelTool(target, {
+              source: { topic: r.topic, partition: r.partition, offset: String(r.offset) },
+              executionScopeId: request.activationId,
+              operationId: request.operationId,
+              writerId: request.originalWriterId,
+            }),
           marker: () =>
             command("if test -f " + root + "/executions; then cat " + root + "/executions; fi"),
           release: () => command("touch " + root + "/release"),

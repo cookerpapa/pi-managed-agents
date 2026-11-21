@@ -14,7 +14,10 @@ import {
 } from "../../lib/production-kubernetes.mjs";
 import { nativeCubeLifecycleOptions } from "../../lib/cube-native-lifecycle-options.mjs";
 import { realpath } from "node:fs/promises";
-const output = process.argv[2];
+import { testKafka } from "../../lib/test-kafka.mjs";
+const output = process.argv[2],
+  serving = process.argv[3] === "--serving";
+let isolatedKafka;
 assert(output && process.env.PI_CLOUD_RUNTIME_LOAD_CHECK === "1");
 process.umask(0o077);
 const cfg = JSON.parse(await readFile(join(runtimeDirectory, "cubesandbox/cluster.json"), "utf8"));
@@ -60,10 +63,16 @@ const cube = {
 const tmp = await mkdtemp(join(tmpdir(), "pma-family-")),
   pg = await testPostgres({});
 try {
+  if (serving) isolatedKafka = await testKafka({});
   const names = ["kafka-1", "kafka-2", "kafka-3"];
   await writeFile(
     join(tmp, "config"),
-    JSON.stringify({ brokers: names.map((n) => n + ":9092"), dbUrl: pg.url, cube }),
+    JSON.stringify({
+      brokers: names.map((n) => n + ":9092"),
+      dbUrl: pg.url,
+      cube,
+      servingBrokers: isolatedKafka?.brokers,
+    }),
     { mode: 0o600 },
   );
   const modules = dirname(await realpath(join(repositoryRoot, "node_modules", "tsx")));
@@ -91,11 +100,15 @@ try {
     repositoryRoot,
     "--env",
     "PATH=/opt/node/bin:/usr/bin:/bin",
+    "--env",
+    "TSX_TSCONFIG_PATH=" + join(repositoryRoot, "packages/control-plane/tsconfig.json"),
     image,
     "/opt/node/bin/node",
     "--import",
     "tsx",
-    "scripts/experiments/minimal-session-storage/retained-family-study.mjs",
+    "scripts/experiments/minimal-session-storage/" +
+      (serving ? "serving-family-study" : "retained-family-study") +
+      ".mjs",
     "/study/config",
     "/study/report.json",
   ];
@@ -108,7 +121,11 @@ try {
   await writeFile(output, await readFile(join(tmp, "report.json")), { mode: 0o600 });
 } finally {
   try {
-    await pg.close();
+    try {
+      await isolatedKafka?.close();
+    } finally {
+      await pg.close();
+    }
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }

@@ -1,5 +1,7 @@
 // Disposable A/B actors for the retained-log experiment. Each has independent
 // Pi, model client, producer and reply mailbox memory.
+import { FamilyPresentation } from "./family-presentation.mjs";
+import { durableToolState } from "@pi-cloud/protocol";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -20,24 +22,41 @@ import { encodeSessionLogFact } from "../../../packages/runtime-core/src/kafka-a
 import { loadPriorRoot, readRetainedFamily } from "./retained-family-read.mjs";
 
 const init = await new Promise((resolve) => process.once("message", resolve));
-const { scope, topic, brokers, dbUrl, binding, seal, mode } = init;
+const { topic, brokers, dbUrl, binding, seal, mode } = init;
 const send = (kind, properties = {}) => process.send({ kind, ...properties });
+const claim = init.controlUrl
+  ? await (await import("./serving-family-claim.mjs")).claimRun(init.controlUrl, init.runId)
+  : undefined;
+const scope = claim?.scope ?? init.scope;
+const bootId = claim?.bootId ?? scope.writerId;
+if (claim) {
+  const ready = new Promise((resolve) => process.once("message", resolve));
+  send("claimed", { scope, bootId, stopOnResume: !!claim.request.stopOnResume });
+  assert.equal((await ready).kind, "start");
+}
 const db = new pg.Client({
     connectionString: dbUrl,
     options: "-c default_transaction_read_only=on",
   }),
-  producer = new KafkaWorkerProducer({ brokers, topic, clientId: "family-" + scope.writerId });
-const mailbox = new KafkaToolReplyMailbox({ brokers, bootId: scope.writerId, replicas: 3 });
+  producer = new KafkaWorkerProducer({ brokers, topic, clientId: "family-" + bootId });
+const mailbox = new KafkaToolReplyMailbox({
+  brokers: init.replyBrokers ?? brokers,
+  bootId,
+  replicas: 3,
+});
+const presentation = claim ? new FamilyPresentation() : undefined;
 const life = new AbortController();
 let runtime,
   restored,
   child,
+  childView,
   finalModelAt,
   publications = 0,
   newIntents = 0,
   childModelCalls = 0,
   parentModelCalls = 0;
-const operations = new Map();
+const operations = new Map(),
+  cancelledTasks = new Set();
 const textOf = (m) =>
   m?.content
     ?.filter((x) => x.type === "text")
@@ -54,6 +73,7 @@ class Published extends MemoryStorage {
   async commit(writes) {
     const p = this.prepareCommit(writes),
       commit = { seq: p.seq, nextId: this.nextId, writes: p.writes };
+    const display = presentation?.prepare(commit);
     const effects = runtime?.preparePublication(commit);
     const tools = (effects?.tools ?? []).map(({ taskId, command }) => {
       assert(command.request?.operation === "tool.execute");
@@ -62,7 +82,9 @@ class Published extends MemoryStorage {
       return {
         target: "cube",
         taskId,
-        scope,
+        scope: scopeFor(
+          p.writes.find((w) => w.type === "task" && w.value.id === taskId).value.conversationId,
+        ),
         request,
         replyRecovery: command.replyRecovery,
         replyTopic: command.replyRecovery.topic,
@@ -76,19 +98,36 @@ class Published extends MemoryStorage {
       factId: randomUUID(),
       occurredAt: new Date().toISOString(),
       tools,
-      cancellations: [],
-      display: [],
+      cancellations: p.writes.flatMap((w) => {
+        const task = w.type === "task" && durableToolState(w.value),
+          op = task && operations.get(task.id);
+        if (!task?.aborted || !op || cancelledTasks.has(task.id)) return [];
+        cancelledTasks.add(task.id);
+        return [
+          {
+            kind: "tool_cancel",
+            scope: scopeFor(task.conversationId),
+            request: {
+              activationId: op.activationId,
+              operationId: op.operationId,
+              originalWriterId: op.writerId,
+            },
+          },
+        ];
+      }),
+      display: display?.display ?? [],
       origins: p.writes
         .filter((w) => ["entry", "task", "submission"].includes(w.type))
         .map((w) => ({
           recordId: w.value.id,
-          sessionId: scope.sessionId,
+          sessionId: scopeFor(w.value.conversationId).sessionId,
           runId: scope.runId,
-          turnId: scope.turnId,
+          turnId: scopeFor(w.value.conversationId).turnId,
         })),
     });
     const seq = p.apply();
     effects?.confirmed();
+    display?.confirmed();
     publications++;
     return seq;
   }
@@ -125,61 +164,73 @@ function resultText(context, name) {
   assert(m, "Missing original Tool result in model context");
   return textOf(m);
 }
-parentModel.setResponses(
-  seal
-    ? [
-        (context) => {
-          parentModelCalls++;
-          const text = resultText(context, "delegate");
-          assert.match(text, /CHILD.*GUEST/);
-          if (mode === "prior-rotated" || mode === "pending")
-            assert(
-              context.messages.some((m) => m.role === "assistant" && textOf(m) === oldAnswer),
-              "Missing predecessor PG answer",
-            );
-          return fauxAssistantMessage("PARENT " + text);
-        },
-      ]
-    : [
-        () => {
-          parentModelCalls++;
-          return mode === "seed"
-            ? fauxAssistantMessage(oldAnswer)
-            : fauxAssistantMessage(fauxToolCall("delegate", {}), { stopReason: "toolUse" });
-        },
-      ],
-);
-childModel.setResponses(
-  seal
-    ? Array.from({ length: 2 }, (_, i) => (context) => {
-        childModelCalls++;
-        const text = resultText(context, "bash");
-        assert.match(text, /GUEST/);
-        if (i === 1)
-          assert(
-            context.messages.some(
-              (m) =>
-                m.role === "user" &&
-                (typeof m.content === "string" ? m.content : textOf(m)).includes(
-                  "queued-child-input",
-                ),
-            ),
-          );
-        return fauxAssistantMessage("CHILD " + text.trim());
-      })
-    : [
-        () => {
-          childModelCalls++;
-          return fauxAssistantMessage(fauxToolCall("bash", { command, timeout: 90 }), {
-            stopReason: "toolUse",
-          });
-        },
-      ],
-);
+const normal = mode === "normal";
+function beginParent(context) {
+  parentModelCalls++;
+  if (claim)
+    assert(
+      context.messages.some(
+        (m) =>
+          m.role === "user" &&
+          (typeof m.content === "string" ? m.content : textOf(m)) === claim.request.input.prompt,
+      ),
+    );
+  return mode === "seed"
+    ? fauxAssistantMessage(oldAnswer)
+    : fauxAssistantMessage(fauxToolCall("delegate", { task: "Run the gated Bash once." }), {
+        stopReason: "toolUse",
+      });
+}
+function finishParent(context) {
+  parentModelCalls++;
+  const text = resultText(context, "delegate");
+  assert.match(
+    text,
+    mode === "reply-timeout" ? /CHILD UNKNOWN tool_reply_timeout/ : /CHILD.*GUEST/,
+  );
+  if (mode === "prior-rotated" || mode === "pending")
+    assert(
+      context.messages.some((m) => m.role === "assistant" && textOf(m) === oldAnswer),
+      "Missing predecessor PG answer",
+    );
+  return fauxAssistantMessage("PARENT " + text);
+}
+function beginChild() {
+  childModelCalls++;
+  return fauxAssistantMessage(fauxToolCall("bash", { command, timeout: 90 }), {
+    stopReason: "toolUse",
+  });
+}
+function finishChild(context) {
+  childModelCalls++;
+  const text = resultText(context, "bash");
+  assert.match(text, mode === "reply-timeout" ? /original Tool reply deadline/i : /GUEST/);
+  if (childModelCalls === (normal ? 3 : 2))
+    assert(
+      context.messages.some(
+        (m) =>
+          m.role === "user" &&
+          (typeof m.content === "string" ? m.content : textOf(m)).includes("queued-child-input"),
+      ),
+    );
+  return fauxAssistantMessage(
+    mode === "reply-timeout"
+      ? "CHILD UNKNOWN tool_reply_timeout: original Tool reply deadline elapsed"
+      : "CHILD " + text.trim(),
+  );
+}
+parentModel.setResponses([
+  ...(seal ? [] : [beginParent]),
+  ...(seal || normal ? [finishParent] : []),
+]);
+childModel.setResponses([
+  ...(seal ? [] : [beginChild]),
+  ...(seal || normal ? [finishChild, finishChild] : []),
+]);
 const delegate = {
   name: "delegate",
   description: "Await the owned child",
-  parameters: Type.Object({}),
+  parameters: Type.Object({ task: Type.String() }),
   replay: "safe",
   async execute(_args, api) {
     let requestId = randomUUID();
@@ -195,10 +246,25 @@ const delegate = {
       assert.equal(doc.value.ownerTaskId, api.taskId);
       requestId = items[0].key;
     }
+    if (claim && !seal) {
+      const start = new Promise((resolve) => {
+        const handle = (m) => {
+          if (m.kind === "startChild") {
+            process.off("message", handle);
+            resolve(m);
+          }
+        };
+        process.on("message", handle);
+      });
+      send("delegateRequest", { requestId, taskId: api.taskId, sequence: store.nextSeq - 1 });
+      childView = (await start).view;
+      assert.equal(childView.id, requestId);
+    }
     const id = await runtime.createConversation({
       requestId,
       ownerTaskId: api.taskId,
       parentConversationId: 1,
+      ...(childView ? { view: childView } : {}),
     });
     if (!seal) {
       child = await runtime.bind(configuration(id));
@@ -206,6 +272,7 @@ const delegate = {
         { type: "input", requestId: scope.runId, content: "Run the gated Bash once." },
         ctx,
       );
+      if (claim) send("childStarted", { id });
     } else assert.equal(child?.id, id, "Recovery changed child identity");
     await child.waitForIdle(ctx);
     const last = (await child.context(ctx)).messages.findLast((m) => m.role === "assistant");
@@ -213,7 +280,13 @@ const delegate = {
   },
 };
 const tool = fixedRemoteToolDefinitions().find((t) => t.name === "bash");
+function scopeFor(id) {
+  return id !== 1 && childView
+    ? { ...scope, sessionId: childView.sessionId, turnId: childView.turnId }
+    : scope;
+}
 function configuration(id) {
+  presentation?.bind(id, scopeFor(id));
   const root = id === 1,
     m = root ? parentModel.getModel() : childModel.getModel();
   return {
@@ -221,7 +294,7 @@ function configuration(id) {
     conversationId: id,
     model: m,
     agent: { instructions: root ? "parent instructions" : "retained child instructions" },
-    context: { sessionId: scope.sessionId, turnId: scope.turnId },
+    context: { sessionId: scopeFor(id).sessionId, turnId: scopeFor(id).turnId },
     tools: root ? [delegate] : [],
     remoteTools: () => (root ? [] : ["bash"]),
     assertCurrent: async () => life.signal.throwIfAborted(),
@@ -249,7 +322,7 @@ function configuration(id) {
           ...(await mailbox.replyPosition()),
           toolName: "bash",
           toolCallId: inv.callId,
-          deadlineAt: Date.now() + 120000,
+          deadlineAt: Date.now() + (mode === "reply-timeout" ? 18000 : 120000),
         };
         op = { operationId: randomUUID(), taskId: inv.taskId, conversationId: id, reply: ref };
         wait = mailbox.wait(op.operationId, inv.callId, "bash", life.signal);
@@ -275,7 +348,32 @@ function configuration(id) {
           },
         },
         result: async () => {
-          const r = await wait.result;
+          let r;
+          try {
+            r = await wait.result;
+          } catch (e) {
+            if (mode === "reply-timeout") {
+              assert.equal(e.code, "tool_reply_timeout");
+              assert.equal(e.effect, "unknown");
+              const at = Date.now(),
+                probeId = randomUUID(),
+                signal = AbortSignal.timeout(10000);
+              const echo = mailbox.waitProbe(probeId, op.activationId, signal);
+              await publish({
+                kind: "path_probe",
+                factId: probeId,
+                scope,
+                occurredAt: new Date(at).toISOString(),
+                execution: {
+                  replyTopic: mailbox.topic,
+                  bindings: [{ bindingId: op.activationId, scope: scopeFor(id), probe: true }],
+                },
+              });
+              assert.equal((await echo).evidence.bindingId, op.activationId);
+              send("unknown", { code: e.code, effect: e.effect, at, deadline: ref.deadlineAt });
+            }
+            throw e;
+          }
           return { ...r.result, isError: r.isError };
         },
         completed: () => wait.executionSettled(),
@@ -291,7 +389,7 @@ try {
   const prior = await loadPriorRoot(db, scope, store);
   if (seal) {
     const start = performance.now();
-    restored = await readRetainedFamily(db, brokers, topic, seal, scope, store, ctx);
+    restored = await readRetainedFamily(db, brokers, topic, seal, scope, store, ctx, presentation);
     if (mode === "expired") {
       throw Error("Incomplete prefix unexpectedly restored");
     }
@@ -329,8 +427,28 @@ try {
   const root = await runtime.bind(configuration(1), seal ? "reattach" : "initialize");
   if (seal) {
     const id = restored.intents[0].conversationId;
+    if (claim) {
+      const receipt = (
+        await store.scanDocuments(
+          { scope: { kind: "session" }, kind: "pi-cloud.conversation-creation", at: "current" },
+          2,
+          undefined,
+          ctx,
+        )
+      ).items;
+      assert.equal(receipt.length, 1);
+      childView = (await store.document(receipt[0].id, "current", ctx)).value.view;
+      assert.equal(childView.id, receipt[0].key);
+    }
     child = await runtime.bind(configuration(id), "reattach");
     assert.equal((await runtime.harness.snapshot(InboxDoc, id, ctx)).items.length, 1);
+    if (claim?.request.stopOnResume) {
+      const receipt = await claim.cancel(async () => {
+        await child.abort(ctx);
+        await root.abort(ctx);
+      });
+      send("stopAcknowledged", { receipt });
+    }
     runtime.harness.resume();
   } else {
     process.on("message", async (m) => {
@@ -351,23 +469,56 @@ try {
       }
     });
     await root.submit(
-      { type: "input", requestId: scope.runId, content: "Delegate to the child." },
+      {
+        type: "input",
+        requestId: scope.runId,
+        content: claim?.request.input.prompt ?? "Delegate to the child.",
+      },
       ctx,
     );
   }
   await root.waitForIdle(ctx);
-  assert(seal || mode === "seed", "Initial Worker finished unexpectedly");
-  await publish({
-    kind: "work_finished",
-    scope,
-    agentId: "root",
-    baseSequence: prior.baseSequence,
-    nativeSequence: store.nextSeq - 1,
-    factId: randomUUID(),
-    occurredAt: new Date().toISOString(),
-    terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
-  });
-  if (mode === "seed") {
+  assert(seal || normal || mode === "seed", "Initial Worker finished unexpectedly");
+  if (!claim?.request.stopOnResume) {
+    const last = (await root.context(ctx)).messages.at(-1);
+    assert.equal(last?.role, "assistant", "Pi has no final parent assistant answer");
+    assert.equal(
+      last.stopReason,
+      "stop",
+      last.errorMessage ?? "Parent model did not finish normally",
+    );
+    assert(finalModelAt, "No successful final provider completion");
+    if (mode !== "seed")
+      assert.match(
+        textOf(last),
+        mode === "reply-timeout"
+          ? /^PARENT CHILD UNKNOWN tool_reply_timeout/
+          : /^PARENT CHILD GUEST/,
+      );
+  }
+  const finish = (terminal) =>
+    publish({
+      kind: "work_finished",
+      scope,
+      agentId: "root",
+      baseSequence: claim ? Number(claim.request.nextEventSeq) - 1 : prior.baseSequence,
+      nativeSequence: store.nextSeq - 1,
+      factId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      terminal,
+    });
+  if (claim) await claim.finish(finish);
+  else await finish({ type: "turn.completed", payload: { stopReason: "stop" } });
+  if (claim?.request.stopOnResume) {
+    assert.equal(childModelCalls + parentModelCalls, 0);
+    const queued = await store.submissionByRequest(child.id, "queued-child-input", ctx);
+    send("stopped", {
+      queuedStatus: queued.status,
+      newIntents,
+      models: childModelCalls + parentModelCalls,
+      cancellations: cancelledTasks.size,
+    });
+  } else if (mode === "seed") {
     send("seedFinished");
   } else {
     const history = (await child.context(ctx)).messages,
@@ -378,9 +529,9 @@ try {
       rootHistory.filter((m) => m.role === "toolResult" && m.toolName === "delegate").length,
       1,
     );
-    assert.equal(newIntents, 0);
-    assert.equal(childModelCalls, 2);
-    assert.equal(parentModelCalls, 1);
+    assert.equal(newIntents, normal ? 1 : 0);
+    assert.equal(childModelCalls, normal ? 3 : 2);
+    assert.equal(parentModelCalls, normal ? 2 : 1);
     assert.equal(
       (await store.submissionByRequest(child.id, "queued-child-input", ctx)).status,
       "done",
@@ -410,6 +561,7 @@ try {
     await mailbox.shutdown();
     await producer.close();
     await db.end();
+    await claim?.close();
     process.disconnect();
   }
 }

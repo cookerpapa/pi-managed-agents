@@ -14,7 +14,10 @@ export async function loadPriorRoot(db, scope, storage) {
   const {
     rows: [row],
   } = await db.query(openingHead, [scope.runId, scope.tenantId, scope.piSessionId]);
-  assert(row?.state === "running" && row.lease_id === scope.writerId, "Unowned read");
+  assert(
+    ["running", "cancel_requested"].includes(row?.state) && row.lease_id === scope.writerId,
+    "Unowned read",
+  );
   // A predecessor can settle only with empty Inboxes. Recover its root at
   // that point, not the pending inputs of the interrupted successor.
   const prior = {
@@ -41,7 +44,16 @@ export async function loadPriorRoot(db, scope, storage) {
   };
 }
 
-export async function readRetainedFamily(db, brokers, topic, seal, scope, storage, ctx) {
+export async function readRetainedFamily(
+  db,
+  brokers,
+  topic,
+  seal,
+  scope,
+  storage,
+  ctx,
+  presentation,
+) {
   const pgStart = performance.now(),
     base = storage.nextSeq - 1;
   const cut = BigInt(seal.offset);
@@ -54,7 +66,7 @@ export async function readRetainedFamily(db, brokers, topic, seal, scope, storag
     [scope.runId, scope.tenantId, scope.piSessionId, topic],
   );
   assert(
-    owner?.state === "running" &&
+    ["running", "cancel_requested"].includes(owner?.state) &&
       owner.lease_id === scope.writerId &&
       BigInt(owner.next_offset) > cut,
     "Missing successor authority or unprojected seal",
@@ -68,6 +80,9 @@ export async function readRetainedFamily(db, brokers, topic, seal, scope, storag
     [scope.tenantId, scope.piSessionId],
   );
   const pgReadMs = performance.now() - pgStart;
+  const intents = Object.values(owner.projection_tools);
+  const pendingIds = new Set(intents.map((op) => op.operationId));
+  const originalTargets = new Map();
   const entries = new Map(rows.map((r) => [r.id, r]));
   const id = randomUUID(),
     originalWriter = seal.writerId;
@@ -142,6 +157,13 @@ export async function readRetainedFamily(db, brokers, topic, seal, scope, storag
           throw Error(
             "Incomplete accepted native prefix: expected " + (count + 1) + ", got " + seq,
           );
+        for (const tool of f.tools) {
+          if (tool.target === "cube" && pendingIds.has(tool.request.operationId))
+            originalTargets.set(tool.request.operationId, {
+              activationId: tool.request.activationId,
+              writerId: f.scope.writerId,
+            });
+        }
         const recovered = writes.map((w, ordinal) => {
           if (w.type !== "entry") return w;
           const e = entries.get(w.value.id);
@@ -158,6 +180,7 @@ export async function readRetainedFamily(db, brokers, topic, seal, scope, storag
         storage.prepareCommit(recovered, seq).apply();
         storage.nextId = Math.max(storage.nextId, nextId);
         count = seq;
+        presentation?.restore(f);
         lastAccepted = f;
       } catch (e) {
         failure = e;
@@ -198,7 +221,6 @@ export async function readRetainedFamily(db, brokers, topic, seal, scope, storag
     );
     assert.deepEqual((await storage.document(q.id, "current", ctx)).value.items, q.items);
   }
-  const intents = Object.values(owner.projection_tools);
   const latestProjected = Math.max(
     owner.projection_state?.seq ?? 0,
     rows.reduce((n, r) => Math.max(n, r.seq), 0),
@@ -216,7 +238,11 @@ export async function readRetainedFamily(db, brokers, topic, seal, scope, storag
     );
   }
   return {
-    intents,
+    intents: intents.map((op) => {
+      const target = originalTargets.get(op.operationId);
+      assert(target, "Missing original dispatch target");
+      return { ...op, ...target };
+    }),
     stats: {
       firstAvailable: String(low),
       commits: count - base,

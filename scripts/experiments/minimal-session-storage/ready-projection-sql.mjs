@@ -11,7 +11,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
     alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,
       add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
-    create index active_projection_start on runs(projection_partition,projection_first) where state='running' and projection_first is not null;
+    create index active_projection_start on runs(projection_partition,projection_first) where state in ('running','cancel_requested') and projection_first is not null;
     create function prefix_message(uuid,uuid,uuid,bigint,text,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${message} $fn$;
     create function prefix_inbox(uuid,uuid,bigint,bigint,bigint,int,text,uuid,uuid) returns table(accepted boolean,writes int)
@@ -19,7 +19,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
     create function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${finishAndRelease} $fn$;
     create function project_ready(p_topic text,p_partition int,p_expected bigint,p_next bigint,p_frames jsonb,p_relaxed boolean default false,p_allow_finish boolean default false,p_bulk_usage boolean default false)
     returns text language plpgsql as $body$
-    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; snap jsonb; pending_usage jsonb[];
+    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; owner_state text; suppress_dispatch boolean := false; snap jsonb; pending_usage jsonb[];
     begin
       select next_offset into strict saved from accepted_fact_projection_offsets
        where topic=p_topic and partition=p_partition for update;
@@ -43,13 +43,14 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
             select count(*)::int into n from prefix_finish((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::uuid,a->>4);
             ok:=n=1;
             if not ok and exists(select 1 from runs where id=(a->>2)::uuid and lease_id=(a->>3)::uuid
-              and state='running' and projection_tools<>'{}'::jsonb)
+              and state in ('running','cancel_requested') and projection_tools<>'{}'::jsonb)
               then raise exception 'Incomplete native Tool at Run settlement' using errcode='PZ002'; end if;
           when 'tool','tool-settled' then
-            select projection_tools->(a->>4) into snap from runs where tenant_id=(a->>0)::uuid
-              and session_id=(a->>1)::uuid and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state='running' for no key update;
+            select projection_tools->(a->>4),state into snap,owner_state from runs where tenant_id=(a->>0)::uuid
+              and session_id=(a->>1)::uuid and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for no key update;
             ok:=found; n:=0;
             if ok then
+              if op->>'kind'='tool' and owner_state='cancel_requested' then suppress_dispatch:=true; end if;
               if (snap is not null and snap is distinct from (a->5)) or (op->>'kind'='tool-settled' and snap is null)
                 then raise exception 'Conflicting native task reference' using errcode='PZ002'; end if;
               update runs set projection_tools=case when op->>'kind'='tool'
@@ -59,12 +60,12 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
           when 'anchor' then
             update runs set projection_first=(frame->>'offset')::bigint,projection_partition=p_partition
               where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid
-                and lease_id=(a->>3)::uuid and state='running' and projection_first is null;
+                and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') and projection_first is null;
             get diagnostics n = row_count;
             ok:=n=1;
           when 'pin' then
             update runs set projection_pin=(frame->>'offset')::bigint
-              where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state='running';
+              where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
             get diagnostics n = row_count;
             ok:=n=1;
           else raise exception 'Unknown projection operation';
@@ -91,7 +92,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
         if frame?'snapshot' then
           snap:=frame->'snapshot';
           update runs set projection_first=(frame->>'offset')::bigint+1,projection_partition=p_partition,projection_pin=null,
-            projection_state=snap->'state' where id=(snap->>'run')::uuid and lease_id=(snap->>'writer')::uuid and state='running';
+            projection_state=snap->'state' where id=(snap->>'run')::uuid and lease_id=(snap->>'writer')::uuid and state in ('running','cancel_requested');
           if not found then raise exception 'Checkpoint owner changed' using errcode='40001'; end if;
         elsif frame?'anchor' and frame->'ops'->0->>'kind'<>'anchor' then
           a:=frame->'anchor';
@@ -101,7 +102,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
         if frame?'pin' and frame->'ops'->0->>'kind'<>'pin' then
           a:=frame->'pin';
           update runs set projection_pin=(frame->>'offset')::bigint
-            where id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state='running';
+            where id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
           if not found then raise exception 'Pin owner changed' using errcode='40001'; end if;
         end if;
       end loop;
@@ -113,7 +114,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
       end if;
       update accepted_fact_projection_offsets set next_offset=p_next where topic=p_topic and partition=p_partition;
       if p_relaxed then perform set_config('synchronous_commit','off',true); end if;
-      return 'applied';
+      return case when suppress_dispatch then 'recorded_without_dispatch' else 'applied' end;
     end $body$;`);
 }
 export const applyPrefixSql = "select project_ready($1,$2,$3,$4,$5::jsonb) as outcome";
@@ -129,7 +130,7 @@ export async function projectionStarts(db, topic, bounds) {
   const { rows } = await db.query(
     `select h.partition,h.next_offset,min(r.projection_first) as first
     from accepted_fact_projection_offsets h left join runs r on r.projection_partition=h.partition
-    and r.state='running' and r.projection_first is not null
+    and r.state in ('running','cancel_requested') and r.projection_first is not null
     where h.topic=$1 and h.partition=any($2::int[]) group by h.partition,h.next_offset`,
     [topic, bounds.map((b) => b.partition)],
   );
