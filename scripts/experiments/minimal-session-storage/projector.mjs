@@ -410,6 +410,8 @@ try {
         const pgOnly = fanout.spec.mode === "pg-control";
         const result = await fanout.finish();
         result.pgTransactions = {
+          poolLimit: pool.options.max,
+          openConnections: pool.totalCount,
           total: prefixStudy.stats.commits - fanout.pgAtStart.commits,
           poolMs: prefixStudy.stats.poolMs - fanout.pgAtStart.poolMs,
           holdMs: prefixStudy.stats.holdMs - fanout.pgAtStart.holdMs,

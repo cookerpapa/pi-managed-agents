@@ -144,6 +144,11 @@ export async function runFanout({
       assert(
         Object.keys(result.grantSizes).every((k) => Number(k) >= 1 && Number(k) <= grantWidth),
       );
+      assert.equal(result.pgTransactions.poolLimit, report.projectorConnections);
+      assert(
+        result.pgTransactions.openConnections > 0 &&
+          result.pgTransactions.openConnections <= report.projectorConnections,
+      );
       assert.equal(result.pgTransactions.total, count);
       assert(
         result.nativeCommits.positions >=

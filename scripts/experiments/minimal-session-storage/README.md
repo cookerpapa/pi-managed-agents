@@ -441,8 +441,14 @@ In the same fan-out fixture use `PI_CLOUD_FANOUT_SUITE=grants` for paired
 intents per arm at widths 8 and 32. Set `PI_CLOUD_FANOUT_PARTITIONS` to 32 or 64.
 Give each run a fresh output directory. Each invocation creates its own RF3
 topic generation, balanced target routing and scratch PG. Pre-warm routes and
-keep one PG transaction per Tool, 12 PG connections and 100 ms receipt delay.
-The report includes actual prefix sizes, logical vs native commits and lag.
+keep one PG transaction per Tool and 100 ms receipt delay.
+`PI_CLOUD_SESSION_BENCH_PROJECTOR_CONNECTIONS` sets this Projector's pool limit
+to 12 (default) or 24. To compare at 64 partitions, run `grants-long` serially
+at 12, 24, 24 and 12 connections. The saved report includes the verified pool
+limit and open client count, summed connection acquisition and hold time,
+transaction count, actual prefix sizes, logical vs native commits and lag.
+Divide `result.pgTransactions.poolMs` and `holdMs` by `total` for per-transaction
+means. Both are client-side elapsed times.
 
 Run `node --import tsx scripts/experiments/minimal-session-storage/run-grant-crash.mjs`
 separately for an isolated three-broker and PG fault trial. Its PG delivery

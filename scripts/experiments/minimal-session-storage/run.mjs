@@ -1379,7 +1379,8 @@ try {
       }
       if (mode === "wake-sizing") await runSizingTrials(wave);
       else if (mode === "wake-throughput" && suite === "pg-paths") {
-        assert.equal(projectorConnections, 12);
+        if (process.env.PI_CLOUD_PG_PATH_PROFILE !== "workspace-fanout")
+          assert.equal(projectorConnections, 12);
         assert.equal(readerMode, "batch");
         const { runPgPaths } = await import("./pg-path-trials.mjs");
         await runPgPaths({
