@@ -1,0 +1,18 @@
+{
+  "browser": "Chrome",
+  "activeReload": true,
+  "settledReload": true,
+  "composerSubmissions": 2,
+  "http5xx": 0,
+  "runs": 2,
+  "physicalExecutions": 1,
+  "runningToolVisible": true,
+  "stableToolIdentity": true,
+  "coldApiRestart": true,
+  "coldWorkerContinuation": true,
+  "modelCalls": [2, 1],
+  "coldPriorEntries": 5,
+  "legacyNativeRowsAdded": 0,
+  "finishRollbackVerified": true,
+  "cleanupVerified": true
+}

@@ -1,3 +1,4 @@
+import { rootCompaction } from "./root-input-reads.ts";
 import { receivingConversationRunId } from "@pi-cloud/runtime-core/run-readiness";
 import type { Database } from "@pi-cloud/database";
 import type { Kysely, Selectable } from "kysely";
@@ -43,7 +44,11 @@ const unavailable = () =>
 
 export class ConversationCompactService {
   constructor(
-    readonly options: { database: Kysely<Database>; backendFactory?: NativeInputBackendFactory },
+    readonly options: {
+      rootMessageHistory?: boolean;
+      database: Kysely<Database>;
+      backendFactory?: NativeInputBackendFactory;
+    },
   ) {}
   async get(
     tenantId: string,
@@ -65,7 +70,7 @@ export class ConversationCompactService {
         const native =
           session.pi_conversation_id === null
             ? undefined
-            : await readNativeCompaction(
+            : await (this.options.rootMessageHistory ? rootCompaction : readNativeCompaction)(
                 db,
                 {
                   tenantId,
@@ -138,7 +143,9 @@ export class ConversationCompactService {
       async ({ transaction: db, session, hasAcceptedRun, acceptInitial }) => {
         if (hasAcceptedRun) return { cold: await acceptInitial() };
         if (session.pi_conversation_id !== null) {
-          const native = await readNativeCompaction(
+          const native = await (
+            this.options.rootMessageHistory ? rootCompaction : readNativeCompaction
+          )(
             db,
             {
               tenantId,

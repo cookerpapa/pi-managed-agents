@@ -28,7 +28,7 @@ export type HistoryTurnSource = {
   frozen?: boolean;
   through?: { sequence: number; ordinal: number };
 };
-type Point = {
+export type HistoryWindowPoint = {
   id: string;
   seq: string;
   ordinal: number;
@@ -160,7 +160,7 @@ async function readLiveHistoryWindow(
     .execute();
   const terminals = new Map(terminalRows.map((r) => [r.turn_id, r]));
   const metadataByTurn = new Map(metadata.map((r) => [r.turn_id, r]));
-  const points = await sql<Point>`with scopes as (
+  const points = await sql<HistoryWindowPoint>`with scopes as (
     select r.*,s.pi_session_id,p.turn_index,p.scope_sequence,p.scope_ordinal,
       exists(select 1 from session_terminal_events terminal where terminal.tenant_id=r.tenant_id and terminal.turn_id=r.turn_id) as ended
     from unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.originSessionId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]) with ordinality p(turn_id,session_id,scope_sequence,scope_ordinal,turn_index)
@@ -209,21 +209,7 @@ async function readLiveHistoryWindow(
   ) a on true
   left join pi_durable_log ab on ab.tenant_id=${input.tenantId}::uuid and ab.session_id=b.pi_session_id and ab.seq=coalesce(exact.seq,a.seq) and ab.ordinal=coalesce(exact.ordinal,a.ordinal)
   order by b.turn_index,b.seq ${order},b.ordinal ${order}`.execute(db);
-  const selected: Point[] = [];
-  let bytes = 0;
-  for (const p of points.rows) {
-    const human = p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) * 4 : 0;
-    const cost = p.body_bytes + p.assistant_bytes + human + 1024;
-    if (
-      selected.length >= (input.maxRecords ?? HISTORY_PAGE_RECORDS) ||
-      bytes + cost > (input.maxBytes ?? HISTORY_PAGE_BYTES)
-    )
-      break;
-    bytes += cost;
-    selected.push(p);
-  }
-  if (!selected.length && points.rows.length && !input.allowEmpty)
-    throw new Error("History record exceeds the native presentation page boundary");
+  const { selected, bytes } = selectHistoryPoints(points.rows, input);
   const bodyPoints = selected.filter((p) => !p.header);
   const rows = bodyPoints.length
     ? await sql<
@@ -304,10 +290,6 @@ async function readLiveHistoryWindow(
     }
     humanEntries.set(scope, map);
   }
-  const ordered = input.direction === "before" ? [...selected].reverse() : selected;
-  const result = new Map<string, ConversationTurnTranscriptResource>();
-  const positions: HistoryPosition[] = [];
-  const headers = new Set<string>();
   const boundary = (id: string) => {
     const meta = metadataByTurn.get(id)!,
       terminal = terminals.get(id);
@@ -322,6 +304,57 @@ async function readLiveHistoryWindow(
           occurredAt: new Date().toISOString(),
         };
   };
+  return renderHistoryPoints(
+    input,
+    points.rows,
+    selected,
+    bytes,
+    rows.rows,
+    dependencies.rows,
+    humanEntries,
+    boundary,
+  );
+}
+
+export function selectHistoryPoints(
+  points: readonly HistoryWindowPoint[],
+  input: HistoryWindowInput,
+) {
+  const selected: HistoryWindowPoint[] = [];
+  let bytes = 0;
+  for (const p of points) {
+    const human = p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) * 4 : 0;
+    const cost = p.body_bytes + p.assistant_bytes + human + 1024;
+    if (
+      selected.length >= (input.maxRecords ?? HISTORY_PAGE_RECORDS) ||
+      bytes + cost > (input.maxBytes ?? HISTORY_PAGE_BYTES)
+    )
+      break;
+    bytes += cost;
+    selected.push(p);
+  }
+  if (!selected.length && points.length && !input.allowEmpty)
+    throw new Error("History record exceeds the native presentation page boundary");
+  return { selected, bytes };
+}
+
+export function renderHistoryPoints(
+  input: HistoryWindowInput,
+  points: readonly HistoryWindowPoint[],
+  selected: HistoryWindowPoint[],
+  bytes: number,
+  rows: readonly (NativeHistoryRow & { ordinal: number })[],
+  dependencies: readonly NativeHistoryRow[],
+  humanEntries: ReadonlyMap<
+    string,
+    ReadonlyMap<string, { inputId: string; text: string; uploads: UserUpload[] }>
+  >,
+  boundary: (turnId: string) => Parameters<typeof projectDurableTranscript>[1],
+): CanonicalHistoryWindow {
+  const ordered = input.direction === "before" ? [...selected].reverse() : selected;
+  const result = new Map<string, ConversationTurnTranscriptResource>();
+  const positions: HistoryPosition[] = [];
+  const headers = new Set<string>();
   for (const p of ordered) {
     const position: HistoryPosition = {
       version: 2,
@@ -337,14 +370,12 @@ async function readLiveHistoryWindow(
       headers.add(p.turn_id);
       continue;
     }
-    const row = rows.rows.find(
+    const row = rows.find(
       (r) => r.pi_session_id === p.pi_session_id && r.seq === p.seq && r.ordinal === p.ordinal,
     );
     if (!row) throw new Error("History body position disappeared");
     const dependency = p.assistant_id
-      ? dependencies.rows.find(
-          (r) => r.pi_session_id === p.pi_session_id && r.id === p.assistant_id,
-        )
+      ? dependencies.find((r) => r.pi_session_id === p.pi_session_id && r.id === p.assistant_id)
       : undefined;
     if (p.assistant_id && !dependency) throw new Error("Tool assistant dependency is missing");
     const projected = projectDurableTranscript(
@@ -372,9 +403,9 @@ async function readLiveHistoryWindow(
     transcripts: result,
     positions,
     headers,
-    more: selected.length < points.rows.length,
+    more: selected.length < points.length,
     bytes,
     lastContinues:
-      selected.length > 0 && points.rows[selected.length]?.turn_id === selected.at(-1)!.turn_id,
+      selected.length > 0 && points[selected.length]?.turn_id === selected.at(-1)!.turn_id,
   };
 }

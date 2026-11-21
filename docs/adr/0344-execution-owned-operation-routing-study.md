@@ -109,3 +109,22 @@ on the experiment branch. Serving compositions use their existing defaults.
 Keep the reader byte budget and sender capacity fixed across the trials.
 The mixed trace includes a capture whose Storage commits await actual RF3
 publication. [Measurements](../reports/display-tool-batching-20261121.md).
+
+### Normal root conversation, isolated matched composition
+
+For the next slice use one Session consumer and one native projection in the
+isolated composition. The public Session API registers Runs as usual. Read
+ordinary root history from those Run headers and bounded candidate message
+windows, inside the same repeatable-read transaction as the coverage cursor.
+Keep links to the originating assistant Entry and Tool task on the pending
+operation and resulting message so pagination can resolve inputs without
+copying argument bodies. Publish live events only after native admission.
+Co-commit normal settlement, the candidate history head and partition
+progress with the control-plane terminal and writer release. A cold Worker
+loads the settled root prefix for the next Run. Do not populate legacy native
+or frozen-history tables for this path. Fork and child read models, other
+control actions and production deployment remain separately gated.
+
+The ordinary root candidate keeps a bounded navigation caption on the same message row and uses Pi’s existing caption rules. The sidebar selects eligible rows before transferring captions. Full native text and tool output stay outside the navigation query.
+
+The isolated Session topic uses the candidate’s seven-day broker retention. The pending-tool reference supplies the original mailbox offset to the existing reply-retention policy. The deployed Session topic retains its separate cutoff rules.

@@ -1,3 +1,4 @@
+import { rootSubmission, rootHumanInputs, rootInputMetadata } from "./root-input-reads.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { sql, type Kysely, type Selectable } from "kysely";
 import type { Database } from "@pi-cloud/database";
@@ -88,6 +89,7 @@ export class QueuedInputService {
   constructor(
     readonly options: {
       database: Kysely<Database>;
+      rootMessageHistory?: boolean;
       backendFactory?: NativeInputBackendFactory;
       confirmations?: InputConfirmationPort;
     },
@@ -111,7 +113,9 @@ export class QueuedInputService {
       .executeTakeFirst();
     if (run) return { status: "accepted" };
     if (session.pi_conversation_id !== null) {
-      const submitted = await readNativeHumanSubmission(
+      const submitted = await (
+        this.options.rootMessageHistory ? rootSubmission : readNativeHumanSubmission
+      )(
         db,
         {
           tenantId,
@@ -278,7 +282,13 @@ export class QueuedInputService {
       conversationId: Number(session.pi_conversation_id),
       runId: expected.runId,
     };
-    const metadata = (await readHumanInputMetadataBatch(db, scope, [scope])).get(expected.runId);
+    const metadata = (
+      await (this.options.rootMessageHistory ? rootInputMetadata : readHumanInputMetadataBatch)(
+        db,
+        scope,
+        [scope],
+      )
+    ).get(expected.runId);
     const receipt =
       expected.action === "submit"
         ? metadata?.inputs[expected.operationId]
@@ -287,10 +297,14 @@ export class QueuedInputService {
     if (receipt.fingerprint !== expected.fingerprint)
       throw new ControlPlaneStoreError("idempotency_conflict", "Input operation identity changed");
     if (expected.action === "submit") {
-      const submitted = await readNativeHumanSubmission(db, scope, expected.operationId);
+      const submitted = await (
+        this.options.rootMessageHistory ? rootSubmission : readNativeHumanSubmission
+      )(db, scope, expected.operationId);
       if (submitted?.runId !== expected.runId) return;
     }
-    const stored = await readNativeHumanInputs(db, scope);
+    const stored = await (
+      this.options.rootMessageHistory ? rootHumanInputs : readNativeHumanInputs
+    )(db, scope);
     return {
       replayed: true,
       ...(expected.action === "submit"
@@ -369,14 +383,16 @@ export class QueuedInputService {
             sessionId: session.pi_session_id,
             conversationId: Number(session.pi_conversation_id),
           };
-          const previous = await readNativeHumanSubmission(tx, scope, inputId);
+          const previous = await (
+            this.options.rootMessageHistory ? rootSubmission : readNativeHumanSubmission
+          )(tx, scope, inputId);
           if (previous?.runId) {
             // A replay needs the immutable receipt, not an Inbox reconstruction.
             // Admission uses READ COMMITTED: a separate head/read sequence can
             // straddle a Worker commit that replaces latest-only document state.
-            const metadata = await readHumanInputMetadataBatch(tx, scope, [
-              { runId: previous.runId, conversationId: scope.conversationId },
-            ]);
+            const metadata = await (
+              this.options.rootMessageHistory ? rootInputMetadata : readHumanInputMetadataBatch
+            )(tx, scope, [{ runId: previous.runId, conversationId: scope.conversationId }]);
             const record = metadata.get(previous.runId)?.inputs[inputId];
             if (!record || record.fingerprint !== fingerprint)
               throw new ControlPlaneStoreError("idempotency_conflict", "Input identity was reused");
@@ -474,7 +490,13 @@ export class QueuedInputService {
     sessionId: string,
     page: { afterPosition?: number; revision?: string } = {},
   ) {
-    return readInputQueue(this.options.database, tenantId, sessionId, page);
+    return readInputQueue(
+      this.options.database,
+      tenantId,
+      sessionId,
+      page,
+      this.options.rootMessageHistory,
+    );
   }
 
   async mutate(
@@ -496,10 +518,14 @@ export class QueuedInputService {
       sessionId: session.pi_session_id,
       conversationId: Number(session.pi_conversation_id),
     };
-    const submission = await readNativeHumanSubmission(this.options.database, scope, inputId);
+    const submission = await (
+      this.options.rootMessageHistory ? rootSubmission : readNativeHumanSubmission
+    )(this.options.database, scope, inputId);
     const target = await this.#run(this.options.database, tenantId, sessionId, submission?.runId);
     if (!target) conflict("Input target is unavailable");
-    const stored = await readNativeHumanInputs(this.options.database, {
+    const stored = await (
+      this.options.rootMessageHistory ? rootHumanInputs : readNativeHumanInputs
+    )(this.options.database, {
       ...scope,
       runId: target.id,
     });

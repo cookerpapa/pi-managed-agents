@@ -1,3 +1,4 @@
+import { rootHumanInputs, rootQueueHead } from "./root-input-reads.ts";
 import { receivingConversationRunId } from "@pi-cloud/runtime-core/run-readiness";
 import { createHash } from "node:crypto";
 import type { Database } from "@pi-cloud/database";
@@ -33,12 +34,13 @@ export async function readInputQueue(
   tenantId: string,
   sessionId: string,
   page: { afterPosition?: number; revision?: string } = {},
+  rootMessageHistory = false,
 ): Promise<InputQueueResource> {
   if (!database.isTransaction)
     return database
       .transaction()
       .setIsolationLevel("repeatable read")
-      .execute((tx) => readInputQueue(tx, tenantId, sessionId, page));
+      .execute((tx) => readInputQueue(tx, tenantId, sessionId, page, rootMessageHistory));
   const afterPosition = page.afterPosition ?? 0;
   if (
     !Number.isSafeInteger(afterPosition) ||
@@ -88,7 +90,7 @@ export async function readInputQueue(
   const scope = { tenantId, sessionId: session.pi_session_id };
   const native =
     latest && session.pi_conversation_id !== null
-      ? await readNativeHumanInputs(database, {
+      ? await (rootMessageHistory ? rootHumanInputs : readNativeHumanInputs)(database, {
           ...scope,
           conversationId: Number(session.pi_conversation_id),
           runId: latest.id,
@@ -96,7 +98,9 @@ export async function readInputQueue(
       : {
           items: [],
           revision: EMPTY_QUEUE_REVISION,
-          nativeSequence: (await new DurablePostgresProjection(database, scope).head()).seq,
+          nativeSequence: rootMessageHistory
+            ? await rootQueueHead(database, scope)
+            : (await new DurablePostgresProjection(database, scope).head()).seq,
         };
   const revision = `${native.revision}.${pgInputRevision(pending)}`;
   if (page.revision !== undefined && page.revision !== revision)

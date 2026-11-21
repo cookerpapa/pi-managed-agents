@@ -14,7 +14,9 @@ const output = process.argv[2],
   bashFields = process.argv[3] === "--bash-fields",
   atomicHandoff = process.argv[3] === "--atomic-handoff",
   pgHandoff = atomicHandoff || bashFields || process.argv[3] === "--pg-handoff",
-  serving = pgHandoff || process.argv[3] === "--serving";
+  browser = process.argv[3] === "--normal-root-web",
+  normalRoot = browser || process.argv[3] === "--normal-root",
+  serving = normalRoot || pgHandoff || process.argv[3] === "--serving";
 let isolatedKafka;
 assert(output && process.env.PI_CLOUD_RUNTIME_LOAD_CHECK === "1");
 process.umask(0o077);
@@ -34,6 +36,7 @@ try {
       atomicHandoff,
       pgHandoff,
       bashFields,
+      browser,
       scene: process.argv[4],
     }),
     { mode: 0o600 },
@@ -70,17 +73,32 @@ try {
     "--import",
     "tsx",
     "scripts/experiments/minimal-session-storage/" +
-      (serving ? "serving-family-study" : "retained-family-study") +
+      (normalRoot
+        ? "normal-root-study"
+        : serving
+          ? "serving-family-study"
+          : "retained-family-study") +
       ".mjs",
     "/study/config",
     "/study/report.json",
   ];
   const p = spawn("docker", args, { stdio: "inherit" });
-  const code = await new Promise((r, j) => {
+  const exited = new Promise((r, j) => {
     p.once("error", j);
     p.once("exit", r);
   });
-  assert.equal(code, 0, "Isolated family handoff failed");
+  let web;
+  if (browser) {
+    web = (await import("./normal-root-browser.mjs")).verifyRootBrowser(tmp);
+    void web.catch(() => {});
+  }
+  const code = await exited;
+  if (browser && code !== 0)
+    await (
+      await import("./browser-signals.mjs")
+    ).browserNote(tmp, "failure", { message: "Isolated Session service exited" });
+  if (web) await web;
+  assert.equal(code, 0, "Isolated Session acceptance failed");
   await writeFile(output, await readFile(join(tmp, "report.json")), { mode: 0o600 });
 } finally {
   try {

@@ -132,6 +132,7 @@ export class WorkspaceOperationRouter {
     }
     const candidate = {
       ...record,
+      rootPresentation: this.env.stage?.rootPresentation === true,
       fact: { ...f, tools, cancellations: cancels.map(({ op }) => op) },
       workspaceBatch: true,
     };
@@ -215,6 +216,9 @@ export class WorkspaceOperationRouter {
   }
   async consume(record, current, grant, mark) {
     const prepared = await this.projectOperation(record, current, mark);
+    return this.dispatch(prepared, record, current, grant, mark);
+  }
+  async dispatch(prepared, record, current, grant, mark) {
     if (!prepared) return;
     const { commands, cancels } = prepared;
     for (const { op, original } of cancels) {

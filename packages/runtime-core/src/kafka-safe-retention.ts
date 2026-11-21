@@ -46,8 +46,14 @@ export async function acceptedFactRetentionFloors(
   return new Map(result.rows.map((r) => [r.partition, r.floor === null ? null : BigInt(r.floor)]));
 }
 
-/** Kafka performs physical deletion; cloud only supplies a safe low-water mark.
- * A stopped projector/PG outage retains accepted data, even beyond the grace. */
+export type BrokerTimedSessionRetention = {
+  replyFloors(
+    database: Kysely<Database>,
+    topics: string[],
+  ): Promise<{ rows: { topic: string; floor: string }[] }>;
+};
+/** The deployed Session log uses PG recovery floors. A broker-timed Session
+ * log delegates segment expiry to Kafka. Both policies protect pending replies. */
 export class KafkaSafeRetention {
   readonly #admin: Pick<
     Admin,
@@ -60,6 +66,7 @@ export class KafkaSafeRetention {
     | "close"
   >;
   readonly #database: Kysely<Database>;
+  readonly #brokerTimed: BrokerTimedSessionRetention | undefined;
   readonly #topic: string;
   readonly #graceMs: number;
   #partitions: number[] = [];
@@ -72,6 +79,7 @@ export class KafkaSafeRetention {
     topic: string;
     clientId: string;
     graceMs: number;
+    brokerTimed?: BrokerTimedSessionRetention;
     admin?: Pick<
       Admin,
       | "listOffsets"
@@ -84,6 +92,7 @@ export class KafkaSafeRetention {
     >;
   }) {
     this.#database = options.database;
+    this.#brokerTimed = options.brokerTimed;
     this.#topic = options.topic;
     this.#graceMs = options.graceMs;
     this.#admin =
@@ -113,7 +122,7 @@ export class KafkaSafeRetention {
     }, 60_000);
     this.#timer.unref();
   }
-  async sweep(now = Date.now()) {
+  async #trimSession(now: number) {
     const offsets = (timestamp: bigint) =>
       this.#admin.listOffsets({
         topics: [
@@ -143,6 +152,9 @@ export class KafkaSafeRetention {
     });
     if (targets.length)
       await this.#admin.deleteRecords({ topics: [{ name: this.#topic, partitions: targets }] });
+  }
+  async sweep(now = Date.now()) {
+    if (!this.#brokerTimed) await this.#trimSession(now);
     // Only positively retired Worker boots are eligible; neither a missed
     // heartbeat nor the absence of a consumer is evidence that a mailbox is dead.
     const replyTopics = (await this.#admin.listTopics()).filter((name) =>
@@ -164,7 +176,9 @@ export class KafkaSafeRetention {
     ]);
     const replyHigh = new Map(replyEnds.map((t) => [t.name, t.partitions[0]?.offset]));
     const pendingReplies = replyTopics.length
-      ? await sql<{ topic: string; floor: string }>`
+      ? this.#brokerTimed
+        ? await this.#brokerTimed.replyFloors(this.#database, replyTopics)
+        : await sql<{ topic: string; floor: string }>`
       select fields->>'replyTopic' as topic,min((fields->>'replyOffset')::bigint)::text as floor
       from pi_durable_owned_records
       where kind='task' and fields ? 'replyTopic' and fields->>'status'<>'terminal'

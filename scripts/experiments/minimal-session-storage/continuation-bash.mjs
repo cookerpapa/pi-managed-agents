@@ -6,14 +6,16 @@ import { awaitWithContext } from "@earendil-works/chord/context";
 import { durableToolState } from "@pi-cloud/protocol";
 import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 
-export function continuationBash(mailbox, runId, measurement) {
+export function continuationBash(mailbox, runId, measurement, fixedCommand) {
   assert.match(runId, /^[a-f0-9-]{36}$/);
   let operation;
   const controller = new AbortController();
   const read = "printf '%s\\n' " + runId + " >> executions && pwd -P && cat marker";
-  const command = measurement
-    ? "began=$EPOCHREALTIME; " + read + ' && printf "%s %s\\n" "$began" "$EPOCHREALTIME"'
-    : read;
+  const command =
+    fixedCommand ??
+    (measurement
+      ? "began=$EPOCHREALTIME; " + read + ' && printf "%s %s\\n" "$began" "$EPOCHREALTIME"'
+      : read);
   return {
     command,
     async intents(writes) {

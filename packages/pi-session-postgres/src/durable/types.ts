@@ -68,6 +68,33 @@ export const documentAddress = (record: {
   ]);
 export const currentOnly = (record: DocumentRecord): boolean =>
   record.scope.kind !== "conversation" || record.history === "latest";
+export function nativeNavigation(entry: EntryRecord) {
+  const visible = entry.model?.find(
+    (message) => message.role === "user" || message.role === "assistant",
+  );
+  const navigation =
+    entry.kind === "pi.compaction"
+      ? "none"
+      : visible?.role === "user"
+        ? "user"
+        : visible?.role === "assistant" &&
+            typeof visible.stopReason === "string" &&
+            !["toolUse", "error", "aborted", "pending", "deferred"].includes(visible.stopReason)
+          ? "assistant"
+          : "none";
+  if (navigation !== "none" && visible) {
+    const text =
+      typeof visible.content === "string"
+        ? visible.content
+        : visible.content
+            .filter((part): part is Extract<typeof part, { type: "text" }> => part.type === "text")
+            .map((part) => part.text)
+            .join("\n");
+    // Disposable navigation captions, never model content or a transcript copy.
+    return { navigation, preview: text.slice(0, 256).replace(/[\u0000\uD800-\uDFFF]/gu, "\uFFFD") };
+  }
+  return { navigation };
+}
 export function indexNative(
   kind: DurableRecordKind,
   value: NativeRecord,
@@ -108,32 +135,7 @@ export function indexNative(
       fields.nativeKind = JSON.stringify(entry.kind);
       if (entry.byTaskId !== undefined) fields.task = String(entry.byTaskId);
       if (entry.model?.[0]) fields.role = entry.model[0].role;
-      const visible = entry.model?.find(
-        (message) => message.role === "user" || message.role === "assistant",
-      );
-      fields.navigation =
-        entry.kind === "pi.compaction"
-          ? "none"
-          : visible?.role === "user"
-            ? "user"
-            : visible?.role === "assistant" &&
-                typeof visible.stopReason === "string" &&
-                !["toolUse", "error", "aborted", "pending", "deferred"].includes(visible.stopReason)
-              ? "assistant"
-              : "none";
-      if (fields.navigation !== "none" && visible) {
-        const text =
-          typeof visible.content === "string"
-            ? visible.content
-            : visible.content
-                .filter(
-                  (part): part is Extract<typeof part, { type: "text" }> => part.type === "text",
-                )
-                .map((part) => part.text)
-                .join("\n");
-        // Disposable navigation captions, never model content or a transcript copy.
-        fields.preview = text.slice(0, 256).replace(/[\u0000\uD800-\uDFFF]/gu, "\uFFFD");
-      }
+      Object.assign(fields, nativeNavigation(entry));
       if (entry.head !== undefined) fields.head = String(entry.head);
     } else if (kind === "submission") {
       const submission = record as SubmissionRecord;

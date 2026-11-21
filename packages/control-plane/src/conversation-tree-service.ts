@@ -1,3 +1,7 @@
+import {
+  rootMessageNavigation,
+  rootMessageTurns,
+} from "@pi-cloud/runtime-core/root-message-history";
 import { replacePrunedHistory } from "./conversation-history-retention.ts";
 import { freezeForkHistory } from "@pi-cloud/runtime-core/frozen-history";
 import { unbindSessionTargets } from "./unbind-session-targets.ts";
@@ -194,7 +198,7 @@ async function sessionBindings(
   if (sessionIds.length === 0) return [];
   return database
     .selectFrom("sessions as session")
-    .leftJoin("subagent_executions as execution", (join) =>
+    .leftJoin("subagent_conversations as execution", (join) =>
       join
         .onRef("execution.tenant_id", "=", "session.tenant_id")
         .onRef("execution.child_session_id", "=", "session.id"),
@@ -253,6 +257,7 @@ function conversationLeaves(
 export class ConversationTreeService {
   readonly #database: Kysely<Database>;
   readonly #readDatabase: Kysely<Database>;
+  readonly #rootMessageHistory: boolean;
   readonly #idGenerator: () => string;
   readonly #onForkTiming:
     ((stage: "native" | "presentation" | "images", milliseconds: number) => void) | undefined;
@@ -260,10 +265,12 @@ export class ConversationTreeService {
   constructor(options: {
     database: Kysely<Database>;
     readDatabase?: Kysely<Database>;
+    rootMessageHistory?: boolean;
     idGenerator?: () => string;
     onForkTiming?: (stage: "native" | "presentation" | "images", milliseconds: number) => void;
   }) {
     this.#database = options.database;
+    this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#readDatabase = options.readDatabase ?? options.database;
     this.#idGenerator = options.idGenerator ?? randomUUID;
     this.#onForkTiming = options.onForkTiming;
@@ -427,7 +434,13 @@ export class ConversationTreeService {
       ]
         .filter((id): id is string => id !== null && id !== undefined)
         .map(Number);
-      const page = await readNavigationEntries(database, {
+      const source =
+        this.#rootMessageHistory &&
+        Number(binding.piConversationId) === 1 &&
+        humanSessions.some((s) => s.id === binding.productSessionId && s.parentSessionId === null)
+          ? rootMessageNavigation
+          : readNavigationEntries;
+      const page = await source(database, {
         tenantId,
         sessionId: binding.piSessionId,
         conversationId: Number(binding.piConversationId),
@@ -480,10 +493,15 @@ export class ConversationTreeService {
         ),
       ),
     ];
+    const rootOnly =
+      this.#rootMessageHistory &&
+      !historyDelegates.length &&
+      humanSessions.every((s) => s.parentSessionId === null) &&
+      !selectedDelegated;
     const turnRows = visibleTurnIds.length
       ? (
           await sql<CompletedTurnRow>`select session_id as "sessionId",turn_id as "turnId",mailbox_position::text as "mailboxPosition"
-      from pi_history_turns where tenant_id=${tenantId}::uuid and session_id=any(${uniqueSessionIds}::uuid[])
+      from ${rootOnly ? rootMessageTurns : sql`pi_history_turns`} where tenant_id=${tenantId}::uuid and session_id=any(${uniqueSessionIds}::uuid[])
         and turn_id=any(${visibleTurnIds}::uuid[]) and state='completed' and not waiting_for_seal`.execute(
             database,
           )
@@ -715,6 +733,7 @@ export class ConversationTreeService {
     const loaded = await loadDelegatedSessionTreeSummaries(database, {
       tenantId,
       rootParentSessionIds: initialParentSessionIds,
+      rootMessageHistory: this.#rootMessageHistory,
       maximum: MAX_TREE_DELEGATIONS,
     });
     if (loaded.truncated) {

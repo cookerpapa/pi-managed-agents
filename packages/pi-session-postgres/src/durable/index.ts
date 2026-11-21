@@ -17,6 +17,7 @@ export {
   type DurableSessionOpen,
   type ManagedNativeRuntime,
 } from "./session-host.ts";
+export { nativeNavigation } from "./types.ts";
 export type { DurableBatch, StoredDurableBatch, DurableScope } from "./types.ts";
 export { readDurableEntries, forkIdleConversation, type StoredHistoryEntry } from "./history.ts";
 export { importForkHistory } from "./history-import.ts";
@@ -28,6 +29,7 @@ export {
   readHumanInputMetadataBatch,
   nativeHumanQueueRevision,
   emptyHumanInputs,
+  materializeHumanQueue,
   type StoredHumanInputs,
   type StoredHumanInput,
 } from "./human-inputs.ts";
@@ -45,6 +47,7 @@ export {
 export {
   readHumanInputPresentation,
   humanPresentationSliceCharacters,
+  firstJsonObject,
 } from "./human-input-presentation.ts";
 export { readNavigationEntries, type NavigationEntry } from "./navigation.ts";
 

@@ -558,3 +558,21 @@ and child histories, queued input placement, physical execution count, and
 removal of the handoff after closure. A second Guest witnesses exact cancellation
 in the Stop case. Neither the deployed Worker configuration nor its live
 Projector is switched by this command.
+
+### Ordinary root from the web composer
+
+Use the operator fixture above with an available Cube/KVM runtime and Chrome:
+
+```bash
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx \
+  scripts/experiments/minimal-session-storage/run-retained-family.mjs \
+  /private/normal-root.json --normal-root-web
+```
+
+Set `PI_CLOUD_RUNTIME_DIRECTORY` to the existing deployment runtime directory
+if running from a separate worktree. The isolated API uses a temporary tenant,
+disposable PG and an isolated Session broker. A real Guest sends its reply on
+the deployment's Kafka cluster using fixture-owned boot topics. Only this test's
+topics and groups are removed. Use `--normal-root` for the HTTP variant, which
+also retries the original input with the same idempotency key. See the
+[acceptance report](../../../docs/reports/normal-root-message-store-20261122.md).

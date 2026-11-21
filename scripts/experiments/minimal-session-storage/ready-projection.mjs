@@ -1,3 +1,4 @@
+import { foldRootPresentation } from "./root-presentation-frame.mjs";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import {
@@ -302,6 +303,7 @@ export class ReadyProjection {
         if (view && !draft.frame.rejected && f.kind === "durable_commit") {
           if (this.persistUsage !== undefined)
             coCommittedUsage(view, f, draft.frame, this.persistUsage && !covered);
+          if (r.rootPresentation) foldRootPresentation(view, f, draft.frame);
           view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
           if (covered && owner?.projection_pin != null)
             view.pinOffset = BigInt(owner.projection_pin);
@@ -312,6 +314,7 @@ export class ReadyProjection {
             f,
             r.offset,
             r.workspaceBatch,
+            r.rootPresentation,
           );
           if (f.tools?.length && !registered)
             throw new Error(
@@ -359,6 +362,23 @@ export class ReadyProjection {
             replayableMetadata(draft.frame, f) ||
             (registered && !draft.frame.strict && !draft.frame.anchor);
         }
+      }
+      if (r.rootPresentation && !covered && !draft.frame.rejected && draft.frame.ops.length) {
+        const shown = f.display.flatMap((d) => [
+          d.coveredThrough ?? 0,
+          ...d.events
+            .filter((e) => e.event.type === "tool.started" || e.event.type === "tool.completed")
+            .map((e) => e.event.seq),
+        ]);
+        if (opened || shown.length)
+          draft.frame.rootDisplay = {
+            tenant: f.scope.tenantId,
+            session: f.scope.piSessionId,
+            run: f.scope.runId,
+            writer: f.scope.writerId,
+            through: Math.max(0, ...shown),
+            seq: f.commit.seq,
+          };
       }
       if (intentPrefix) {
         assert(

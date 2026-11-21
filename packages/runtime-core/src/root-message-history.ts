@@ -1,0 +1,266 @@
+import {
+  firstJsonObject,
+  humanPresentationSliceCharacters,
+  type StoredHumanInput,
+} from "@pi-cloud/pi-session-postgres/durable";
+// Ordinary root Sessions in the matched message-store composition.
+import { sql, type Kysely } from "kysely";
+import type { Database } from "@pi-cloud/database";
+import { HISTORY_PAGE_RECORDS, parseUserUploads, type UserUpload } from "@pi-cloud/protocol";
+import type { HistoryHeader, HistoryTurnRow } from "./frozen-history.ts";
+import {
+  renderHistoryPoints,
+  selectHistoryPoints,
+  type HistoryWindowInput,
+  type HistoryWindowPoint,
+} from "./canonical-history-window.ts";
+import { terminalMetadata, type NativeHistoryRow } from "./native-transcript-presentation.ts";
+
+export const rootMessageTurns = sql<HistoryTurnRow>`(select r.tenant_id,r.session_id,r.session_id as origin_session_id,r.turn_id,r.id as run_id,s.pi_session_id,
+  r.mailbox_position,r.operation_kind,r.state,r.stop_reason,r.output_display_seq,r.output_display_native_seq,
+  (r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
+  from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id where r.pruned_at is null and s.pruned_at is null
+    and (r.state<>'queued' or r.operation_kind='compact') and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)) root_turns`;
+
+export async function rootMessageHeaders(
+  db: Kysely<Database>,
+  tenant: string,
+  session: string,
+  ids: readonly string[],
+) {
+  if (!ids.length) return new Map<string, HistoryHeader>();
+  const rows = await sql<
+    HistoryHeader & { turn_id: string }
+  >`select turn_id,input_text,null::text as input_source,input_uploads,scheduled_origin,output_display_seq
+    from runs where tenant_id=${tenant}::uuid and session_id=${session}::uuid and turn_id=any(${[...ids]}::uuid[]) and pruned_at is null`.execute(
+    db,
+  );
+  return new Map(rows.rows.map((r) => [r.turn_id, r]));
+}
+
+export async function rootMessagePosition(
+  db: Kysely<Database>,
+  tenant: string,
+  turn: HistoryTurnRow,
+  kind: "entry" | "task",
+  id: string,
+) {
+  return (
+    await sql<{ seq: string; ordinal: number }>`select * from (
+    select commit_seq as seq,ordinal from messages where tenant_id=${tenant}::uuid and run_id=${turn.run_id}::uuid and pi_session_id=${turn.pi_session_id} and conversation_id=1
+      and ${kind === "entry" ? sql`entry_id` : sql`tool_task_id`}=${id}::bigint
+    ${
+      kind === "task"
+        ? sql`union all select (v->>'seq')::bigint,(v->>'ordinal')::int from runs r cross join lateral jsonb_each(r.projection_tools) t(k,v)
+      where r.id=${turn.run_id}::uuid and r.tenant_id=${tenant}::uuid and k=${id} and v->>'conversationId'='1'`
+        : sql``
+    }
+  ) refs order by seq desc,ordinal desc limit 1`.execute(db)
+  ).rows[0];
+}
+
+export async function readRootMessageWindow(db: Kysely<Database>, input: HistoryWindowInput) {
+  if (!input.turns.length)
+    return {
+      transcripts: new Map(),
+      positions: [],
+      headers: new Set<string>(),
+      more: false,
+      bytes: 0,
+      lastContinues: false,
+    };
+  const order = sql.raw(input.direction === "before" ? "desc" : "asc"),
+    compare = sql.raw(
+      input.direction === "before" ? (input.inclusive ? "<=" : "<") : input.inclusive ? ">=" : ">",
+    ),
+    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]) with ordinality t(turn_id,through_seq,through_ordinal,turn_index)
+      join runs r on r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid and r.turn_id=t.turn_id and r.pruned_at is null
+      join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id and s.pruned_at is null`,
+    bound = (
+      seq: ReturnType<typeof sql.raw>,
+      ord: ReturnType<typeof sql.raw>,
+    ) => sql`and (${seq},${ord}) <= (t.through_seq,t.through_ordinal)
+        ${input.position ? sql`and (r.turn_id<>${input.position.turnId}::uuid or (${seq},${ord}) ${compare} (${input.position.sequence}::bigint,${input.position.ordinal}::int))` : sql``}`,
+    limit = (input.maxRecords ?? HISTORY_PAGE_RECORDS) + 1;
+  const meta = await sql<
+    HistoryWindowPoint & { pending: boolean; run_id: string }
+  >`select p.*,r.id as run_id,r.turn_id,s.pi_session_id,r.session_id as origin_session_id,t.turn_index,
+      coalesce(octet_length(a.content),0) as assistant_bytes
+    from ${scope} cross join lateral (
+      (select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
+        octet_length(m.content) as body_bytes,m.assistant_entry_id::text as assistant_id,
+        case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,false as pending
+        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=1 and m.role not in ('system','pi.system')
+          ${bound(sql.raw("m.commit_seq"), sql.raw("m.ordinal"))}
+        order by m.commit_seq ${order},m.ordinal ${order} limit ${limit})
+      union all select k,(v->>'seq')::bigint,(v->>'ordinal')::int,'{}'::jsonb,octet_length(v::text),v->>'assistantEntryId','"pi.tool"',false,true
+        from jsonb_each(r.projection_tools) q(k,v) where v->>'conversationId'='1'
+        ${bound(sql.raw("(v->>'seq')::bigint"), sql.raw("(v->>'ordinal')::int"))}
+      union all select '0',0,0,'{}'::jsonb,octet_length(r.input_text)+octet_length(r.input_uploads::text),null,null,true,false
+        where true ${bound(sql.raw("0"), sql.raw("0"))}
+    ) p left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.conversation_id=1 and a.run_id=r.id and a.entry_id=p.assistant_id::bigint
+    order by t.turn_index,p.seq ${order},p.ordinal ${order} limit ${limit}`.execute(db);
+  const { selected, bytes } = selectHistoryPoints(meta.rows, input);
+  const picked = meta.rows.slice(0, selected.length).filter((p) => !p.header);
+  type Body = NativeHistoryRow & { ordinal: number };
+  const rows: Body[] = [],
+    dependencies: Body[] = [],
+    humans = new Map<
+      string,
+      Map<string, { inputId: string; text: string; uploads: UserUpload[] }>
+    >();
+  if (picked.length) {
+    const bodies = await sql<{
+      id: string;
+      seq: string;
+      ordinal: number;
+      pi_session_id: string;
+      content: string | null;
+      source_input_id: string | null;
+      human: string | null;
+      native_input_id: string | null;
+      created_at: Date;
+      pending: { arguments: unknown; startedAt: string; reply: { toolCallId: string } } | null;
+      assistant_id: string | null;
+      proposal: string | null;
+    }>`
+      select p.id::text,p.seq::text,p.ordinal,s.pi_session_id,m.content,m.source_input_id,r.root_input_receipts->m.source_input_id->>'id' as native_input_id,case when starts_with(m.source_input_id,'input-') and strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')>0 then
+        substring(r.root_human_inputs from strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')+length(to_json(m.source_input_id)::text)+1 for p.human_limit) end as human,coalesce(m.created_at,r.created_at) as created_at,
+        case when p.pending then r.projection_tools->p.id::text end as pending,a.entry_id::text as assistant_id,a.content as proposal
+      from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
+      join runs r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid
+      join sessions s on s.id=r.session_id and s.tenant_id=r.tenant_id
+      left join messages m on not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid and m.run_id=r.id and m.entry_id=p.id and m.conversation_id=1
+      left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.run_id=r.id and a.entry_id=p.assistant_id and a.conversation_id=1`.execute(
+      db,
+    );
+    for (const r of bodies.rows) {
+      const entry = r.pending
+        ? {
+            kind: "pi.tool",
+            input: { callId: r.pending.reply.toolCallId },
+            state: {
+              status: "running",
+              checkpoint: { phase: "execute", arguments: r.pending.arguments },
+            },
+          }
+        : JSON.parse(r.content!);
+      const row = {
+        id: r.id,
+        seq: r.seq,
+        ordinal: r.ordinal,
+        fields: {},
+        pi_session_id: r.pi_session_id,
+        body: JSON.stringify({ value: entry }),
+        committed_at: r.pending ? new Date(r.pending.startedAt) : r.created_at,
+      };
+      rows.push(row);
+      if (r.assistant_id && r.proposal)
+        dependencies.push({ ...row, id: r.assistant_id, body: '{"value":' + r.proposal + "}" });
+      if (r.source_input_id?.startsWith("input-")) {
+        const human = r.human && (firstJsonObject(r.human) as StoredHumanInput | undefined);
+        if (
+          !human ||
+          typeof human.text !== "string" ||
+          (human.nativeId !== null && String(human.nativeId) !== r.native_input_id)
+        )
+          throw Error("Consumed root input metadata is missing");
+        const collection = humans.get(r.pi_session_id) ?? new Map();
+        collection.set(r.id, {
+          inputId: r.source_input_id,
+          text: human.text,
+          uploads: parseUserUploads(human.uploads),
+        });
+        humans.set(r.pi_session_id, collection);
+      }
+    }
+  }
+  const metadata = await sql<{
+    turn_id: string;
+    coverage: string;
+    created_at: Date;
+    seq: string | null;
+    type: string;
+    payload: Record<string, unknown>;
+    occurred_at: Date;
+  }>`select r.turn_id,r.output_display_seq as coverage,r.created_at,e.seq,e.type,e.payload,e.occurred_at from ${scope}
+      left join lateral(select seq,type,payload,occurred_at from session_terminal_events where tenant_id=r.tenant_id and session_id=r.session_id and turn_id=r.turn_id order by seq desc limit 1)e on true`.execute(
+    db,
+  );
+  const byTurn = new Map(metadata.rows.map((r) => [r.turn_id, r]));
+  return renderHistoryPoints(
+    input,
+    meta.rows,
+    selected,
+    bytes,
+    rows,
+    dependencies,
+    humans,
+    (id) => {
+      const m = byTurn.get(id)!;
+      return m.seq !== null
+        ? terminalMetadata({ ...m, seq: m.seq })
+        : {
+            throughSequence: Number(m.coverage),
+            terminalSequence: null,
+            stopReason: null,
+            failure: null,
+            cancellation: null,
+            occurredAt: m.created_at.toISOString(),
+          };
+    },
+  );
+}
+
+export async function rootMessageNavigation(
+  db: Kysely<Database>,
+  input: {
+    tenantId: string;
+    sessionId: string;
+    conversationId: number;
+    limit: number;
+    from?: number;
+    through?: number;
+    includeIds?: readonly number[];
+  },
+) {
+  const eligible = sql`m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=${input.sessionId}::uuid and m.conversation_id=${input.conversationId}
+    and m.navigation_caption is not null`;
+  const { rows } = await sql<{
+    id: string;
+    seq: string;
+    turn_id: string;
+    role: "assistant" | "user";
+    preview: string;
+    created_at: Date;
+    forced: boolean;
+  }>`with bounded as(
+    (select entry_id,false as forced from messages m where ${eligible} and entry_id between ${input.from ?? 0}::bigint and ${input.through ?? Number.MAX_SAFE_INTEGER}::bigint order by entry_id desc limit ${input.limit + 1})
+    union all (select entry_id,true from messages m where ${eligible} and entry_id=any(${[...(input.includeIds ?? [])]}::bigint[])))
+    select m.entry_id as id,m.commit_seq as seq,m.role,m.created_at,r.turn_id,b.forced,
+      m.navigation_caption as preview
+      from bounded b join messages m on m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=${input.sessionId}::uuid and m.entry_id=b.entry_id
+      join runs r on r.id=m.run_id and r.tenant_id=m.tenant_id and r.pruned_at is null order by m.entry_id desc`.execute(
+    db,
+  );
+  const directional = rows.filter((r) => !r.forced),
+    page = directional.slice(0, input.limit);
+  const entries = [
+    ...new Map(
+      [...page, ...rows.filter((r) => r.forced)].map((r) => [
+        r.id,
+        {
+          id: Number(r.id),
+          seq: Number(r.seq),
+          kind: "pi." + r.role,
+          role: r.role,
+          finalAssistant: r.role === "assistant",
+          text: r.preview ?? "",
+          turnId: r.turn_id,
+          createdAt: r.created_at.toISOString(),
+        },
+      ]),
+    ).values(),
+  ].sort((a, b) => a.id - b.id);
+  return { entries, hasMore: directional.length > input.limit, beforeId: page.at(-1)?.id ?? null };
+}

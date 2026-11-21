@@ -84,6 +84,7 @@ export {
 export type ControlPlaneStoreOptions = {
   database: Kysely<Database>;
   conversationReadDatabase?: Kysely<Database>;
+  rootMessageHistory?: boolean;
   tenantId: string;
   defaultModelProfileId: string;
   idGenerator?: () => string;
@@ -287,6 +288,7 @@ export class ControlPlaneStore {
     this.#conversations = new ConversationReader(
       options.conversationReadDatabase ?? options.database,
       options.tenantId,
+      options.rootMessageHistory,
     );
     this.#database = options.database;
     this.#tenantId = options.tenantId;

@@ -7,6 +7,7 @@ import type { PiCloudMetrics } from "@pi-cloud/observability";
 export class ControlPlaneStoreFactory {
   readonly #database: Kysely<Database>;
   readonly #conversationReadDatabase: Kysely<Database>;
+  readonly #rootMessageHistory: boolean;
   readonly #idGenerator: (() => string) | undefined;
   readonly #environmentImageRevision: string | undefined;
   readonly #metrics: PiCloudMetrics | undefined;
@@ -14,12 +15,14 @@ export class ControlPlaneStoreFactory {
   constructor(options: {
     database: Kysely<Database>;
     conversationReadDatabase?: Kysely<Database>;
+    rootMessageHistory?: boolean;
     idGenerator?: () => string;
     environmentImageRevision?: string;
     metrics?: PiCloudMetrics;
   }) {
     this.#database = options.database;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
+    this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#idGenerator = options.idGenerator;
     this.#environmentImageRevision = options.environmentImageRevision;
     this.#metrics = options.metrics;
@@ -30,6 +33,7 @@ export class ControlPlaneStoreFactory {
       database: this.#database,
       conversationReadDatabase: this.#conversationReadDatabase,
       tenantId: identity.tenantId,
+      rootMessageHistory: this.#rootMessageHistory,
       defaultModelProfileId: identity.defaultModelProfileId,
       ...(this.#environmentImageRevision === undefined
         ? {}

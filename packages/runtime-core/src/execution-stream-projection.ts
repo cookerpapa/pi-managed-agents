@@ -1,5 +1,5 @@
 import { ExecutionStreamBoundary, type BoundaryCacheLimits } from "./execution-stream-boundary.ts";
-import { settleHistoryTurn, settleChildHistory } from "./presentation-settlement.ts";
+import { settleHistoryTurn } from "./presentation-settlement.ts";
 import { transitionLockedRun } from "./run-state.ts";
 import { PostgresDurableCommitProjector } from "./postgres-durable-commit-projector.ts";
 import type { Database } from "@pi-cloud/database";
@@ -16,7 +16,11 @@ import type {
   AcceptedWorkFinishedFact,
   AcceptedFact,
 } from "./accepted-fact.ts";
-import { finishWorkIn } from "./work-finished-projection.ts";
+import {
+  finishWorkIn,
+  settleNativeHistory,
+  type SettleSessionHistory,
+} from "./work-finished-projection.ts";
 import { releaseIdleSessionLease } from "./session-lease-release.ts";
 import type { KafkaAcceptedFactRecord } from "./kafka-accepted-fact-consumer.ts";
 import { recordFactProjection, type FactPosition } from "./accepted-fact-recovery.ts";
@@ -32,6 +36,24 @@ export type RecoverySealCheckpoint = (
   position: FactPosition,
   current: () => boolean,
 ) => Promise<void>;
+
+export type SessionNativeStore = {
+  brokerTimedRetention: import("./kafka-safe-retention.ts").BrokerTimedSessionRetention;
+  controlProjected(position: FactPosition): void;
+  projection: Pick<
+    PostgresDurableCommitProjector,
+    | "reset"
+    | "statistics"
+    | "replay"
+    | "project"
+    | "prepareCoverage"
+    | "closedWriterCleanup"
+    | "checkpointLiveIn"
+    | "releaseSettled"
+  >;
+  replayPlan: typeof import("./accepted-fact-recovery.ts").loadFactReplayPlan;
+  settle: SettleSessionHistory;
+};
 
 export type ExecutionProjectionResult = {
   admitted?: boolean;
@@ -50,7 +72,7 @@ export function factEvents(fact: AcceptedFact): readonly PiCloudEvent[] {
 export class ExecutionStreamProjector {
   readonly #database: Kysely<Database>;
   readonly #boundary: ExecutionStreamBoundary;
-  readonly #durable: PostgresDurableCommitProjector;
+  readonly #durable: SessionNativeStore["projection"];
   #recovery: { topic: string; next: ReadonlyMap<number, bigint> } | undefined;
   readonly #prefixes = new Map<string, ExecutionPrefix>();
 
@@ -59,10 +81,13 @@ export class ExecutionStreamProjector {
     readonly modelAccounting?: ModelAccountingPort,
     boundaryLimits?: BoundaryCacheLimits,
     private readonly recoveryCheckpoint?: RecoverySealCheckpoint,
+    private readonly nativeStore?: SessionNativeStore,
   ) {
     this.#database = database;
     this.#boundary = new ExecutionStreamBoundary(database, boundaryLimits);
-    this.#durable = new PostgresDurableCommitProjector(database, undefined, modelAccounting);
+    this.#durable =
+      nativeStore?.projection ??
+      new PostgresDurableCommitProjector(database, undefined, modelAccounting);
   }
 
   restoreProjectedPositions(topic: string, next: ReadonlyMap<number, bigint>): void {
@@ -384,6 +409,7 @@ export class ExecutionStreamProjector {
         position,
         this.#prefixes.get(key)?.highWaterMark ?? 0,
         retire,
+        this.nativeStore?.settle,
       );
       if (result) {
         rootClosed = position.offset;
@@ -628,13 +654,7 @@ export class ExecutionStreamProjector {
         .execute();
       await recordFactProjection(transaction, position);
       if (event.type === "turn.failed") await recoverQuarantinedSession(transaction, fact.scope);
-      await settleHistoryTurn(
-        transaction,
-        fact.scope.tenantId,
-        fact.scope.sessionId,
-        fact.scope.turnId,
-      );
-      await settleChildHistory(transaction, fact.scope.tenantId, fact.scope.runId);
+      await (this.nativeStore?.settle ?? settleNativeHistory)(transaction, fact, position);
       if (
         event.type !== "turn.completed" &&
         event.type !== "turn.failed" &&

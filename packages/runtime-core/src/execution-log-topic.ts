@@ -17,7 +17,15 @@ export class ExecutionLogTopic {
   readonly #replicas: number;
   readonly #manageTopic: boolean;
   #started = false;
-  constructor(options: ExecutionLogTopicOptions) {
+  constructor(
+    options: ExecutionLogTopicOptions,
+    private readonly brokerRetentionMs = -1,
+  ) {
+    if (
+      brokerRetentionMs !== -1 &&
+      (!Number.isSafeInteger(brokerRetentionMs) || brokerRetentionMs <= 0)
+    )
+      throw TypeError("Invalid broker retention");
     if (!options.brokers.length || options.brokers.some((s) => !s.trim()))
       throw new TypeError("Kafka brokers are invalid");
     for (const n of [options.partitions, options.replicas])
@@ -36,7 +44,7 @@ export class ExecutionLogTopic {
     if (this.#started) throw new Error("Execution log topic can only start once");
     const configs = [
       { name: "cleanup.policy", value: "delete" },
-      { name: "retention.ms", value: "-1" },
+      { name: "retention.ms", value: String(this.brokerRetentionMs) },
       { name: "retention.bytes", value: "-1" },
       { name: "message.timestamp.type", value: "LogAppendTime" },
       { name: "min.insync.replicas", value: String(Math.max(1, this.#replicas - 1)) },

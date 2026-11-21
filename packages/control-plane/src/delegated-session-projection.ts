@@ -86,12 +86,23 @@ export async function loadDelegatedSessionTreeSummaries(
     tenantId: string;
     rootParentSessionIds: readonly string[];
     maximum: number;
+    rootMessageHistory?: boolean;
   },
 ): Promise<{
   items: DelegatedSessionSummaryResource[];
   truncated: boolean;
 }> {
   const pending = [...new Set(input.rootParentSessionIds)];
+  if (input.rootMessageHistory && pending.length) {
+    const child = await database
+      .selectFrom("subagent_conversations")
+      .select("id")
+      .where("tenant_id", "=", input.tenantId)
+      .where("parent_session_id", "in", pending)
+      .limit(1)
+      .executeTakeFirst();
+    if (!child) return { items: [], truncated: false };
+  }
   const loadedParents = new Set<string>();
   const items: DelegatedSessionSummaryResource[] = [];
   while (pending.length > 0 && items.length <= input.maximum) {

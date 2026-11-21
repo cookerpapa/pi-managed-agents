@@ -9,7 +9,7 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
   ) => `(${row}->>'tenant')::uuid,(${row}->>'session')::uuid,(${row}->>'conversation')::bigint,
     (${row}->>'document')::bigint,(${row}->>'seq')::bigint,(${row}->>'ordinal')::int,${row}->'value'`;
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
-    alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,add column native_work_handoff jsonb,
+    alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,add column native_work_handoff jsonb,add column root_compacts jsonb,add column root_input_receipts jsonb,add column root_human_inputs text,add column root_input_seq bigint not null default 0,
       add column cancel_positions jsonb not null default '{}',add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
     create index active_projection_start on runs(projection_partition,projection_first) where state in ('running','cancel_requested') and projection_first is not null;
     create function prefix_message(uuid,uuid,uuid,bigint,text,uuid) returns table(accepted boolean,writes int)
@@ -35,6 +35,17 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
           if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin') and not (op->>'kind'='finish' and p_allow_finish)) or
             (op->>'kind'='inbox' and (a->>6)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
           case op->>'kind'
+          when 'root-compact' then
+            update runs set root_compacts=jsonb_build_object('requests',coalesce(root_compacts->'requests','{}'::jsonb)||(op->'requests'),
+              'tasks',coalesce(root_compacts->'tasks','{}'::jsonb)||(op->'tasks'),'submissions',coalesce(root_compacts->'submissions','{}'::jsonb)||(op->'submissions'),
+              'latest',coalesce(op->>'latest',root_compacts->>'latest'),'seq',frame->'nativeSeq')
+              where id=(a->>2)::uuid and tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
+            ok:=found;n:=1;
+          when 'root-input' then
+            update runs set root_input_receipts=coalesce(root_input_receipts,'{}'::jsonb)||(op->'receipts'),
+              root_human_inputs=coalesce(op->>'document',root_human_inputs),root_input_seq=(frame->>'nativeSeq')::bigint
+              where id=(a->>2)::uuid and tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
+            ok:=found;n:=1;
           when 'message' then
             select accepted,writes into strict ok,n from prefix_message((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid);
           when 'inbox' then
@@ -103,6 +114,14 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
               if not found then raise exception 'Conflicting accepted usage position' using errcode='PZ002'; end if;
             end if;
           end loop;
+        end if;
+        if frame?'rootDisplay' then
+          a:=frame->'rootDisplay';
+          update runs set output_first_topic=coalesce(output_first_topic,p_topic),
+            output_first_partition=coalesce(output_first_partition,p_partition),output_first_offset=coalesce(output_first_offset,(frame->>'offset')::bigint),
+            output_display_seq=greatest(output_display_seq,(a->>'through')::bigint),output_display_native_seq=greatest(output_display_native_seq,(a->>'seq')::bigint)
+            where id=(a->>'run')::uuid and tenant_id=(a->>'tenant')::uuid and session_id=(a->>'session')::uuid and lease_id=(a->>'writer')::uuid and state in ('running','cancel_requested');
+          if not found then raise exception 'Root display owner changed' using errcode='40001'; end if;
         end if;
         if frame?'snapshot' then
           snap:=frame->'snapshot';

@@ -1,3 +1,4 @@
+import { nativeNavigation } from "@pi-cloud/pi-session-postgres/durable";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { isDeepStrictEqual } from "node:util";
@@ -217,15 +218,27 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       s.liveId = w.record.id;
     if (w.type === "entry") {
       const role = w.value.model?.[0]?.role;
-      if (stage?.integrated || ["user", "assistant", "toolResult"].includes(role))
+      if (stage?.integrated || ["user", "assistant", "toolResult"].includes(role)) {
+        const assistant =
+          stage?.rootPresentation && role === "toolResult" && w.value.byTaskId != null
+            ? (batch.writes.find(
+                (v) =>
+                  v.type === "task" &&
+                  v.value.id === w.value.byTaskId &&
+                  v.value.kind === "pi.tool",
+              )?.value.input.assistant ?? s.pendingTools?.[w.value.byTaskId]?.assistantEntryId)
+            : undefined;
         messages.push({
           id: w.value.id,
           conversation: w.value.conversationId,
           role: role ?? w.value.kind,
+          ...(assistant != null ? { task: w.value.byTaskId, assistant } : {}),
+          ...(stage?.rootPresentation ? { caption: nativeNavigation(w.value).preview } : {}),
           content: JSON.stringify(w.value),
           input: inputs.get(w.value.id) ?? null,
           ordinal,
         });
+      }
       if (
         stage?.integrated &&
         w.value.conversationId === 1 &&

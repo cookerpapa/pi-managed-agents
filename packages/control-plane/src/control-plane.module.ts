@@ -108,6 +108,7 @@ export class ControlPlaneModule {
       ...(options.idGenerator === undefined ? {} : { idGenerator: options.idGenerator }),
     });
     const controlPlaneStores = new ControlPlaneStoreFactory({
+      rootMessageHistory: options.rootMessageHistory ?? false,
       database: options.database,
       ...(options.conversationReadDatabase
         ? { conversationReadDatabase: options.conversationReadDatabase }
@@ -259,6 +260,7 @@ export class ControlPlaneModule {
         {
           provide: QueuedInputService,
           useValue: new QueuedInputService({
+            rootMessageHistory: options.rootMessageHistory ?? false,
             database: options.database,
             ...(options.inputConfirmations ? { confirmations: options.inputConfirmations } : {}),
             ...(options.nativeInputBackendFactory
@@ -269,6 +271,7 @@ export class ControlPlaneModule {
         {
           provide: ConversationCompactService,
           useValue: new ConversationCompactService({
+            rootMessageHistory: options.rootMessageHistory ?? false,
             database: options.database,
             ...(options.nativeInputBackendFactory
               ? { backendFactory: options.nativeInputBackendFactory }
@@ -278,6 +281,7 @@ export class ControlPlaneModule {
         {
           provide: ConversationTreeService,
           useValue: new ConversationTreeService({
+            rootMessageHistory: options.rootMessageHistory ?? false,
             database: options.database,
             ...(options.conversationReadDatabase
               ? { readDatabase: options.conversationReadDatabase }

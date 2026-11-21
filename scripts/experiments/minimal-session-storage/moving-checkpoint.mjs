@@ -74,6 +74,7 @@ export function foldLive(documents = {}, writes) {
 export function checkpoint(view, record) {
   const inboxRoutes = emptyInboxRoutes(view.inboxes);
   if (
+    view.rootInputDoc ||
     !inboxRoutes ||
     Object.keys(view.pendingTools ?? {}).length ||
     !Object.keys(view.liveDocs).length ||
@@ -150,7 +151,15 @@ export function useSynchronousPolicy(fact, recoverableTools = false) {
 
 // The canonical native Task supplies the identity. Its original reply
 // descriptor is current recovery data. Kafka group progress fences execution.
-export function foldToolReferences(view, previous, frame, fact, offset, workspaceBatch) {
+export function foldToolReferences(
+  view,
+  previous,
+  frame,
+  fact,
+  offset,
+  workspaceBatch,
+  rootPresentation = false,
+) {
   const pending = { ...previous?.pendingTools };
   const writes = fact.commit.writes
     .filter((w) => w.type === "task" && w.value.kind === "pi.tool")
@@ -180,6 +189,14 @@ export function foldToolReferences(view, previous, frame, fact, offset, workspac
       conversationId: task.conversationId,
       offset: String(offset),
       seq: fact.commit.seq,
+      ...(rootPresentation
+        ? {
+            assistantEntryId: task.input.assistant,
+            ordinal: fact.commit.writes.findIndex((w) => w.type === "task" && w.value === task),
+            arguments: task.state.checkpoint.arguments,
+            startedAt: fact.occurredAt,
+          }
+        : {}),
       reply,
     };
     assert(!pending[task.id], "Duplicate pending native Tool");

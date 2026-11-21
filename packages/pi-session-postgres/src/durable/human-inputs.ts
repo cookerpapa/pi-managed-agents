@@ -94,20 +94,22 @@ export async function readNativeHumanInputs(
     head.seq,
     scope.runId,
   );
-  const state =
-    metadata === undefined
-      ? emptyHumanInputs(scope.runId)
-      : (metadata as unknown as StoredHumanInputs);
-  if (
-    state.runId !== scope.runId ||
-    !state.inputs ||
-    !Array.isArray(state.order) ||
-    !state.receipts
-  )
-    throw new Error("Invalid native human-input metadata");
   const inbox = ((await document(projection, scope.conversationId, "pi.inbox", head.seq)) ?? {
     items: [],
   }) as Queue;
+  return materializeHumanQueue(scope.runId, metadata, inbox, head.seq);
+}
+
+export function materializeHumanQueue(
+  runId: string,
+  metadata: Record<string, unknown> | undefined,
+  inbox: Queue,
+  nativeSequence: number,
+) {
+  const state =
+    metadata === undefined ? emptyHumanInputs(runId) : (metadata as unknown as StoredHumanInputs);
+  if (state.runId !== runId || !state.inputs || !Array.isArray(state.order) || !state.receipts)
+    throw new Error("Invalid native human-input metadata");
   if (!Array.isArray(inbox.items)) throw new Error("Invalid native pending-input queue");
   const byNative = new Map(
     Object.entries(state.inputs).map(([id, input]) => [input.nativeId, { id, input }]),
@@ -132,7 +134,7 @@ export async function readNativeHumanInputs(
   return {
     state,
     items,
-    nativeSequence: head.seq,
+    nativeSequence,
     revision: nativeHumanQueueRevision(inbox, state),
   };
 }

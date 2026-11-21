@@ -1,3 +1,9 @@
+import {
+  rootMessageHeaders,
+  rootMessagePosition,
+  rootMessageTurns,
+  readRootMessageWindow,
+} from "@pi-cloud/runtime-core/root-message-history";
 import { historyHeaders, type HistoryTurnRow } from "@pi-cloud/runtime-core/frozen-history";
 import { parseScheduledOrigin } from "@pi-cloud/protocol";
 import {
@@ -92,7 +98,11 @@ function listPosition(cursor: string | undefined): { at: string; id: string } | 
 export class ConversationReader {
   readonly #database: Kysely<Database>;
   readonly #tenantId: string;
-  constructor(database: Kysely<Database>, tenantId: string) {
+  constructor(
+    database: Kysely<Database>,
+    tenantId: string,
+    private readonly rootMessageHistory = false,
+  ) {
     this.#database = database;
     this.#tenantId = tenantId;
   }
@@ -129,7 +139,11 @@ export class ConversationReader {
       .innerJoinLateral(
         (query) =>
           query
-            .selectFrom("conversation_turns as counted_run")
+            .selectFrom(
+              sql<
+                Database["conversation_turns"]
+              >`${this.rootMessageHistory ? sql`runs` : sql`conversation_turns`}`.as("counted_run"),
+            )
             .select((expression) => expression.fn.countAll<string>().as("count"))
             .whereRef("counted_run.tenant_id", "=", "session_row.tenant_id")
             .whereRef("counted_run.session_id", "=", "session_row.id")
@@ -170,6 +184,7 @@ export class ConversationReader {
     const visibleRows = rows.slice(0, MAX_CONVERSATION_SUMMARIES);
     const delegated = await loadDelegatedSessionTreeSummaries(this.#database, {
       tenantId: this.#tenantId,
+      rootMessageHistory: this.rootMessageHistory,
       rootParentSessionIds: visibleRows.map((row) => row.sessionId),
       maximum: MAX_DELEGATED_SESSION_SUMMARIES,
     });
@@ -227,7 +242,7 @@ export class ConversationReader {
       .transaction()
       .setIsolationLevel("repeatable read")
       .execute((transaction) => {
-        const reader = new ConversationReader(transaction, this.#tenantId);
+        const reader = new ConversationReader(transaction, this.#tenantId, this.rootMessageHistory);
         return reader.#readConversation(sessionId, query, filters);
       });
   }
@@ -293,11 +308,14 @@ export class ConversationReader {
         "session_row.workspace_id as workspaceId",
         "session_row.development_environment_id as developmentEnvironmentId",
         "session_row.desired_model_profile_id as modelProfileId",
-        sql<SessionState>`case when session_row.session_kind='subagent' then
+        (this.rootMessageHistory
+          ? sql<SessionState>`session_row.state`
+          : sql<SessionState>`case when session_row.session_kind='subagent' then
           case (select e.state from subagent_executions e where e.tenant_id=session_row.tenant_id and e.child_session_id=session_row.id)
             when 'running' then 'running' when 'completed' then 'idle' when 'cancelled' then 'idle'
             when 'failed' then 'failed' when 'unknown' then 'failed' else 'cold' end
-          else session_row.state end`.as("sessionState"),
+          else session_row.state end`
+        ).as("sessionState"),
         "session_row.execution_mode as executionMode",
         "session_row.sandbox_profile_key as sandboxProfileKey",
         "session_row.working_directory as workingDirectory",
@@ -315,11 +333,14 @@ export class ConversationReader {
         "session_row.pi_session_id as piSessionId",
         // A Fork may have no Runs of its own but still own a shared history root.
         // Read these indexed facts in the same snapshot as the Session metadata.
-        sql<boolean>`session_row.session_kind='conversation'
+        (this.rootMessageHistory
+          ? sql<boolean>`false`
+          : sql<boolean>`session_row.session_kind='conversation'
           and not exists(select 1 from runs r where r.tenant_id=session_row.tenant_id
             and r.session_id=session_row.id and r.pruned_at is null)
           and not exists(select 1 from pi_history_views v where v.tenant_id=session_row.tenant_id
-            and v.session_id=session_row.id)`.as("emptyHistory"),
+            and v.session_id=session_row.id)`
+        ).as("emptyHistory"),
       ])
       .where("session_row.tenant_id", "=", this.#tenantId)
       .where("session_row.id", "=", sessionId)
@@ -329,10 +350,31 @@ export class ConversationReader {
       throw new ControlPlaneStoreError("not_found", "Conversation was not found");
     }
 
+    const messages =
+      this.rootMessageHistory &&
+      conversation.sessionKind === "conversation" &&
+      conversation.parentSessionId === null;
+    const relation = messages ? rootMessageTurns : sql`pi_history_turns`;
+    if (this.rootMessageHistory && conversation.sessionKind === "subagent") {
+      const row = await this.#database
+        .selectFrom("subagent_executions")
+        .select("state")
+        .where("tenant_id", "=", this.#tenantId)
+        .where("child_session_id", "=", sessionId)
+        .executeTakeFirst();
+      conversation.sessionState =
+        row?.state === "running"
+          ? "running"
+          : row?.state === "completed" || row?.state === "cancelled"
+            ? "idle"
+            : row?.state === "failed" || row?.state === "unknown"
+              ? "failed"
+              : "cold";
+    }
     const owner = { tenantId: this.#tenantId, sessionId };
     const findTurn = async (id: string) =>
       (
-        await sql<HistoryTurnRow>`select * from pi_history_turns
+        await sql<HistoryTurnRow>`select * from ${relation}
       where tenant_id=${owner.tenantId}::uuid and session_id=${sessionId}::uuid and turn_id=${id}::uuid`.execute(
           this.#database,
         )
@@ -375,7 +417,9 @@ export class ConversationReader {
         const lookup = query.entryId ?? query.toolCallId!.split(":")[1]!;
         const kind = query.toolCallId?.startsWith("task:") ? "task" : "entry";
         let record: { seq: string; ordinal: number } | undefined;
-        if (anchor.frozen) {
+        if (messages)
+          record = await rootMessagePosition(this.#database, this.#tenantId, anchor, kind, lookup);
+        else if (anchor.frozen) {
           record = (
             await sql<{
               seq: string;
@@ -420,7 +464,7 @@ export class ConversationReader {
     const rows = conversation.emptyHistory
       ? []
       : (
-          await sql<HistoryTurnRow>`select * from pi_history_turns where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
+          await sql<HistoryTurnRow>`select * from ${relation} where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
       ${filters.completedOnly ? sql`and state in ('completed','failed','cancelled','timed_out') and not waiting_for_seal` : sql``}
       ${cutoff ? sql`and mailbox_position<=${cutoff.mailbox_position}::bigint` : sql``}
       ${anchor ? sql`and mailbox_position ${sql.raw(direction === "before" ? "<=" : ">=")} ${anchor.mailbox_position}::bigint` : sql``}
@@ -444,18 +488,24 @@ export class ConversationReader {
       frozen: r.frozen,
     }));
     const sources = lineageTurnRows.slice(0, MAX_CONVERSATION_TURNS);
-    const window = await readCanonicalHistoryWindow(this.#database, {
-      tenantId: this.#tenantId,
-      sessionId,
-      turns: sources as HistoryTurnSource[],
-      direction,
-      ...(position ? { position } : {}),
-      inclusive,
-    });
+    const window = await (messages ? readRootMessageWindow : readCanonicalHistoryWindow)(
+      this.#database,
+      {
+        tenantId: this.#tenantId,
+        sessionId,
+        turns: sources as HistoryTurnSource[],
+        direction,
+        ...(position ? { position } : {}),
+        inclusive,
+      },
+    );
     const sourceByTurn = new Map(sources.map((r) => [r.turnId, r]));
-    const headerByTurn = await historyHeaders(this.#database, this.#tenantId, sessionId, [
-      ...window.headers,
-    ]);
+    const headerByTurn = await (messages ? rootMessageHeaders : historyHeaders)(
+      this.#database,
+      this.#tenantId,
+      sessionId,
+      [...window.headers],
+    );
     const selectedTurns = [...new Set(window.positions.map((p) => p.turnId))];
     const turns = selectedTurns.map((id) => {
       const row = sourceByTurn.get(id)!;

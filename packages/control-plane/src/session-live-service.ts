@@ -26,6 +26,7 @@ export class SessionLiveService {
     readonly options: {
       database: Kysely<Database>;
       stream: SessionEventStream;
+      rootMessageHistory?: boolean;
       token: string;
       inputConfirmations?: Pick<SessionEventHub, "watchInput">;
     },
@@ -115,9 +116,11 @@ export class SessionLiveService {
             tenantId,
             sessionId,
             loadCanonical: () =>
-              new ConversationReader(this.options.database, tenantId).getConversationView(
-                sessionId,
-              ),
+              new ConversationReader(
+                this.options.database,
+                tenantId,
+                this.options.rootMessageHistory,
+              ).getConversationView(sessionId),
           }),
         );
         if (abort.signal.aborted) {

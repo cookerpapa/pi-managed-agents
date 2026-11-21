@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, verify a normal root from the browser through a real Guest, reload and a second cold Worker using the candidate history only. [Ordinary root acceptance](reports/normal-root-message-store-20261122.md).
+
 - [x] Under #52, make the recovery checkpoint and release to the queue atomic for the first active child Bash handoff. Cold-restart the actual Projector and verify the replacement Worker Session host with the legacy native tables denied. [Failure acceptance and remaining scope](reports/atomic-family-handoff-20261122.md).
 
 - [x] Under #52, compare the daily average and peak loads for one million 20-tool Runs. [Daily-load study](reports/tool-loop-capacity-20261121.md#每天百万-run每个-run-20-次工具调用).

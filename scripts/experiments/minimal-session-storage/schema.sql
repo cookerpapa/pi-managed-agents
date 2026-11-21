@@ -11,7 +11,7 @@ create unique index runs_one_active on runs (tenant_id,session_id) where state i
 create table messages (
   tenant_id uuid not null, pi_session_id uuid not null, entry_id bigint not null,
   conversation_id bigint not null, run_id uuid not null references runs(id),
-  role text not null, content text not null, source_input_id text, commit_seq bigint not null,
+  navigation_caption text, assistant_entry_id bigint, tool_task_id bigint, role text not null, content text not null, source_input_id text, commit_seq bigint not null,
   ordinal integer not null, created_at timestamptz not null default clock_timestamp(),
   primary key (tenant_id,pi_session_id,entry_id),
   unique (tenant_id,pi_session_id,commit_seq,ordinal)

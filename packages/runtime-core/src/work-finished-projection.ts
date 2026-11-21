@@ -3,12 +3,22 @@ import { sql, type Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import { isTerminalRunState } from "@pi-cloud/domain";
 import { parsePiCloudEvent, type PiCloudEvent } from "@pi-cloud/protocol";
-import type { AcceptedWorkFinishedFact } from "./accepted-fact.ts";
+import type { AcceptedWorkFinishedFact, AcceptedExecutionSealFact } from "./accepted-fact.ts";
 import type { FactPosition } from "./accepted-fact-recovery.ts";
 import { projectionOffsetWrite } from "./accepted-fact-recovery.ts";
 import { transitionLockedRun, type RunTransitionState } from "./run-state.ts";
 import { advanceLaneReadiness } from "./run-readiness.ts";
 import { settleHistoryTurn, settleChildHistory } from "./presentation-settlement.ts";
+
+export type SettleSessionHistory = (
+  tx: Transaction<Database>,
+  fact: AcceptedWorkFinishedFact | AcceptedExecutionSealFact,
+  position: FactPosition,
+) => Promise<void>;
+export const settleNativeHistory: SettleSessionHistory = async (tx, fact) => {
+  await settleHistoryTurn(tx, fact.scope.tenantId, fact.scope.sessionId, fact.scope.turnId);
+  await settleChildHistory(tx, fact.scope.tenantId, fact.scope.runId);
+};
 
 /** Called with an unsealed Root Run under its row and Session writer locks.
  * Pi has settled the family; this materializes cloud work and presentation. */
@@ -19,6 +29,7 @@ export async function finishWorkIn(
   position: FactPosition,
   highWaterMark: number,
   retireWriter: boolean,
+  settle: SettleSessionHistory = settleNativeHistory,
 ): Promise<PiCloudEvent | undefined> {
   const now = new Date();
   // A control-plane terminal decision already in progress remains authoritative.
@@ -139,8 +150,7 @@ export async function finishWorkIn(
     cancellations as (${cancellations}), session_state as (${session})
     ${retireWriter ? sql`, retired as (${writer})` : sql``}
     ${projectionOffsetWrite(position)}`.execute(tx);
-  await settleHistoryTurn(tx, fact.scope.tenantId, fact.scope.sessionId, fact.scope.turnId);
-  await settleChildHistory(tx, fact.scope.tenantId, fact.scope.runId);
+  await settle(tx, fact, position);
   await advanceLaneReadiness(tx, fact.scope.tenantId, fact.scope.sessionId);
   return event;
 }

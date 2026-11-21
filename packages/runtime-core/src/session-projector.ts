@@ -76,6 +76,7 @@ export class SessionProjector {
       advertisedBaseUrl: string;
       publicationToken: string;
       modelAccounting?: ModelAccountingPort;
+      nativeStore?: import("./execution-stream-projection.ts").SessionNativeStore;
       recoveryCheckpoint?: {
         tracks(scope: AcceptedFactScope): boolean;
         advance(
@@ -134,7 +135,10 @@ export class SessionProjector {
     decode: typeof decodeSessionLogFact = decodeSessionLogFact,
   ) {
     const topic = options.topic ?? ACCEPTED_FACT_TOPIC;
-    this.#topic = new ExecutionLogTopic(options);
+    this.#topic = new ExecutionLogTopic(
+      options,
+      options.nativeStore ? options.retentionMs : undefined,
+    );
     this.publication = new SessionPublicationIngress(options.capacity, options.metrics);
     this.#publicationControl = new PostgresPublicationControl({
       database: options.publicationDatabase,
@@ -180,6 +184,7 @@ export class SessionProjector {
             await recovery.advance(tx, fact, position, current, state.seq);
           }
         : undefined,
+      options.nativeStore,
     );
     let currentControlAssignment: () => boolean = () => false;
     const groupId = "pi-cloud-session-projector-v2";
@@ -201,7 +206,11 @@ export class SessionProjector {
         // choosing the recovery floor: later changes are necessarily replayed.
         // Loading before bounds could skip a change committed during handoff.
         const current = currentControlAssignment;
-        const plan = await loadFactReplayPlan(options.database, topic, bounds);
+        const plan = await (options.nativeStore?.replayPlan ?? loadFactReplayPlan)(
+          options.database,
+          topic,
+          bounds,
+        );
         if (current())
           await this.#throughGate(async () => {
             if (!current()) return;
@@ -331,6 +340,7 @@ export class SessionProjector {
                     .where("applied_at", "is", null)
                     .execute();
               });
+            if (current?.() !== false) options.nativeStore?.controlProjected(raw);
             return;
           }
           const record = raw as KafkaAcceptedFactRecord;
@@ -421,7 +431,12 @@ export class SessionProjector {
         checkHealth: () => this.#topic.checkHealth(),
       },
     });
-    this.#retention = new KafkaSafeRetention({ ...options, topic, graceMs: options.retentionMs });
+    this.#retention = new KafkaSafeRetention({
+      ...options,
+      topic,
+      graceMs: options.retentionMs,
+      ...(options.nativeStore ? { brokerTimed: options.nativeStore.brokerTimedRetention } : {}),
+    });
     this.eventStore.owner = (tenant, session) => this.owner(tenant, session);
   }
   async #projectForDelivery(
