@@ -61,3 +61,18 @@ most one outstanding request, while other targets can overlap their receipt wait
 assignment prevents any new send from that assignment; an already issued call is never
 retried. The assay handles execute intents only. It does not select a production policy
 for ordered cancellation, closure, persistent handoff or device reconnection.
+
+### Partition-local grant experiment
+
+In an isolated topic generation, a consumer may opt into granting the immediately
+available, contiguous prefix of up to 32 ordinary execute intents. Validate and
+project each intent and reserve its distinct target and byte budget first. A
+duplicate target, unavailable reservation, non-execute record, control change,
+cancel, seal or ownership change ends the prefix. Confirm its last offset + 1
+once before any sends. On rewind, the broker-confirmed boundary suppresses the
+entire previously granted portion, including any unsent tail. After uncertain
+confirmation or ownership loss the old owner cannot launch more work. The
+accepted tradeoff is up to the actual prefix length of uncertain operations per
+interrupted partition grant. The ordinary per-record shipping path stays the
+default. Partition-count comparisons create separate generations so the Session
+key, replay positions and binding boundaries stay consistent within each trial.

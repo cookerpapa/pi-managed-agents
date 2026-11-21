@@ -25,8 +25,18 @@ export type KafkaLogConsumerOptions<T> = {
   batchRead?: boolean;
   /** Synchronously materialize a ready prefix before any per-record handler
    * or progress acknowledgement. Return its length, ending at the first
-   * externally observable barrier. A retry first isolates the failing record. */
-  prepareReady?(records: readonly KafkaLogRecord<T>[], current: () => boolean): Promise<number>;
+   * externally observable barrier. A retry first isolates the failing record.
+   * With effectPrefixLimit, the callback may await one grant after projecting
+   * its admissible prefix and return that exact length. Individual handlers
+   * still run; offsets covered by the grant cannot gain a second permission. */
+  prepareReady?(
+    records: readonly KafkaLogRecord<T>[],
+    current: () => boolean,
+    grantPrefix?: (count: number) => Promise<number>,
+  ): Promise<number>;
+  /** Opt-in. Grant a projected prefix once, returning the first newly granted index.
+   * On revocation or a fully covered replay the returned index equals the count. */
+  effectPrefixLimit?: number;
   /** Boot-local callback delivery only; never a durable projection recovery cursor. */
   resumeFromMemory?: boolean;
   /** Include completed delivery as well as the durable projection recovery floor. */
@@ -75,6 +85,15 @@ export class KafkaLogConsumer<T> {
   readonly #publicationWriters = new Set<KafkaPublicationWriter>();
 
   constructor(options: KafkaLogConsumerOptions<T>) {
+    if (
+      options.effectPrefixLimit !== undefined &&
+      (!options.orderedEffects ||
+        !options.prepareReady ||
+        !Number.isInteger(options.effectPrefixLimit) ||
+        options.effectPrefixLimit < 1 ||
+        options.effectPrefixLimit > 32)
+    )
+      throw new Error("Effect prefixes require ordered preparation with a limit of 1 to 32");
     if (options.orderedEffects && !options.groupRecovery)
       throw new Error("Ordered effects require durable group progress");
     if (
@@ -224,6 +243,9 @@ export class KafkaLogConsumer<T> {
         topic: this.#options.topic,
         batchRead: this.#options.batchRead === true,
         readyPrefixes: this.#options.prepareReady !== undefined,
+        ...(this.#options.effectPrefixLimit
+          ? { readyPrefixLimit: this.#options.effectPrefixLimit }
+          : {}),
         logger,
         onPosition: (partition, offset) => {
           if (
@@ -476,6 +498,44 @@ export class KafkaLogConsumer<T> {
       this.#committedOffsets.set(partition, offset);
   }
 
+  async #preparePrefix(
+    ready: readonly KafkaLogRecord<T>[],
+    current: () => boolean,
+    grantThrough: (next: bigint) => Promise<boolean>,
+  ) {
+    const prepare = this.#options.prepareReady!;
+    if (!this.#options.effectPrefixLimit) return prepare(ready, current);
+    let open = true,
+      requested = 0,
+      pending: Promise<number> | undefined;
+    const grantPrefix = (count: number) => {
+      if (!open || requested || !Number.isInteger(count) || count < 1 || count > ready.length)
+        throw new Error("Invalid dispatch prefix");
+      for (let j = 1; j < count; j++)
+        if (ready[j]!.offset !== ready[j - 1]!.offset + 1n)
+          throw new Error("Noncontiguous dispatch prefix");
+      requested = count;
+      const before = this.#committedOffsets.get(ready[0]!.partition) ?? -1n;
+      let first = 0;
+      while (first < count && ready[first]!.offset < before) first++;
+      pending = grantThrough(ready[count - 1]!.offset + 1n).then((granted) =>
+        granted ? first : count,
+      );
+      void pending.catch(() => {}); // Always joined below, even if preparation throws.
+      return pending;
+    };
+    let length: number;
+    try {
+      length = await prepare(ready, current, grantPrefix);
+    } finally {
+      open = false;
+      await pending;
+    }
+    if (requested && length !== requested)
+      throw new Error("Prepared length differs from granted prefix");
+    return length;
+  }
+
   async #batch(
     consumer: KafkaPartitionReader,
     payload: KafkaTypes.EachBatchPayload,
@@ -506,6 +566,18 @@ export class KafkaLogConsumer<T> {
         offset: BigInt(m.offset),
       });
     };
+    const grantThrough = async (next: bigint) => {
+      if (!current()) return false;
+      if (next <= (this.#committedOffsets.get(batch.partition) ?? -1n)) return false;
+      await consumer.commitOffset({
+        topic: batch.topic,
+        partition: batch.partition,
+        offset: next.toString(),
+      });
+      if (!current()) return false;
+      this.#committedOffsets.set(batch.partition, next);
+      return true;
+    };
     let prepared = 0;
     for (const [i, message] of batch.messages.entries()) {
       if (this.#closing || epoch !== this.#epoch || payload.isStale() || !this.#ready) return;
@@ -514,7 +586,12 @@ export class KafkaLogConsumer<T> {
         if (this.#options.prepareReady && i === prepared) {
           const ready = [record];
           if (!this.#retries.has(batch.partition))
-            for (let j = i + 1; j < batch.messages.length; j++) {
+            for (
+              let j = i + 1;
+              j < batch.messages.length &&
+              ready.length < (this.#options.effectPrefixLimit ?? Infinity);
+              j++
+            ) {
               // Settle the valid prefix before an undecodable successor stalls.
               try {
                 ready.push(at(j));
@@ -522,7 +599,7 @@ export class KafkaLogConsumer<T> {
                 break;
               }
             }
-          const length = await this.#options.prepareReady(ready, current);
+          const length = await this.#preparePrefix(ready, current, grantThrough);
           if (!current()) return;
           if (!Number.isInteger(length) || length < 1 || length > ready.length)
             throw new Error("Invalid projected prefix length");
@@ -532,19 +609,7 @@ export class KafkaLogConsumer<T> {
           record,
           current,
           this.#options.orderedEffects
-            ? async () => {
-                if (epoch !== this.#epoch || payload.isStale() || this.#closing) return false;
-                const next = BigInt(message.offset) + 1n;
-                if (next <= (this.#committedOffsets.get(batch.partition) ?? -1n)) return false;
-                await consumer.commitOffset({
-                  topic: batch.topic,
-                  partition: batch.partition,
-                  offset: next.toString(),
-                });
-                if (epoch !== this.#epoch || payload.isStale() || this.#closing) return false;
-                this.#committedOffsets.set(batch.partition, next);
-                return true;
-              }
+            ? () => grantThrough(BigInt(message.offset) + 1n)
             : undefined,
         );
         if (epoch !== this.#epoch || payload.isStale()) return;

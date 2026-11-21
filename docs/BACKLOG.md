@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare partition-local grants of up to 1, 8 and 32 admitted tools, including real consumer loss after a partial send. Measure separate 32/64-partition topic generations. [Projection, routing and crash evidence](reports/partition-tool-grants-20261121.md).
+
 - [x] Under #52, isolate the distribution cost across 4,000 lightly loaded destinations using real Kafka/PG, per-operation offset grants, bounded receipt waits, and a network simulator. [Fan-out measurements](reports/projector-fanout-20261121.md).
 
 - [x] Under #52, measure matched short root Runs while stepping the proportion of real Cube Bash operations. Verify physical execution counts and attribute PG, dispatch ACK, shell startup and reply delays. [Results and capacity limits](reports/guest-tool-mix-20261121.md).

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { FanoutSender } from "./fanout-network.mjs";
 import { fanoutFixture, offered, targets } from "./fanout-fixture.mjs";
 import { operationsFor } from "./workspace-operations.mjs";
+import { prepareToolGrants, plainExecution } from "./tool-grant-prefix.mjs";
 import { pace, wall } from "./pg-path-replay.mjs";
 
 function phase() {
@@ -92,6 +93,8 @@ export class FanoutProjector {
     this.commitStats = { calls: 0, positions: 0, callback: phase() };
     this.spec = spec;
     this.handled = 0;
+    this.prepared = new WeakSet();
+    this.grantSizes = {};
     this.lastAck = 0;
     this.waited = Promise.withResolvers();
     this.gate = Promise.withResolvers();
@@ -141,7 +144,53 @@ export class FanoutProjector {
       readerBytes: reader.estimatedBytes,
     });
   }
+  async prepare(ready, current, grant, router) {
+    if (!(this.spec?.grantWidth > 1) || !plainExecution(ready[0].fact)) return 1;
+    await this.gate.promise;
+    let prior = wall();
+    const count = await prepareToolGrants(ready, current, grant, {
+      limit: this.spec.grantWidth,
+      sender: this.sender,
+      router,
+      targetFor: (r) => {
+        const i = this.bySession.get(r.fact.scope.piSessionId);
+        assert(i !== undefined);
+        return i;
+      },
+      markProjection: (key) => {
+        const now = wall();
+        this.phases[key === "routeReady" ? "route" : "pg"].add(now - prior);
+        prior = now;
+      },
+      observeGrant: (n, ms) => {
+        this.grantSizes[n] = (this.grantSizes[n] ?? 0) + 1;
+        this.phases.grant.add(ms);
+      },
+      prepareSend: (r, { route, command, op }, slot) => {
+        assert.equal(this.byBinding.get(route.bindingId), slot.target);
+        const packet = JSON.stringify({
+          position: { topic: r.topic, partition: r.partition, offset: String(r.offset) },
+          command,
+          reply: op.reply,
+        });
+        assert(Buffer.byteLength(packet) <= this.sender.packetLimit);
+        return () => this.sender.start(slot, packet, command.request.operationId);
+      },
+    });
+    if (current()) for (const r of ready.slice(0, count)) this.prepared.add(r.fact);
+    return count || 1;
+  }
+  processed() {
+    if (++this.handled === this.spec.count) {
+      this.processedAt = wall();
+      this.waited.resolve();
+    }
+  }
   async handle(record, current, grant, router, nextOffsets) {
+    if (this.prepared.delete(record.fact)) {
+      this.processed();
+      return;
+    }
     await this.gate.promise;
     const index = this.bySession.get(record.fact.scope.piSessionId);
     assert(index !== undefined && operationsFor(record.fact).length === 1);
@@ -169,6 +218,7 @@ export class FanoutProjector {
           async () => {
             if (this.spec.mode === "pg-control") return false;
             granted = await grant();
+            if (granted) this.grantSizes[1] = (this.grantSizes[1] ?? 0) + 1;
             return granted;
           },
           mark,
@@ -178,10 +228,7 @@ export class FanoutProjector {
     } finally {
       if (!t.op) this.sender.release(t);
     }
-    if (++this.handled === this.spec.count) {
-      this.processedAt = wall();
-      this.waited.resolve();
-    }
+    this.processed();
   }
   resolve(binding) {
     const i = this.byBinding.get(binding);
@@ -264,6 +311,7 @@ export class FanoutProjector {
       memoryEnd: process.memoryUsage(),
       acks: this.sender.acks,
       cap: this.sender.slots,
+      grantSizes: this.grantSizes,
       nativeCommits: {
         calls: this.commitStats.calls,
         positions: this.commitStats.positions,

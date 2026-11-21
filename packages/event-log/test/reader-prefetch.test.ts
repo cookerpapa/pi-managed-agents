@@ -156,8 +156,8 @@ it("bounds a ready prefix by count, bytes, generation and seek epoch", () => {
       epoch,
     );
   for (let i = 0; i < 18; i++) push(i);
-  const take = () => {
-    const records = p.takeReady(p.take(0)!);
+  const take = (limit?: number) => {
+    const records = p.takeReady(p.take(0)!, limit);
     for (const r of records) p.release(r);
     return records.map((r) => r.message.offset);
   };
@@ -169,6 +169,9 @@ it("bounds a ready prefix by count, bytes, generation and seek epoch", () => {
   push(21, 1, 1, 7);
   push(22, 1, 2, 7);
   for (let i = 18; i <= 22; i++) expect(take()).toEqual([i]);
+  for (let i = 23; i < 57; i++) push(i);
+  expect(take(32)).toHaveLength(32);
+  expect(take(32)).toEqual([55, 56]);
   expect(p.statistics().records).toBe(0);
 });
 

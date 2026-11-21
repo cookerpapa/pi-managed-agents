@@ -57,7 +57,7 @@ export class WorkspaceOperationRouter {
     if (!n) return 0;
     return this.view.apply(records.slice(0, n), current, (r, d) => projectRecord(r, d, this.env));
   }
-  async consume(record, current, grant, mark) {
+  async projectOperation(record, current, mark) {
     const f = record.fact,
       ops = operationsFor(f);
     const covered = record.offset < this.view.next.get(record.partition);
@@ -137,6 +137,12 @@ export class WorkspaceOperationRouter {
     await this.view.apply([candidate], current, (r, d) => projectRecord(r, d, this.env));
     mark?.("projected");
     if (!current() || !this.view.canDeliver(record)) return;
+    return { commands, cancels };
+  }
+  async consume(record, current, grant, mark) {
+    const prepared = await this.projectOperation(record, current, mark);
+    if (!prepared) return;
+    const { commands, cancels } = prepared;
     for (const { op, original } of cancels) {
       if (!original || !current()) continue;
       // The provider bounds its cancellation RPC. A transport error leaves

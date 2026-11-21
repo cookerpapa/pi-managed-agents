@@ -79,11 +79,11 @@ export class PartitionPrefetch {
     return this.#parts.get(partition)?.queue.shift();
   }
   /** The caller retains the budget of every returned record until the handler settles. */
-  takeReady(first: BufferedRecord): BufferedRecord[] {
+  takeReady(first: BufferedRecord, limit = 16): BufferedRecord[] {
     const queue = this.#parts.get(first.message.partition)!.queue;
     let extra = 0,
       bytes = first.bytes;
-    while (extra < 15 && extra < queue.length) {
+    while (1 + extra < limit && extra < queue.length) {
       const next = queue[extra]!;
       if (
         next.generation !== first.generation ||

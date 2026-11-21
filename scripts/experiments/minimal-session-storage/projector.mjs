@@ -16,6 +16,7 @@ import { projectionTemplates } from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { decodeWorkspaceFact, operationsFor } from "./workspace-operations.mjs";
+import { partitions } from "./fanout-fixture.mjs";
 import { FanoutProjector } from "./fanout-projector.mjs";
 import { MessageRateMeter } from "./complete-message-rate.mjs";
 
@@ -56,7 +57,7 @@ let stage,
   created = false;
 const blank = () => ({
   byKind: {},
-  byPartition: Array(32).fill(0),
+  byPartition: Array(partitions).fill(0),
   acknowledgedInputs: 0,
   inboxSnapshots: 0,
   inboxBytes: 0,
@@ -110,7 +111,7 @@ const environment = {
   },
   pathStudy,
   tailProbe,
-  partitions: 32,
+  partitions,
   get stage() {
     return stage;
   },
@@ -164,6 +165,7 @@ const reader = new KafkaLogConsumer({
   clientId: group,
   groupRecovery: true,
   orderedEffects: workspaceProfile,
+  ...(fanout && __GRANT_STUDY__ ? { effectPrefixLimit: 32 } : {}),
   batchRead: process.argv[6] !== "single",
   replayOffsets: async (bounds) =>
     prefixStudy?.width
@@ -171,9 +173,10 @@ const reader = new KafkaLogConsumer({
       : new Map(bounds.map((b) => [b.partition, b.low])),
   ...(prefixStudy
     ? {
-        prepareReady: async (records, current) => {
+        prepareReady: async (records, current, grantPrefix) => {
           try {
-            if (fanout?.spec) return 1;
+            if (fanout?.spec)
+              return await fanout.prepare(records, current, grantPrefix, workspaceRouter);
             if (messageMeter && messageMeter.at === undefined) await messageMeter.gate.promise;
             if (workspaceRouter && workspaceMode !== "direct") {
               if (workspaceMode === "single") return 1;
@@ -278,6 +281,22 @@ async function lag() {
     queued: reader.statistics().queuedRecords,
   };
 }
+async function verifyGroupPosition(ends, allowPeriodic) {
+  const deadline = Date.now() + 5000;
+  for (;;) {
+    const offsets = (await admin.fetchOffsets({ groupId: group, topics: [topic] }))[0].partitions;
+    if (
+      offsets.length === partitions &&
+      offsets.every((row) => BigInt(row.offset) === ends[row.partition])
+    )
+      break;
+    assert(
+      allowPeriodic && Date.now() < deadline,
+      "Committed offsets did not cover verified input",
+    );
+    await delay(80);
+  }
+}
 async function cleanup() {
   try {
     try {
@@ -325,7 +344,7 @@ try {
     topics: [
       {
         topic,
-        numPartitions: 32,
+        numPartitions: partitions,
         replicationFactor: 3,
         configEntries: [
           { name: "min.insync.replicas", value: "2" },
@@ -369,10 +388,13 @@ try {
         await reader.waitUntilInitialReplay(ends);
         assert.equal(sessions.size, 4000);
         await fanout.warm(workspaceRouter, topic);
+        await verifyGroupPosition(ends, true);
         send("fanoutWarmDone");
       },
       fanoutBegin: (m) => {
         fanout.pgAtStart = {
+          poolMs: prefixStudy.stats.poolMs,
+          holdMs: prefixStudy.stats.holdMs,
           commits: prefixStudy.stats.commits,
           sync: prefixStudy.stats.syncTransactions,
           async: prefixStudy.stats.asyncTransactions,
@@ -389,23 +411,14 @@ try {
         const result = await fanout.finish();
         result.pgTransactions = {
           total: prefixStudy.stats.commits - fanout.pgAtStart.commits,
+          poolMs: prefixStudy.stats.poolMs - fanout.pgAtStart.poolMs,
+          holdMs: prefixStudy.stats.holdMs - fanout.pgAtStart.holdMs,
           sync: prefixStudy.stats.syncTransactions - fanout.pgAtStart.sync,
           async: prefixStudy.stats.asyncTransactions - fanout.pgAtStart.async,
         };
         const ends = await reader.captureEndOffsets();
         await reader.waitUntilInitialReplay(ends);
-        const deadline = Date.now() + 5000;
-        for (;;) {
-          const offsets = (await admin.fetchOffsets({ groupId: group, topics: [topic] }))[0]
-            .partitions;
-          if (
-            offsets.length === 32 &&
-            offsets.every((row) => BigInt(row.offset) === ends[row.partition])
-          )
-            break;
-          assert(pgOnly && Date.now() < deadline, "Committed offsets did not cover verified input");
-          await delay(80);
-        }
+        await verifyGroupPosition(ends, pgOnly);
         send("fanoutFinished", { result, ends: ends.map(String) });
       },
       guestAccepted: (m) => guestRoutes.accepted(m),

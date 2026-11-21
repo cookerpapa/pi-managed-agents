@@ -101,6 +101,11 @@ const statsDb = new pg.Pool({
   max: 1,
   application_name: "bench-observer",
 });
+const fanoutPartitions =
+  process.env.PI_CLOUD_PG_PATH_PROFILE === "workspace-fanout"
+    ? Number(process.env.PI_CLOUD_FANOUT_PARTITIONS ?? 32)
+    : 32;
+assert([32, 64].includes(fanoutPartitions));
 const source = Object.fromEntries(
   await Promise.all(
     ["worker", "projector", ...(mode.startsWith("wake") ? ["wake-runtime"] : [])].map(
@@ -111,6 +116,11 @@ const source = Object.fromEntries(
           bundle: true,
           packages: "external",
           define: {
+            __FANOUT_PARTITIONS__: String(fanoutPartitions),
+            __GRANT_STUDY__: String(
+              process.env.PI_CLOUD_PG_PATH_PROFILE === "workspace-fanout" &&
+                ["grants", "grants-long"].includes(process.env.PI_CLOUD_FANOUT_SUITE),
+            ),
             __PG_PATH_STUDY__: String(mode === "wake-throughput" && suite === "pg-paths"),
             __READY_STUDY__: String(
               !!cpuFixture && isPrefixStudy(process.env.PI_CLOUD_PG_PATH_PROFILE),

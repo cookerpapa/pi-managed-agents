@@ -97,6 +97,7 @@ beforeEach(() => {
 });
 async function fixture(options?: {
   memory?: boolean;
+  effectPrefixLimit?: number;
   beforeHandle?: () => Promise<void>;
   prepareReady?: KafkaLogConsumerOptions<{ command: boolean; n: number }>["prepareReady"];
 }) {
@@ -107,6 +108,7 @@ async function fixture(options?: {
     topic: "log",
     groupId: "group",
     clientId: "test",
+    ...(options?.effectPrefixLimit ? { effectPrefixLimit: options.effectPrefixLimit } : {}),
     ...(options?.prepareReady ? { prepareReady: options.prepareReady } : {}),
     ...(options?.memory
       ? { commitMessages: false, resumeFromMemory: true }
@@ -543,5 +545,81 @@ it("surfaces a background client error and reconstructs the consumer instead of 
     expect(test.effects).toEqual([3]);
   } finally {
     await test.consumer.close();
+  }
+});
+
+it("grants only the fresh suffix and suppresses per-record redispatch after a rewind", async () => {
+  const sends: number[] = [];
+  const t = await fixture({
+    effectPrefixLimit: 8,
+    prepareReady: async (records, current, grant) => {
+      const from = await grant!(records.length);
+      for (const r of records.slice(from)) if (current()) sends.push(r.fact.n);
+      return records.length;
+    },
+  });
+  try {
+    const input: Array<[number, boolean]> = [
+      [1, true],
+      [2, true],
+      [3, true],
+      [4, true],
+    ];
+    await t.deliver(input);
+    await t.deliver(input);
+    expect(sends).toEqual([3, 4]);
+    expect(t.effects).toEqual([]);
+    expect(f.commit.mock.calls).toEqual([[{ topic: "log", partition: 0, offset: "5" }]]);
+  } finally {
+    await t.consumer.close();
+  }
+});
+
+it.each(["gap", "out-of-range", "lost-ack", "revoked"])(
+  "does not send on %s during a prefix grant",
+  async (fault) => {
+    const sends: number[] = [];
+    if (fault === "lost-ack") f.commit.mockRejectedValueOnce(new Error("ack missing"));
+    if (fault === "revoked")
+      f.commit.mockImplementationOnce(async () => {
+        f.stale = true;
+      });
+    const t = await fixture({
+      effectPrefixLimit: 8,
+      prepareReady: async (records, current, grant) => {
+        const start = await grant!(records.length + (fault === "out-of-range" ? 1 : 0));
+        for (const r of records.slice(start)) if (current()) sends.push(r.fact.n);
+        return records.length;
+      },
+    });
+    try {
+      await t.deliver([
+        [3, true],
+        [fault === "gap" ? 5 : 4, true],
+      ]);
+      expect(sends).toEqual([]);
+      expect(t.effects).toEqual([]);
+      expect(f.commit).toHaveBeenCalledTimes(["lost-ack", "revoked"].includes(fault) ? 1 : 0);
+    } finally {
+      await t.consumer.close();
+    }
+  },
+);
+
+it("expires an unused prefix capability once its callback returns", async () => {
+  let expired: ((count: number) => Promise<number>) | undefined;
+  const t = await fixture({
+    effectPrefixLimit: 8,
+    prepareReady: async (_records, _current, grant) => {
+      expired = grant;
+      return 1;
+    },
+  });
+  try {
+    await t.deliver([[3, false]]);
+    expect(() => expired!(1)).toThrow("Invalid dispatch prefix");
+    expect(f.commit).not.toHaveBeenCalled();
+  } finally {
+    await t.consumer.close();
   }
 });

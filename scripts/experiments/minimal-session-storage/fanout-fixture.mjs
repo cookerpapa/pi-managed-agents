@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { kafkaProducerLane } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 export const targets = 4000,
-  partitions = 32,
+  partitions =
+    typeof __FANOUT_PARTITIONS__ === "number"
+      ? __FANOUT_PARTITIONS__
+      : Number(process.env.PI_CLOUD_FANOUT_PARTITIONS ?? 32),
   offered = 4600;
 export function fanoutFixture(token) {
   assert.match(token, /^[a-f0-9]{16}$/);
@@ -20,7 +23,8 @@ export function fanoutFixture(token) {
   for (let n = 0, filled = 0; filled < targets; n++) {
     const session = id(1, n),
       p = kafkaProducerLane(session, partitions);
-    if (bins[p].length < targets / partitions) {
+    // 64 partitions receive 62 or 63 targets each.
+    if (bins[p].length < Math.ceil((targets - p) / partitions)) {
       bins[p].push(session);
       filled++;
     }

@@ -45,7 +45,7 @@ import {
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { emitFrames } from "./pg-path-replay.mjs";
 import { fanoutReceiver } from "./fanout-network.mjs";
-import { fanoutFixture } from "./fanout-fixture.mjs";
+import { fanoutFixture, partitions } from "./fanout-fixture.mjs";
 import { messageTape } from "./complete-message-rate.mjs";
 
 const pool = await openPool(5),
@@ -173,7 +173,7 @@ async function execute(row, claimMs, claimReason) {
     writerId: row.lease_id,
     fencingToken: sc.integrated ? Number(row.mailbox_position) : 1,
   };
-  const partition = kafkaProducerLane(row.session_id, 32),
+  const partition = kafkaProducerLane(row.session_id, partitions),
     gate = Promise.withResolvers(),
     release = Promise.withResolvers(),
     inspectRelease = Promise.withResolvers();

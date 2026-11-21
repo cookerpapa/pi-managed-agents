@@ -433,3 +433,18 @@ resetting. Network-only calibration and no-send controls are explicitly labelled
 The report retains source ACK rates, receiver arrival buckets, phase distributions,
 RSS/heap samples and dispatch reservations. No script executes the payload or
 returns a canonical Tool Result.
+
+### Consecutive grants and partition count
+
+In the same fan-out fixture use `PI_CLOUD_FANOUT_SUITE=grants` for paired
+1/8/32/32/8/1 limits (32,000 intents per arm). Use `grants-long` for 92,000
+intents per arm at widths 8 and 32. Set `PI_CLOUD_FANOUT_PARTITIONS` to 32 or 64.
+Give each run a fresh output directory. Each invocation creates its own RF3
+topic generation, balanced target routing and scratch PG. Pre-warm routes and
+keep one PG transaction per Tool, 12 PG connections and 100 ms receipt delay.
+The report includes actual prefix sizes, logical vs native commits and lag.
+
+Run `node --import tsx scripts/experiments/minimal-session-storage/run-grant-crash.mjs`
+separately for an isolated three-broker and PG fault trial. Its PG delivery
+witness permits duplicates so that re-execution would be visible. A replacement
+rewinds from offset zero after the first process dies with six unsent commands.

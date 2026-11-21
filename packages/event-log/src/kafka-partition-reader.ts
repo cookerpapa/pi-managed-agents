@@ -13,6 +13,7 @@ export type PartitionReaderOptions = {
   prefetch?: PrefetchLimits;
   batchRead?: boolean;
   readyPrefixes?: boolean;
+  readyPrefixLimit?: number;
   /** Optional diagnostics only; observer failure cannot change delivery. */
   onStatistics?(statistics: {
     receivedRecords: number;
@@ -371,7 +372,9 @@ export class KafkaPartitionReader {
       this.#failed === undefined &&
       generation === this.#generation &&
       epoch === this.#epoch(partition);
-    const prefix = this.#options.readyPrefixes ? this.#prefetch.takeReady(buffered) : [buffered];
+    const prefix = this.#options.readyPrefixes
+      ? this.#prefetch.takeReady(buffered, this.#options.readyPrefixLimit)
+      : [buffered];
     const records = prefix.map(({ message }): K.KafkaMessage => ({
       key: typeof message.key === "string" ? Buffer.from(message.key) : (message.key ?? null),
       value: message.value,

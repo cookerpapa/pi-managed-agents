@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Partition-local Tool grants and partition count](partition-tool-grants-20261121.md) measures 32/64 partition generations and verifies a partly sent grant after a process kill.
+
 - [Projector dispatch across 4,000 sandbox identities](projector-fanout-20261121.md) separates network receipt latency from PG projection and Kafka dispatch grants.
 
 - [Real Bash dispatch under mixed load](guest-tool-mix-20261121.md) measures the first external execution bottleneck in the #52 candidate.

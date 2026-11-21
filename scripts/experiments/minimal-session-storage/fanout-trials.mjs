@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { fanoutFixture, targets, offered } from "./fanout-fixture.mjs";
+import { fanoutFixture, targets, offered, partitions } from "./fanout-fixture.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
 import { wall } from "./pg-path-replay.mjs";
 const md5 = (s) => createHash("md5").update(s).digest("hex");
@@ -37,7 +37,7 @@ export async function runFanout({
       after: connected.after,
       elapsedMs: connected.elapsedMs,
     },
-    partitions: 32,
+    partitions,
     offered,
     slots: 3072,
     packetReservation: 4096,
@@ -86,7 +86,9 @@ export async function runFanout({
     }
   }
   const suite = process.env.PI_CLOUD_FANOUT_SUITE ?? "matrix";
-  for (const [i, { mode, ms, rounds, preload = false, cap }] of cases(suite).entries()) {
+  for (const [i, { mode, ms, rounds, preload = false, cap, grantWidth = 1 }] of cases(
+    suite,
+  ).entries()) {
     const arm = i + 1,
       count = rounds * targets;
     if (mode !== "direct") await seed(arm);
@@ -109,6 +111,7 @@ export async function runFanout({
         count,
         start,
         preload,
+        grantWidth,
         cap,
       });
       ({ source } = await call(emitter, "emitMessages", "messagesEmitted", {
@@ -118,7 +121,7 @@ export async function runFanout({
       source.rate = (count * 1000) / (source.acknowledgedAt - start);
       if (preload) await call(projector, "fanoutRelease", "fanoutReleased", { start: wall() });
       ({ result, ends } = await call(projector, "fanoutFinish", "fanoutFinished"));
-      assert.equal(ends.length, 32);
+      assert.equal(ends.length, partitions);
       if (mode === "offset-control") {
         const { rows } = await db.query(
           "select count(*)::int n from runs where projection_tools <> '{}'::jsonb",
@@ -132,13 +135,28 @@ export async function runFanout({
     });
     assert(network.total === deliveryRounds * targets && result.acks === network.total);
     assert(result.peakActive <= (cap ?? 3072) && result.peakReservedBytes <= 12 * 1024 * 1024);
-    assert(result.peakWaiting <= 32, "Only the partition callbacks may await capacity");
-    const trial = { mode, delay: ms, count, preload, bytes, source, result, network };
+    assert(result.peakWaiting <= partitions, "Only the partition callbacks may await capacity");
+    if (suite.startsWith("grants")) {
+      assert.equal(
+        Object.entries(result.grantSizes).reduce((sum, [size, n]) => sum + Number(size) * n, 0),
+        count,
+      );
+      assert(
+        Object.keys(result.grantSizes).every((k) => Number(k) >= 1 && Number(k) <= grantWidth),
+      );
+      assert.equal(result.pgTransactions.total, count);
+      assert(
+        result.nativeCommits.positions >=
+          Object.values(result.grantSizes).reduce((sum, n) => sum + n, 0),
+      );
+    }
+    const trial = { mode, delay: ms, grantWidth, count, preload, bytes, source, result, network };
     study.trials.push(trial);
     await save();
     console.log(
       JSON.stringify({
         mode,
+        grantWidth,
         ms,
         count,
         preload,
@@ -157,6 +175,12 @@ export async function runFanout({
 
 function cases(suite) {
   const trial = (mode, ms, rounds, options) => ({ mode, ms, rounds, ...options });
+  if (suite === "grants" || suite === "grants-long") {
+    const widths = suite === "grants" ? [1, 8, 32, 32, 8, 1] : [8, 32];
+    return widths.map((grantWidth) =>
+      trial("concurrent", 100, suite === "grants" ? 8 : 23, { grantWidth }),
+    );
+  }
   if (suite === "sustain")
     return [
       trial("direct", 500, 32),
