@@ -42,17 +42,27 @@ export function collectInputConfirmations(
     const next = state(row);
     if (!next) continue;
     const old = state(before.get(row.id));
-    const base = {
-      tenantId: scope.tenantId,
-      conversationId: next.conversationId,
-      runId: next.runId,
-    };
-    for (const [operationId, input] of Object.entries(next.inputs))
-      if (input.nativeId !== null && old?.inputs[operationId]?.nativeId !== input.nativeId)
-        result.push({ ...base, action: "submit", operationId, fingerprint: input.fingerprint });
-    for (const [operationId, receipt] of Object.entries(next.receipts))
-      if (!old?.receipts[operationId])
-        result.push({ ...base, action: "mutate", operationId, fingerprint: receipt.fingerprint });
+    result.push(...changedInputConfirmations(scope.tenantId, next, old));
   }
+  return result;
+}
+
+export function changedInputConfirmations(
+  tenantId: string,
+  next: State,
+  old?: State,
+): ProjectedInputConfirmation[] {
+  const result: ProjectedInputConfirmation[] = [];
+  const base = {
+    tenantId,
+    conversationId: next.conversationId,
+    runId: next.runId,
+  };
+  for (const [operationId, input] of Object.entries(next.inputs))
+    if (input.nativeId !== null && old?.inputs[operationId]?.nativeId !== input.nativeId)
+      result.push({ ...base, action: "submit", operationId, fingerprint: input.fingerprint });
+  for (const [operationId, receipt] of Object.entries(next.receipts))
+    if (!old?.receipts[operationId])
+      result.push({ ...base, action: "mutate", operationId, fingerprint: receipt.fingerprint });
   return result;
 }

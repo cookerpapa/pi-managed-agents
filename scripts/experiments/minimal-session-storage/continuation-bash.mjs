@@ -6,7 +6,7 @@ import { awaitWithContext } from "@earendil-works/chord/context";
 import { durableToolState } from "@pi-cloud/protocol";
 import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 
-export function continuationBash(mailbox, runId, measurement, fixedCommand) {
+export function continuationBash(mailbox, runId, measurement, fixedCommand, timeoutMs = 10000) {
   assert.match(runId, /^[a-f0-9-]{36}$/);
   let operation;
   const controller = new AbortController();
@@ -18,6 +18,15 @@ export function continuationBash(mailbox, runId, measurement, fixedCommand) {
       : read);
   return {
     command,
+    async restore(original) {
+      assert(!operation);
+      await mailbox.restore([original], controller.signal);
+      operation = {
+        taskId: original.taskId,
+        reply: original.reply,
+        wait: mailbox.resumeWait(original.operationId, original.reply, controller.signal),
+      };
+    },
     async intents(writes) {
       const intents = [];
       if (measurement && !measurement.remote) return intents;
@@ -59,7 +68,7 @@ export function continuationBash(mailbox, runId, measurement, fixedCommand) {
           operationId: id,
           taskId: task.id,
           reply,
-          timeoutMs: 10000,
+          timeoutMs,
           maximumOutputBytes: 51200,
         });
       }

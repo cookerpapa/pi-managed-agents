@@ -76,6 +76,11 @@ export function foldRootPresentation(view, f, frame) {
     });
     frame.strict = true;
   }
+  if (doc)
+    assert(
+      doc.runId === f.scope.runId && doc.inputs && doc.receipts,
+      "Root input metadata changed Run",
+    );
   if (doc || Object.keys(receipts).length) {
     frame.nativeSeq = f.commit.seq;
     frame.ops.push({

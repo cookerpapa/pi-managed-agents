@@ -14,7 +14,11 @@ import {
 } from "./projection-statements.mjs";
 import { batchHash } from "./moving-checkpoint.mjs";
 
-export async function projectRecord({ fact: f, partition, offset }, draft, environment) {
+export async function projectRecord(
+  { fact: f, partition, offset, openingRow },
+  draft,
+  environment,
+) {
   const {
     pool,
     sessions,
@@ -145,9 +149,10 @@ export async function projectRecord({ fact: f, partition, offset }, draft, envir
       inboxes = {};
     if (batch.seq !== 1) {
       if (stage?.integrated) {
-        const {
-          rows: [row],
-        } = await pool.query(openingHead, [runId, tenantId, piSessionId]);
+        const row =
+          openingRow === undefined
+            ? (await pool.query(openingHead, [runId, tenantId, piSessionId])).rows[0]
+            : openingRow;
         metrics.queries++;
         if (!["running", "cancel_requested"].includes(row?.state) || row.lease_id !== writerId) {
           metrics.stale++;

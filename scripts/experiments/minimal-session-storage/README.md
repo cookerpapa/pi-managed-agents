@@ -576,3 +576,15 @@ the deployment's Kafka cluster using fixture-owned boot topics. Only this test's
 topics and groups are removed. Use `--normal-root` for the HTTP variant, which
 also retries the original input with the same idempotency key. See the
 [acceptance report](../../../docs/reports/normal-root-message-store-20261122.md).
+
+
+### Browser-confirmed busy input across a root handoff
+
+With the same Cube, Chrome and disposable database fixture, run the two cases serially:
+
+```bash
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/root-follow-up.json --root-input-web follow_up
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/root-steer.json --root-input-web steer
+```
+
+Each case holds the projector before the busy input reaches PG, waits for the real HTTP receipt in Chrome, and terminates the first Worker. The replacement attaches to the original tool and consumes the original input. See the [acceptance report](../../../docs/reports/root-input-handoff-20261122.md).

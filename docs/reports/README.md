@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Confirmed root input across Worker loss](root-input-handoff-20261122.md) checks the browser receipt, native Inbox and original tool across a sealed handoff.
+
 - [Ordinary root conversation on the new message store](normal-root-message-store-20261122.md) follows both a browser refresh during Bash and a cold continuation across API and Projector restart.
 
 - [Atomic recovery after Worker and Projector process loss](atomic-family-handoff-20261122.md) verifies the new store, original reply, public family history and a rolled-back recovery seal.

@@ -8,11 +8,12 @@ import {
   TurnExecutionCancelledError,
 } from "../../../packages/runtime-core/src/run-executor.ts";
 import { SessionLeaseCoordinator } from "../../../packages/runtime-core/src/session-lease-coordinator.ts";
+import { PostgresSessionLeaseObserver } from "../../../packages/pi-session-postgres/src/postgres-session-lease-observer.ts";
 import { RunCancellationExecutor } from "../../../packages/runtime-core/src/run-cancellation-executor.ts";
 import { registerTestWorker } from "../../../packages/control-plane/test/fixtures/registered-worker.ts";
 import { admitTestExecution } from "../../../packages/control-plane/test/admit-test-execution.ts";
 
-export async function claimRun(connectionString, runId) {
+export async function claimRun(connectionString, runId, observeInput = false) {
   const database = createDatabase({ connectionString, maxConnections: 3 });
   const workerId = randomUUID();
   await database
@@ -48,6 +49,14 @@ export async function claimRun(connectionString, runId) {
   const { leaseId, piConversationId, ...scope } = admission.publication.scope;
   assert.equal(piConversationId, 1);
   const identity = await owner.heartbeatIdentity();
+  const observer = observeInput ? new PostgresSessionLeaseObserver({ database }) : undefined;
+  const inputAuthority = observer?.open({
+    tenantId: scope.tenantId,
+    piSessionId: scope.piSessionId,
+    leaseId,
+    writerId: scope.writerId,
+    fencingToken: scope.fencingToken,
+  });
   let timer,
     nativeHost,
     renewalError,
@@ -76,6 +85,7 @@ export async function claimRun(connectionString, runId) {
     const at = performance.now();
     const response = await owner.renewFromHeartbeat(heartbeat);
     nativeHost?.observeLeaseRenewals(heartbeat, response, at);
+    observer?.observeRenewals(heartbeat, response, at);
     assert(response.payload.familyLeaseRenewals?.length === 1, "Lease renewal was not accepted");
     if (!closed)
       timer = setTimeout(
@@ -87,8 +97,11 @@ export async function claimRun(connectionString, runId) {
       );
   }
   await renew();
+  inputAuthority?.start();
   return {
+    inputAuthority,
     scope,
+    workerId,
     attachNativeHost(host) {
       nativeHost = host;
     },
@@ -131,6 +144,7 @@ export async function claimRun(connectionString, runId) {
     async close() {
       closed = true;
       clearTimeout(timer);
+      await observer?.close();
       await database.destroy();
     },
   };

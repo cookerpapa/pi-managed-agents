@@ -1,6 +1,9 @@
 // Matched source for ordinary text/tool root Sessions; never opens a legacy
 // native projection. One SessionProjector owns admission, live events and grant.
+import { rootOpeningHead } from "./session-prefix.mjs";
+import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import assert from "node:assert/strict";
+import { changedInputConfirmations } from "@pi-cloud/pi-session-postgres/durable";
 import { sql } from "kysely";
 import { resolveDurableDisplay } from "@pi-cloud/protocol";
 import { ReadyProjection } from "./ready-projection.mjs";
@@ -72,10 +75,24 @@ export function normalRootProjection(pool, topic, select, resolve) {
       async project(fact, position, current) {
         assert.equal(fact.scope.sessionId, fact.scope.piSessionId);
         assert(
-          !fact.modelEvidence?.length && !fact.inputQueueSessions?.length,
-          "Unexpected accounting or inbox confirmation in ordinary root profile",
+          !fact.modelEvidence?.length &&
+            (fact.inputQueueSessions ?? []).every((id) => id === fact.scope.sessionId),
+          "Unsupported root accounting or cross-session input",
         );
-        const r = { ...position, fact },
+        const { scope } = fact;
+        let previous = view.sessions.get(scope.runId),
+          openingRow;
+        if (!previous && fact.commit.seq > 1) {
+          openingRow =
+            (await pool.query(rootOpeningHead, [scope.runId, scope.tenantId, scope.piSessionId]))
+              .rows[0] ?? null;
+          if (openingRow?.has_handoff)
+            previous = await reopenRootProjection(pool, scope, position, fact.commit.seq);
+          if (!current()) return { admitted: false, events: [], covers: [] };
+          if (previous) view.sessions.set(scope.runId, previous);
+        }
+        const before = previous?.rootInputDoc;
+        const r = { ...position, fact, openingRow },
           plan = await router.projectOperation(r, current);
         const session = view.sessions.get(fact.scope.runId);
         const admitted =
@@ -97,7 +114,19 @@ export function normalRootProjection(pool, topic, select, resolve) {
               covers.push({ sessionId: d.scope.sessionId, through: d.coveredThrough });
           }
         }
-        return { admitted, events, covers };
+        const after = session?.rootInputDoc;
+        const inputConfirmations =
+          admitted && fact.inputQueueSessions?.length && after && before !== after
+            ? changedInputConfirmations(
+                scope.tenantId,
+                { ...after.value, conversationId: 1 },
+                before ? { ...before.value, conversationId: 1 } : undefined,
+              ).map(({ conversationId, ...receipt }) => ({
+                ...receipt,
+                sessionId: scope.sessionId,
+              }))
+            : [];
+        return { admitted, events, covers, inputConfirmations };
       },
       async prepareCoverage() {
         throw Error("Standalone native display is outside the ordinary root composition");
@@ -109,9 +138,10 @@ export function normalRootProjection(pool, topic, select, resolve) {
         assert(current());
         const s = view.sessions.get(scope.runId);
         assert(
-          s && s.writer === scope.writerId && sequence === s.seq,
+          s && s.writer === scope.writerId && (sequence === undefined || sequence === s.seq),
           "Native root has not reached its completion",
         );
+        if (sequence === undefined) return () => {}; // Forced seal records active work via the recovery checkpoint.
         assertFamilySettled(s);
         assert(emptyInboxRoutes(s.inboxes));
         return () => {};
@@ -163,7 +193,7 @@ export function normalRootProjection(pool, topic, select, resolve) {
     view,
     nativeStore,
     async dispatch(r, current, grant) {
-      if (r.fact.kind === "work_finished") {
+      if (r.fact.kind === "work_finished" || r.fact.kind === "execution_seal") {
         nativeStore.controlProjected(r);
         return;
       }

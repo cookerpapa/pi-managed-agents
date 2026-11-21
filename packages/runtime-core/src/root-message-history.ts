@@ -20,7 +20,7 @@ export const rootMessageTurns = sql<HistoryTurnRow>`(select r.tenant_id,r.sessio
   r.mailbox_position,r.operation_kind,r.state,r.stop_reason,r.output_display_seq,r.output_display_native_seq,
   (r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
   from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id where r.pruned_at is null and s.pruned_at is null
-    and (r.state<>'queued' or r.operation_kind='compact') and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)) root_turns`;
+    and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact') and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)) root_turns`;
 
 export async function rootMessageHeaders(
   db: Kysely<Database>,

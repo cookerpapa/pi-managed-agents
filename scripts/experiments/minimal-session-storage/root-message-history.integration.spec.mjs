@@ -1,3 +1,4 @@
+import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import pg from "pg";
@@ -198,5 +199,72 @@ it("pages a Tool across proposal and result, and restores original input and com
     } finally {
       await admin.end();
     }
+  }
+});
+
+it("binds the cold root projection to the sealed writer, the exact next native commit and the retained Inbox", async () => {
+  const c = new pg.Client({ connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL });
+  await c.connect();
+  try {
+    await c.query(`create temporary table runs(id uuid,session_id uuid,tenant_id uuid,lease_id uuid,fencing_token int,mailbox_position bigint,native_work_handoff jsonb,projection_tools jsonb,projection_pin bigint);
+      create temporary table session_leases(tenant_id uuid,lease_id uuid,pi_session_id text,fencing_token int,writer_seal_offset bigint,released_at timestamptz);
+      create temporary table inboxes(tenant_id uuid,pi_session_id uuid,doc_id bigint,conversation_id int,commit_seq bigint,items jsonb)`);
+    const session = randomUUID(),
+      scope = {
+        runId: randomUUID(),
+        tenantId: randomUUID(),
+        sessionId: session,
+        piSessionId: session,
+        turnId: randomUUID(),
+        writerId: randomUUID(),
+        fencingToken: 2,
+      };
+    const old = randomUUID(),
+      point = { topic: "root", partition: 0, offset: 15n },
+      h = {
+        scope: { ...scope, writerId: old, fencingToken: 1 },
+        topic: "root",
+        partition: 0,
+        offset: "14",
+        nativeText: JSON.stringify({ seq: 9, nextId: 20, records: [], heads: [] }),
+      },
+      items = [{ id: 8, mode: "steer", content: "follow the edit" }];
+    await c.query("insert into session_leases values($1,$2,$3,1,14,now()),($1,$4,$3,2,null,null)", [
+      scope.tenantId,
+      old,
+      session,
+      scope.writerId,
+    ]);
+    await c.query("insert into runs values($1,$2,$3,$4,2,1,$5,'{}',12)", [
+      scope.runId,
+      session,
+      scope.tenantId,
+      scope.writerId,
+      h,
+    ]);
+    await c.query("insert into inboxes values($1,$2,4,1,8,$3)", [
+      scope.tenantId,
+      session,
+      JSON.stringify(items),
+    ]);
+    expect(await reopenRootProjection(c, scope, point, 10)).toMatchObject({
+      seq: 9,
+      nextId: 20,
+      writer: scope.writerId,
+      inboxes: { 4: { conversation: 1, value: { items } } },
+    });
+    for (const [s, p, seq] of [
+      [{ ...scope, writerId: old }, point, 10],
+      [scope, { ...point, partition: 1 }, 10],
+      [scope, { ...point, offset: 14n }, 10],
+      [scope, point, 11],
+      [{ ...scope, turnId: randomUUID() }, point, 10],
+    ]) {
+      await expect(reopenRootProjection(c, s, p, seq)).rejects.toThrow(/sealed root|sealed input/);
+    }
+    await c.query("update inboxes set commit_seq=10");
+    await expect(reopenRootProjection(c, scope, point, 10)).rejects.toThrow("sealed input");
+  } finally {
+    await c.end();
   }
 });

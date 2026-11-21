@@ -148,7 +148,11 @@ export class ConversationReader {
             .whereRef("counted_run.tenant_id", "=", "session_row.tenant_id")
             .whereRef("counted_run.session_id", "=", "session_row.id")
             .where("counted_run.pruned_at", "is", null)
-            .where("counted_run.state", "!=", "queued")
+            .where(
+              this.rootMessageHistory
+                ? sql<boolean>`(counted_run.state<>'queued' or counted_run.started_at is not null)`
+                : sql<boolean>`counted_run.state<>'queued'`,
+            )
             .where("counted_run.operation_kind", "=", "chat")
             .where(
               sql<boolean>`not (counted_run.state='cancelled' and counted_run.started_at is null)`,

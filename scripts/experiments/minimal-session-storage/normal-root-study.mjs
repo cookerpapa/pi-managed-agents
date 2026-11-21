@@ -1,3 +1,4 @@
+import { rootInputStudy } from "./root-input-handoff-study.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -27,6 +28,7 @@ const {
   servingBrokers: brokers,
   cube,
   browser,
+  inputMode,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
 assert(new URL(dbUrl).hostname === "127.0.0.1" && brokers.every((b) => b.startsWith("127.0.0.1:")));
 const topic = "pma-root-" + randomUUID(),
@@ -55,6 +57,7 @@ let composed,
   dispatches = 0;
 let interruptedFinish,
   finishRollbackVerified = false;
+const busy = inputMode ? rootInputStudy(db, pool, topic, inputMode) : undefined;
 async function open() {
   composed = normalRootProjection(
     pool,
@@ -71,31 +74,32 @@ async function open() {
     },
   );
   const settle = composed.nativeStore.settle;
-  composed.nativeStore.settle = async (tx, fact, position) => {
-    if (interruptedFinish === fact.factId && !finishRollbackVerified) {
-      // This independent reader sees the last committed version while the
-      // retried terminal transaction holds the row lock.
-      const {
-        rows: [before],
-      } = await pool.query(
-        `select r.state,r.history_head,
+  if (!busy)
+    composed.nativeStore.settle = async (tx, fact, position) => {
+      if (interruptedFinish === fact.factId && !finishRollbackVerified) {
+        // This independent reader sees the last committed version while the
+        // retried terminal transaction holds the row lock.
+        const {
+          rows: [before],
+        } = await pool.query(
+          `select r.state,r.history_head,
         (select count(*)::int from session_terminal_events e where e.tenant_id=r.tenant_id and e.turn_id=r.turn_id) terminals,
         (select next_offset from accepted_fact_projection_offsets where topic=$2 and partition=$3) progress
         from runs r where r.id=$1`,
-        [fact.scope.runId, position.topic, position.partition],
-      );
-      assert.equal(before.state, "running");
-      assert.equal(before.history_head, null);
-      assert.equal(before.terminals, 0);
-      assert(BigInt(before.progress) <= position.offset);
-      finishRollbackVerified = true;
-    }
-    await settle(tx, fact, position);
-    if (!interruptedFinish) {
-      interruptedFinish = fact.factId;
-      throw Error("Injected interruption before normal completion COMMIT");
-    }
-  };
+          [fact.scope.runId, position.topic, position.partition],
+        );
+        assert.equal(before.state, "running");
+        assert.equal(before.history_head, null);
+        assert.equal(before.terminals, 0);
+        assert(BigInt(before.progress) <= position.offset);
+        finishRollbackVerified = true;
+      }
+      await settle(tx, fact, position);
+      if (!interruptedFinish) {
+        interruptedFinish = fact.factId;
+        throw Error("Injected interruption before normal completion COMMIT");
+      }
+    };
   projector = new SessionProjector(
     {
       database: db,
@@ -110,8 +114,13 @@ async function open() {
       publicationToken: randomUUID() + randomUUID(),
       advertisedBaseUrl: "http://127.0.0.1:9",
       nativeStore: composed.nativeStore,
+      ...(busy
+        ? { recoveryCheckpoint: busy.guard(composed), nativeChanges: busy.nativeChanges }
+        : {}),
       controlTools: { consume: (...args) => composed.dispatch(...args) },
-      toolCommands: { consume: async (r) => assert.equal(r.fact.kind, "work_finished") },
+      toolCommands: {
+        consume: async (r) => assert(["work_finished", "execution_seal"].includes(r.fact.kind)),
+      },
     },
     (v) => decodeWorkspaceFact(v),
   );
@@ -120,6 +129,7 @@ async function open() {
   app = await createControlPlaneApplication({
     database: db,
     rootMessageHistory: true,
+    ...(busy ? await busy.ports(projector) : {}),
     eventRuntime: { eventHub: projector.eventHub, eventStore: projector.eventStore },
     productionHttpGateway: new ProductionHttpGateway({
       authenticator: new PostgresTenantApiAuthenticator({ database: db }),
@@ -131,17 +141,19 @@ async function open() {
   api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), tenant.credential.token);
 }
 async function close() {
+  await busy?.close();
   await app?.close();
   app = undefined;
   await projector?.close();
   projector = undefined;
 }
-function work(runId) {
+function work(runId, resumeInput = false) {
   const child = fork(fileURLToPath(new URL("./normal-root-worker.mjs", import.meta.url)), [], {
     execArgv: ["--import", "tsx"],
     stdio: ["ignore", "inherit", "inherit", "ipc"],
   });
   actors.add(child);
+  busy?.attach(child);
   const done = new Promise((resolve, reject) => {
     let evidence;
     child.on("message", (m) => {
@@ -159,7 +171,7 @@ function work(runId) {
     });
   });
   void done.catch(() => {});
-  child.send({ dbUrl: url.href, topic, brokers, replyBrokers, runId });
+  child.send({ dbUrl: url.href, topic, brokers, replyBrokers, runId, inputMode, resumeInput });
   return done;
 }
 const items = (page) => page.turns.flatMap((t) => t.transcript?.items ?? []);
@@ -229,7 +241,9 @@ try {
   evidence = await withFamilyGuest(cube, async (guest) => {
     endpoint = await guest.directory(binding);
     const prompt1 = "Check the value in the workspace.",
-      prompt2 = "What did the preceding command return?",
+      prompt2 = busy
+        ? "Check the saved value " + randomUUID()
+        : "What did the preceding command return?",
       key = randomUUID();
     async function browserRun(n) {
       return until(
@@ -251,6 +265,8 @@ try {
         origin,
         id,
         token: tenant.credential.token,
+        inputMode,
+        preferenceKey: "pi-cloud:composer-enter:" + tenant.tenantId + ":" + tenant.ownerUserId,
         first: prompt1,
         second: prompt2,
       });
@@ -270,6 +286,24 @@ try {
     const active = await api.getConversation(id);
     const tool = items(active).find((i) => i.kind === "tool");
     assert(tool?.status === "running" && tool.input.command.includes("cat result"));
+    if (busy) {
+      const measured = await Promise.race([
+        busy.failed,
+        busy.exercise({
+          first: prompt1,
+          second: prompt2,
+          id,
+          runId: first.runId,
+          api,
+          endpoint,
+          work,
+          dispatchCount: () => dispatches,
+        }),
+      ]);
+      assert.deepEqual(await legacyCounts(), baseline);
+      await projector.checkHealth();
+      return measured;
+    }
     if (browser) await browserMessage("/study", "active");
     await endpoint.release();
     await a;
@@ -329,6 +363,9 @@ try {
       finishRollbackVerified,
     };
   });
+} catch (error) {
+  if (browser) await browserNote("/study", "failure", { message: error.message });
+  throw error;
 } finally {
   await Promise.all(
     [...actors].map(
@@ -348,7 +385,11 @@ try {
       if (topics.length) await replyAdmin.deleteTopics({ topics });
       const groups = (await replyAdmin.listGroups()).groups
         .map((g) => g.groupId)
-        .filter((g) => [...replyBoots].some((id) => g === "tool-reply-" + id));
+        .filter((g) =>
+          [...replyBoots].some(
+            (id) => g === "tool-reply-" + id || g.startsWith("tool-restore-" + id + "-"),
+          ),
+        );
       for (const group of groups)
         await until(
           async () => {

@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { createServer } from "vite";
+import { until } from "./family-process.mjs";
 import { withChromePage } from "../../lib/chrome-cdp.mjs";
 import { browserNote, browserMessage } from "./browser-signals.mjs";
 
 export async function verifyRootBrowser(dir) {
   let server;
   try {
-    const { origin, id, token, first, second } = await browserMessage(dir, "ready");
+    const { origin, id, token, first, second, inputMode, preferenceKey } = await browserMessage(
+      dir,
+      "ready",
+    );
     assert(new URL(origin).hostname === "127.0.0.1");
     server = await createServer({
       configFile: false,
@@ -74,8 +78,88 @@ export async function verifyRootBrowser(dir) {
         await page.waitFor(
           "document.querySelector('.product-conversation-heading strong')?.textContent==='normal root'",
         );
+        if (inputMode) {
+          await page.evaluate(
+            `localStorage.setItem(${JSON.stringify(preferenceKey)},${JSON.stringify(inputMode)})`,
+          );
+          await page.navigate(url);
+          await page.waitFor(
+            "document.querySelector('.product-conversation-heading strong')?.textContent==='normal root'",
+          );
+        }
         await submit(first);
         await page.waitFor("document.querySelector('.product-tool-running')", 60000);
+        if (inputMode) {
+          let requestId,
+            key,
+            status,
+            body,
+            finished = false;
+          page.onNetworkEvent((method, m) => {
+            if (
+              method === "Network.requestWillBeSent" &&
+              m.request.method === "POST" &&
+              new URL(m.request.url).pathname === "/v1/sessions/" + id + "/turns"
+            ) {
+              requestId = m.requestId;
+              key = Object.entries(m.request.headers).find(
+                ([k]) => k.toLowerCase() === "idempotency-key",
+              )?.[1];
+              body = JSON.parse(m.request.postData);
+            }
+            if (requestId && m.requestId === requestId) {
+              if (method === "Network.responseReceived") status = m.response.status;
+              if (method === "Network.loadingFinished") finished = true;
+            }
+          });
+          await submit(second);
+          await browserMessage(dir, "held");
+          assert(requestId && key && body.prompt === second && body.whenBusy === inputMode);
+          assert.equal(status, undefined);
+          await browserNote(dir, "unconfirmed");
+          await until(() => finished, "browser accepted busy input");
+          assert(status >= 200 && status < 300);
+          const response = await page.send("Network.getResponseBody", { requestId });
+          const receipt = JSON.parse(
+            response.base64Encoded
+              ? Buffer.from(response.body, "base64").toString()
+              : response.body,
+          );
+          const queued = `[...document.querySelectorAll('.pending-input-row')].some(e=>e.dataset.inputId===${JSON.stringify(receipt.inputId)} && e.innerText.includes(${JSON.stringify(second)}))`;
+          await page.waitFor(queued);
+          await browserNote(dir, "accepted", { receipt, key, thinkingLevel: body.thinkingLevel });
+          await browserMessage(dir, "between");
+          await page.navigate(url);
+          await page.waitFor(queued);
+          await page.waitFor(has(first));
+          await page.waitFor("document.querySelector('.product-tool-running')");
+          await browserNote(dir, "queueWhileUnclaimed");
+          await browserMessage(dir, "reclaimed");
+          await page.navigate(url);
+          await page.waitFor(queued);
+          await browserNote(dir, "queueReload");
+          const { answer } = await browserMessage(dir, "settled");
+          await page.waitFor(has(answer));
+          await page.waitFor("document.querySelectorAll('.pending-input-row').length===0");
+          await page.navigate(url);
+          await page.waitFor(has(answer));
+          assert.equal(
+            await page.evaluate(
+              `[...document.querySelectorAll('.product-user-bubble')].filter(e=>e.textContent===${JSON.stringify(second)}).length`,
+            ),
+            1,
+          );
+          assert.equal(
+            await page.evaluate("document.querySelectorAll('.pending-input-row').length"),
+            0,
+          );
+          assert.equal(
+            await page.evaluate("document.querySelectorAll('.product-tool-completed').length"),
+            1,
+          );
+          assert.deepEqual(failures, []);
+          return;
+        }
         await page.navigate(url);
         await page.waitFor("document.querySelector('.product-tool-running')");
         await page.waitFor(has(first));

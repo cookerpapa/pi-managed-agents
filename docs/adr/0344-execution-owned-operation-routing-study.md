@@ -128,3 +128,7 @@ control actions and production deployment remain separately gated.
 The ordinary root candidate keeps a bounded navigation caption on the same message row and uses Pi’s existing caption rules. The sidebar selects eligible rows before transferring captions. Full native text and tool output stay outside the navigation query.
 
 The isolated Session topic uses the candidate’s seven-day broker retention. The pending-tool reference supplies the original mailbox offset to the existing reply-retention policy. The deployed Session topic retains its separate cutoff rules.
+
+### Confirmed busy input during a first root handoff
+
+Exercise ADR-0328 on the candidate store with the public composer. Derive the exact submit or edit confirmation from the change to the native human-input document and emit it only after the candidate projection commits. Hold the original tool open while the Worker loses its lease. A new Worker reads the ordered seal, restores the native Inbox and original waiter, and continues the same Run. The Projector releases the old writer view at closure. On the first admitted commit of the replacement it restores the projection view using the PG seal, original tool references and root Inbox under the new lease and adjacent native sequence. It recomputes the retained root count and byte total once at normal settlement. Limit this study to the first handoff of an ordinary root with the Projector still running. There is no new owner, broker or per-input history table.

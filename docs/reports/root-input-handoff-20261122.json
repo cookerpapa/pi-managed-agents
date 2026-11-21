@@ -1,0 +1,46 @@
+{
+  "cases": [
+    {
+      "browser": "Chrome",
+      "activeReload": true,
+      "settledReload": true,
+      "composerSubmissions": 2,
+      "http5xx": 0,
+      "mode": "steer",
+      "confirmedAfterProjection": true,
+      "workerKilledAfterReceipt": true,
+      "retrySameInput": true,
+      "queueVisibleBeforeReclaim": true,
+      "restoredQueuedId": true,
+      "originalMailboxRestored": true,
+      "modelCallsAfterHandoff": 1,
+      "physicalExecutions": 1,
+      "runs": 1,
+      "placements": 1,
+      "results": 1,
+      "legacyNativeRowsAdded": 0,
+      "cleanupVerified": true
+    },
+    {
+      "browser": "Chrome",
+      "activeReload": true,
+      "settledReload": true,
+      "composerSubmissions": 2,
+      "http5xx": 0,
+      "mode": "follow_up",
+      "confirmedAfterProjection": true,
+      "workerKilledAfterReceipt": true,
+      "retrySameInput": true,
+      "queueVisibleBeforeReclaim": true,
+      "restoredQueuedId": true,
+      "originalMailboxRestored": true,
+      "modelCallsAfterHandoff": 2,
+      "physicalExecutions": 1,
+      "runs": 1,
+      "placements": 1,
+      "results": 1,
+      "legacyNativeRowsAdded": 0,
+      "cleanupVerified": true
+    }
+  ]
+}

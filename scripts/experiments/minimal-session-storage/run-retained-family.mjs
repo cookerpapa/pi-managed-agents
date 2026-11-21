@@ -14,9 +14,11 @@ const output = process.argv[2],
   bashFields = process.argv[3] === "--bash-fields",
   atomicHandoff = process.argv[3] === "--atomic-handoff",
   pgHandoff = atomicHandoff || bashFields || process.argv[3] === "--pg-handoff",
-  browser = process.argv[3] === "--normal-root-web",
+  inputMode = process.argv[3] === "--root-input-web" ? process.argv[4] : undefined,
+  browser = process.argv[3] === "--normal-root-web" || !!inputMode,
   normalRoot = browser || process.argv[3] === "--normal-root",
   serving = normalRoot || pgHandoff || process.argv[3] === "--serving";
+if (process.argv[3] === "--root-input-web") assert(["steer", "follow_up"].includes(inputMode));
 let isolatedKafka;
 assert(output && process.env.PI_CLOUD_RUNTIME_LOAD_CHECK === "1");
 process.umask(0o077);
@@ -36,6 +38,7 @@ try {
       atomicHandoff,
       pgHandoff,
       bashFields,
+      inputMode,
       browser,
       scene: process.argv[4],
     }),
