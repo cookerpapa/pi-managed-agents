@@ -136,6 +136,7 @@ const source = Object.fromEntries(
                   "grants-display-ackmix",
                   "grants-display-wide",
                   "grants-tool-loop",
+                  "grants-million-day",
                 ].includes(process.env.PI_CLOUD_FANOUT_SUITE),
             ),
             __PG_PATH_STUDY__: String(mode === "wake-throughput" && suite === "pg-paths"),

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, compare the daily average and peak loads for one million 20-tool Runs. [Daily-load study](reports/tool-loop-capacity-20261121.md#每天百万-run每个-run-20-次工具调用).
+
 - [x] Under #52, measure verified projection throughput for 200-call Runs with native tool intents, results, compaction and closure. [Mixed long-Run capacity](reports/tool-loop-capacity-20261121.md).
 
 - [x] Under #52, measure the post-PG delivery of a matching native Tool start, full-trace batch coverage and the throughput of wider dispatch grants. [Width and traffic-mix measurements](reports/display-tool-batching-20261121.md).

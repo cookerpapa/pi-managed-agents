@@ -523,3 +523,17 @@ Kafka positions. After the driver exits, run
 `node scripts/experiments/minimal-session-storage/summarize-tool-loop.mjs <output-directory>`
 to get Kafka records, completed history rows and tool pairs per second, plus
 lag at four points in the input window and time to drain after the producer.
+
+
+### One million Runs per day at 20 tools per Run
+
+`PI_CLOUD_FANOUT_SUITE=grants-million-day` uses the same driver and summary
+command as the 200-tool study. It captures 1,024 fixed-Pi Runs with 20
+sequential Bash calls, 1 KiB tool results and normal closure. The captured
+profile has 187 Kafka records per Run, without threshold compaction. Paced
+replays offer the record rates equivalent to one, two, three, one and a half,
+and again one million Runs per day. The live arm waits for the Kafka producer
+on every native commit. PG Run rows and routes are prepared before timing;
+the rates describe the Session Projector and warm tool dispatch. Each arm
+verifies completion, original ordered call/result pairs, displays, receipts
+and committed partition positions.

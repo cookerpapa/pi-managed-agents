@@ -185,6 +185,7 @@ export async function runFanout({
           count,
         );
         if (rounds > 1) await verifyLoopHistory(db, owners, mix, rounds);
+        if (suite === "grants-million-day") assert.equal(mix.records, 187 * targets);
       } else await verify(arm, rounds);
     }
     const deliveryRounds = mode.endsWith("-control") ? 0 : rounds;
@@ -277,7 +278,7 @@ async function verifyLoopHistory(db, owners, mix, rounds) {
   assert.deepEqual(counts, mix.entries);
   assert.equal(counts["pi.assistant"], count + targets);
   assert.equal(counts["pi.user"], targets);
-  assert.equal(counts["pi.compaction"], targets);
+  assert.equal(counts["pi.compaction"] ?? 0, rounds === 200 ? targets : 0);
   const pairs = await db.query(`with history as (
             select run_id,commit_seq,ordinal,role,content::jsonb->'model'->0 msg from messages where role in ('assistant','toolResult')
           ), calls as (select run_id,commit_seq,ordinal,msg->'content'->0->>'id' id from history where role='assistant' and msg->'content'->0->>'type'='toolCall'),
@@ -298,17 +299,22 @@ async function verifyLoopHistory(db, owners, mix, rounds) {
 
 function cases(suite) {
   const trial = (mode, ms, rounds, options) => ({ mode, ms, rounds, ...options });
-  if (suite === "grants-tool-loop")
-    return [
-      { liveSource: true },
-      { rate: 2500 },
-      { rate: 3500 },
-      { rate: 4600 },
-      { rate: 6500 },
-      { preload: true },
-      { rate: 3500 },
-    ].map((options) =>
-      trial("concurrent", 100, 200, {
+  if (suite === "grants-tool-loop" || suite === "grants-million-day") {
+    const short = suite === "grants-million-day";
+    // A fixed native 20-call trace has 187 Session records, including closure.
+    const dailyRate = (187 * 1_000_000) / 86_400;
+    const rates = short
+      ? [1, 2, 3, 1.5, 1].map((multiplier) => ({ rate: Math.round(multiplier * dailyRate) }))
+      : [
+          { rate: 2500 },
+          { rate: 3500 },
+          { rate: 4600 },
+          { rate: 6500 },
+          { preload: true },
+          { rate: 3500 },
+        ];
+    return [{ liveSource: true }, ...rates].map((options) =>
+      trial("concurrent", 100, short ? 20 : 200, {
         grantWidth: 8,
         batchProjection: true,
         display: true,
@@ -316,6 +322,7 @@ function cases(suite) {
         ...options,
       }),
     );
+  }
   if (suite === "grants-display-wide")
     return [32, 64, 128, 128, 64, 32].map((grantWidth) =>
       trial("concurrent", 100, 8, {

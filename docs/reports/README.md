@@ -1,6 +1,6 @@
 # Delivery and research evidence
 
-- [Projector capacity for 200-tool Runs](tool-loop-capacity-20261121.md) separates Kafka records, history messages and tool pairs under live, paced and preloaded traffic.
+- [Projector capacity for 20- and 200-tool Runs](tool-loop-capacity-20261121.md) compares million-Run daily demand and peak loads, separating Kafka records, history messages and tool pairs.
 
 - [Native tool starts and grant width](display-tool-batching-20261121.md) measures actual batch membership on a complete Pi trace and separates arrival-limited throughput from backlog drain.
 

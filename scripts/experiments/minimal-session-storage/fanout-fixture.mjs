@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { kafkaProducerLane } from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 export function fanoutTargets(suite) {
+  if (suite === "grants-million-day") return 1024;
   return suite === "grants-tool-loop" ? 128 : 4000;
 }
 export const targets =

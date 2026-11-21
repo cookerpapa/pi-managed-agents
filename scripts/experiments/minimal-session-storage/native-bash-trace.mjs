@@ -85,7 +85,7 @@ export async function nativeBashTrace(scope, onCommit, options = {}) {
         { stopReason: "toolUse" },
       );
     };
-    // This profile expects one summary and one final response in addition to the tool requests.
+    // Reserve responses for the final answer and at most one summary in these profiles.
     fake.setResponses(Array(callsPerRun + 2).fill(respond));
   } else {
     const first = fauxAssistantMessage(

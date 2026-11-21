@@ -11,15 +11,19 @@ const report = await json("run/report.json"),
   cleanup = await json("fixture-cleanup.json");
 assert(report.cleaned && report.projectorResourcesRemoved && Object.values(cleanup).every(Boolean));
 const { trials, partitions, targets } = report.fanout;
-assert(
-  trials[0]?.mix?.intents === 200 * targets &&
-    trials[0]?.mix?.entries?.["pi.compaction"] === targets,
-  "Expected the 200-call native tool-loop study",
-);
 const first = trials[0].mix,
   complete = Object.values(first.entries).reduce((a, n) => a + n, 0);
 const calls = first.intents;
-assert(trials.some((t) => t.liveSource) && trials.some((t) => t.preload));
+const callsPerRun = calls / targets;
+assert(
+  [20, 200].includes(callsPerRun) &&
+    first.runs === targets &&
+    first.entries["pi.tool-result"] === calls,
+);
+assert(trials.some((t) => t.liveSource) && trials.some((t) => !t.liveSource && !t.preload));
+if (callsPerRun === 200)
+  assert(first.entries["pi.compaction"] === targets && trials.some((t) => t.preload));
+else assert(first.records === 187 * targets && !first.entries["pi.compaction"]);
 const rounded = (v) => Math.round(v * 10) / 10;
 const rates = trials.map((t) => {
   const { result: r, source: s } = t;
@@ -47,6 +51,7 @@ const rates = trials.map((t) => {
     actualInputRecordsPerSec: t.preload ? null : rounded(s.rate),
     projectorSeconds: rounded(duration),
     recordsPerSec: rounded(first.records / duration),
+    completedRunsPerSec: rounded(first.runs / duration),
     completeHistoryRowsPerSec: rounded(complete / duration),
     toolPairsPerSec: rounded(calls / duration),
     callAndResultMessagesPerSec: rounded((2 * calls) / duration),
