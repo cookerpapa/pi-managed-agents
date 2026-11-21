@@ -6,15 +6,19 @@ import { awaitWithContext } from "@earendil-works/chord/context";
 import { durableToolState } from "@pi-cloud/protocol";
 import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 
-export function continuationBash(mailbox, runId) {
+export function continuationBash(mailbox, runId, measurement) {
   assert.match(runId, /^[a-f0-9-]{36}$/);
   let operation;
   const controller = new AbortController();
-  const command = "printf '%s\\n' " + runId + " >> executions && pwd -P && cat marker";
+  const read = "printf '%s\\n' " + runId + " >> executions && pwd -P && cat marker";
+  const command = measurement
+    ? "began=$EPOCHREALTIME; " + read + ' && printf "%s %s\\n" "$began" "$EPOCHREALTIME"'
+    : read;
   return {
     command,
     async intents(writes) {
       const intents = [];
+      if (measurement && !measurement.remote) return intents;
       for (const write of writes) {
         const task = write.type === "task" && durableToolState(write.value);
         if (!task?.intent) continue;
@@ -24,6 +28,7 @@ export function continuationBash(mailbox, runId) {
           continue;
         }
         assert.equal(task.intent.arguments.command, command);
+        const waitStarted = performance.now();
         const id = randomUUID(),
           reply = {
             ...(await mailbox.replyPosition()),
@@ -37,6 +42,15 @@ export function continuationBash(mailbox, runId) {
           "bash",
           AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]),
         );
+        if (measurement) {
+          measurement.waitSetupMs = performance.now() - waitStarted;
+          void wait.result.then(
+            () => {
+              measurement.replyAt = performance.timeOrigin + performance.now();
+            },
+            () => {},
+          );
+        }
         operation = { taskId: task.id, reply, wait };
         intents.push({
           action: "execute",
@@ -53,6 +67,15 @@ export function continuationBash(mailbox, runId) {
       ...fixedRemoteToolDefinitions().find((t) => t.name === "bash"),
       async execute(args, api, context) {
         assert.equal(args.command, command);
+        if (measurement && !measurement.remote)
+          return {
+            content: [
+              {
+                type: "text",
+                text: "/workspace/load\nload-marker\n1000000000.000000 1000000000.000001\n",
+              },
+            ],
+          };
         assert.equal(operation?.taskId, api.taskId);
         assert.equal(operation.reply.toolCallId, api.callId);
         const response = await awaitWithContext(operation.wait.result, context);

@@ -393,3 +393,21 @@ The cluster and isolated-fixture prerequisites above apply.
   rate and lag samples to interpret generator backpressure.
 - `workspace-rate-input` holds projection until every Kafka ACK returns at a target of 4,630
   counted entries per second, then drains and verifies the same history.
+
+### Mixed native history and real Guest load
+
+Use the `workspace-guest-mix` profile with the same isolated-fixture command as
+`workspace-guest-continuation`. Each fresh Session gets one native Bash proposal, one
+canonical result and two deterministic model calls. At a fixed open-loop arrival rate,
+0%, 25%, 50% and 100% of those proposals perform real work on an owned Cube VM; the
+remaining controls return fixed text without executing shell. Reverse the order on the
+second pass. The driver checks the original call/result pairing, model input, physical
+execution multiset per VM, and final Kafka lag.
+
+`PI_CLOUD_GUEST_MIX_RATE` (default 4 Runs/s) and `PI_CLOUD_GUEST_MIX_COUNT` (default
+64 scheduled Runs per arm, a multiple of 32) control the offered workload.
+`PI_CLOUD_GUEST_MIX_CONFIRM=1` repeats only the all-real arm after warmup;
+`PI_CLOUD_GUEST_MIX_TARGETS=2` divides work across two owned Guests. Run invocations
+serially. The report includes per-operation latency distributions, lag samples and
+Guest resource counts. The failed-arm report is a snapshot of outstanding work at
+interruption. A missing acceptance ACK stops the trial and is never retried.

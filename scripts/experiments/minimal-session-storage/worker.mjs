@@ -146,7 +146,9 @@ async function execute(row, claimMs, claimReason) {
   const started = performance.now(),
     sc = stage,
     id = row.id;
-  const bash = sc.guestTools ? continuationBash(guestMailbox, id) : undefined;
+  const mix =
+    sc.guestQuarters === undefined ? undefined : { remote: row.initial_input.startsWith("guest ") };
+  const bash = sc.guestTools ? continuationBash(guestMailbox, id, mix) : undefined;
   let observedBash;
   send("claim", { id, actor, at: Date.now() });
   const head = sc.integrated ? priorState(row) : EMPTY_HEAD;
@@ -219,7 +221,7 @@ async function execute(row, claimMs, claimReason) {
       waiters.delete(sequence);
     }
   }
-  active.set(id, { confirm, inspectRelease });
+  active.set(id, { confirm, inspectRelease, abortMixedWait: mix ? () => bash.close() : undefined });
   async function publish(fact) {
     if (fact.kind === "durable_commit") {
       lastNative = fact;
@@ -228,12 +230,15 @@ async function execute(row, claimMs, claimReason) {
     const payload = bash ? encodeWorkspaceFact(fact) : encodeSessionLogFact(fact);
     bytes += Buffer.byteLength(payload);
     const start = performance.now();
+    const measuredIntent = mix && fact.workspaceOperations?.length;
+    if (measuredIntent) mix.publishedAt = performance.timeOrigin + start;
     await producer.append(partition, {
       factId: fact.factId,
       sessionId: row.session_id,
       value: payload,
     });
     const elapsed = performance.now() - start;
+    if (measuredIntent) mix.producerAckMs = elapsed;
     records++;
     if (fact.kind === "work_finished") {
       finishAckMs = elapsed;
@@ -307,6 +312,7 @@ async function execute(row, claimMs, claimReason) {
             observedTools,
             observedEnvironment,
             observedBash,
+            ...(mix ? { mix } : {}),
             toolExecutions,
             firstModelAt,
             baseSeq: head.seq,
@@ -744,7 +750,10 @@ listen(
     residence?.stop();
     directed?.close();
     clearInterval(poll);
-    for (const state of active.values()) state.inspectRelease.resolve();
+    for (const state of active.values()) {
+      state.inspectRelease.resolve();
+      state.abortMixedWait?.();
+    }
     const deadline = Date.now() + 20000;
     while (claims || running || directed?.busy || active.size) {
       assert(Date.now() < deadline, "Experimental Worker did not drain before producer shutdown");

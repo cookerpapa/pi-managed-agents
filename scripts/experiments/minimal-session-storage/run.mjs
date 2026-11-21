@@ -23,6 +23,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
+import { observeGuestHttp } from "./guest-http-timing.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import { build } from "esbuild";
@@ -161,6 +162,8 @@ const actors = [],
   workers = [],
   entries = new Map();
 const guestEndpoints = new Map();
+const guestHttp =
+  process.env.PI_CLOUD_PG_PATH_PROFILE === "workspace-guest-mix" ? observeGuestHttp() : undefined;
 const guestBoots = { w0: randomUUID(), w1: randomUUID() };
 let projector, fixture, router, network, wakeUrl, wakeStage, transition;
 function receive(a, m) {
@@ -184,10 +187,24 @@ function receive(a, m) {
       "Unexpected or duplicate Guest dispatch",
     );
     entry.guestOperationId = cmd.request.operationId;
-    void endpoint.submitAt(attachment, position, cmd, ref).then(
-      () => a.write({ kind: "guestAccepted", op: cmd.request.operationId, ok: true }),
+    if (wakeStage.guestQuarters !== undefined)
+      entry.submitStarted = performance.timeOrigin + performance.now();
+    const submit = () => endpoint.submitAt(attachment, position, cmd, ref);
+    if (guestHttp) entry.guestHttp = {};
+    void (guestHttp ? guestHttp.submit(entry.guestHttp, submit) : submit()).then(
+      () => {
+        if (wakeStage?.guestQuarters !== undefined)
+          entry.submitEnded = performance.timeOrigin + performance.now();
+        a.write({ kind: "guestAccepted", op: cmd.request.operationId, ok: true });
+      },
       (error) => {
         a.write({ kind: "guestAccepted", op: cmd.request.operationId, ok: false });
+        if (wakeStage?.guestQuarters !== undefined)
+          entry.failedSubmit = {
+            at: Date.now(),
+            kind: error.code ?? error.name,
+            reason: typeof error.cause === "string" ? error.cause : undefined,
+          };
         fatal(error);
       },
     );
@@ -216,6 +233,17 @@ function receive(a, m) {
   const e = entries.get(m.id);
   if (!e) {
     fatal(new Error("Unknown trial run"));
+    return;
+  }
+  if (m.kind === "toolTiming" || m.kind === "resultProjected") {
+    assert(a === projector && wakeStage?.guestQuarters !== undefined);
+    if (m.kind === "toolTiming") {
+      assert(!e.toolTiming);
+      e.toolTiming = m;
+    } else {
+      assert(!e.resultProjectedAt);
+      e.resultProjectedAt = m.at;
+    }
     return;
   }
   if (m.kind === "claim") {
@@ -511,6 +539,7 @@ function notifyBatch(directedStage, hint) {
 async function intake(e, sc = {}) {
   for (let i = 0; ; i++)
     try {
+      const withSelection = sc.environmentCases || sc.guestQuarters !== undefined;
       const started = performance.now(),
         client = await db.connect();
       const acquired = performance.now();
@@ -518,7 +547,7 @@ async function intake(e, sc = {}) {
       try {
         let environment;
         let statement = sc.integrated ? localityIntake : sc.omitNotify ? quietIntake : intakeSql;
-        if (sc.environmentCases) {
+        if (withSelection) {
           await client.query("begin");
           const selected = await client.query(
             "select value from study_session_environments where tenant=$1 and session=$2 for share",
@@ -537,9 +566,9 @@ async function intake(e, sc = {}) {
           ...(sc.integrated ? [e.modelRef ?? "local-load"] : []),
           ...(environment ? [environment] : []),
         ]));
-        if (sc.environmentCases) await client.query("commit");
+        if (withSelection) await client.query("commit");
       } catch (error) {
-        if (sc.environmentCases) await client.query("rollback");
+        if (withSelection) await client.query("rollback");
         throw error;
       } finally {
         client.release();
@@ -662,7 +691,11 @@ async function verify(sc, records, cohort) {
       );
       assert.equal(answers.length, answerCount);
       if (sc.guestTools) {
-        assert(r.guestOperationId, "Missing Guest dispatch");
+        assert.equal(
+          !!r.guestOperationId,
+          r.realGuest ?? true,
+          "Unexpected number of Guest dispatches",
+        );
         assert.deepEqual(
           history.map((m) => m.role),
           ["user", "assistant", "toolResult", "assistant"],
@@ -749,7 +782,7 @@ const report = {
   cleaned: false,
 };
 const save = () => writeFile(resolve(out, "report.json"), JSON.stringify(report, null, 2) + "\n");
-async function wave(spec) {
+async function wave(spec, measureMix) {
   const sc = {
     scene: "plain",
     modelDelayMs: 0,
@@ -761,7 +794,11 @@ async function wave(spec) {
     ...spec,
   };
   entries.clear();
-  const cohort = sc.integrated ? await seedCohort(db, tenant, sc) : [];
+  const cohort = measureMix
+    ? await (await import("./guest-mix-study.mjs")).mixCohort(db, tenant, sc.count, sc.guestTargets)
+    : sc.integrated
+      ? await seedCohort(db, tenant, sc)
+      : [];
   wakeCount = 0;
   await configure(sc);
   let sampling = true;
@@ -798,6 +835,10 @@ async function wave(spec) {
             workerDone: Promise.withResolvers(),
             projected: Promise.withResolvers(),
           };
+        if (measureMix) {
+          e.realGuest = ((index % 32) + Math.floor(index / 32)) % 4 < sc.guestQuarters;
+          e.text = (e.realGuest ? "guest " : "fixed ") + e.text;
+        }
         entries.set(id, e);
         if (sc.initialBytes)
           e.text = randomBytes(Math.ceil(sc.initialBytes / 2))
@@ -867,6 +908,37 @@ async function wave(spec) {
     const bad = load.results.filter((r) => !r.success);
     assert.equal(bad.length, 0, bad[0]?.error);
     await guard(Promise.all([...entries.values()].map((e) => e.workerDone.promise)));
+  } catch (error) {
+    if (measureMix) {
+      const rows = [...entries.values()];
+      report.interruptedGuestMix = {
+        label: sc.label,
+        rate: sc.rate,
+        quarters: sc.guestQuarters,
+        targets: sc.guestTargets,
+        launched: rows.length,
+        claimed: rows.filter((e) => e.claimedAt).length,
+        dispatches: rows.filter((e) => e.guestOperationId).length,
+        submitConfirmed: rows.filter((e) => e.submitEnded).length,
+        settled: rows.filter((e) => e.terminal).length,
+        failures: rows
+          .filter((e) => e.failedSubmit)
+          .map((e) => ({
+            runId: e.id,
+            ...e.failedSubmit,
+            http: e.guestHttp,
+            afterAdapterMs: e.failedSubmit.at - e.submitStarted,
+          })),
+        samples: samples.map((s) => ({
+          at: s.at - start,
+          lag: s.lag,
+          running: s.running,
+          queued: s.queued,
+        })),
+      };
+      await save();
+    }
+    throw error;
   } finally {
     sampling = false;
     await observing;
@@ -915,6 +987,7 @@ async function wave(spec) {
           })),
         }
       : {}),
+    ...(measureMix ? { guestMix: await measureMix(items) } : {}),
     completed: complete,
     dropped: load.dropped.length,
     ...(sc.integrated
@@ -1332,6 +1405,7 @@ try {
   report.error = String(error.stack ?? error).slice(0, 2600);
   throw error;
 } finally {
+  guestHttp?.close();
   const cleanErrors = [];
   try {
     await stopActors(actors.filter((a) => a !== projector));
@@ -1362,6 +1436,7 @@ try {
     cleanErrors.push(e);
   }
   await admin.end();
+  report.projectorResourcesRemoved = actorCleanup;
   report.cleaned = !cleanErrors.length && actorCleanup;
   if (cleanErrors.length)
     report.cleanupErrors = cleanErrors.map((e) => String(e.message).slice(0, 500));

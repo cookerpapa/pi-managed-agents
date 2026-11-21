@@ -15,7 +15,7 @@ import { projectRecord } from "./project-record.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
-import { decodeWorkspaceFact } from "./workspace-operations.mjs";
+import { decodeWorkspaceFact, operationsFor } from "./workspace-operations.mjs";
 import { MessageRateMeter } from "./complete-message-rate.mjs";
 
 let resetAssignment;
@@ -123,12 +123,14 @@ const workspaceProfile = [
   "workspace-rate-input",
   "workspace-continuation",
   "workspace-guest-continuation",
+  "workspace-guest-mix",
 ].includes(process.argv[8]);
 const ownedReplyTopics = new Set();
-const guestRoutes =
-  process.argv[8] === "workspace-guest-continuation"
-    ? continuationGuestRoutes(pool, send)
-    : undefined;
+const guestRoutes = ["workspace-guest-continuation", "workspace-guest-mix"].includes(
+  process.argv[8],
+)
+  ? continuationGuestRoutes(pool, send)
+  : undefined;
 const workspaceRouter = workspaceProfile
   ? new WorkspaceOperationRouter({
       pool,
@@ -200,9 +202,34 @@ const reader = new KafkaLogConsumer({
         workspaceMode !== "direct" &&
         !preparedHistory.delete(record.fact)
       ) {
-        if (record.fact.kind === "durable_commit")
-          await workspaceRouter.consume(record, current, grant);
-        else await prefixStudy.apply([record], current, processRecord);
+        if (record.fact.kind === "durable_commit") {
+          const op = stage.guestQuarters !== undefined && operationsFor(record.fact)[0];
+          const timing = op ? { received: performance.timeOrigin + performance.now() } : undefined;
+          await workspaceRouter.consume(
+            record,
+            current,
+            grant,
+            timing
+              ? (key) => {
+                  timing[key] = performance.timeOrigin + performance.now();
+                  if (key === "granted")
+                    send("toolTiming", { id: record.fact.scope.runId, op: op.operationId, timing });
+                }
+              : undefined,
+          );
+        } else await prefixStudy.apply([record], current, processRecord);
+      }
+      if (
+        stage?.guestQuarters !== undefined &&
+        record.fact.kind === "durable_commit" &&
+        record.fact.commit.writes.some(
+          (w) => w.type === "entry" && w.value.model?.some((m) => m.role === "toolResult"),
+        )
+      ) {
+        send("resultProjected", {
+          id: record.fact.scope.runId,
+          at: performance.timeOrigin + performance.now(),
+        });
       }
       if (pathStudy?.mode) pathStudy.applied(record.fact);
       messageMeter?.apply(record.fact);
@@ -259,9 +286,17 @@ async function cleanup() {
           assert(Date.now() < end);
           await delay(150);
         }
-        if ((await admin.listGroups()).groups.some((g) => g.groupId === group))
-          await admin.deleteGroups([group]);
-        assert(!(await admin.listGroups()).groups.some((g) => g.groupId === group));
+        const ownedGroups = new Set([
+          group,
+          ...[...ownedReplyTopics].map(
+            (t) => "tool-reply-" + t.slice("pi-cloud.tool-replies.v4.".length),
+          ),
+        ]);
+        const remaining = (await admin.listGroups()).groups
+          .map((g) => g.groupId)
+          .filter((id) => ownedGroups.has(id));
+        if (remaining.length) await admin.deleteGroups(remaining);
+        assert(!(await admin.listGroups()).groups.some((g) => ownedGroups.has(g.groupId)));
       }
       send("cleaned", { actor, topicAndGroupRemoved: created });
     } finally {

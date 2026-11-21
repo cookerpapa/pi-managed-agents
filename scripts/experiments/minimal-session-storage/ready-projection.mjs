@@ -33,6 +33,7 @@ export const isMovingStudy = (name) =>
     "workspace-rate-input",
     "workspace-continuation",
     "workspace-guest-continuation",
+    "workspace-guest-mix",
     "message-rate",
     "message-rate-smoke",
     "message-rate-confirm",

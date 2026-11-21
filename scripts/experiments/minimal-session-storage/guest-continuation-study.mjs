@@ -9,7 +9,7 @@ import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
 
 const root = "/workspace/game",
   client = root + "/client";
-export async function runGuestContinuation(wave, db, endpoints) {
+export async function installGuestResources(db) {
   await installWorkspaceRoutes(db);
   await installContinuationEnvironments(db);
   await db.query(
@@ -18,6 +18,9 @@ export async function runGuestContinuation(wave, db, endpoints) {
   await db.query(
     "create table study_guest_attachments(binding uuid primary key default gen_random_uuid(), target uuid references study_guest_targets(target) not null, cwd text not null, unique(target,cwd))",
   );
+}
+export async function runGuestContinuation(wave, db, endpoints) {
+  await installGuestResources(db);
   const config = await studyCubeConfig();
   await withFamilyGuest(config, (first) =>
     withFamilyGuest(config, async (second) => {

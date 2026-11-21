@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, measure matched short root Runs while stepping the proportion of real Cube Bash operations. Verify physical execution counts and attribute PG, dispatch ACK, shell startup and reply delays. [Results and capacity limits](reports/guest-tool-mix-20261121.md).
+
 - [x] Under #52, run the first Bash after an idle directory or Workspace change against real Cube Guests on warm and cold Workers. Compare the first model input, relative read and canonical result. [Guest acceptance](reports/workspace-continuation-rate-20261121.md#真实-guest-的续聊验收).
 
 - [x] Check preferred Worker continuation after an idle directory, compute or Workspace change, including cold fallback and the provider-facing native context. Compare execution-side history batching with single-record projection on real Kafka. [Study and remaining load boundary](reports/workspace-continuation-rate-20261121.md).

@@ -253,6 +253,10 @@ export async function runPgPaths({
   cpuFixture,
 }) {
   const profile = process.env.PI_CLOUD_PG_PATH_PROFILE ?? "full";
+  if (profile === "workspace-guest-mix") {
+    const { runGuestMix } = await import("./guest-mix-study.mjs");
+    return runGuestMix(wave, forkPool, guestEndpoints, report, save);
+  }
   if (profile === "workspace-guest-continuation") {
     const { runGuestContinuation } = await import("./guest-continuation-study.mjs");
     return runGuestContinuation(wave, forkPool, guestEndpoints);

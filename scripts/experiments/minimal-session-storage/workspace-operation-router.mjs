@@ -57,7 +57,7 @@ export class WorkspaceOperationRouter {
     if (!n) return 0;
     return this.view.apply(records.slice(0, n), current, (r, d) => projectRecord(r, d, this.env));
   }
-  async consume(record, current, grant) {
+  async consume(record, current, grant, mark) {
     const f = record.fact,
       ops = operationsFor(f);
     const covered = record.offset < this.view.next.get(record.partition);
@@ -133,7 +133,9 @@ export class WorkspaceOperationRouter {
       fact: { ...f, tools, cancellations: cancels.map(({ op }) => op) },
       workspaceBatch: true,
     };
+    mark?.("routeReady");
     await this.view.apply([candidate], current, (r, d) => projectRecord(r, d, this.env));
+    mark?.("projected");
     if (!current() || !this.view.canDeliver(record)) return;
     for (const { op, original } of cancels) {
       if (!original || !current()) continue;
@@ -155,6 +157,7 @@ export class WorkspaceOperationRouter {
       }
     }
     if (commands.length && current() && (await grant()) && current()) {
+      mark?.("granted");
       for (const { op, route, command } of commands) {
         if (!current()) return;
         const endpoint = this.resolve(route.bindingId);
