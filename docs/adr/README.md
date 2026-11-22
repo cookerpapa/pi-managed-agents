@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0346](0346-elastic-retention-at-run-admission.md) records elastic retention at chat Run admission in the #52 candidate.
+
 [ADR-0345](0345-ordered-agent-configuration.md) retains ordered Pi agent configuration versions in the candidate message store.
 
 [ADR-0344](0344-execution-owned-operation-routing-study.md) keeps sandbox bindings on the execution side in the #52 prototype.

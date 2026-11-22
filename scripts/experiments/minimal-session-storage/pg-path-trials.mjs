@@ -248,6 +248,7 @@ export async function runPgPaths({
   guard,
   observer,
   forkPool,
+  tenant,
   report,
   save,
   token,
@@ -278,7 +279,7 @@ export async function runPgPaths({
   }
   if (profile === "workspace-continuation") {
     const { runContinuationCases } = await import("./continuation-cases.mjs");
-    return runContinuationCases(wave, forkPool);
+    return runContinuationCases(wave, forkPool, tenant);
   }
   if (
     [

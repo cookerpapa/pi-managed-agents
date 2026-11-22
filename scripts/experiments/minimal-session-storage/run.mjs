@@ -4,6 +4,7 @@ import { fanoutTargets } from "./fanout-fixture.mjs";
 import { isCommitStudy } from "./pg-group-commit.mjs";
 import { isPrefixStudy } from "./ready-projection.mjs";
 import { environmentSection } from "./continuation-environment.mjs";
+import { selectedRunEnvironment } from "./admission-retention.mjs";
 import { selectEnvironment } from "./continuation-cases.mjs";
 import { answer, claimSql, claimBatchSql, claimHintedBatchSql } from "./fixture.mjs";
 import { runWakeTrials, waitForWakeState, wakeNetwork } from "./wake-trials.mjs";
@@ -433,6 +434,7 @@ async function startActor(role, id, pod, ...roleArgs) {
 async function configure(sc) {
   const options = { ...sc, kind: "stage", stage: sc.label, ...(sc.replay ? { fixture } : {}) };
   delete options.environmentCases;
+  delete options.expectedElasticStates;
   if (sc.replay) assert(fixture);
   wakeStage = ["directed", "broadcast"].includes(sc.wakeMode) ? sc : undefined;
   transition = undefined;
@@ -577,12 +579,7 @@ async function intake(e, sc = {}) {
         let statement = sc.integrated ? localityIntake : sc.omitNotify ? quietIntake : intakeSql;
         if (withSelection) {
           await client.query("begin");
-          const selected = await client.query(
-            "select value from study_session_environments where tenant=$1 and session=$2 for share",
-            [tenant, e.session],
-          );
-          assert.equal(selected.rowCount, 1);
-          environment = selected.rows[0].value;
+          environment = await selectedRunEnvironment(client, tenant, e.session, e.key);
           statement = environmentIntake;
         }
         ({ rows } = await client.query(statement, [
@@ -594,6 +591,7 @@ async function intake(e, sc = {}) {
           ...(sc.integrated ? [e.modelRef ?? "local-load"] : []),
           ...(environment ? [environment] : []),
         ]));
+        assert.equal(rows.length, 1, "Changed idempotent input");
         if (withSelection) await client.query("commit");
       } catch (error) {
         if (withSelection) await client.query("rollback");
@@ -603,7 +601,6 @@ async function intake(e, sc = {}) {
       }
       e.admissionPoolMs = acquired - started;
       e.admissionSqlMs = performance.now() - acquired;
-      assert.equal(rows.length, 1, "Changed idempotent input");
       if (!sc.omitNotify) wakeCount++;
       if (sc.wakeMode === "relay") for (const worker of workers) worker.write({ kind: "wake" });
       if (sc.wakeMode === "coalesced") notifyBatch();
@@ -771,7 +768,17 @@ async function verify(sc, records, cohort) {
     let last;
     for (const run of records) {
       const desired = sc.environmentCases[run.index];
-      assert.deepEqual(byId.get(run.id).environment_snapshot, desired);
+      const admitted = byId.get(run.id).environment_snapshot;
+      if (desired.executionMode === "elastic") {
+        const { elastic, ...selection } = admitted;
+        const { computeSessionId, ...expectedSelection } = desired;
+        assert.deepEqual(selection, expectedSelection);
+        assert.equal(elastic.state, sc.expectedElasticStates[run.index]);
+        assert.deepEqual(
+          Object.keys(elastic).sort(),
+          elastic.state === "retained" ? ["state", "until"] : ["state"],
+        );
+      } else assert.deepEqual(admitted, desired);
       const updates = (byRun.get(run.id) ?? [])
         .flatMap((m) => JSON.parse(m.content).model ?? [])
         .filter(
@@ -1411,6 +1418,7 @@ try {
           guard,
           observer: statsDb,
           forkPool: db,
+          tenant,
           report,
           save,
           out,

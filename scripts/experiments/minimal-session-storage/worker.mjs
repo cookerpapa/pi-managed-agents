@@ -423,6 +423,7 @@ async function execute(row, claimMs, claimReason) {
   if (previous) restoreSettled(store, row, head, previous.records);
   const registry = createRegistry();
   const environment = row.environment_snapshot;
+  let admittedPrompt;
   if (environment)
     registry.install(
       defineExtension({
@@ -431,7 +432,9 @@ async function execute(row, claimMs, claimReason) {
           {
             key: environmentSection,
             tag: false,
-            render: () => continuationPrompt(row.previous_environment, environment),
+            // Later steps keep the admission observation; activity can extend the deadline.
+            render: () =>
+              (admittedPrompt ??= continuationPrompt(row.previous_environment, environment)),
           },
         ],
       }),
