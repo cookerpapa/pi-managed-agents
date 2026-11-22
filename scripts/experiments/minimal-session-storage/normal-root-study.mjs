@@ -31,6 +31,8 @@ const {
   browser,
   inputMode,
   stopInputs,
+  stopHandoff,
+  replyBeforeReclaim,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
 assert(new URL(dbUrl).hostname === "127.0.0.1" && brokers.every((b) => b.startsWith("127.0.0.1:")));
 const topic = "pma-root-" + randomUUID(),
@@ -58,7 +60,8 @@ let composed,
   evidence,
   dispatches = 0,
   cancels = 0,
-  operation;
+  operation,
+  originalReply;
 let interruptedFinish,
   finishRollbackVerified = false;
 const busy = inputMode ? rootInputStudy(db, pool, topic, inputMode) : undefined;
@@ -73,6 +76,7 @@ async function open() {
         submit: async (...args) => {
           dispatches++;
           operation = args[1].request.operationId;
+          originalReply = args[2];
           await endpoint.submit(...args);
         },
         async cancel(r, request) {
@@ -288,6 +292,7 @@ try {
         token: tenant.credential.token,
         inputMode,
         stopInputs,
+        stopHandoff,
         third,
         edited,
         preferenceKey: "pi-cloud:composer-enter:" + tenant.tenantId + ":" + tenant.ownerUserId,
@@ -328,6 +333,19 @@ try {
                   verifyStoppedRoot({
                     actor,
                     receipt,
+                    stopHandoff,
+                    db,
+                    ...(replyBeforeReclaim
+                      ? {
+                          finishOriginal: async () => {
+                            await endpoint.release();
+                            await until(async () => {
+                              const [p] = await replyAdmin.fetchTopicOffsets(originalReply.topic);
+                              return BigInt(p.high ?? p.offset) > BigInt(originalReply.offset);
+                            }, "original Guest reply in its exclusive fixture mailbox");
+                          },
+                        }
+                      : {}),
                     first,
                     originalPrompt: prompt1,
                     second: prompt2,

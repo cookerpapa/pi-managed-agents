@@ -17,6 +17,7 @@ export async function verifyRootBrowser(dir) {
       inputMode,
       preferenceKey,
       stopInputs,
+      stopHandoff,
       third,
       edited,
     } = await browserMessage(dir, "ready");
@@ -170,6 +171,10 @@ export async function verifyRootBrowser(dir) {
             await page.waitFor(
               "document.querySelectorAll('.pending-input-row').length===2 && document.querySelector('.product-stop-button:not(:disabled)')",
             );
+            if (stopHandoff) {
+              await browserNote(dir, "bothAccepted", { another });
+              await browserMessage(dir, "workerLost");
+            }
             await page.evaluate("document.querySelector('.product-stop-button').click()");
             await browserNote(dir, "stopClicked", { another });
             await until(() => blockedAcks > 0, "return acknowledgement held", 45000);

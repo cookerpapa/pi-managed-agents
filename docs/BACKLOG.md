@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Verify Stop after the root Worker is killed, with both a still-running tool and an original reply that arrives before reclaim. [Browser results](reports/stopped-root-inputs-20261122.md#stop-after-losing-the-worker).
+
 - [x] Under #52, Stop a running root with accepted steer and follow-up input. Reload a modified draft before its return acknowledgement and explicitly continue on a cold Worker. [Stop and draft acceptance](reports/stopped-root-inputs-20261122.md).
 
 - [x] Under #52, interrupt a root Worker immediately after Chrome confirms steer or follow-up. Verify one placement, the original tool result, queue visibility through handoff and cold history. [Confirmed busy input](reports/root-input-handoff-20261122.md).

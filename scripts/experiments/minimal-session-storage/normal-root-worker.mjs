@@ -147,7 +147,11 @@ try {
       presentation.sequences = new Map(native.sequences);
       const [q] = family.queues;
       inputDocuments.add(Number(q.doc_id));
-      assert.equal(q.items.length, 1);
+      assert.equal(q.items.length, cfg.stopInputs ? 2 : 1);
+      if (cfg.stopInputs) {
+        assert(claim.request.stopOnResume);
+        assert.equal(q.items[1].mode, "steer");
+      }
       assert.equal(q.items[0].mode, cfg.inputMode === "steer" ? "steer" : "followUp");
       queuedInput = await store.submission(q.items[0].id, ctx);
       assert.equal(queuedInput.status, "queued");
@@ -288,14 +292,20 @@ try {
         { type: "input", requestId: scope.runId, content: claim.request.input.prompt },
         ctx,
       );
-  if (cfg.resumeInput) harness.resume();
+  if (claim.request.stopOnResume) {
+    assert(cfg.resumeInput && cfg.stopInputs);
+    acceptingInputs = false;
+    stopWork = claim.cancel(() => root.abort(ctx));
+    await stopWork;
+  } else if (cfg.resumeInput) harness.resume();
   await root.waitForIdle(ctx);
   acceptingInputs = false;
   await stopWork;
   if (sub && !stopWork) assert.equal((await sub.wait(ctx)).status, "done");
   if (cfg.resumeInput) {
     const placed = await store.submissionByRequest(1, queuedInput.requestId, ctx);
-    assert.equal(placed.status, "done");
+    assert.equal(placed.status, stopWork ? "unanswered" : "done");
+    if (stopWork) assert.equal(placed.reason, "aborted");
     assert.equal(placed.id, queuedInput.id);
   }
   await harness.close(ctx);
@@ -316,6 +326,7 @@ try {
   );
   process.send({
     done: true,
+    stoppedOnResume: !!claim.request.stopOnResume,
     restoredUserPrompts,
     priorEntries: prior.priorPgEntries,
     modelCalls: fake.state.callCount,

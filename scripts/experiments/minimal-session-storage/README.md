@@ -592,3 +592,5 @@ Each case holds the projector before the busy input reaches PG, waits for the re
 ### Stop with two pending root inputs
 
 Run `PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/stopped-root.json --root-stop-web` with the browser and Cube prerequisites above. The fixture queues a follow-up and a steer, clicks Stop, holds the browser's acknowledgement of the returned inputs and edits the draft. It reloads before acknowledgement and again after acknowledgement, then sends the edited text to a fresh Worker. [Checks and failure evidence](../../../docs/reports/stopped-root-inputs-20261122.md).
+
+To kill the old Worker before clicking Stop, use `--root-stop-handoff-web`. Append `already-returned` to publish the original Guest reply before the replacement claims the Run. Both cases verify zero model calls from the replacement and exercise the same draft recovery and edited continuation.

@@ -25,3 +25,14 @@ The candidate API reads the stopped Run's input metadata and native Submission o
 This case covers text inputs on one browser profile while the Worker remains reachable. The handoff of a live Worker is covered by the [separate crash scenario](root-input-handoff-20261122.md). A simultaneous Stop and Worker loss, or transfer of an edited local draft to a different device, was outside this test. Release remains gated by [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48).
 
 The previous browser steer/Worker-loss case passed again. The RF3/PG transport group passed 25 tests, including a candidate read that excludes placed and explicitly withdrawn inputs, preserves attachment metadata and rejects another tenant. The focused queue, history, draft and UI group passed 89 tests. Both affected TypeScript workspaces passed type checking. One trial timed out opening the initial chat page before submission. The completed Stop run recorded zero HTTP 5xx responses.
+
+## Stop after losing the Worker
+
+The additional browser gate terminates A after the browser confirms both inputs. The user clicks Stop while A's lease is outstanding. PG expiry and the ordered seal requeue the same Run. B reads its original Inbox, recovers the original mailbox and processes the persisted Stop before resuming generation.
+
+| Original operation when B arrives | B model requests | Guest executions | Cancellation dispatches | Inputs returned / placed |
+| --- | ---: | ---: | ---: | ---: |
+| Bash still running | 0 | 1 | 1 | 2 / 0 |
+| Original reply already published | 0 | 1 | 0 | 2 / 0 |
+
+For the second case the driver released the Guest after the seal, then waited for the original per-boot mailbox to pass the saved offset before starting B. Both cases repeated the lost browser acknowledgement, draft edit, refresh and explicit cold continuation. [Aggregate evidence](root-stop-handoff-20261122.json).

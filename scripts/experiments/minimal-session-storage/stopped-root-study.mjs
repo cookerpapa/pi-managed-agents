@@ -1,3 +1,5 @@
+import { once } from "node:events";
+import { SessionExpiryReconciler } from "../../../packages/control-plane/src/session-expiry-reconciler.ts";
 import assert from "node:assert/strict";
 import { browserNote, browserMessage } from "./browser-signals.mjs";
 import { until } from "./family-process.mjs";
@@ -5,6 +7,9 @@ import { until } from "./family-process.mjs";
 export async function verifyStoppedRoot({
   actor,
   receipt,
+  stopHandoff,
+  db,
+  finishOriginal,
   first,
   originalPrompt,
   second,
@@ -19,6 +24,13 @@ export async function verifyStoppedRoot({
   endpoint,
   counts,
 }) {
+  if (stopHandoff) {
+    await browserMessage("/study", "bothAccepted");
+    const exit = once(actor, "exit");
+    actor.kill("SIGKILL");
+    assert.equal((await exit)[1], "SIGKILL");
+    await browserNote("/study", "workerLost");
+  }
   const { another } = await browserMessage("/study", "stopClicked");
   assert.equal(another.delivery, "steer");
   assert.equal(another.runId, receipt.runId);
@@ -36,9 +48,27 @@ export async function verifyStoppedRoot({
   );
   const page = () => api.getReturnedInputs(id, undefined, { requestId: stop.id, afterPosition: 0 });
   assert((await page()).pending);
-  actor.send({ stop: true });
-  const stopped = await a;
-  assert.equal(stopped.modelCalls, 1);
+  let stopped;
+  if (stopHandoff) {
+    const expiry = new SessionExpiryReconciler(db);
+    await until(
+      async () => (await expiry.sweep()).expiredAssignments === 1,
+      "old lease expired with Stop pending",
+    );
+    await until(
+      async () => (await api.getRun(runId)).state === "queued",
+      "ordered seal requeued stopped work",
+    );
+    assert((await page()).pending);
+    await finishOriginal?.();
+    stopped = await work(runId, true);
+    assert.equal(stopped.modelCalls, 0);
+    assert(stopped.stoppedOnResume);
+  } else {
+    actor.send({ stop: true });
+    stopped = await a;
+    assert.equal(stopped.modelCalls, 1);
+  }
   await until(
     async () => (await api.getRun(runId)).state === "cancelled",
     "cancelled root settlement",
@@ -71,7 +101,7 @@ export async function verifyStoppedRoot({
       ],
       ["unanswered", "aborted", undefined],
     );
-  assert.deepEqual(counts(), { dispatches: 1, cancels: 1 });
+  assert.deepEqual(counts(), { dispatches: 1, cancels: finishOriginal ? 0 : 1 });
   await browserMessage("/study", "editedReload");
   assert.equal((await api.getReturnedInputs(id)).requestId, null);
   assert.equal(
@@ -109,7 +139,13 @@ export async function verifyStoppedRoot({
     returnedPlacements: 0,
     runsBeforeExplicitSend: 1,
     explicitEditedPlacements: 1,
-    modelCallsInStoppedRun: stopped.modelCalls,
+    ...(stopHandoff
+      ? {
+          workerLostBeforeStop: true,
+          replyBeforeReclaim: !!finishOriginal,
+          replacementModelCalls: stopped.modelCalls,
+        }
+      : { modelCallsInStoppedRun: stopped.modelCalls }),
     physicalExecutions: 1,
     orderedCancellations: counts().cancels,
     legacyNativeRowsAdded: 0,

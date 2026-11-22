@@ -1,0 +1,43 @@
+[
+  {
+    "case": "Guest still running",
+    "browser": "Chrome",
+    "originalTextRestoredInOrder": true,
+    "refreshBeforeReturnAck": true,
+    "editedDraftPersisted": true,
+    "settledReload": true,
+    "composerSubmissions": 4,
+    "http5xx": 0,
+    "returnedInputs": 2,
+    "returnedPlacements": 0,
+    "runsBeforeExplicitSend": 1,
+    "explicitEditedPlacements": 1,
+    "workerLostBeforeStop": true,
+    "replacementModelCalls": 0,
+    "physicalExecutions": 1,
+    "orderedCancellations": 1,
+    "legacyNativeRowsAdded": 0,
+    "cleanupVerified": true
+  },
+  {
+    "case": "Original reply already in Kafka",
+    "browser": "Chrome",
+    "originalTextRestoredInOrder": true,
+    "refreshBeforeReturnAck": true,
+    "editedDraftPersisted": true,
+    "settledReload": true,
+    "composerSubmissions": 4,
+    "http5xx": 0,
+    "returnedInputs": 2,
+    "returnedPlacements": 0,
+    "runsBeforeExplicitSend": 1,
+    "explicitEditedPlacements": 1,
+    "workerLostBeforeStop": true,
+    "replyBeforeReclaim": true,
+    "replacementModelCalls": 0,
+    "physicalExecutions": 1,
+    "orderedCancellations": 0,
+    "legacyNativeRowsAdded": 0,
+    "cleanupVerified": true
+  }
+]
