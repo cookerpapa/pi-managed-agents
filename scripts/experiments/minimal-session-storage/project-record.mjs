@@ -1,5 +1,6 @@
 // The isolated actor runs in a pinned operator image. Bundle its matching pure caption code.
 import { nativeNavigation } from "../../../packages/pi-session-postgres/src/durable/types.ts";
+import { reopenWorld, worldRoutes } from "./conversation-world.mjs";
 import { agentLane, agentVersion } from "./agent-configuration.mjs";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
@@ -101,6 +102,7 @@ export async function projectRecord(
           floor: s.floor,
           count: s.count,
           bytes: s.bytes,
+          ...worldRoutes(s),
           ...(s.agentRoutes ? { agentRoutes: s.agentRoutes } : {}),
           ...(s.usageDocs ? { usageDocs: s.usageDocs } : {}),
         };
@@ -150,7 +152,8 @@ export async function projectRecord(
     // If the final record already retired the view, an old Kafka delivery must
     // not re-open it. An active replacement needs native recovery beyond this assay.
     let prior = EMPTY_HEAD,
-      inboxes = {};
+      inboxes = {},
+      worlds;
     if (batch.seq !== 1) {
       if (stage?.integrated) {
         const row =
@@ -166,6 +169,7 @@ export async function projectRecord(
         // The predecessor settled with an empty Inbox. During rewind the PG
         // row can already contain this Run's later, still-pending additions.
         prior = priorState(draft?.restoring ? { ...row, inbox_items: [] } : row);
+        if (prior.worldRoutes) worlds = reopenWorld(prior.worldRoutes);
         inboxes = reopenEmptyInboxes(row.inbox_routes);
         assert(inboxes[row.inbox_id]?.conversation === 1, "Predecessor root Inbox changed");
       } else {
@@ -192,6 +196,7 @@ export async function projectRecord(
       count: prior.count,
       bytes: prior.bytes,
       nextId: prior.nextId,
+      ...(worlds ? { worldDocs: worlds } : {}),
       ...(prior.agentRoutes ? { agentRoutes: prior.agentRoutes } : {}),
       ...(prior.usageDocs ? { usageDocs: prior.usageDocs } : {}),
       floor: prior.floor,

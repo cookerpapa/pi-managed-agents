@@ -60,6 +60,7 @@ export async function withFamilyGuest(config, run) {
       );
     }
     return await run({
+      allocationId: fixture,
       command,
       submitAt,
       async directory(id) {

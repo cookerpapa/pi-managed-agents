@@ -22,6 +22,7 @@ import { FamilyPresentation } from "./family-presentation.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
 import { ForkStorage, setForkLayout } from "./fork-storage.mjs";
+import { worldToken } from "./conversation-world.mjs";
 import { restoreForkPrefix } from "./session-prefix.mjs";
 
 const now = "2026-11-22T00:00:00.000Z";
@@ -329,7 +330,7 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
       records = visible
         .toReversed()
         .map((r) => ({ entry: JSON.parse(r.content), seq: Number(r.commit_seq) }));
-    restoreForkPrefix(memory, records, config);
+    restoreForkPrefix(memory, records, config, await forks.rootWorld(scope.tenantId, nested));
     const cold = await Harness.open(
       memory,
       { models: createModels(), registry: createRegistry() },
@@ -339,7 +340,11 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
     try {
       coldState = await cold.snapshot(AgentDoc, 1, ctx);
       assert.deepEqual(coldState, trace.forkDocument);
-      if (trace.nativeNotices) coldNotices = await nextEnvironmentMessages(cold, 1);
+      if (trace.nativeNotices)
+        coldNotices = await nextEnvironmentMessages(cold, 1, {
+          ...currentEnvironment,
+          continuityId: worldToken(currentEnvironment.continuityId),
+        });
     } finally {
       await cold.close(ctx);
     }
@@ -446,11 +451,9 @@ async function compareDocumentHistory(base, admin, scope) {
         2,
       ),
     );
-    if (
-      !isDeepStrictEqual(a.coldNotices, left.nativeNotices) ||
-      !isDeepStrictEqual(b.coldNotices, right.nativeNotices)
-    )
-      process.exitCode = 2;
+    assert(!sameData && sameFork);
+    assert.deepEqual(a.coldNotices, left.nativeNotices);
+    assert.deepEqual(b.coldNotices, right.nativeNotices);
   } else {
     assert(!sameData && sameFork);
     console.log(

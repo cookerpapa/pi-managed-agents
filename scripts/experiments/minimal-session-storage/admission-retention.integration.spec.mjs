@@ -54,6 +54,35 @@ it("orders Run admission with idle expiry, rollback, redelivery and compute scop
     assert.equal((await db.query("select count(*)::int n from workspace_runtimes")).rows[0].n, 1);
 
     await seedElasticWorkspace(db, tenant, workspace, "retained", null, owner);
+    // All comparisons happen where the allocation is retained. Neither the
+    // current allocation nor the previous ID is copied to the model snapshot.
+    const allocations = (
+      await db.query("select workspace_runtime_id as id,compute_session_id from workspace_runtimes")
+    ).rows;
+    const same = allocations.find((r) => !r.compute_session_id).id;
+    const otherScope = allocations.find((r) => r.compute_session_id).id;
+    await seedElasticWorkspace(db, tenant, workspace, "released");
+    const old = (
+      await db.query(
+        "select workspace_runtime_id as id from workspace_runtimes where state='released'",
+      )
+    ).rows[0].id;
+    for (const [id, continuity] of [
+      [same, undefined],
+      [otherScope, "different"],
+      [old, "replaced"],
+      [randomUUID(), "different"],
+    ]) {
+      await client.query("begin");
+      await client.query(
+        "insert into conversation_worlds(tenant_id,pi_session_id,conversation_id,state) values($1,$2,1,$3)",
+        [tenant, session, { sandbox: { status: "active", continuityId: id } }],
+      );
+      const info = (await observe(randomUUID())).elastic;
+      assert.equal(info.continuity, continuity);
+      assert(!JSON.stringify(info).includes(id));
+      await client.query("rollback");
+    }
     const past = await deadline();
     await client.query("begin");
     assert.equal((await observe(randomUUID())).elastic.state, "retained");

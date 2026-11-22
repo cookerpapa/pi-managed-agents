@@ -22,7 +22,7 @@ export function continuationGuestRoutes(pool, send) {
       );
       assert.equal(rows.length, 1, "Missing Guest for admitted Workspace");
       descriptors.set(rows[0].binding, rows[0]);
-      return rows[0].binding;
+      return { bindingId: rows[0].binding, allocationId: rows[0].target };
     },
     resolve(binding) {
       return {

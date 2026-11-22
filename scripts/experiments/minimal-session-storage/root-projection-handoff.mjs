@@ -1,5 +1,6 @@
 // Called only on a cold opening after the first incarnation. The public control
 // transaction has already sealed the old writer and admitted this one.
+import { foldWorld } from "./conversation-world.mjs";
 import assert from "node:assert/strict";
 import { NATIVE_HUMAN_INPUT_DOCUMENT } from "@pi-cloud/protocol";
 import { foldLive } from "./moving-checkpoint.mjs";
@@ -48,7 +49,10 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
   );
   const liveId = Object.keys(liveDocs).find((id) => liveDocs[id].conversation === 1);
   const marker = state.heads.filter((h) => h.conversationId === 1).sort((a, b) => b.id - a.id)[0];
+  const worlds = {};
+  foldWorld(worlds, writes);
   return {
+    ...worlds,
     agentRoutes: Object.fromEntries(
       writes
         .filter((w) => w.type === "document.create" && w.record.kind === "pi.agent")

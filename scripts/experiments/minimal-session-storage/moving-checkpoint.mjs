@@ -93,6 +93,7 @@ export function checkpoint(view, record) {
     "markerId",
     "liveId",
     "agentRoutes",
+    "worldDocs",
     "usageDocs",
     "lastFact",
   ])
@@ -185,6 +186,9 @@ export function foldToolReferences(
       "Unmatched native sandbox intent",
     );
     const value = {
+      ...(ref.allocationSpanStart !== undefined
+        ? { allocationSpanStart: ref.allocationSpanStart }
+        : {}),
       operationId: ref.request.operationId,
       taskId: task.id,
       conversationId: task.conversationId,
@@ -220,8 +224,14 @@ export function foldToolReferences(
   for (const task of writes) {
     const original = pending[task.id];
     if (original && ["completing", "terminal"].includes(task.state.status)) {
+      const confirmUse =
+        original.allocationSpanStart !== undefined &&
+        task.state.outcome?.status === "completed" &&
+        BigInt(view.confirmedUseSpans?.[original.conversationId] ?? -1) <
+          BigInt(original.allocationSpanStart);
       frame.ops.push({
         kind: "tool-settled",
+        ...(confirmUse ? { confirmUse } : {}),
         args: [
           ...scope,
           task.id,
@@ -234,6 +244,11 @@ export function foldToolReferences(
         count: 1,
       });
       frame.strict = true;
+      if (confirmUse)
+        view.confirmedUseSpans = {
+          ...view.confirmedUseSpans,
+          [original.conversationId]: original.allocationSpanStart,
+        };
       delete pending[task.id];
     }
   }
@@ -270,7 +285,7 @@ export function replayableMetadata(frame, fact) {
   if (frame.strict || frame.rejected || !frame.ops.length || useSynchronousPolicy(fact))
     return false;
   return frame.ops.every((op) => {
-    if (op.kind === "pin") return true;
+    if (op.kind === "pin" || op.kind === "world") return true;
     if (op.kind === "inbox")
       return (
         op.args[6] === "[]" &&

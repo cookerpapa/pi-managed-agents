@@ -110,6 +110,7 @@ export class WorkspaceOperationRouter {
         request,
         replyTopic: op.reply.topic,
         replyRecovery: op.reply,
+        ...(route?.allocationId ? { allocationSpanStart: route.from } : {}),
         occurredAt: f.occurredAt,
       });
       if (!route) continue;

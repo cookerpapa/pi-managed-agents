@@ -1,5 +1,6 @@
 // Matched source for ordinary text/tool root Sessions; never opens a legacy
 // native projection. One SessionProjector owns admission, live events and grant.
+import { worldRoutes } from "./conversation-world.mjs";
 import { rootOpeningHead } from "./session-prefix.mjs";
 import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import assert from "node:assert/strict";
@@ -168,6 +169,7 @@ export function normalRootProjection(pool, topic, select, resolve) {
       );
       const h = {
         version: f.factId,
+        ...worldRoutes(s),
         ...(s.agentRoutes ? { agentRoutes: s.agentRoutes } : {}),
         seq: s.seq,
         nextId: s.nextId,

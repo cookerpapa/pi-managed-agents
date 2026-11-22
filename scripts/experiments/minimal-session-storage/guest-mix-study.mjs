@@ -152,7 +152,7 @@ export async function runGuestMix(wave, db, endpoints, report, save) {
   async function run(guests) {
     try {
       for (const [i, guest] of guests.entries()) {
-        const target = randomUUID();
+        const target = guest.allocationId;
         endpoints.set(target, guest);
         await db.query("insert into study_guest_targets values($1,$2)", ["mix-" + i, target]);
         await guest.command(

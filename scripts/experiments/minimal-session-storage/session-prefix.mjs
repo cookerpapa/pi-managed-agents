@@ -1,3 +1,4 @@
+import { worldBaseWrite, worldToken } from "./conversation-world.mjs";
 import { agentBaseWrite } from "./agent-configuration.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -236,6 +237,15 @@ export function restoreSettled(store, row, head, records) {
     },
     content: { kind: "base", version: 1, value: { items: row.inbox_items } },
   });
+  for (const [id, lane] of Object.entries(head.worldRoutes ?? {}))
+    add(
+      head.seq,
+      worldBaseWrite(
+        Number(id),
+        row.world_states?.[lane]?.schemaVersion === 3 ? row.world_states[lane] : null,
+        lane,
+      ),
+    );
   if (row.agent_config) {
     const v = row.agent_config;
     assert(
@@ -254,7 +264,7 @@ export function restoreSettled(store, row, head, records) {
 
 // Import the retained single path selected by the Fork directory into fresh
 // native storage. Inbox and AgentDoc receive independent destination IDs.
-export function restoreForkPrefix(store, records, agent) {
+export function restoreForkPrefix(store, records, agent, world) {
   assert(records.length > 0);
   let maximumId = 1,
     maximumSeq = 0;
@@ -262,6 +272,13 @@ export function restoreForkPrefix(store, records, agent) {
     maximumId = Math.max(maximumId, r.entry.id);
     maximumSeq = Math.max(maximumSeq, r.seq);
   }
+  const nativeWorld =
+    world?.schemaVersion === 3
+      ? {
+          ...world,
+          sandbox: { ...world.sandbox, continuityId: worldToken(world.sandbox.continuityId) },
+        }
+      : undefined;
   const seq = maximumSeq + 1,
     inboxId = maximumId + 1;
   restoreSettled(
@@ -269,9 +286,14 @@ export function restoreForkPrefix(store, records, agent) {
     {
       inbox_id: inboxId,
       inbox_items: [],
+      ...(nativeWorld ? { world_states: { 1: nativeWorld } } : {}),
       ...(agent ? { agent_config: { id: inboxId + 1, seq, content: JSON.stringify(agent) } } : {}),
     },
-    { version: "fork", seq },
+    {
+      version: "fork",
+      seq,
+      ...(nativeWorld ? { worldRoutes: { [inboxId + 2]: 1 } } : {}),
+    },
     records,
   );
 }

@@ -1,6 +1,6 @@
 // Resource-owner operation inside the caller's admission transaction. Fields and
 // lock order follow the serving allocation repository and its idle expiry claim.
-async function retainElasticForAdmission(tx, tenant, workspace, computeSessionId) {
+async function retainElasticForAdmission(tx, tenant, workspace, computeSessionId, session) {
   const {
     rows: [resource],
   } = await tx.query(
@@ -33,15 +33,29 @@ async function retainElasticForAdmission(tx, tenant, workspace, computeSessionId
   const {
     rows: [renewed],
   } = await tx.query(
-    `update workspace_runtimes set idle_expires_at=greatest(idle_expires_at,
+    `with retained as (update workspace_runtimes set idle_expires_at=greatest(idle_expires_at,
        statement_timestamp()+(creation_spec->>'retentionWindowMs')::bigint*interval '1 millisecond')
        where workspace_runtime_id=$1 and runtime_capsule is not null and idle_expires_at is not null
          and (creation_spec->>'retentionWindowMs')::bigint>0
-       returning idle_expires_at`,
-    [allocation.workspace_runtime_id],
+       returning idle_expires_at,workspace_runtime_id,tenant_id,workspace_id,compute_session_id,sandbox_domain_id)
+       select r.idle_expires_at, case
+         when w.state is null or w.state#>>'{sandbox,continuityId}'=r.workspace_runtime_id::text then null
+         when old.workspace_id=r.workspace_id and old.compute_session_id is not distinct from r.compute_session_id
+           and old.sandbox_domain_id=r.sandbox_domain_id and old.state='released' then 'replaced'
+         else 'different'
+       end as continuity
+       from retained r left join conversation_worlds w on w.tenant_id=r.tenant_id and w.pi_session_id=$2 and w.conversation_id=1
+       left join workspace_runtimes old on old.tenant_id=r.tenant_id and old.workspace_runtime_id=case
+         when (w.state#>>'{sandbox,continuityId}') ~* '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$'
+         then (w.state#>>'{sandbox,continuityId}')::uuid end`,
+    [allocation.workspace_runtime_id, session],
   );
   return renewed
-    ? { state: "retained", until: renewed.idle_expires_at.toISOString() }
+    ? {
+        state: "retained",
+        until: renewed.idle_expires_at.toISOString(),
+        ...(renewed.continuity ? { continuity: renewed.continuity } : {}),
+      }
     : { state: "unknown" };
 }
 
@@ -67,6 +81,6 @@ export async function selectedRunEnvironment(tx, tenant, session, key) {
   const { computeSessionId, ...modelEnvironment } = env;
   return {
     ...modelEnvironment,
-    elastic: await retainElasticForAdmission(tx, tenant, env.workspace, computeSessionId),
+    elastic: await retainElasticForAdmission(tx, tenant, env.workspace, computeSessionId, session),
   };
 }

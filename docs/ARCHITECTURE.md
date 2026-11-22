@@ -401,7 +401,7 @@ reasoning, unfinished Tool structures and provider replay signatures are not
 promoted. Cold and active context preparation use the same rule.
 See [ADR-0283](adr/0283-interrupted-assistant-text-context.md).
 
-In the isolated #52 storage candidate, the same physical message stream also holds typed agent-configuration versions at native commit coordinates. The branch directory retains an immutable reference selected at the anchor. [ADR-0345](adr/0345-ordered-agent-configuration.md).
+In the isolated #52 storage candidate, the same physical message stream also holds typed agent-configuration versions at native commit coordinates. The branch directory retains an immutable reference selected at the anchor. Fork creation also copies the source Conversation’s latest confirmed compute allocation for first-request continuity. [ADR-0347](adr/0347-conversation-compute-continuity.md). [ADR-0345](adr/0345-ordered-agent-configuration.md).
 
 ## Tools and Cube
 

@@ -1,7 +1,6 @@
 // Operator-only endpoint map. Only the execution actor can ask this driver to
 // submit an admitted Tool; results go through Guest HTTPS and the Worker mailbox.
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import { withFamilyGuest } from "./retained-family-cube.mjs";
 import { installContinuationEnvironments } from "./continuation-cases.mjs";
 import { studyCubeConfig } from "./study-cube-config.mjs";
@@ -34,7 +33,7 @@ export async function runGuestContinuation(wave, db, endpoints) {
           ["first", first],
           ["second", second],
         ]) {
-          const target = randomUUID();
+          const target = guest.allocationId;
           endpoints.set(target, guest);
           await db.query("insert into study_guest_targets values($1,$2)", [workspace, target]);
         }
@@ -95,6 +94,17 @@ export async function runGuestContinuation(wave, db, endpoints) {
             assert.equal(trace.bash, loc.cwd + "\n" + loc.marker);
             loc.runs.push(trace.runId);
           }
+          const {
+            rows: [observation],
+          } = await db.query(
+            "select w.state#>>'{sandbox,continuityId}' as generation from runs r join conversation_worlds w on w.tenant_id=r.tenant_id and w.pi_session_id=r.session_id and w.conversation_id=1 where r.id=$1",
+            [result.environmentTrace.at(-1).runId],
+          );
+          assert.equal(
+            observation?.generation,
+            second.allocationId,
+            "The settled Guest Tool must record the original allocation",
+          );
           assert(result.router.preferred >= (switchAt ? 1 : 2));
         }
         for (const loc of locations) {

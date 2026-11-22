@@ -46,7 +46,7 @@ export async function runFanout({
   const owners = fixture.owners;
   async function seed(arm, displayRounds, mixed) {
     await call(projector, "fanoutReset", "fanoutResetDone");
-    await db.query("truncate workspace_route_spans,messages,inboxes,runs");
+    await db.query("truncate conversation_worlds,workspace_route_spans,messages,inboxes,runs");
     await db.query(
       `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id)
       select r,$1,s,1,r,'fixture','fixture','running',w from unnest($2::uuid[],$3::uuid[],$4::uuid[]) a(r,s,w)`,
@@ -56,14 +56,15 @@ export async function runFanout({
       ],
     );
     await db.query(
-      `insert into workspace_route_spans(run_id,conversation_id,tenant_id,pi_session_id,session_id,turn_id,topic,partition,first_offset,binding_id,writer_id)
-      select id,1,tenant_id,session_id::text,session_id,id,$1,p,0,b,lease_id from runs join
+      `insert into workspace_route_spans(run_id,conversation_id,tenant_id,pi_session_id,session_id,turn_id,topic,partition,first_offset,binding_id,writer_id,allocation_id)
+      select id,1,tenant_id,session_id::text,session_id,id,$1,p,0,b,lease_id,case when $5 then gen_random_uuid() end from runs join
       unnest($2::uuid[],$3::int[],$4::uuid[]) a(r,p,b) on a.r=id`,
       [
         topic,
         owners.map((o) => o.scope.runId),
         owners.map((o) => o.partition),
         owners.map((o) => o.binding),
+        mixed,
       ],
     );
     if (!mixed) {
@@ -170,6 +171,14 @@ export async function runFanout({
         assert.equal(rows[0].n, 0);
       } else if (mixed) {
         assert.equal(result.handled, mix.records);
+        assert.equal(
+          (
+            await db.query(`select count(*)::int n from conversation_worlds w join workspace_route_spans s
+          on s.tenant_id=w.tenant_id and s.pi_session_id=w.pi_session_id::text and s.conversation_id=w.conversation_id
+          and s.allocation_id::text=w.state#>>'{sandbox,continuityId}'`)
+          ).rows[0].n,
+          targets,
+        );
         if (study.trials.length) assert.equal(mix.hash, study.trials[0].mix.hash);
         assert.equal(
           (

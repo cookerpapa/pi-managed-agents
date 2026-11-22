@@ -7,7 +7,7 @@ export async function installWorkspaceRoutes(db) {
     run_id uuid not null references runs(id) on delete cascade, conversation_id bigint not null,
     tenant_id uuid not null, pi_session_id text not null, session_id uuid not null,turn_id uuid not null,
     topic text not null, partition int not null, first_offset bigint not null,
-    binding_id uuid not null, writer_id uuid not null,
+    binding_id uuid not null, writer_id uuid not null, allocation_id uuid,
     primary key(run_id,conversation_id,topic,partition,first_offset),
     unique(run_id,conversation_id,binding_id)
   )`);
@@ -33,7 +33,7 @@ export class WorkspaceRouteSpans {
   #read(db, s, lane, topic, p) {
     return db
       .query(
-        `select first_offset::text as "from", binding_id as "bindingId", writer_id as "writerId",
+        `select first_offset::text as "from", binding_id as "bindingId", allocation_id as "allocationId", writer_id as "writerId",
       session_id as "sessionId", turn_id as "turnId" from workspace_route_spans where tenant_id=$1 and pi_session_id=$2
       and run_id=$3 and conversation_id=$4 and topic=$5 and partition=$6 order by first_offset`,
         [s.tenantId, s.piSessionId, s.runId, lane, topic, p],
@@ -52,7 +52,9 @@ export class WorkspaceRouteSpans {
     }
     return spans.findLast((row) => BigInt(row.from) <= offset);
   }
-  async activate(s, lane, position, bindingId, current) {
+  async activate(s, lane, position, selected, current) {
+    const bindingId = typeof selected === "string" ? selected : selected.bindingId;
+    const allocationId = selected.allocationId ?? null;
     const { topic, partition, offset } = position,
       c = await this.db.connect();
     const key = this.#key(s, lane, topic, partition),
@@ -74,6 +76,7 @@ export class WorkspaceRouteSpans {
         assert(
           last.from === String(offset) &&
             last.bindingId === bindingId &&
+            last.allocationId === allocationId &&
             last.writerId === s.writerId &&
             last.sessionId === s.sessionId &&
             last.turnId === s.turnId,
@@ -81,7 +84,7 @@ export class WorkspaceRouteSpans {
         );
       } else {
         await c.query(
-          "insert into workspace_route_spans(run_id,conversation_id,tenant_id,pi_session_id,session_id,turn_id,topic,partition,first_offset,binding_id,writer_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+          "insert into workspace_route_spans(run_id,conversation_id,tenant_id,pi_session_id,session_id,turn_id,topic,partition,first_offset,binding_id,writer_id,allocation_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
           [
             s.runId,
             lane,
@@ -94,11 +97,13 @@ export class WorkspaceRouteSpans {
             String(offset),
             bindingId,
             s.writerId,
+            allocationId,
           ],
         );
         spans.push({
           from: String(offset),
           bindingId,
+          allocationId,
           writerId: s.writerId,
           sessionId: s.sessionId,
           turnId: s.turnId,

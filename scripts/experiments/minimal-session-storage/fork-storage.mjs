@@ -24,7 +24,7 @@ export async function setForkLayout(pool, enabled, cover = true) {
   try {
     await c.query("begin");
     await c.query(
-      "truncate messages,inboxes,runs,fork_requests,fork_sessions,fork_completed_runs,pi_history_nodes,pi_history_streams",
+      "truncate conversation_worlds,messages,inboxes,runs,fork_requests,fork_sessions,fork_completed_runs,pi_history_nodes,pi_history_streams",
     );
     await c.query(
       "alter table messages drop constraint if exists messages_run_id_fkey, drop constraint if exists retained_message_stream",
@@ -145,6 +145,20 @@ export class ForkStorage {
       tx,
     );
   }
+  async copyWorld(tx, t, from, lane, to) {
+    await sql`insert into conversation_worlds(tenant_id,pi_session_id,conversation_id,state)
+      select tenant_id,${to}::uuid,1,state from conversation_worlds
+      where tenant_id=${t}::uuid and pi_session_id=${from}::uuid and conversation_id=${lane}`.execute(
+      tx,
+    );
+  }
+  async rootWorld(t, session) {
+    const { rows } =
+      await sql`select w.state from fork_sessions s join conversation_worlds w on w.tenant_id=s.tenant_id and w.pi_session_id=s.stream_id and w.conversation_id=1 where s.tenant_id=${t}::uuid and s.id=${session}::uuid`.execute(
+        this.db,
+      );
+    return rows[0]?.state;
+  }
   async lock(tx, t, exclusive) {
     if (exclusive) await sql`select pg_advisory_xact_lock(hashtextextended(${t},17))`.execute(tx);
     else await sql`select pg_advisory_xact_lock_shared(hashtextextended(${t},17))`.execute(tx);
@@ -173,6 +187,7 @@ export class ForkStorage {
       const { root, agent } = await this.freeze(tx, t, s, point),
         target = randomUUID();
       await this.branchStream(tx, t, target, agent);
+      await this.copyWorld(tx, t, s.stream_id, point.lane, target);
       await sql`insert into fork_sessions values(${t}::uuid,${target}::uuid,${target}::uuid,${root}::uuid)`.execute(
         tx,
       );
@@ -224,13 +239,17 @@ export class ForkStorage {
       await sql`delete from runs where tenant_id=${t}::uuid and session_id=${stream}::uuid`.execute(
         tx,
       );
+      const fresh = point ? randomUUID() : undefined;
+      if (point) await this.copyWorld(tx, t, stream, point.lane, fresh);
+      await sql`delete from conversation_worlds where tenant_id=${t}::uuid and pi_session_id=${stream}::uuid`.execute(
+        tx,
+      );
       if (!point) {
         await sql`delete from fork_sessions where tenant_id=${t}::uuid and id=${id}::uuid`.execute(
           tx,
         );
         return;
       }
-      const fresh = randomUUID();
       await this.branchStream(tx, t, fresh, frozen.agent);
       await sql`update fork_sessions set root_id=${frozen.root}::uuid,stream_id=${fresh}::uuid where tenant_id=${t}::uuid and id=${id}::uuid`.execute(
         tx,

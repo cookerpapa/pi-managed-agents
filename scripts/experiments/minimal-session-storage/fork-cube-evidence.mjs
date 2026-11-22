@@ -7,10 +7,7 @@ import { Harness, createRegistry, defineExtension } from "@earendil-works/pi-dur
 import { getCurrentSystemMessage } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
-import {
-  PiSessionWorldStateController,
-  PI_SANDBOX_RESET_MESSAGE,
-} from "../../../packages/sandbox-supervisor/src/pi-sandbox-continuity.ts";
+import { PI_SANDBOX_RESET_MESSAGE } from "../../../packages/sandbox-supervisor/src/pi-sandbox-continuity.ts";
 import { continuationPrompt, environmentSection } from "./continuation-environment.mjs";
 import { installContinuationEnvironments, selectEnvironment } from "./continuation-cases.mjs";
 import { selectedRunEnvironment } from "./admission-retention.mjs";
@@ -30,12 +27,15 @@ async function sample(conversation, provider) {
             m.content.some((b) => b.text === "The workspace service is running."),
         ),
       );
-      const resetCount = context.messages.filter(
-        (m) => m.role === "system" && m.content === PI_SANDBOX_RESET_MESSAGE,
-      ).length;
+      const admission = getCurrentSystemMessage(context.messages)?.sections?.[environmentSection];
+      const resetCount =
+        Number(admission?.includes("previously used by this conversation was replaced") ?? false) +
+        context.messages.filter(
+          (m) => m.role === "system" && m.content === PI_SANDBOX_RESET_MESSAGE,
+        ).length;
       request = {
         resetCount,
-        admission: getCurrentSystemMessage(context.messages)?.sections?.[environmentSection],
+        admission,
       };
       return fauxAssistantMessage("Checked.");
     },
@@ -118,16 +118,6 @@ async function coldRequest({ memory, pool, dest }, target) {
   );
   try {
     const root = await cold.root(ctx);
-    // Even giving the diagnostic controller the true current generation is
-    // insufficient if the cold store cannot supply its earlier observation.
-    const controller = await PiSessionWorldStateController.create(cold, root.id, {
-      continuity: "warm_reuse",
-      continuityId: current,
-      environmentSha256: "a".repeat(64),
-      workspaceBindingSha256: "b".repeat(64),
-      toolPolicySha256: "c".repeat(64),
-    });
-    await controller.capture();
     const request = await sample(root, provider);
     assert.match(request.admission, /retained the existing elastic sandbox/);
     return request;
@@ -165,13 +155,20 @@ export async function cubeForkEvidence(base, admin, scope, nativeHistory, pgHist
     );
     await fixture.confirmControl();
     assert.deepEqual(candidateChanged.page, candidateUnchanged.page);
-    assert.deepEqual(candidateChanged.retained, candidateUnchanged.retained);
+    const { conversation_worlds: changedWorld, ...changedSource } = candidateChanged.retained;
+    const { conversation_worlds: unchangedWorld, ...unchangedSource } = candidateUnchanged.retained;
+    assert.deepEqual(changedSource, unchangedSource);
+    assert.equal(changedWorld.length, 1);
+    assert.equal(unchangedWorld.length, 1);
+    assert.equal(changedWorld[0].state.sandbox.continuityId, first);
+    assert.equal(unchangedWorld[0].state.sandbox.continuityId, current);
     assert.equal(changed.firstRequest.resetCount, 1);
     assert.equal(unchanged.firstRequest.resetCount, 0);
-    assert.equal(
-      candidateChanged.firstRequest.admission,
-      candidateUnchanged.firstRequest.admission,
-    );
+    assert.equal(candidateChanged.firstRequest.resetCount, 1);
+    assert.equal(candidateUnchanged.firstRequest.resetCount, 0);
+    for (const req of [candidateChanged.firstRequest, candidateUnchanged.firstRequest]) {
+      assert(!req.admission.includes(first) && !req.admission.includes(current));
+    }
     const cases = [
       ["original process still serving", unchanged, candidateUnchanged],
       ["original process gone", changed, candidateChanged],
@@ -182,7 +179,7 @@ export async function cubeForkEvidence(base, admin, scope, nativeHistory, pgHist
     }));
     return {
       cases,
-      identicalSourceRows: true,
+      identicalSourceExceptObservation: true,
       identicalVisibleEntries: true,
       bothAdmissionsRetained: true,
       previousVmConfirmedAbsent: true,
@@ -191,5 +188,5 @@ export async function cubeForkEvidence(base, admin, scope, nativeHistory, pgHist
     };
   });
   console.log(JSON.stringify({ ...evidence, cleanupVerified: true }, null, 2));
-  if (evidence.cases.some((c) => c.nativeResets !== c.candidateResets)) process.exitCode = 2;
+  assert(evidence.cases.every((c) => c.nativeResets === c.candidateResets));
 }

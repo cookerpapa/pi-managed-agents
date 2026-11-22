@@ -31,3 +31,12 @@ create table inboxes (
   doc_id bigint not null, commit_seq bigint not null, ordinal integer not null,
   items jsonb not null, created_seq bigint not null, primary key (tenant_id,pi_session_id,conversation_id)
 );
+-- Only the most recent confirmed resource observation for each live Conversation.
+create table conversation_worlds (
+  tenant_id uuid not null, pi_session_id uuid not null, conversation_id bigint not null,
+  -- A Fork starts its own ordered stream and inherits only the observation.
+  seen_offset bigint,
+  state jsonb not null check (jsonb_typeof(state#>'{sandbox,continuityId}') is not distinct from 'string'
+    and state#>>'{sandbox,status}'='active' and octet_length(state::text)<=4096),
+  primary key(tenant_id,pi_session_id,conversation_id)
+);

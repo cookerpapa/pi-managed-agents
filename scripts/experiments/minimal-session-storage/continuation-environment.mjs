@@ -35,6 +35,14 @@ export function continuationPrompt(previous, current, now = Date.now()) {
       unknown: "The elastic sandbox state was unconfirmed when this Run was accepted.",
     };
     lines.push(descriptions[state]);
+    if (current.elastic.continuity === "replaced")
+      lines.push(
+        "The elastic sandbox previously used by this conversation was replaced. Its processes ended. Workspace files are preserved.",
+      );
+    else if (current.elastic.continuity === "different")
+      lines.push(
+        "This conversation is using a different elastic sandbox. Processes from the previous sandbox do not carry over.",
+      );
   }
   return lines.join("\n");
 }

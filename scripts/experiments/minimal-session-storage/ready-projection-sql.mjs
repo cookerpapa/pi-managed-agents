@@ -32,9 +32,19 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
         applied:=0;
         for op in select value from jsonb_array_elements(frame->'ops') loop
           a:=op->'args';
-          if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin') and not (op->>'kind'='finish' and p_allow_finish)) or
+          if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin','world') and not (op->>'kind'='finish' and p_allow_finish)) or
             (op->>'kind'='inbox' and (a->>6)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
           case op->>'kind'
+          when 'world' then
+            perform 1 from runs where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid
+              and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for share;
+            ok:=found; n:=1;
+            if ok then
+              insert into conversation_worlds as w(tenant_id,pi_session_id,conversation_id,seen_offset,state)
+              values ((a->>0)::uuid,(a->>1)::uuid,(a->>4)::bigint,(frame->>'offset')::bigint,op->'state')
+              on conflict(tenant_id,pi_session_id,conversation_id) do update set state=excluded.state,seen_offset=excluded.seen_offset
+                where (w.seen_offset is null or w.seen_offset<=excluded.seen_offset) and w.state is distinct from excluded.state;
+            end if;
           when 'root-compact' then
             update runs set root_compacts=jsonb_build_object('requests',coalesce(root_compacts->'requests','{}'::jsonb)||(op->'requests'),
               'tasks',coalesce(root_compacts->'tasks','{}'::jsonb)||(op->'tasks'),'submissions',coalesce(root_compacts->'submissions','{}'::jsonb)||(op->'submissions'),
@@ -69,6 +79,17 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
               end if;
               if (snap is not null and snap is distinct from (a->5)) or (op->>'kind'='tool-settled' and snap is null)
                 then raise exception 'Conflicting native task reference' using errcode='PZ002'; end if;
+              if op->'confirmUse'='true'::jsonb and op->>'kind'='tool-settled' then
+                insert into conversation_worlds as w (tenant_id,pi_session_id,conversation_id,seen_offset,state)
+                select span.tenant_id,(a->>1)::uuid,span.conversation_id,(snap->>'offset')::bigint,
+                  jsonb_build_object('sandbox',jsonb_build_object('status','active','continuityId',span.allocation_id::text))
+                from workspace_route_spans span where span.run_id=(a->>2)::uuid and span.tenant_id=(a->>0)::uuid
+                  and span.pi_session_id=(a->>1) and span.conversation_id=(snap->>'conversationId')::bigint
+                  and span.topic=p_topic and span.partition=p_partition and span.first_offset=(snap->>'allocationSpanStart')::bigint
+                  and span.allocation_id is not null
+                on conflict(tenant_id,pi_session_id,conversation_id) do update set state=excluded.state,seen_offset=excluded.seen_offset
+                  where (w.seen_offset is null or w.seen_offset<=excluded.seen_offset) and w.state#>>'{sandbox,continuityId}' is distinct from excluded.state#>>'{sandbox,continuityId}';
+              end if;
               update runs set projection_tools=case when op->>'kind'='tool'
                 then jsonb_set(projection_tools,array[a->>4],a->5) else projection_tools-(a->>4) end,
                 cancel_positions=case when op->>'kind'='tool-settled' and a->6 is null then cancel_positions-(a#>>'{5,operationId}') else cancel_positions end where id=(a->>2)::uuid;
