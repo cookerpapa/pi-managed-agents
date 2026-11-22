@@ -1,8 +1,7 @@
 # Subagents
 
-PiCloud exposes `subagent` for direct delegation, `subagent_control` for discovery
-and management. Users request these
-in ordinary language; they do not configure Workers or Kafka.
+Pi Managed Agents provides `subagent` to delegate a task and `subagent_control`
+to find and manage children. Users can request delegation in ordinary language.
 
 ## Direct task
 

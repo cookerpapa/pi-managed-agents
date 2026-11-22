@@ -685,13 +685,17 @@ async function scenario(guest, mode, replacement) {
             scope: first,
             taskId: request.taskId,
             toolName: "subagent_control",
-            replyMode: "hostcall",
             arguments: { action: "wait", target: child.executionId },
           },
           () => true,
         );
-        assert.equal(outcome.result?.details?.value.state, "completed");
-        assert.equal(outcome.result.details.value.output, answers.at(-1));
+        assert.equal(outcome.isError ?? false, false);
+        assert.equal(outcome.result.details.action, "wait");
+        const part = outcome.result.content[0];
+        assert.equal(part.type, "text");
+        const delivered = JSON.parse(part.text);
+        assert.equal(delivered.state, "completed");
+        assert.equal(delivered.output, answers.at(-1));
       } finally {
         await reader.close();
       }
