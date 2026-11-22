@@ -1,0 +1,89 @@
+{
+  "results": [
+    {
+      "mode": "double-before-open",
+      "terminal": "completed",
+      "guestExecutions": 1,
+      "physicalDispatches": 1,
+      "canonicalBashResults": 1,
+      "cancelCommands": 0,
+      "replacementBashIntents": 0,
+      "readinessProbes": 0,
+      "originalDeadlinePreserved": true,
+      "secondSealBeforeC": true,
+      "thirdWorkerColdMs": 3088,
+      "bEditedInbox": false,
+      "workerBDiedBeforeOpen": true,
+      "compactSummaryInFinalModelRequest": true,
+      "replyAfterTerminal": false,
+      "rollbackVerified": true
+    },
+    {
+      "mode": "double-pending",
+      "terminal": "completed",
+      "guestExecutions": 1,
+      "physicalDispatches": 1,
+      "canonicalBashResults": 1,
+      "cancelCommands": 0,
+      "replacementBashIntents": 0,
+      "readinessProbes": 0,
+      "originalDeadlinePreserved": true,
+      "secondSealBeforeC": true,
+      "thirdWorkerColdMs": 3137,
+      "bEditedInbox": true,
+      "workerBDiedBeforeOpen": false,
+      "compactSummaryInFinalModelRequest": true,
+      "replyAfterTerminal": false,
+      "rollbackVerified": true
+    },
+    {
+      "mode": "serving-pending",
+      "terminal": "completed",
+      "guestExecutions": 1,
+      "physicalDispatches": 1,
+      "canonicalBashResults": 1,
+      "cancelCommands": 0,
+      "replacementBashIntents": 0,
+      "readinessProbes": 0,
+      "replyAfterTerminal": false,
+      "rollbackVerified": true
+    },
+    {
+      "mode": "already-returned",
+      "terminal": "completed",
+      "guestExecutions": 1,
+      "physicalDispatches": 1,
+      "canonicalBashResults": 1,
+      "cancelCommands": 0,
+      "replacementBashIntents": 0,
+      "readinessProbes": 0,
+      "replyAfterTerminal": false,
+      "rollbackVerified": true
+    },
+    {
+      "mode": "reply-timeout",
+      "terminal": "completed",
+      "guestExecutions": 1,
+      "physicalDispatches": 1,
+      "canonicalBashResults": 1,
+      "cancelCommands": 0,
+      "replacementBashIntents": 0,
+      "readinessProbes": 1,
+      "replyAfterTerminal": true,
+      "rollbackVerified": true
+    },
+    {
+      "mode": "user-stop",
+      "terminal": "cancelled",
+      "guestExecutions": 1,
+      "physicalDispatches": 1,
+      "canonicalBashResults": 1,
+      "cancelCommands": 1,
+      "replacementBashIntents": 0,
+      "readinessProbes": 0,
+      "replyAfterTerminal": false,
+      "rollbackVerified": true
+    }
+  ],
+  "cleanupVerified": true
+}

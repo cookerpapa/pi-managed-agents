@@ -7,6 +7,7 @@ import {
   AcceptedFamilyCheckpoint,
   hydrateSealedFamily,
   readSealedFamily,
+  resumeFamilyCheckpoint,
   saveSealedFamily,
 } from "@pi-cloud/pi-session-postgres/durable";
 import { sql } from "kysely";
@@ -116,6 +117,59 @@ it.skipIf(!source)(
       ])
         await expect(readSealedFamily(db, other, topic)).rejects.toThrow();
       await expect(readSealedFamily(db, successor, "other")).rejects.toThrow(/source/);
+      // A claimant may publish new deltas or die with none. Both use the same
+      // sealed predecessor, and an empty seal cannot hide an accepted suffix.
+      const next = { ...position, offset: position.offset + 2n };
+      const nextSeal = randomUUID();
+      await expect(resumeFamilyCheckpoint(db, successor, position)).rejects.toThrow(/position/);
+      await expect(
+        resumeFamilyCheckpoint(db, successor, { ...next, partition: 1 }),
+      ).rejects.toThrow(/position/);
+      await expect(resumeFamilyCheckpoint(db, successor, next, true)).rejects.toThrow(/matched/);
+      const base = await resumeFamilyCheckpoint(db, successor, next);
+      expect(base.snapshot()).toEqual(family.snapshot());
+      const successorDelta = {
+        ...first,
+        factId: randomUUID(),
+        scope: successor,
+        commit: {
+          seq: 3,
+          nextId: 4,
+          writes: [
+            {
+              type: "document.change",
+              id: 2,
+              content: { kind: "base", version: 1, value: { text: "B wrote this" } },
+            },
+          ],
+        },
+      };
+      expect(() => new AcceptedFamilyCheckpoint().observe(successorDelta)).toThrow(/prefix/);
+      base.observe(successorDelta);
+      base.observe(successorDelta);
+      expect(
+        base.snapshot().records.find((r) => r.write.record?.id === 2).write.content.value.text,
+      ).toBe("B wrote this");
+      expect(() =>
+        base.observe({ ...successorDelta, commit: { ...successorDelta.commit, seq: 5 } }),
+      ).toThrow(/prefix/);
+      await expect(
+        db.transaction().execute(async (tx) => {
+          await sql`update runs set output_first_offset=null,output_first_topic=null,output_first_partition=null,output_seal_id=${nextSeal}::uuid`.execute(
+            tx,
+          );
+          const empty = await resumeFamilyCheckpoint(tx, successor, next, true);
+          await expect(
+            saveSealedFamily(tx, successor, next, nextSeal, base.snapshot()),
+          ).rejects.toThrow(/seal/);
+          await saveSealedFamily(tx, successor, next, nextSeal, empty.snapshot());
+          const stored = (await sql`select native_work_handoff as h from runs`.execute(tx)).rows[0]
+            .h;
+          expect(stored.scope.writerId).toBe(successor.writerId);
+          expect(JSON.parse(stored.nativeText)).toEqual(family.snapshot());
+          throw Error("rollback study");
+        }),
+      ).rejects.toThrow("rollback study");
       const image = await readSealedFamily(db, successor, topic),
         store = new MemoryStorage();
       await hydrateSealedFamily(image, store);

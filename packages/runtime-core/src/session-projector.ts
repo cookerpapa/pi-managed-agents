@@ -1,4 +1,8 @@
-import { AcceptedFamilyCheckpoint, saveSealedFamily } from "@pi-cloud/pi-session-postgres/durable";
+import {
+  AcceptedFamilyCheckpoint,
+  resumeFamilyCheckpoint,
+  saveSealedFamily,
+} from "@pi-cloud/pi-session-postgres/durable";
 import type { Database } from "@pi-cloud/database";
 import type { Kysely } from "kysely";
 import { KafkaLogConsumer } from "@pi-cloud/event-log";
@@ -176,9 +180,9 @@ export class SessionProjector {
       recovery && families
         ? async (tx, fact, position, current) => {
             if (!recovery.tracks(fact.scope)) return;
-            const family = families.get(fact.scope.writerId);
-            if (!family)
-              throw Error("Accepted native family prefix was not reconstructed before handoff");
+            const family =
+              families.get(fact.scope.writerId) ??
+              (await resumeFamilyCheckpoint(tx, fact.scope, position, true));
             const state = family.snapshot();
             await saveSealedFamily(tx, fact.scope, position, fact.factId, state);
             await recovery.advance(tx, fact, position, current, state.seq);
@@ -397,7 +401,11 @@ export class SessionProjector {
                 if (fact.kind === "durable_commit" && recovery.tracks(fact.scope)) {
                   let family = families.get(fact.scope.writerId);
                   if (!family) {
-                    family = new AcceptedFamilyCheckpoint();
+                    family =
+                      fact.commit.seq === 1 && fact.scope.fencingToken === 1
+                        ? new AcceptedFamilyCheckpoint()
+                        : await resumeFamilyCheckpoint(options.database, fact.scope, record);
+                    if (current?.() === false) return;
                     families.set(fact.scope.writerId, family);
                   }
                   family.observe(fact);

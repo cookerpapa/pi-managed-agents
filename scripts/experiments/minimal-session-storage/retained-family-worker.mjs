@@ -243,6 +243,15 @@ function resultText(context, name) {
   return textOf(m);
 }
 const normal = mode === "normal";
+const twice = ["double-pending", "double-before-open"].includes(mode);
+const summary = "Retained family summary: build the shared workspace.";
+function checkCompacted(context) {
+  const messages = JSON.stringify(context.messages);
+  assert(
+    messages.includes(summary) && !messages.includes("expired-history-marker"),
+    "Incorrect compacted model context",
+  );
+}
 function beginParent(context) {
   parentModelCalls++;
   if (claim)
@@ -261,6 +270,7 @@ function beginParent(context) {
 }
 function finishParent(context) {
   parentModelCalls++;
+  if (twice) checkCompacted(context);
   const text = resultText(context, "delegate");
   assert.match(
     text,
@@ -291,7 +301,9 @@ function finishChild(context) {
       context.messages.some(
         (m) =>
           m.role === "user" &&
-          (typeof m.content === "string" ? m.content : textOf(m)).includes("queued-child-input"),
+          (typeof m.content === "string" ? m.content : textOf(m)).includes(
+            mode === "double-pending" ? "queued-child-input edited-by-B" : "queued-child-input",
+          ),
       ),
     );
   return fauxAssistantMessage(
@@ -301,6 +313,13 @@ function finishChild(context) {
   );
 }
 parentModel.setResponses([
+  ...(twice && !takeover
+    ? [
+        fauxAssistantMessage("old text ".repeat(600)),
+        fauxAssistantMessage("recent text ".repeat(240)),
+        fauxAssistantMessage(summary),
+      ]
+    : []),
   ...(takeover ? [] : [beginParent]),
   ...(takeover || normal ? [finishParent] : []),
 ]);
@@ -627,7 +646,10 @@ try {
       models,
       remoteTools: [],
       infrastructureTools: [delegate, workspaceBash],
-      settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
+      settings: {
+        compaction: { enabled: false, ...(twice ? { keepRecentTokens: 64 } : {}) },
+        retry: { maxRetries: 0 },
+      },
     });
   runtime = sessionHandle ? await sessionHandle.runtime(openRuntime) : await openRuntime();
   const root = await runtime.bind(configuration(1), takeover ? "reattach" : "initialize");
@@ -656,7 +678,15 @@ try {
       assert.equal(childView.id, receipt[0].key);
     }
     child = await runtime.bind(configuration(id), "reattach");
-    assert.equal((await runtime.harness.snapshot(InboxDoc, id, ctx)).items.length, 1);
+    const inbox = await runtime.harness.snapshot(InboxDoc, id, ctx);
+    assert.equal(inbox.items.length, 1);
+    if (twice)
+      assert.equal(
+        inbox.items[0].content,
+        scope.fencingToken >= 3 && mode === "double-pending"
+          ? "queued-child-input edited-by-B"
+          : "queued-child-input",
+      );
     if (claim?.request.stopOnResume) {
       modelsBeforeStop = childModelCalls + parentModelCalls;
       stopWork = claim
@@ -667,6 +697,20 @@ try {
         .then((receipt) => send("stopAcknowledged", { receipt }));
       await stopWork;
     }
+    if (twice)
+      process.on("message", async (m) => {
+        if (m.kind !== "confirmBEdit") return;
+        try {
+          await child.commit(async (tx) => {
+            const inbox = await tx.doc(InboxDoc, child.id);
+            assert.equal(inbox.items.length, 1);
+            inbox.items[0].content = "queued-child-input edited-by-B";
+          }, ctx);
+          send("bEdited", { seq: store.nextSeq - 1 });
+        } catch (error) {
+          send("error", { message: error.message });
+        }
+      });
     runtime.harness.resume();
   } else {
     process.on("message", async (m) => {
@@ -700,6 +744,16 @@ try {
         send("error", { message: e.message });
       }
     });
+    if (twice) {
+      for (const text of ["expired-history-marker " + "old ".repeat(1500), "keep the tail"]) {
+        const seed = await root.submit({ type: "input", content: text }, ctx);
+        await root.waitForIdle(ctx);
+        assert.equal((await seed.wait(ctx)).status, "done");
+      }
+      await root.compact(undefined, ctx);
+      await root.waitForIdle(ctx);
+      checkCompacted(await root.context(ctx));
+    }
     await root.submit(
       {
         type: "input",

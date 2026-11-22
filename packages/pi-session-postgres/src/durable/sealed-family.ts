@@ -14,7 +14,7 @@ import {
   type ToolReplyRecovery,
 } from "@pi-cloud/protocol";
 import { sql, type Kysely, type Transaction } from "kysely";
-import type { SealedNativeState } from "./accepted-family-checkpoint.ts";
+import { AcceptedFamilyCheckpoint, type SealedNativeState } from "./accepted-family-checkpoint.ts";
 
 type FamilyScope = {
   tenantId: string;
@@ -71,6 +71,57 @@ function pendingReferences(state: SealedNativeState, refs: Record<string, Pendin
   });
 }
 
+// The candidate worker and projector both require the same immediate predecessor.
+// At a recoverable seal the current lease may already be marked closed inside
+// this transaction, so only a Worker cold-read also requires an active writer.
+function predecessor(scope: FamilyScope) {
+  return sql`from runs r join session_leases active on active.tenant_id=r.tenant_id and active.lease_id=r.lease_id
+      join session_leases old on old.tenant_id=r.tenant_id and old.pi_session_id=active.pi_session_id
+        and old.lease_id=(r.native_work_handoff#>>'{scope,writerId}')::uuid
+        and old.fencing_token+1=active.fencing_token and old.writer_sealed_at is not null
+        and old.released_at is not null and old.writer_seal_offset=(r.native_work_handoff->>'offset')::bigint
+      where r.id=${scope.runId}::uuid and r.tenant_id=${scope.tenantId}::uuid and r.session_id=${scope.sessionId}::uuid
+        and r.turn_id=${scope.turnId}::uuid and r.mailbox_position=1
+        and active.pi_session_id=${scope.piSessionId} and active.lease_id=${scope.writerId}::uuid
+        and r.fencing_token=active.fencing_token and active.fencing_token=${scope.fencingToken}`;
+}
+
+function decodePredecessor(stored: StoredHandoff, scope: FamilyScope, topic: string): Handoff {
+  const { nativeText, ...source } = stored;
+  for (const k of ["tenantId", "piSessionId", "sessionId", "turnId", "runId"] as const)
+    if (source.scope[k] !== scope[k]) throw Error("Sealed family identity changed");
+  if (source.topic !== topic || source.scope.fencingToken + 1 !== scope.fencingToken)
+    throw Error("Sealed family source changed");
+  return { ...source, state: JSON.parse(nativeText) };
+}
+
+export async function resumeFamilyCheckpoint(
+  db: Kysely<Database>,
+  scope: FamilyScope,
+  position: { topic: string; partition: number; offset: bigint },
+  atEmptySeal = false,
+) {
+  const {
+    rows: [row],
+  } = await sql<{ handoff: StoredHandoff; inboxes: { id: string; created: string }[] | null }>`
+    select r.native_work_handoff as handoff,
+      (select jsonb_agg(jsonb_build_object('id',i.doc_id::text,'created',i.created_seq::text))
+       from inboxes i where i.tenant_id=r.tenant_id and i.pi_session_id=${scope.piSessionId}) as inboxes
+    ${predecessor(scope)} and r.state in ('running','cancel_requested')
+    and (not ${atEmptySeal}::boolean or r.output_first_offset is null)`.execute(db);
+  if (!row) throw Error("No matched predecessor for the admitted family prefix");
+  const h = decodePredecessor(row.handoff, scope, position.topic);
+  if (h.partition !== position.partition || BigInt(h.offset) >= position.offset)
+    throw Error("Invalid predecessor seal position");
+  return AcceptedFamilyCheckpoint.resume(
+    scope.writerId,
+    h.state,
+    (row.inboxes ?? [])
+      .filter((i) => BigInt(i.created) <= BigInt(h.state.seq))
+      .map((i) => Number(i.id)),
+  );
+}
+
 export async function saveSealedFamily(
   tx: Transaction<Database>,
   scope: FamilyScope,
@@ -90,12 +141,18 @@ export async function saveSealedFamily(
   };
   const result = await sql<{
     refs: Record<string, PendingNativeTool>;
-  }>`with durable as materialized (select set_config('synchronous_commit','on',true))
-      update runs set native_work_handoff=${JSON.stringify(handoff)}::jsonb from durable
+  }>`with durable as materialized (select set_config('synchronous_commit','on',true), ${JSON.stringify(handoff)}::jsonb as handoff)
+      update runs set native_work_handoff=durable.handoff from durable
     where id=${scope.runId}::uuid and tenant_id=${scope.tenantId}::uuid and session_id=${scope.sessionId}::uuid
       and turn_id=${scope.turnId}::uuid and lease_id=${scope.writerId}::uuid and fencing_token=${scope.fencingToken}
       and output_seal_id=${sealId}::uuid and recovery_requested_at is not null and mailbox_position=1
-      and output_first_topic=${position.topic} and output_first_partition=${position.partition} and output_first_offset<=${String(position.offset)}::bigint
+      and ((output_first_topic=${position.topic} and output_first_partition=${position.partition} and output_first_offset<=${String(position.offset)}::bigint)
+        or (output_first_offset is null and output_first_topic is null and output_first_partition is null
+          and exists (select 1 ${predecessor(scope)}
+            and r.native_work_handoff->>'topic'=${position.topic}
+            and (r.native_work_handoff->>'partition')::int=${position.partition}
+            and old.writer_seal_offset<${String(position.offset)}::bigint
+            and r.native_work_handoff->>'nativeText'=durable.handoff->>'nativeText')))
       returning projection_tools as refs`.execute(tx);
   if (result.rows.length !== 1) throw Error("Native handoff does not match the requested Run seal");
   pendingReferences(state, result.rows[0]!.refs);
@@ -177,23 +234,10 @@ export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope,
         handoff: StoredHandoff;
         refs: Record<string, PendingNativeTool>;
       }>`select r.native_work_handoff as handoff,r.projection_tools as refs
-      from runs r join session_leases active on active.tenant_id=r.tenant_id and active.lease_id=r.lease_id
-      join session_leases old on old.tenant_id=r.tenant_id and old.pi_session_id=active.pi_session_id
-        and old.lease_id=(r.native_work_handoff#>>'{scope,writerId}')::uuid
-        and old.fencing_token+1=active.fencing_token and old.writer_sealed_at is not null
-        and old.released_at is not null and old.writer_seal_offset=(r.native_work_handoff->>'offset')::bigint
-      where r.id=${scope.runId}::uuid and r.tenant_id=${scope.tenantId}::uuid and r.session_id=${scope.sessionId}::uuid
-        and r.turn_id=${scope.turnId}::uuid and r.state in ('running','cancel_requested') and r.mailbox_position=1
-        and active.pi_session_id=${scope.piSessionId} and active.lease_id=${scope.writerId}::uuid
-        and r.fencing_token=active.fencing_token and active.fencing_token=${scope.fencingToken} and active.released_at is null
+      ${predecessor(scope)} and r.state in ('running','cancel_requested') and active.released_at is null
         and active.writer_failed_at is null and active.writer_sealed_at is null`.execute(tx);
       if (!row) throw Error("No matching sealed native handoff for the claimed Run");
-      const { nativeText, ...source } = row.handoff;
-      const h: Handoff = { ...source, state: JSON.parse(nativeText) };
-      for (const k of ["tenantId", "piSessionId", "sessionId", "turnId", "runId"] as const)
-        if (h.scope[k] !== scope[k]) throw Error("Sealed family identity changed");
-      if (h.topic !== topic || h.scope.fencingToken + 1 !== scope.fencingToken)
-        throw Error("Sealed family source changed");
+      const h = decodePredecessor(row.handoff, scope, topic);
       const { ranges, pinned } = sealedHistorySelection(h.state);
       const { rows: entries } = await sql<{
         entry_id: string;

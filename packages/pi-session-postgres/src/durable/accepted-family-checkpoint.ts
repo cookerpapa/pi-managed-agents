@@ -21,6 +21,46 @@ export class AcceptedFamilyCheckpoint {
   #seq = 0;
   #lastFact?: string;
   #nextId = 2;
+  static resume(writer: string, state: SealedNativeState, inboxIds: readonly number[]) {
+    const next = new AcceptedFamilyCheckpoint();
+    if (
+      !Number.isSafeInteger(state.seq) ||
+      state.seq < 1 ||
+      !Number.isSafeInteger(state.nextId) ||
+      state.nextId < 2
+    )
+      throw Error("Invalid predecessor native head");
+    next.#writer = writer;
+    next.#seq = state.seq;
+    next.#nextId = state.nextId;
+    next.#heads = state.heads.slice();
+    next.#sequences = new Map(state.sequences);
+    const put = (id: number, value: FoldedRecord) => {
+      if (!Number.isSafeInteger(id) || id < 1 || id >= state.nextId || next.#records.has(id))
+        throw Error("Invalid predecessor native identity");
+      next.#records.set(id, value);
+    };
+    for (const row of state.records) {
+      if (!Number.isSafeInteger(row.seq) || row.seq < 1 || row.seq > state.seq)
+        throw Error("Invalid predecessor record position");
+      const w = row.write;
+      switch (w.type) {
+        case "conversation":
+        case "task":
+        case "submission":
+          put(w.value.id, row);
+          break;
+        case "document.create":
+          put(w.record.id, row);
+          break;
+        default:
+          throw Error("Invalid predecessor record type");
+      }
+    }
+    for (const id of inboxIds) put(id, "inbox");
+    return next;
+  }
+
   get seq() {
     return this.#seq;
   }

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Verify two consecutive Worker losses during the first root Run with a real parent compaction, original child Bash wait, and both an edited Inbox and a claimant lost before native open. [Repeated family handoff](reports/repeated-family-handoff-20261122.md).
+
 - [x] Verify atomic elastic retention on candidate chat admission, including expiry races, duplicate input and the first provider request on preferred and cold Workers. [Decision and evidence](adr/0346-elastic-retention-at-run-admission.md).
 
 - [x] Retain each Conversation’s latest confirmed compute allocation, freeze it on Fork, and compare it during elastic admission. [Decision](adr/0347-conversation-compute-continuity.md) and [paired Cube check](reports/ordered-agent-configuration-20261122.md#修复后的同一组对照)。

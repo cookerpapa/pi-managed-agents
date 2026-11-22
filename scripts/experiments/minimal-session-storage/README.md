@@ -559,6 +559,13 @@ removal of the handoff after closure. A second Guest witnesses exact cancellatio
 in the Stop case. Neither the deployed Worker configuration nor its live
 Projector is switched by this command.
 
+The `double-pending` scene also kills B after it has reattached to the original
+operation and committed an edit to the child's Inbox. `double-before-open` kills
+B after claim and before starting Pi. Both scenes compact the original parent's
+context, remove both sealed Kafka prefixes, and require C to consume the original
+reply at its original deadline and continue the same family. Append either scene
+to the atomic-handoff command to run it separately.
+
 ### Ordinary root from the web composer
 
 Use the operator fixture above with an available Cube/KVM runtime and Chrome:

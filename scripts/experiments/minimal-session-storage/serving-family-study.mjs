@@ -45,7 +45,11 @@ assert(
     brokers.every((b) => b.startsWith("127.0.0.1:")) &&
     new URL(dbUrl).hostname === "127.0.0.1",
 );
-const database = createDatabase({ connectionString: dbUrl, maxConnections: 10 });
+// The dual-store comparator keeps control tables (including its own Kafka
+// offset) in public. The candidate-only Inbox is in the second schema.
+const controlUrl = new URL(dbUrl);
+if (atomicHandoff) controlUrl.searchParams.set("options", "-c search_path=public,candidate");
+const database = createDatabase({ connectionString: controlUrl.href, maxConnections: 10 });
 const pool = new pg.Pool({
   connectionString: dbUrl,
   options: "-c search_path=candidate,public",
@@ -140,7 +144,8 @@ async function scenario(guest, mode, replacement) {
   if (pgHandoff && !atomicHandoff) state.study = new SealStudy();
   cases.set(runId, state);
   await initialOwner?.register(runId, binding);
-  let a, b, witness;
+  let a, b, c, witness, secondSeal, thirdCold;
+  const twice = ["double-pending", "double-before-open"].includes(mode);
   const scopeOf = async (actor) => {
     const { scope, bootId } = await actor.wait("claimed");
     assert.notEqual(bootId, scope.writerId);
@@ -167,6 +172,7 @@ async function scenario(guest, mode, replacement) {
     return until(async () => {
       a?.check();
       b?.check();
+      c?.check();
       if (state.error) throw state.error;
       await projector.checkHealth();
       return check();
@@ -371,37 +377,81 @@ async function scenario(guest, mode, replacement) {
       assert.notEqual(first.writerId, second.writerId);
       assert.equal(second.fencingToken, first.fencingToken + 1);
       assert.equal((await b.wait("claimed")).stopOnResume, mode === "user-stop");
-      view.sessions.get(runId).writer = second.writerId;
-      b.proc.send({ kind: "start" });
-      cold = await b.wait("cold");
-      if (pgHandoff) {
-        assert.equal(cold.requestHash, queued.requestHash);
-        assert.equal(cold.oldWriter, first.writerId);
-        assert.equal(cold.sealOffset, state.seal.offset);
-        if (!atomicHandoff) {
-          assert.deepEqual(cold.candidateChild, {
-            id: child.executionId,
-            sourceTask: request.taskId,
-            childConversationId: child.conversationId,
-          });
-          assert(state.ambiguous && state.requestAbsentFromMemory && state.snapshotBytes > 0);
-        } else
-          assert(
-            state.restarted &&
-              state.atomicReady &&
-              state.rollbackVerified &&
-              state.snapshotBytes > 0,
-          );
+      if (!atomicHandoff) view.sessions.get(runId).writer = second.writerId;
+      if (mode !== "double-before-open") {
+        b.proc.send({ kind: "start" });
+        cold = await b.wait("cold");
+        if (pgHandoff) {
+          assert.equal(cold.requestHash, queued.requestHash);
+          assert.equal(cold.oldWriter, first.writerId);
+          assert.equal(cold.sealOffset, state.seal.offset);
+          if (!atomicHandoff) {
+            assert.deepEqual(cold.candidateChild, {
+              id: child.executionId,
+              sourceTask: request.taskId,
+              childConversationId: child.conversationId,
+            });
+            assert(state.ambiguous && state.requestAbsentFromMemory && state.snapshotBytes > 0);
+          } else
+            assert(
+              state.restarted &&
+                state.atomicReady &&
+                state.rollbackVerified &&
+                state.snapshotBytes > 0,
+            );
+        }
+        if (mode !== "user-stop") {
+          const wait = await b.wait("reattached");
+          assert.equal(wait.originalTopic, state.ref.topic);
+          assert.equal(wait.operationId, state.operation);
+          assert.equal(wait.deadline, state.ref.deadlineAt);
+          if (mode === "serving-pending") await dir.release();
+        }
       }
-      if (mode !== "user-stop") {
-        const wait = await b.wait("reattached");
-        assert.equal(wait.originalTopic, state.ref.topic);
-        assert.equal(wait.operationId, state.operation);
-        assert.equal(wait.deadline, state.ref.deadlineAt);
-        if (mode === "serving-pending") await dir.release();
+      if (twice) {
+        if (mode === "double-pending") {
+          b.proc.send({ kind: "confirmBEdit" });
+          const edit = await b.wait("bEdited");
+          await wait(() => state.seq >= edit.seq, "B edit entered ordered projection");
+        }
+        b.proc.kill("SIGKILL");
+        assert.equal((await b.ended).signal, "SIGKILL");
+        await wait(async () => (await reaper.sweep()).expiredAssignments === 1, "B lease expiry");
+        await wait(
+          async () =>
+            state.seal?.writerId === second.writerId &&
+            (await api.getRun(runId)).state === "queued",
+          "B ordered seal",
+        );
+        secondSeal = state.seal;
+        assert(BigInt(secondSeal.offset) > BigInt(old.writer_seal_offset));
+        const low = BigInt(secondSeal.offset) + 1n;
+        await sessionAdmin.deleteTopicRecords({
+          topic,
+          partitions: [{ partition: 0, offset: String(low) }],
+        });
+        await until(
+          async () => BigInt((await sessionAdmin.fetchTopicOffsets(topic))[0].low) >= low,
+          "B prefix physically outside Kafka",
+        );
+        c = spawn(secondSeal);
+        const third = await scopeOf(c);
+        assert.equal(third.fencingToken, second.fencingToken + 1);
+        assert(![first.writerId, second.writerId].includes(third.writerId));
+        state.probeRecipient = { scope: third, proc: c.proc };
+        c.proc.send({ kind: "start" });
+        thirdCold = await c.wait("cold");
+        assert.equal(thirdCold.oldWriter, second.writerId);
+        assert.equal(thirdCold.sealOffset, secondSeal.offset);
+        assert.equal(thirdCold.requestHash, queued.requestHash);
+        const again = await c.wait("reattached");
+        assert.equal(again.originalTopic, state.ref.topic);
+        assert.equal(again.operationId, state.operation);
+        assert.equal(again.deadline, state.ref.deadlineAt);
+        await dir.release();
       }
     }
-    const active = b ?? a;
+    const active = c ?? b ?? a;
     const outcome = await active.wait(stopped ? "stopped" : "finished");
     if (stopped) {
       assert.equal((await active.wait("stopAcknowledged")).receipt, state.stopReceipt);
@@ -449,7 +499,7 @@ async function scenario(guest, mode, replacement) {
     }
     const relationship = await children.status(first.tenantId, child.executionId);
     assert.equal(relationship.conversationId, child.conversationId);
-    if (["normal", "serving-pending", "already-returned"].includes(mode))
+    if (twice || ["normal", "serving-pending", "already-returned"].includes(mode))
       assert(JSON.stringify(history).includes(await dir.result()));
     if (mode === "reply-timeout")
       assert(JSON.stringify(history).includes("PARENT CHILD UNKNOWN tool_reply_timeout"));
@@ -504,6 +554,17 @@ async function scenario(guest, mode, replacement) {
       mode,
       terminal,
       publicChildView: true,
+      ...(twice
+        ? {
+            successiveWorkerLosses: 2,
+            originalDeadlinePreserved: true,
+            secondSealBeforeC: true,
+            thirdWorkerColdMs: Math.round(thirdCold.coldMs),
+            compactSummaryInFinalModelRequest: true,
+            bEditedInbox: mode === "double-pending",
+            workerBDiedBeforeOpen: mode === "double-before-open",
+          }
+        : {}),
       originalRunReclaimed: !!b,
       ...(replacement ? { changedGuestBeforeStop: true, cancelledOriginalGuestOnly: true } : {}),
       physicalDispatches: state.dispatches,
@@ -544,6 +605,7 @@ async function scenario(guest, mode, replacement) {
   } finally {
     await a?.close();
     await b?.close();
+    await c?.close();
     await witness?.close();
     resources.delete(binding);
     resources.delete(state.currentBinding);
@@ -559,6 +621,24 @@ function progress(state, fact) {
   state.seq = fact.commit.seq;
   if (initialProcess) process.send({ kind: "progress", run: fact.scope.runId, seq: state.seq });
 }
+// The comparison view retains the previous native sequence in this process.
+// Only an admitted successor after the ordered seal can extend that prefix.
+function adoptFamily(record) {
+  if (!atomicHandoff || record.fact.kind !== "durable_commit") return;
+  const { scope, commit } = record.fact;
+  const prior = view.sessions.get(scope.runId);
+  if (!prior || prior.writer === scope.writerId) return;
+  const seal = cases.get(scope.runId)?.seal;
+  assert(
+    seal &&
+      seal.epoch + 1 === scope.fencingToken &&
+      BigInt(seal.offset) < record.offset &&
+      prior.seq === seal.seq &&
+      commit.seq === seal.seq + 1,
+    "Missing sealed comparison prefix",
+  );
+  prior.writer = scope.writerId;
+}
 async function startProjector() {
   projector = new SessionProjector(
     {
@@ -567,7 +647,10 @@ async function startProjector() {
       ...(atomicHandoff
         ? {
             recoveryCheckpoint: {
-              tracks: (scope) => cases.has(scope.runId) && scope.fencingToken === 1,
+              tracks: (scope) =>
+                cases.has(scope.runId) &&
+                (scope.fencingToken === 1 ||
+                  ["double-pending", "double-before-open"].includes(cases.get(scope.runId).mode)),
               async advance(tx, f, pos, current, nativeSequence) {
                 const s = cases.get(f.scope.runId);
                 assert(s && current());
@@ -670,6 +753,7 @@ async function startProjector() {
           accepts: (r) => cases.has(r.fact.scope.runId) && router.canBatch(r.fact),
           consume: async (records, current) => {
             for (let i = 0; i < records.length && current();) {
+              adoptFamily(records[i]);
               const n = await router.prepareHistory(records.slice(i), current);
               assert(n > 0);
               if (!current()) return;
@@ -696,6 +780,7 @@ async function startProjector() {
                 s.queuedId = q.value.requestId;
               }
             }
+            adoptFamily(r);
             await router.consume(r, current, grant);
             if (current() && s.study && !s.seal && f.commit.seq > s.study.seq) s.study.observe(f);
             progress(s, f);
@@ -720,10 +805,8 @@ async function startProjector() {
                   "select native_work_handoff->>'sealId' as seal from public.runs where id=$1",
                   [f.scope.runId],
                 );
-                if (!s.seal) {
-                  assert.equal(ready.seal, f.factId);
-                  s.atomicReady = true;
-                }
+                assert.equal(ready.seal, f.factId);
+                s.atomicReady = true;
               } else if (s.study && f.kind === "execution_seal") {
                 const original = view.sessions.get(f.scope.runId);
                 assert(s.queuedId && original && original.seq === s.study.seq);
@@ -758,6 +841,7 @@ async function startProjector() {
                   offset: String(r.offset),
                   writerId: f.scope.writerId,
                   epoch: f.scope.fencingToken,
+                  seq: view.sessions.get(f.scope.runId)?.seq,
                 };
               if (f.kind === "work_finished") {
                 router.spans.forget(f.scope);
@@ -876,7 +960,7 @@ if (initialProcess) {
 
     const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
     const modes = atomicHandoff
-      ? handoffs
+      ? ["double-before-open", "double-pending", ...handoffs]
       : bashFields
         ? ["active-stop", "serving-pending", "user-stop"]
         : pgHandoff

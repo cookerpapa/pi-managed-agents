@@ -83,3 +83,15 @@ original tool task/reply match rejects recovery. Preserve otherwise unallocated
 native IDs and the commit head through Pi's public embedded storage methods.
 The recovery seal forces synchronous commit for this transaction. Historical
 read APIs and further handoffs of the same Run are outside this first slice.
+
+## Repeated handoff in the same root Run
+
+A replacement continues the native sequence of its immediate, PG-sealed predecessor.
+When the candidate Projector folds its first successor commit, seed the fold from
+the existing Run handoff and the predecessor's Inbox document identities. Apply
+only the contiguous admitted successor suffix. A claimant can also die before
+publishing: the ordered seal may carry forward a verified predecessor when no
+output prefix exists for this incarnation. Verify tenant, physical Session, Run,
+turn, adjacent lease epoch, original partition and earlier seal position. Reuse
+the single Run field and its atomic seal/requeue transaction. Ordinary publication
+and the tool reply channel keep their existing authorities and absolute deadlines.
