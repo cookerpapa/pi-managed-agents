@@ -25,7 +25,7 @@ export type CandidateToolCommand = Readonly<{
   executionReference: string;
   /** Cloud invocation identity (native result Entry ID); request retains the Pi call ID. */
   toolCallId: string;
-  /** Logical Tool may use the workflow executor's Bash transport. */
+  /** Logical name recorded for tool attribution and historical requests. */
   nativeToolName?: string;
   replyTopic?: string;
   replyRecovery?: import("./tool-recovery.ts").ToolReplyRecovery;

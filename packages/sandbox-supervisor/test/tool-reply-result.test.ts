@@ -200,9 +200,7 @@ async function fixture(mode: Mode) {
   const runner = new RemoteToolSandboxTurnRunner({
     trustedWorkspaceDirectory: directory,
     runtimeIdentity: { supervisorId: "fixture", sandboxId: "fixture", bootId: randomUUID() },
-    broker: {
-      workflowUrlFor: () => "http://fixture.invalid/workflow",
-    },
+    broker: {},
     openAgentSession: async () => handle,
     modelRuntimeLeaseResolver: () => ({
       runtime: {

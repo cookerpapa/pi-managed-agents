@@ -116,7 +116,7 @@ export class ControlToolDispatcher {
     // expanded arguments here would turn an ordinary replay into a conflict.
     let admitted: boolean | undefined;
     for (const reference of fact.tools) {
-      if (reference.target !== "control") continue;
+      if (reference.target !== "control" || reference.sourceDocumentId !== undefined) continue;
       const repeatable = reference.implementation
         ? reference.implementation.replay === "safe"
         : this.options.replayable?.(reference.toolName) !== false;
@@ -161,8 +161,7 @@ export class ControlToolDispatcher {
           if (
             pending.dispatch.scope.tenantId === fact.scope.tenantId &&
             pending.dispatch.scope.piSessionId === fact.scope.piSessionId &&
-            (pending.dispatch.sourceDocumentId === write.id ||
-              pending.dispatch.recovery?.documentId === write.id)
+            pending.dispatch.recovery?.documentId === write.id
           )
             this.#remove(key);
     }
@@ -245,10 +244,7 @@ export class ControlToolDispatcher {
           and r.fields->>'nativeKind'='"pi.tool"'
           and r.fields->>'status' in ('pending','running')
           and coalesce(r.fields->>'abortRequested','false')='false'
-          and (effect->>'sourceDocumentId' is null or exists(
-            select 1 from pi_durable_records doc where doc.tenant_id=c.tenant_id
-              and doc.session_id=c.session_id and doc.id=(effect->>'sourceDocumentId')::bigint
-              and doc.kind='document' and doc.retired_seq is null))
+          and effect->>'sourceDocumentId' is null
           and (effect->'recovery' is null or exists(
             select 1 from pi_durable_records doc where doc.tenant_id=c.tenant_id
               and doc.session_id=c.session_id and doc.id=(effect->'recovery'->>'documentId')::bigint
@@ -295,8 +291,8 @@ export class ControlToolDispatcher {
       cloud_metadata: string | null;
     }>`select l.body,c.cloud_metadata from pi_durable_records r
       join pi_durable_log l on l.tenant_id=r.tenant_id and l.session_id=r.session_id
-        and l.seq=${sourceSequence} and l.record_id=${d.sourceDocumentId ?? d.taskId}
-        and l.record_kind=${d.sourceDocumentId === undefined ? "task" : "document.create"}
+        and l.seq=${sourceSequence} and l.record_id=${d.taskId}
+        and l.record_kind='task'
       join pi_durable_commits c on c.tenant_id=l.tenant_id and c.session_id=l.session_id and c.seq=l.seq
       where r.tenant_id=${d.scope.tenantId}::uuid and r.session_id=${d.scope.piSessionId}
         and r.id=${d.taskId} and r.kind='task'
@@ -305,13 +301,6 @@ export class ControlToolDispatcher {
         and coalesce(r.fields->>'abortRequested','false')='false'`.execute(this.options.database);
     if (!row.rows[0]) return;
     const write = JSON.parse(row.rows[0].body) as Record<string, unknown>;
-    if (d.sourceDocumentId !== undefined) {
-      const live =
-        await sql`select 1 from pi_durable_records where tenant_id=${d.scope.tenantId}::uuid
-        and session_id=${d.scope.piSessionId} and id=${d.sourceDocumentId}
-        and kind='document' and retired_seq is null`.execute(this.options.database);
-      if (!live.rows.length) return;
-    }
     if (d.recovery) {
       const receipt = await sql<{ body: string }>`select l.body from pi_durable_records doc
         join pi_durable_log l on l.tenant_id=doc.tenant_id and l.session_id=doc.session_id
@@ -475,7 +464,7 @@ export class ControlToolDispatcher {
         "packed" in outcome
           ? undefined
           : parseToolResultPayload({
-              toolName: command.replyMode === "hostcall" ? "subagent-control" : command.toolName,
+              toolName: command.toolName,
               toolCallId: command.nativeCallId,
               isError: outcome.isError ?? false,
               result: outcome.result,

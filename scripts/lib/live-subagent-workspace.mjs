@@ -16,8 +16,8 @@ export async function checkSubagentWorkspace({
   for (const kind of ["none", "ephemeral"]) {
     const task =
       kind === "none"
-        ? 'Call subagent exactly once with context:"fresh",workspace:null,task:"Without using tools, reply WORKSPACE_NONE_OK and explain briefly whether you can operate the parent phone or Linux files." Do not call workflow, phone, file or shell tools yourself. When it finishes, reply WORKSPACE_NONE_OK.'
-        : 'Call subagent exactly once with context:"fresh",workspace:{compute:"ephemeral",tools:["bash"]},task:"Use bash to write WORKSPACE_SHARED_VOLUME_OK into /workspace/subagent-workspace-marker.txt, then reply EPHEMERAL_LINUX_OK. This is separate Linux compute on a shared Volume, not a phone." After it finishes, use read to read /workspace/subagent-workspace-marker.txt in your own workspace, then reply WORKSPACE_SHARED_VOLUME_OK. Do not call workflow or any phone operation.';
+        ? 'Call subagent exactly once with context:"fresh",workspace:null,task:"Without using tools, reply WORKSPACE_NONE_OK and explain briefly whether you can operate the parent phone or Linux files." Do not call phone, file or shell tools yourself. When it finishes, reply WORKSPACE_NONE_OK.'
+        : 'Call subagent exactly once with context:"fresh",workspace:{compute:"ephemeral",tools:["bash"]},task:"Use bash to write WORKSPACE_SHARED_VOLUME_OK into /workspace/subagent-workspace-marker.txt, then reply EPHEMERAL_LINUX_OK. This is separate Linux compute on a shared Volume, not a phone." After it finishes, use read to read /workspace/subagent-workspace-marker.txt in your own workspace, then reply WORKSPACE_SHARED_VOLUME_OK. Do not call any phone operation.';
     const run = await api.acceptTurn(
       session.sessionId,
       task,

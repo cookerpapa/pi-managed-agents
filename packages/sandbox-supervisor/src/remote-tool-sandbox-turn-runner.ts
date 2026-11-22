@@ -1,6 +1,5 @@
 import { measureRunPreparation } from "@pi-cloud/observability";
 import { hasConversationWorkspace } from "@pi-cloud/protocol";
-import type { WorkflowPreparer } from "./workflow-transport.ts";
 import {
   awaitWithContext,
   withAbortSignal,
@@ -61,7 +60,6 @@ export interface SandboxControlBoundary {
     images: import("@pi-cloud/protocol").ImageAttachmentReference[],
     signal?: AbortSignal,
   ): Promise<import("@pi-cloud/protocol").EnvironmentImagesResponse>;
-  workflowUrlFor(bindingId: string): string;
 }
 
 export type RemoteToolSandboxTurnRunnerOptions = {
@@ -121,7 +119,6 @@ export type RemoteToolSandboxTurnRunnerOptions = {
   createTrustedTools?: (
     command: ExecuteTurnCommandMessage,
     context: Readonly<{
-      prepareWorkflow: WorkflowPreparer;
       environment(): ToolEnvironmentRequest;
       onExecutionUnavailable(failure: { code: string; message: string }): void;
     }>,
@@ -698,12 +695,7 @@ export class RemoteToolSandboxTurnRunner implements SupervisorTurnRunner {
         if (toolRuntimeFailure !== undefined) throw toolRuntimeFailure;
       };
       const settlementPolicy = settlementGatePolicyFromCommand(command);
-      let prepareWorkflow: WorkflowPreparer | undefined;
       const trustedToolBindings = (await this.#createTrustedTools?.(command, {
-        prepareWorkflow: (...args) => {
-          if (!prepareWorkflow) throw new Error("Remote workflow runtime is not ready");
-          return prepareWorkflow(...args);
-        },
         environment: noteEnvironment,
         onExecutionUnavailable: (failure) => {
           toolRuntimeFailure ??= new PiTurnError(failure.code, failure.message, false);
@@ -996,7 +988,6 @@ export class RemoteToolSandboxTurnRunner implements SupervisorTurnRunner {
               return {
                 activationId: logical.requestId,
                 environment: logical,
-                workflowUrl: this.#broker.workflowUrlFor(logical.requestId),
               };
             },
             executionReference: toolAssignment.executionReference,
@@ -1041,7 +1032,6 @@ export class RemoteToolSandboxTurnRunner implements SupervisorTurnRunner {
                     : { tracestate: downstreamTrace.tracestate }),
                 }),
           });
-          prepareWorkflow = remoteTools.prepareWorkflow;
           return {
             ...remoteTools,
             get tools() {

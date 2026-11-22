@@ -13,7 +13,6 @@ import {
   type WorkspaceFileTransferRequest,
 } from "@pi-cloud/protocol";
 import {
-  TOOL_WORKFLOW_PATH,
   parseInternalServiceError,
   parseSandboxControlListWorkspaceDirectoryResponse,
   parseSandboxControlReadWorkspaceFileResponse,
@@ -171,14 +170,6 @@ export class SandboxControlClient {
       "requestTimeoutMs",
     );
     this.#idGenerator = options.idGenerator ?? randomUUID;
-  }
-
-  get workflowUrl(): string {
-    return new URL(TOOL_WORKFLOW_PATH, this.#baseUrl).toString();
-  }
-
-  workflowUrlFor(_activationId: string): string {
-    return this.workflowUrl;
   }
 
   async prepareEnvironmentImages(
@@ -859,10 +850,6 @@ export class ReplicatedSandboxControlClient {
       this.#ownerClients.set(new URL(replicaUrl).toString(), client);
       return client;
     });
-  }
-
-  workflowUrlFor(activationId: string): string {
-    return this.#ownedClient(activationId).workflowUrlFor(activationId);
   }
 
   async checkHealth(): Promise<void> {

@@ -196,7 +196,7 @@ verified the same Run continuing with its original Worker, lease and VM while
 its next model request observed the updated directory.
 
 Sandbox integration uses focused lifecycle, execution, file, image, terminal,
-preview, workflow and credential interfaces. Cube and BoxLite share fixed Guest
+preview and credential interfaces. Cube and BoxLite share fixed Guest
 behavior while each adapter owns its provider mechanics.
 Workers describe logical targets; the Session execution side prepares bindings
 when needed. The resource owner keeps physical admission and recovery; file access adds no lifecycle

@@ -93,19 +93,6 @@ const ConversationStop = defineDocFamily<{ stopped: boolean }, boolean>({
   family: true,
   initial: (stopped) => ({ stopped }),
 });
-type HostCallValue = {
-  conversationId: number;
-  toolName: string;
-  callId: string;
-  arguments: Record<string, JsonValue>;
-};
-const HostCallDocument = defineDocFamily<HostCallValue, HostCallValue>({
-  kind: "pi-cloud.tool-hostcall",
-  version: 1,
-  scope: "task",
-  family: true,
-  initial: (value) => value,
-});
 const ControlRecoveryDocument = defineDocFamily<
   { sequence: number; operationId: string },
   { sequence: number; operationId: string }
@@ -159,7 +146,11 @@ export class DurableAgentSession {
   readonly #unsubscribeTools: (() => void) | undefined;
   readonly #controlPublications = new Map<
     string,
-    { taskId: number; command: CandidateControlToolCommand }
+    {
+      taskId: number;
+      command: CandidateControlToolCommand;
+      recovery: NonNullable<CandidateControlToolCommand["recovery"]>;
+    }
   >();
   readonly #models: ScopedDurableModels;
   readonly remote: DurableRemoteTools;
@@ -210,7 +201,11 @@ export class DurableAgentSession {
           if (isControlToolCommand(prepared.command) && !prepared.command.replyRecovery) {
             if (!prepared.command.recovery)
               throw new Error("Control recovery requires its original reference");
-            await this.publishControl(invocation.taskId, prepared.command);
+            await this.#publishRecovery(
+              invocation.taskId,
+              prepared.command,
+              prepared.command.recovery,
+            );
           } else if (!("replyRecovery" in prepared.command) || !prepared.command.replyRecovery) {
             throw new Error("Remote recovery requires an original reply reference");
           }
@@ -236,12 +231,7 @@ export class DurableAgentSession {
           }),
           ...(options.publicEgress ? [publicEgressSection(options.publicEgress)] : []),
           section("delegation-policy", async (input, context) => {
-            if (
-              !input.agent.tools.some(
-                (tool) => tool.name === "subagent" || tool.name === "workflow",
-              )
-            )
-              return undefined;
+            if (!input.agent.tools.some((tool) => tool.name === "subagent")) return undefined;
             const run = await input.read.snapshot(CloudRunDocument, input.conversationId, context);
             return delegationInstructions(
               (run?.selectedThinkingLevel ?? "off") as AgentThinkingLevel,
@@ -711,75 +701,50 @@ export class DurableAgentSession {
     for (const write of commit.writes) {
       if (write.type !== "document.create") continue;
       const record = write.record as { id: number; kind: string; key?: string };
-      if (
-        !["pi-cloud.tool-hostcall", "pi-cloud.tool-recovery"].includes(record.kind) ||
-        !record.key
-      )
-        continue;
+      if (record.kind !== "pi-cloud.tool-recovery" || !record.key) continue;
       const pending = this.#controlPublications.get(record.key);
-      if (!pending) throw new Error("Native hostcall has no prepared dispatch");
+      if (!pending) throw new Error("Native recovery has no prepared dispatch");
       tools.push({
         taskId: pending.taskId,
-        command:
-          record.kind === "pi-cloud.tool-recovery"
-            ? {
-                ...pending.command,
-                recovery: { ...pending.command.recovery!, documentId: record.id },
-              }
-            : { ...pending.command, sourceDocumentId: record.id },
+        command: {
+          ...pending.command,
+          recovery: { ...pending.recovery, documentId: record.id },
+        },
       });
     }
     return { ...prepared, tools };
   }
-  async publishControl(taskId: number, command: CandidateControlToolCommand): Promise<void> {
+  async #publishRecovery(
+    taskId: number,
+    command: CandidateControlToolCommand,
+    recovery: NonNullable<CandidateControlToolCommand["recovery"]>,
+  ): Promise<void> {
     const runId = parseExecutionReference(command.executionReference).runId;
     const binding = this.#bindings.get(command.conversationId);
-    if (binding?.runId !== runId) throw new Error("Native hostcall invocation has ended");
+    if (binding?.runId !== runId) throw new Error("Native recovery invocation has ended");
     await binding.assertCurrent();
     if (this.#controlPublications.has(command.operationId))
-      throw new Error("Native hostcall is already publishing");
-    this.#controlPublications.set(command.operationId, { taskId, command });
+      throw new Error("Native recovery is already publishing");
+    this.#controlPublications.set(command.operationId, { taskId, command, recovery });
     try {
       await this.#harness.commit(async (tx) => {
         const task = await tx.task(taskId as TaskId);
         const tool = durableToolState(task);
         if (!tool?.intent || !tool.running || tool.conversationId !== command.conversationId)
-          throw new Error("Native hostcall invocation has ended");
-        if (command.recovery) {
-          const seed = {
-            sequence: command.recovery.sequence,
-            operationId: command.recovery.operationId,
-          };
-          const value = await tx.doc(
-            ControlRecoveryDocument,
-            taskId as TaskId,
-            command.operationId,
-            seed,
-          );
-          if (!isDeepStrictEqual(JSON.parse(JSON.stringify(value)), seed))
-            throw new Error("Native recovery identity changed");
-        } else {
-          const seed: HostCallValue = {
-            conversationId: command.conversationId,
-            toolName: command.toolName,
-            callId: command.nativeCallId,
-            arguments: command.arguments as Record<string, JsonValue>,
-          };
-          const value = await tx.doc(HostCallDocument, taskId as TaskId, command.operationId, seed);
-          if (!isDeepStrictEqual(JSON.parse(JSON.stringify(value)), seed))
-            throw new Error("Native hostcall identity changed arguments");
-        }
+          throw new Error("Native recovery invocation has ended");
+        const seed = { sequence: recovery.sequence, operationId: recovery.operationId };
+        const value = await tx.doc(
+          ControlRecoveryDocument,
+          taskId as TaskId,
+          command.operationId,
+          seed,
+        );
+        if (!isDeepStrictEqual(JSON.parse(JSON.stringify(value)), seed))
+          throw new Error("Native recovery identity changed");
       }, BACKGROUND_CONTEXT);
     } finally {
       this.#controlPublications.delete(command.operationId);
     }
-  }
-  async retireHostCall(taskId: number, id: string): Promise<void> {
-    await this.#harness.commit(async (tx) => {
-      const task = await tx.task(taskId as TaskId);
-      if (!task || task.state.status === "terminal") return;
-      await tx.retireDoc(HostCallDocument, taskId as TaskId, id);
-    }, BACKGROUND_CONTEXT);
   }
   async #awaitRun(
     runId: string,

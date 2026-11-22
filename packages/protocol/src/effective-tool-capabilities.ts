@@ -13,7 +13,6 @@ export type ConversationToolScope = {
 type OfferedDefinition = {
   availability?: "root" | "child" | "delegation";
   environment?: ToolEnvironmentRequirement;
-  workflowScript?: unknown;
 };
 export function toolExecutionTarget(definition: OfferedDefinition, scope: ConversationToolScope) {
   const environment = definition.environment;
@@ -38,12 +37,7 @@ export function isConversationToolOffered(
     scope.depth >= scope.maximumDepth
   )
     return false;
-  if (
-    (definition.environment?.kind === "workspace" || definition.workflowScript) &&
-    !hasConversationWorkspace(scope)
-  )
-    return false;
-  if (definition.workflowScript && !(scope.toolCapabilities ?? CLOUD_TOOL_NAMES).includes("bash"))
+  if (definition.environment?.kind === "workspace" && !hasConversationWorkspace(scope))
     return false;
   return (
     definition.environment?.kind !== "target" ||

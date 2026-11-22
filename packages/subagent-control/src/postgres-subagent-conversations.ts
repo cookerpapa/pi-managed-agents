@@ -410,7 +410,7 @@ export class PostgresSubagentConversations {
           "Use contact_supervisor when parent input is required; return a focused result when done.",
           parseCloudToolCapabilitySnapshot(child.tool_capabilities).length
             ? `Linux workspace tools: ${parseCloudToolCapabilitySnapshot(child.tool_capabilities).join(", ")}. Working directory: ${child.working_directory}. Workspace files remain on the shared Volume.`
-            : "Linux workspace access: none. No file, shell, Preview, workflow or workspace-image tools are available.",
+            : "Linux workspace access: none. No file, shell, Preview or workspace-image tools are available.",
           "External device control: none. Parent phone screenshots/history may be analyzed, but phone/device control was not inherited.",
           this.policy.maximumDepth === null || depth < this.policy.maximumDepth
             ? "Delegate only concrete independent subtasks with a clear stopping condition."

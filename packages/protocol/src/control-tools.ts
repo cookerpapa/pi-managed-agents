@@ -1,7 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { MAX_AGENT_INPUT_CHARACTERS, assertSubagentTaskInputBudget } from "./agent-input-budget.ts";
-import { MAX_TOOL_COMMAND_BYTES } from "./tool-sandbox.ts";
 import { CloudToolNameSchema } from "./tool-capabilities.ts";
 
 const context = Type.Union([Type.Literal("fresh"), Type.Literal("branch")], {
@@ -50,7 +49,6 @@ export const SubagentToolSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export type SubagentTask = Static<typeof SubagentToolSchema> & { key: string };
 
 /** Root coding Conversations own a Workspace; a child with no file/shell grant
  * has workspace:null. Its ordinary workspace tools must follow the same rule. */
@@ -126,30 +124,16 @@ export function prepareSubagentControlArguments(value: unknown): Static<typeof c
   if (!Value.Check(controlActions, value)) throw new Error("Invalid Subagent control arguments");
   return value;
 }
-export function validateSubagentTask(value: SubagentTask): void {
-  const { key, ...task } = value;
-  if (typeof key !== "string" || !key) throw new Error("Invalid Subagent task key");
-  prepareSubagentArguments(task);
-}
-export function validateSubagentControl(
-  value: unknown,
-): Exclude<Static<typeof controlActions>, { action: "list" }> {
-  const request = prepareSubagentControlArguments(value);
-  if (!("target" in request)) throw new Error("Expected a Subagent control request");
-  return request;
-}
-
 export type ControlToolName =
   "subagent" | "subagent_control" | "contact_supervisor" | "subagent_supervisor";
 export type InfrastructureToolDefinition = {
-  name: ControlToolName | "workflow";
+  name: ControlToolName;
   description: string;
   parameters: TSchema;
   replay?: "safe" | "unsafe";
   prepareArguments?(value: unknown): unknown;
   availability?: "child" | "delegation" | "root";
   inheritedContext?(args: Record<string, unknown>): boolean;
-  workflowScript?(args: Record<string, unknown>): string | undefined;
 };
 const subagent: InfrastructureToolDefinition = {
   name: "subagent",
@@ -180,24 +164,6 @@ const subagentControl: InfrastructureToolDefinition = {
     "send may target main or parent. cancel stops current child work. Interrupted management is not automatically replayed; inspect state before repeating it.",
   ].join(" "),
 };
-const workflow: InfrastructureToolDefinition = {
-  name: "workflow",
-  replay: "unsafe",
-  availability: "delegation",
-  parameters: Type.Object(
-    { script: Type.String({ minLength: 1, maxLength: MAX_TOOL_COMMAND_BYTES }) },
-    { additionalProperties: false },
-  ),
-  workflowScript: (args) => String(args.script),
-  description: [
-    "Run a JavaScript orchestration script inside Cube. Return the selected value explicitly; console output is not the result.",
-    "Use await runs.run(key,{task,context?,workspace?}) or runs.all([{key,task,...}]); replies contain executionId,state,output.",
-    "runs.status(target), runs.wait(target), runs.cancel(target), runs.send(target,message,delivery), console and emit are available.",
-    "A target is an executionId or a key within this script. Duplicate keys reuse one child during this invocation.",
-    "Interrupted scripts are not automatically rerun. Use subagent_control to inspect existing children before deciding what to do next.",
-    "Returned text is limited to 50 KiB UTF-8 or 2000 lines. Store larger output in Workspace and return a summary/path.",
-  ].join(" "),
-};
 const contactSchema = Type.Object(
   {
     reason: Type.Union([
@@ -224,7 +190,6 @@ export function infrastructureToolDefinitions(): readonly InfrastructureToolDefi
   return [
     subagent,
     subagentControl,
-    workflow,
     {
       name: "contact_supervisor",
       availability: "child",

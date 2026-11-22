@@ -378,14 +378,6 @@ export interface SandboxPreviews {
   ): Promise<SandboxHttpServiceDiscovery>;
 }
 
-/** Open the fixed guest workflow transport without granting VM lifecycle authority. */
-export interface SandboxWorkflows {
-  openWorkflow?(
-    handle: SandboxHandle,
-    input: { script: string; operationId: string; cwd: string },
-  ): Promise<Duplex>;
-}
-
 /** Workspace-scoped Git credential operations, independent of execution and VM lifecycle. */
 export interface SandboxSourceCredentials {
   authorizeSourceCredential?(
@@ -413,5 +405,4 @@ export interface SandboxProvider
     SandboxImages,
     SandboxTerminals,
     SandboxPreviews,
-    SandboxWorkflows,
     SandboxSourceCredentials {}

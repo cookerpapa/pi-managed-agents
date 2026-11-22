@@ -46,22 +46,17 @@ it("uses only local file tools on an explicitly selected Linux target and preser
   expect(executorToolBudget("android_tap", {})).toEqual({ operationMs: 30_000, replyMs: 90_000 });
 });
 
-it("does not advertise shell workflows to a read-only child", () => {
-  const scope = {
-    sessionKind: "subagent" as const,
-    toolCapabilities: ["read"],
-    depth: 1,
-    maximumDepth: null,
-  };
-  expect(effectiveToolCapabilities(scope, []).tools).toContain("subagent");
-  expect(effectiveToolCapabilities(scope, []).tools).not.toContain("workflow");
-  expect(isConversationToolOffered({ workflowScript: () => "return 1" }, scope)).toBe(false);
-  const none = effectiveToolCapabilities({ ...scope, toolCapabilities: [] }, []);
-  expect(none.runtimes).toEqual([]);
-  expect(none.tools).not.toContain("read");
-  expect(skillAvailability({ runtime: "none", tools: [], software: [] }, none).state).toBe(
-    "available",
-  );
+it("advertises direct delegation without a workspace-script orchestrator", () => {
+  for (const sessionKind of ["conversation", "subagent"] as const)
+    for (const toolCapabilities of [[], ["read"], ["read", "write", "edit", "bash"]]) {
+      const exposed = effectiveToolCapabilities(
+        { sessionKind, depth: 1, maximumDepth: null, toolCapabilities },
+        [],
+      ).tools;
+      expect(exposed).toContain("subagent");
+      expect(exposed).toContain("subagent_control");
+      expect(exposed).not.toContain("workflow");
+    }
 });
 
 it("offers device capabilities only to their accepted root and supports both runtime requirements", () => {

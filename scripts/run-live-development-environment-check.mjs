@@ -486,7 +486,7 @@ try {
     session.sessionId,
     [
       "Call the subagent Tool exactly once.",
-      'Use workflow with this exact script: return runs.run("development-shared", {context:"fresh", sandbox:"shared", tools:["read","bash"], task:"Use bash to confirm the current directory is /home/user/empty-project and ./test.sh passes, then reply exactly DEVELOPMENT-SUBAGENT-OK"})',
+      'Call subagent({context:"fresh", workspace:{compute:"shared",tools:["read","bash"]}, task:"Use bash to confirm the current directory is /home/user/empty-project and ./test.sh passes, then reply exactly DEVELOPMENT-SUBAGENT-OK"})',
       "After it finishes, reply exactly DEVELOPMENT-SUBAGENT-OK.",
     ].join(" "),
     newIdempotencyKey("turn"),

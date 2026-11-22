@@ -6,7 +6,6 @@ import {
   prepareSubagentArguments,
   prepareSubagentControlArguments,
   serializeSubagentResult,
-  assertSubagentResultBudget,
   SUBAGENT_RESULT_TOO_LARGE,
   type SubagentHostRequest,
 } from "@pi-cloud/protocol";
@@ -21,7 +20,7 @@ import {
   PostgresSubagentSupervisorChannel,
   SupervisorChannelError,
 } from "@pi-cloud/subagent-control/subagent-supervisor";
-import { sql, type Kysely } from "kysely";
+import type { Kysely } from "kysely";
 import {
   HttpSupervisorManagementClient,
   HttpSupervisorManagementError,
@@ -195,7 +194,6 @@ export class SubagentController {
           source: {
             sequence: call.nativeSequence,
             taskId: call.taskId,
-            ...(call.sourceDocumentId ? { documentId: call.sourceDocumentId } : {}),
           },
           prompt: args.task,
           contextMode: args.context ?? "fresh",
@@ -213,9 +211,6 @@ export class SubagentController {
             isError: true,
             result: {
               content: [{ type: "text", text: serializeSubagentResult(value) }],
-              ...(call.replyMode === "hostcall"
-                ? { details: { executionReference: reference, value } }
-                : {}),
             },
           };
       } else if (args.action === "list") {
@@ -278,11 +273,6 @@ export class SubagentController {
             );
         }
       }
-      if (call.replyMode === "hostcall") {
-        assertSubagentResultBudget(value);
-        const result = { content: [], details: { executionReference: reference, value } };
-        return { result };
-      }
       return {
         result: {
           content: [{ type: "text", text: serializeSubagentResult(value) }],
@@ -301,9 +291,6 @@ export class SubagentController {
         isError: true,
         result: {
           content: [{ type: "text", text: error.message }],
-          ...(call.replyMode === "hostcall"
-            ? { details: { executionReference: reference, value: {} } }
-            : {}),
         },
       };
     }
@@ -322,36 +309,10 @@ export class SubagentController {
           .executeTakeFirst()
       : undefined;
     if (exact) return exact.id;
-    if (call.replyMode !== "hostcall")
-      throw new SubagentConversationError(
-        "invalid_control_request",
-        'Subagent target does not belong to this Session. Agent IDs in forked history are historical; use subagent_control(action="list") to find this Session\'s agents, or create a new agent when needed.',
-      );
-    const source = await sql<{
-      document_id: string;
-    }>`select effect->>'sourceDocumentId' as document_id
-      from pi_durable_commits c
-      cross join lateral jsonb_array_elements(c.cloud_metadata::jsonb->'controlTools') effect
-      where c.tenant_id=${call.scope.tenantId}::uuid and c.session_id=${call.scope.piSessionId}
-        and c.cloud_metadata is not null and effect->>'workflowKey'=${target}
-        and effect->>'taskId'=${String(call.taskId)}
-      order by c.seq limit 1`.execute(this.options.database);
-    if (!source.rows[0])
-      throw new SubagentConversationError(
-        "invalid_control_request",
-        "Workflow target key is unavailable",
-      );
-    const child = await this.options.database
-      .selectFrom("subagent_conversations")
-      .select("id")
-      .where("tenant_id", "=", call.scope.tenantId)
-      .where("root_run_id", "=", call.scope.runId)
-      .where("parent_tool_call_id", "=", `task:${call.taskId}`)
-      .where("source_record_id", "=", source.rows[0].document_id)
-      .executeTakeFirst();
-    if (!child)
-      throw Object.assign(new Error("Workflow target admission is pending"), { retryable: true });
-    return child.id;
+    throw new SubagentConversationError(
+      "invalid_control_request",
+      'Subagent target does not belong to this Session. Agent IDs in forked history are historical; use subagent_control(action="list") to find this Session\'s agents, or create a new agent when needed.',
+    );
   }
   async #nativeSend(
     call: AcceptedControlToolCommand,

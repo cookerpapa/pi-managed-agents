@@ -241,6 +241,27 @@ function backend(ownerBaseUrl = "http://sandbox-control.invalid"): SandboxContro
 }
 
 describe("Sandbox control authenticated RPC", () => {
+  it("leaves both retired guest orchestration routes unregistered", async () => {
+    const server = new SandboxControlServer({
+      host: "127.0.0.1",
+      port: 0,
+      serviceToken: SERVICE_TOKEN,
+      broker: backend(),
+    });
+    servers.push(server);
+    const address = await server.listen();
+    for (const [method, path] of [
+      ["GET", "/internal/v1/tool-workflow"],
+      ["POST", "/internal/v1/workflow-log-delivery"],
+    ] as const) {
+      const reply = await fetch(new URL(path, address), {
+        method,
+        headers: { authorization: `Bearer ${SERVICE_TOKEN}` },
+      });
+      expect(reply.status).toBe(404);
+      await reply.body?.cancel();
+    }
+  });
   it("transfers a complete package larger than ordinary RPC results and checks its identity", async () => {
     const broker = backend();
     const bytes = Buffer.alloc(5 * 1024 * 1024, 7);
@@ -292,14 +313,7 @@ describe("Sandbox control authenticated RPC", () => {
       port: 0,
       serviceToken: SERVICE_TOKEN,
       broker: backend(),
-      logDelivery: {
-        instanceId: "recovering-control",
-        token: SERVICE_TOKEN,
-        receive: vi.fn(),
-        checkHealth() {
-          if (!recovered) throw new Error("Publication not ready");
-        },
-      },
+      readiness: () => recovered,
     });
     servers.push(server);
     const address = await server.listen();
@@ -694,9 +708,6 @@ describe("Sandbox control authenticated RPC", () => {
       };
       const reserved = await client.create(request);
       expect(reserved.activationId).toBe(activationIds[0]);
-      expect(client.workflowUrlFor(reserved.activationId)).toBe(
-        new URL("/internal/v1/tool-workflow", addresses[0]).toString(),
-      );
       await expect(
         client.release(reserved.activationId, request.assignment, { kind: "keep_warm" }),
       ).resolves.toMatchObject({ retained: false });
@@ -710,9 +721,6 @@ describe("Sandbox control authenticated RPC", () => {
       };
       const sibling = await client.create(siblingSessionRequest);
       expect(sibling.activationId).toBe(activationIds[1]);
-      expect(client.workflowUrlFor(sibling.activationId)).toBe(
-        new URL("/internal/v1/tool-workflow", addresses[1]).toString(),
-      );
       await expect(
         client.release(sibling.activationId, siblingSessionRequest.assignment, {
           kind: "keep_warm",
@@ -797,17 +805,11 @@ describe("Sandbox control authenticated RPC", () => {
     await client.release(child.activationId, childAssignment, {
       kind: "keep_warm",
     });
-    expect(client.workflowUrlFor(parent.activationId)).toBe(
-      new URL("/internal/v1/tool-workflow", ownerBaseUrl).toString(),
-    );
     await expect(
       client.release(parent.activationId, assignment, {
         kind: "keep_warm",
       }),
     ).resolves.toMatchObject({ activationId: parent.activationId });
-    expect(() => client.workflowUrlFor(parent.activationId)).toThrow(
-      "Tool binding owner is unavailable",
-    );
   });
 
   it("closes an existing scope through the stable endpoint after its owner Pod disappears", async () => {

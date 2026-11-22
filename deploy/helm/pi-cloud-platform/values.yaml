@@ -246,7 +246,6 @@ sandboxPlane:
   workspaceDeletionReaperBatchSize: 16
   volumeGatewayRequestTimeoutMs: 660000
   maximumActivePerReplica: null
-  maximumActiveCommands: 32
   elasticRetentionMs: 1800000
   workspace:
     quotaExistingClaim: ""

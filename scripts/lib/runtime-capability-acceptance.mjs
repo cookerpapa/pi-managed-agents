@@ -158,11 +158,7 @@ export async function runtimeCapabilityAcceptance({
       "max",
     );
     const networkHistory = await finish(network);
-    assert.equal(
-      callsIn(networkHistory).filter((call) => call.name === "subagent" || call.name === "workflow")
-        .length,
-      0,
-    );
+    assert.equal(callsIn(networkHistory).filter((call) => call.name === "subagent").length, 0);
     assert(
       nativeMessages(networkHistory).some(
         (message) =>

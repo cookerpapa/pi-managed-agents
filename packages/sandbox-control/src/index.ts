@@ -52,7 +52,6 @@ export {
   type SandboxImages,
   type SandboxTerminals,
   type SandboxPreviews,
-  type SandboxWorkflows,
   type SandboxSourceCredentials,
   type SandboxResourceLimits,
   type SandboxTerminalSession,

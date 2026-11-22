@@ -213,7 +213,7 @@ it("pages one owner's snapshot and enforces retained row/byte budgets before rea
   await expect(limited.load([0], () => true)).rejects.toThrow("capacity");
 });
 
-it("closes workflow channels only for the closed fact, even if an older reference loaded revocation", async () => {
+it("notifies binding closure only for the closed fact, even if an older reference loaded revocation", async () => {
   const f = fixture();
   await f.view.load([0], () => true);
   f.set({ ...f.original, revision: "3", dispatchClosed: true });

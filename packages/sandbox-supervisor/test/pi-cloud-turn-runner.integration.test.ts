@@ -174,7 +174,6 @@ async function fixture(
     },
     createAgentTools: ({ stepWorldState, captureSamplingStep }) =>
       createTrustedRemoteAgentTools({
-        workflowUrl: "http://127.0.0.1:1",
         activationId: "20000000-0000-4000-8000-000000000001",
         executionReference: scope.executionReference,
         turnContextSha256: turn.sha256,

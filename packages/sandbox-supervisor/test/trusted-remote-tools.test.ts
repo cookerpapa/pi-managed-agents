@@ -197,7 +197,6 @@ function configuration(overrides: Partial<TrustedRemoteToolsRuntimeConfiguration
         pending = { resolve };
         signal.addEventListener("abort", () => reject(signal.reason), { once: true });
       }),
-    workflowUrl: "http://127.0.0.1:4999/v1/tool-operations",
     activationId: "10000000-0000-4000-8000-000000000001",
     executionReference: EXECUTION_LEASE,
     turnContextSha256: TURN_CONTEXT_SHA256,
@@ -705,10 +704,8 @@ describe("whole-tool Worker adapter", () => {
   it("has no sandbox activation during prompt/context preparation", async () => {
     const { value } = configuration();
     delete value.activationId;
-    delete value.workflowUrl;
     const resolveOperationTarget = vi.fn(async () => ({
       activationId: "10000000-0000-4000-8000-000000000077",
-      workflowUrl: "http://broker/workflow",
     }));
     value.resolveOperationTarget = resolveOperationTarget;
     const runtime = createTrustedRemoteAgentTools(value);

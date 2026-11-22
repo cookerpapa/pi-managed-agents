@@ -384,10 +384,6 @@ export class BoxLiteRuntimeClient implements GuestRuntimeClient<BoxLiteInstance>
     stream.once("close", () => signal?.removeEventListener("abort", abort));
     return stream;
   }
-  async openProgram(instance: BoxLiteInstance, input: { script: string; cwd: string }) {
-    return (await this.#stream({ id: instance.sandboxId, kind: "program", ...input, tty: false }))
-      .stream;
-  }
   async openTerminal(
     instance: BoxLiteInstance,
     input: { rows: number; cols: number; admin: boolean },

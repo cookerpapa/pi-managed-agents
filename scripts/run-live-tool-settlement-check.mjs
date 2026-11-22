@@ -104,67 +104,9 @@ try {
     sessionId: session.sessionId,
   };
   await writeFile(output, JSON.stringify(report, null, 2) + "\n", { mode: 0o600 });
-  for (const c of [
-    {
-      name: "complete-json",
-      script: 'return {body:"x".repeat(48000),end:"COMPLETE_JSON"};',
-      error: false,
-    },
-    {
-      name: "byte-overflow",
-      script:
-        'const fs=await import("node:fs");fs.appendFileSync("byte-marker","once\\n");return "x".repeat(51201);',
-      error: true,
-      marker: "byte-marker",
-    },
-    {
-      name: "line-overflow",
-      script:
-        'const fs=await import("node:fs");fs.appendFileSync("line-marker","once\\n");return "line\\n".repeat(2001);',
-      error: true,
-      marker: "line-marker",
-    },
-  ]) {
-    console.log(JSON.stringify({ phase: c.name }));
-    const result = await run(
-      "严格只调用一次 workflow 工具，script 必须逐字使用下面代码。不要启动子 Agent，不要使用其他工具，也不要重试。工具结束后无论成功或报错，只回复 CHECKED，不要复述返回数据。\n" +
-        c.script,
-    );
-    const calls = result.messages
-      .filter((m) => m.role === "assistant")
-      .flatMap((m) => m.content.filter((p) => p.type === "toolCall"));
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].name, "workflow");
-    assert.equal(calls[0].arguments.script, c.script);
-    const results = result.messages.filter((m) => m.role === "toolResult");
-    assert.equal(results.length, 1);
-    assert.equal(results[0].isError, c.error);
-    const text = results[0].content
-      .filter((p) => p.type === "text")
-      .map((p) => p.text)
-      .join("\n");
-    if (c.error) {
-      assert(text.includes("subagent_result_too_large"));
-      assert(Buffer.byteLength(text) < 2048);
-      const file = await api.readWorkspaceFile(session.sessionId, c.marker);
-      assert.equal(Buffer.from(file.bytes).toString("utf8"), "once\n");
-    } else {
-      const value = JSON.parse(text);
-      assert.equal(value.body, "x".repeat(48000));
-      assert.equal(value.end, "COMPLETE_JSON");
-    }
-    report.cases.push({
-      name: c.name,
-      runId: result.runId,
-      toolCalls: calls.length,
-      isError: results[0].isError,
-      resultBytes: Buffer.byteLength(text),
-      ...(c.marker ? { effectOnce: true } : { completeJson: true }),
-    });
-  }
   console.log(JSON.stringify({ phase: "supervisor-reply" }));
   const result = await run(
-    'Delegate exactly one fresh child with tools:[] using subagent. Its task: Call contact_supervisor with reason need_decision and ask for an approved colour; wait for the reply and answer with that colour. When the child returns blocked, use subagent_supervisor action:reply with its replyTo request ID and message "APPROVED-TEAL". Do not launch another child or use workflow. Wait for the actual child response, then answer SUPERVISOR-TEAL-OK.',
+    'Delegate exactly one fresh child with workspace:null using subagent. Its task: Call contact_supervisor with reason need_decision and ask for an approved colour; wait for the reply and answer with that colour. When the child returns blocked, use subagent_supervisor action:reply with its replyTo request ID and message "APPROVED-TEAL". Do not launch another child. Wait for the actual child response, then answer SUPERVISOR-TEAL-OK.',
   );
   const replies = result.messages.filter((m) => m.role === "toolResult");
   assert(

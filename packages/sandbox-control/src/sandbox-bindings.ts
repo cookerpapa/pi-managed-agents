@@ -1,7 +1,7 @@
 import type { Database } from "@pi-cloud/database";
 import { sql, type Kysely } from "kysely";
 import { parseExecutionReference, type ToolSandboxAssignment } from "@pi-cloud/protocol";
-import type { ToolLogFact } from "./workflow-command-dispatcher.ts";
+import type { ToolLogFact } from "./tool-command-dispatcher.ts";
 import type { SandboxBindingSnapshot, SandboxExecutionDescriptor } from "./sandbox-execution.ts";
 
 export class BindingClosurePending extends Error {

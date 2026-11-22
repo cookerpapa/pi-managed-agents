@@ -15,12 +15,9 @@ import {
   type OriginalControlToolIntent,
   type OriginalRemoteToolIntent,
   type ToolReplyRecovery,
-  validateSubagentControl,
-  validateSubagentTask,
   type ExecuteTurnCommandMessage,
   type ToolResultPayload,
   type ToolReplyWait,
-  type SubagentTask,
   type ControlToolCatalogSource,
   type InfrastructureToolDefinition,
   type ExecutionTargetGrant,
@@ -37,12 +34,10 @@ import {
   type TrustedAgentTool,
   type TrustedAgentToolSet,
   type PreparedAgentTool,
-  type SubagentControlClient,
 } from "@pi-cloud/sandbox-supervisor";
-import type { WorkflowPreparer } from "@pi-cloud/sandbox-supervisor";
 
 /** Definitions, frozen invocation metadata and reply transport only. Trusted
- * Tool business logic runs in Control Plane handlers; scripts stay in Cube. */
+ * Tool business logic runs in the corresponding execution-side handler. */
 export class WorkerToolRuntime {
   constructor(
     readonly options: {
@@ -64,7 +59,6 @@ export class WorkerToolRuntime {
           signal?: AbortSignal,
         ): Promise<OriginalControlToolIntent>;
       };
-      control: Pick<SubagentControlClient, "request">;
       maximumDepth: number | null;
       prepareTarget?(
         command: ExecuteTurnCommandMessage,
@@ -84,7 +78,6 @@ export class WorkerToolRuntime {
 
   async create(context: {
     command: ExecuteTurnCommandMessage;
-    prepareWorkflow: WorkflowPreparer;
     environment(): import("@pi-cloud/protocol").ToolEnvironmentRequest;
     onExecutionUnavailable?(failure: { code: string; message: string }): void;
   }): Promise<TrustedAgentToolSet> {
@@ -114,110 +107,6 @@ export class WorkerToolRuntime {
           )
         : 0;
     const capabilities = { ...scope, depth, maximumDepth: this.options.maximumDepth };
-    const prepareWorkflow = async (
-      nativeCallId: string,
-      invocationId: string,
-      script: string,
-      signal: AbortSignal | undefined,
-      toolName: string,
-    ) => {
-      if (!workspaceAvailable)
-        throw new Error("workspace_unavailable: this child has no Linux workspace");
-      const lifetime = new AbortController();
-      const activeSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
-      const hostcalls = new Map<
-        string,
-        {
-          fingerprint: string;
-          result: Promise<Record<string, unknown>>;
-          published: Promise<void>;
-        }
-      >();
-      const workflowCall = async (
-        method: string,
-        args: Record<string, unknown>,
-        callerSignal?: AbortSignal,
-      ): Promise<Record<string, unknown>> => {
-        const signal = callerSignal ? AbortSignal.any([activeSignal, callerSignal]) : activeSignal;
-        signal.throwIfAborted();
-        if (method === "run") {
-          if (typeof args.key !== "string" || !args.task || typeof args.task !== "object")
-            throw new Error("runs.run requires a key and task specification");
-          const task = { ...args.task, key: args.key } as SubagentTask;
-          validateSubagentTask(task);
-          const key = task.key,
-            fingerprint = JSON.stringify(task);
-          const prior = hostcalls.get(key);
-          if (prior) {
-            if (prior.fingerprint !== fingerprint)
-              throw new Error("Workflow key changed arguments");
-            return prior.result;
-          }
-          const publication = Promise.withResolvers<void>();
-          void publication.promise.catch(() => {});
-          const result = (async () =>
-            this.options.control.request({
-              executionReference: scope.executionReference,
-              conversationId: scope.piSession.conversationId,
-              toolCallId: invocationId,
-              request: {
-                action: "run",
-                key: task.key,
-                task: task.task,
-                context: task.context ?? "fresh",
-                ...(task.workspace === undefined ? {} : { workspace: task.workspace }),
-                anchor: await this.options.nativeConversations.childAnchor(
-                  scope.executionReference,
-                  task.context === "branch",
-                  scope.piSession.conversationId,
-                ),
-              },
-              onPublished: () => publication.resolve(),
-              ...(signal ? { signal } : {}),
-            }))();
-          void result.catch(publication.reject);
-          hostcalls.set(key, { fingerprint, result, published: publication.promise });
-          return result;
-        }
-        if (typeof args.target === "string") await hostcalls.get(args.target)?.published;
-        return this.options.control.request({
-          executionReference: scope.executionReference,
-          conversationId: scope.piSession.conversationId,
-          toolCallId: invocationId,
-          request: validateSubagentControl({ ...args, action: method }),
-          ...(signal ? { signal } : {}),
-        });
-      };
-
-      try {
-        const prepared = await context.prepareWorkflow(
-          nativeCallId,
-          script,
-          workflowCall,
-          activeSignal,
-          toolName,
-        );
-        let disposed = false;
-        return {
-          ...prepared,
-          dispose() {
-            if (disposed) return;
-            disposed = true;
-            lifetime.abort(new Error("Workflow invocation has closed"));
-            try {
-              prepared.dispose();
-            } finally {
-              hostcalls.clear();
-            }
-          },
-        };
-      } catch (error) {
-        lifetime.abort(error);
-        hostcalls.clear();
-        throw error;
-      }
-    };
-
     type Definition = Omit<InfrastructureToolDefinition, "name"> & {
       name: string;
       environment?: ToolEnvironmentRequirement;
@@ -341,15 +230,10 @@ export class WorkerToolRuntime {
           throw new Error("tool_unavailable: this registration only restores an original reply");
         if (definition.availability === "root" && scope.sessionKind === "subagent")
           throw new Error("tool_unavailable: This Tool belongs to the root conversation");
-        if (!workspaceAvailable && (environment.kind === "workspace" || definition.workflowScript))
+        if (!workspaceAvailable && environment.kind === "workspace")
           throw new Error("workspace_unavailable: this child has no Linux workspace");
         const args = raw as Record<string, unknown>,
           invocationId = toolInvocationId(nativeCallId);
-        const script = definition.workflowScript?.(args);
-        if (script !== undefined) {
-          if (recovery) throw new Error("Workflow execution cannot be recovered");
-          return prepareWorkflow(nativeCallId, invocationId, script, signal, definition.name);
-        }
         if (ordinary) {
           const current = catalog.read().tools.find((tool) => tool.name === definition.name);
           if (

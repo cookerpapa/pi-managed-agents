@@ -111,7 +111,6 @@ export async function createExecutionBackendDirectory(options: {
     return provider;
   };
   type HandleMethod =
-    | "openWorkflow"
     | "preparePackage"
     | "exportPackage"
     | "imageIo"
@@ -142,7 +141,6 @@ export async function createExecutionBackendDirectory(options: {
       handles.set(handle, actual);
       return handle;
     },
-    openWorkflow: route("openWorkflow"),
     preparePackage: route("preparePackage"),
     exportPackage: route("exportPackage"),
     imageIo: route("imageIo"),

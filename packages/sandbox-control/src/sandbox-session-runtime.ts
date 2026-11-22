@@ -1,14 +1,7 @@
 import type { Database } from "@pi-cloud/database";
 import { operationalLog, type PiCloudMetrics } from "@pi-cloud/observability";
-import {
-  KafkaToolReplyPublisher,
-  ToolProgressPublisher,
-  toolReplyTopic,
-} from "@pi-cloud/event-log";
-import {
-  encodeSessionImages,
-  type ConfiguredImageAttachments,
-} from "@pi-cloud/session-attachments";
+import { KafkaToolReplyPublisher, toolReplyTopic } from "@pi-cloud/event-log";
+import { type ConfiguredImageAttachments } from "@pi-cloud/session-attachments";
 import { parseExecutionReference } from "@pi-cloud/protocol";
 import { sql, type Kysely } from "kysely";
 import { setTimeout as delay } from "node:timers/promises";
@@ -22,8 +15,7 @@ import { executionTargetId } from "./sandbox-execution.ts";
 import { SandboxControlServer, type SandboxControlBackend } from "./sandbox-control-server.ts";
 import { SandboxControlError } from "./sandbox-provider.ts";
 import { PostgresSandboxHttpServiceRegistry } from "./sandbox-http-service-registry.ts";
-import { WorkflowCommandDispatcher } from "./workflow-command-dispatcher.ts";
-import { ToolCommandDispatcher, type ToolLogDelivery } from "./tool-command-dispatcher.ts";
+import { ToolCommandDispatcher } from "./tool-command-dispatcher.ts";
 import { FixedGuestToolExecutor } from "./fixed-guest-tool-executor.ts";
 import { ToolEnvironmentCoordinator } from "./tool-environment-coordinator.ts";
 import { EnvironmentRecovery } from "./environment-recovery.ts";
@@ -34,7 +26,6 @@ import { SessionActivityRetention } from "./session-activity-retention.ts";
 import { ToolCompletionIssuer } from "./tool-completion-issuer.ts";
 import { readFile } from "node:fs/promises";
 import { quarantineExecutionTarget } from "./runtime-quarantine.ts";
-import { relayWorkflowAttachment } from "./workflow-attachment-relay.ts";
 
 /** Session execution only. No resource owner, lifecycle controller or second consumer. */
 export async function createSandboxSessionRuntime(options: {
@@ -147,36 +138,6 @@ export async function createSandboxSessionRuntime(options: {
     );
     cleanup.push(() => replies.close());
     await replies.start();
-    const progress = new ToolProgressPublisher(config.controlPlaneUrl, options.managementToken);
-    cleanup.push(() => progress.close());
-    const workflows = new WorkflowCommandDispatcher({
-      broker: execution,
-      publishReply: async (topic, reply, scope) =>
-        replies.publish(
-          topic,
-          reply.kind === "tool_result"
-            ? {
-                ...reply,
-                result: await encodeSessionImages(
-                  options.images?.codec,
-                  { tenantId: scope.tenantId, runId: scope.runId },
-                  reply.result,
-                ),
-              }
-            : reply,
-        ),
-      maximumActiveCommands: config.maximumActiveCommands,
-      metrics,
-      progress,
-    });
-    cleanup.push(() => workflows.close());
-    const receive = async (delivery: ToolLogDelivery) => {
-      const record = { ...delivery, offset: BigInt(delivery.offset) };
-      if (delivery.fact.kind === "execution_seal" || delivery.fact.kind === "binding_close") {
-        workflows.consume(record);
-        await execution.stopWorkflowScope(delivery.fact);
-      } else workflows.receive(record);
-    };
     const probes = new ExecutionPathProbes({
       routes: bindingView,
       cube: client,
@@ -255,7 +216,6 @@ export async function createSandboxSessionRuntime(options: {
       environments,
       metrics,
       onDispatch: (command, route) => probes.rememberTool(command, route),
-      workflow: (_route, delivery) => receive(delivery),
       publishReply: (topic, reply) => replies.publish(topic, reply),
       quarantine: async (target) => {
         const ids = await quarantineExecutionTarget(database, target);
@@ -366,19 +326,6 @@ export async function createSandboxSessionRuntime(options: {
           retained: true,
         };
       },
-      attachWorkflow: async (id, operation, reference, send, signal) => {
-        const owner = await waitBinding(id, reference, signal, 360_000);
-        return owner
-          ? relayWorkflowAttachment({
-              baseUrl: owner,
-              activationId: id,
-              operationId: operation,
-              executionReference: reference,
-              send,
-              signal,
-            })
-          : execution.attachWorkflow(id, operation, reference, send, signal);
-      },
     };
     const environmentOwner = async (id: string) => {
       if (bindingView.owner(id)) return;
@@ -483,23 +430,6 @@ export async function createSandboxSessionRuntime(options: {
         await bindingView.consume(change, current);
         if (change.entity !== "sandbox_binding" || !change.closed || !current()) return;
         await dispatcher.cancelRetiredBinding(change, position, current);
-        // Interactive channels belong to this Projector, independent of resource-owner liveness.
-        workflows.consume({
-          fact: {
-            kind: "binding_close",
-            bindingId: change.entityId,
-            scope: {
-              runId: change.runId,
-              writerId:
-                change.cancelTarget?.writerId ??
-                bindingView.binding(change.entityId)?.writerId ??
-                "",
-            },
-          },
-          topic: position.topic,
-          partition: position.partition,
-          offset: BigInt(position.offset),
-        });
         await execution.closeBinding(change.entityId);
         // Routing withdrawal is authoritative; a missing probe is not. Deliver
         // this rare control observation through the existing Worker mailbox.
@@ -539,7 +469,7 @@ export async function createSandboxSessionRuntime(options: {
           });
       },
       quiescence: () => ({
-        active: execution.activeCount + workflows.statistics().activeCommands,
+        active: execution.activeCount,
         unsettled: 0,
       }),
       reset: () => execution.reset(),

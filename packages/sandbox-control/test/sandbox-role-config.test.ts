@@ -49,7 +49,6 @@ it("separates management lifetime settings from Session execution transport sett
     const execution = await loadSandboxExecutionConfig({
       ...common,
       PI_CLOUD_KAFKA_BROKERS: "kafka.invalid:9092",
-      PI_CLOUD_CONTROL_PLANE_URL: "http://runtime.invalid:3000",
       DATABASE_URL_FILE: "/unused/missing-database",
       PI_CLOUD_CUBESANDBOX_API_KEY_FILE: "/unused/missing-native-key",
       PI_CLOUD_CUBESANDBOX_DEVELOPMENT_TEMPLATE_IDS: "invalid unused templates",

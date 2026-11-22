@@ -33,7 +33,6 @@ export {
   type TrustedRemoteAgentTools,
   type TrustedRemoteToolsRuntimeConfiguration,
 } from "./trusted-remote-tools.ts";
-export type { WorkflowPreparer } from "./workflow-transport.ts";
 export type { PreparedAgentTool, PreparedToolExecution } from "./prepared-tool.ts";
 
 export {
@@ -119,6 +118,4 @@ export {
   type SupervisorWebSocketConnection,
   type SupervisorWebSocketConnectionFactory,
 } from "./reconnecting-supervisor-websocket-client.ts";
-export { SubagentControlClient } from "./subagent-control-client.ts";
-export type { WorkflowHostCall } from "./workflow-transport.ts";
 export { toolInvocationId, withToolInvocation, type ToolInvocation } from "./tool-invocation.ts";

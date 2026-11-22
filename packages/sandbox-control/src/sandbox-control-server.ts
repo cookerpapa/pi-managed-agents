@@ -35,7 +35,6 @@ import { parseTraceCarrier, withSpan, type PiCloudMetrics } from "@pi-cloud/obse
 import { createHash, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { RawData, WebSocket } from "ws";
-import { TOOL_WORKFLOW_PATH } from "./workflow-channels.ts";
 import {
   SANDBOX_CONTROL_INVENTORY_PATH,
   SANDBOX_CONTROL_LIVE_PATH,
@@ -49,7 +48,6 @@ import { WorkspaceVolumeGatewayError } from "./workspace-volume-gateway-contract
 import { parseUploadIdentity, parseWorkspaceUploadRequest } from "@pi-cloud/protocol";
 import { SANDBOX_CONTROL_WORKSPACE_UPLOAD_PATH } from "./sandbox-control-client.ts";
 import { SandboxOwnerRedirectError, type SandboxController } from "./sandbox-controller.ts";
-import { WORKFLOW_LOG_DELIVERY_PATH, type ToolLogDelivery } from "./tool-command-dispatcher.ts";
 
 const DEFAULT_BODY_LIMIT = 5 * 1_024 * 1_024;
 const DEFAULT_TERMINAL_SEND_BUFFER_BYTES = 1 * 1_024 * 1_024;
@@ -81,16 +79,11 @@ export type SandboxControlServerOptions = {
   broker: SandboxControlBackend;
   /** Listener setup may precede Projector bootstrap and execution readiness. */
   readiness?(): boolean;
-  logDelivery?: {
-    instanceId: string;
-    token: string;
-    receive(delivery: ToolLogDelivery): void | Promise<void>;
-    checkHealth(): void;
-  };
+  executionEvidenceToken?: string;
   /** Management returns execution-side binding addresses and refuses data operations. */
   executionBaseUrl?: string;
   managementOnly?: boolean;
-  /** Called only for authenticated bound service requests and workflow attachments. */
+  /** Called only for authenticated bound service requests. */
   routeBinding?(bindingId: string, reference: string): Promise<string | undefined>;
   bodyLimit?: number;
   metrics?: PiCloudMetrics;
@@ -118,7 +111,6 @@ export type SandboxControlBackend = Pick<
   Partial<
     Pick<
       SandboxController,
-      | "attachWorkflow"
       | "openTerminal"
       | "provisionDevelopmentEnvironment"
       | "developmentEnvironmentLifecycle"
@@ -228,7 +220,6 @@ export class SandboxControlServer {
   readonly #terminalDigest: Buffer | undefined;
   readonly #broker: SandboxControlBackend;
   readonly #readiness: SandboxControlServerOptions["readiness"];
-  readonly #logDelivery: SandboxControlServerOptions["logDelivery"];
   readonly #deliveryDigest: Buffer | undefined;
   readonly #server: FastifyInstance;
   readonly #metrics: PiCloudMetrics | undefined;
@@ -257,9 +248,10 @@ export class SandboxControlServer {
         : digest(validServiceToken(options.terminalToken));
     this.#broker = options.broker;
     this.#readiness = options.readiness;
-    this.#logDelivery = options.logDelivery;
     this.#deliveryDigest =
-      options.logDelivery && digest(validServiceToken(options.logDelivery.token));
+      options.executionEvidenceToken === undefined
+        ? undefined
+        : digest(validServiceToken(options.executionEvidenceToken));
     this.#metrics = options.metrics;
     this.#executionBaseUrl = options.executionBaseUrl;
     this.#server = Fastify({
@@ -294,12 +286,11 @@ export class SandboxControlServer {
       const body = request.body as
         | { type?: string; activationId?: string; assignment?: { executionReference?: string } }
         | undefined;
-      const workflow = path === TOOL_WORKFLOW_PATH;
       const bound =
         path === SANDBOX_CONTROL_SERVICE_PATH &&
         body?.activationId &&
         body.type !== "tool_sandbox.release";
-      if (options.managementOnly && (workflow || bound))
+      if (options.managementOnly && bound)
         return reply.code(409).send({
           error: {
             code: "execution_endpoint_required",
@@ -308,19 +299,6 @@ export class SandboxControlServer {
           },
         });
       try {
-        // A forwarded attachment gets one hop. A moving partition fails closed
-        // instead of opening an unbounded chain of duplex relays.
-        const attachment = request.query as { local?: string; activationId?: string };
-        if (
-          workflow &&
-          attachment.local === "1" &&
-          attachment.activationId &&
-          options.routeBinding
-        ) {
-          const reference = bearer(request.headers.authorization);
-          if (!reference || (await options.routeBinding(attachment.activationId, reference)))
-            return reply.code(409).send({ error: "workflow_owner_changed" });
-        }
         if (
           options.routeBinding &&
           bound &&
@@ -609,61 +587,6 @@ export class SandboxControlServer {
   }
 
   #installRoutes(): void {
-    // Register after the websocket plugin has installed its route hook.
-    this.#server.register(async (scope) => {
-      scope.get(TOOL_WORKFLOW_PATH, { websocket: true }, (socket, request) => {
-        const query = request.query as { activationId?: string; operationId?: string };
-        const lease = bearer(request.headers.authorization);
-        if (!lease || !query.activationId || !query.operationId || !this.#broker.attachWorkflow) {
-          socket.close(1008, "Invalid workflow attachment");
-          return;
-        }
-        const controller = new AbortController();
-        let attached:
-          Awaited<ReturnType<NonNullable<SandboxControlBackend["attachWorkflow"]>>> | undefined;
-        const send = (frame: unknown) => {
-          if (socket.readyState !== 1) return;
-          if (socket.bufferedAmount > DEFAULT_TERMINAL_SEND_BUFFER_BYTES) {
-            socket.close(1013, "Workflow reader is too slow");
-            return;
-          }
-          socket.send(JSON.stringify(frame));
-        };
-        const fail = (error: unknown) => {
-          send({
-            type: "error",
-            message: error instanceof Error ? error.message : "Workflow channel failed",
-          });
-          socket.close(1011);
-          controller.abort();
-        };
-        socket.on("close", () => {
-          controller.abort();
-          attached?.close();
-        });
-        socket.on("error", () => {
-          controller.abort();
-          attached?.close();
-        });
-        socket.on("message", (data: RawData) => {
-          try {
-            if (!attached) throw new Error("Workflow is not attached");
-            attached.respond(JSON.parse(data.toString()));
-          } catch (error) {
-            fail(error);
-          }
-        });
-        void this.#broker
-          .attachWorkflow(query.activationId, query.operationId, lease, send, controller.signal)
-          .then((channel) => {
-            attached = channel;
-            if (controller.signal.aborted) channel.close();
-          })
-          .catch((error) => {
-            if (!controller.signal.aborted) fail(error);
-          });
-      });
-    });
     this.#server.post(
       RUNTIME_EXECUTION_EVIDENCE_PATH,
       { bodyLimit: 1024 },
@@ -694,31 +617,6 @@ export class SandboxControlServer {
         return reply.code(204).send();
       },
     );
-    this.#server.post(WORKFLOW_LOG_DELIVERY_PATH, async (request, reply) => {
-      const credential = bearer(request.headers.authorization);
-      if (
-        !this.#logDelivery ||
-        !this.#deliveryDigest ||
-        !credential ||
-        !timingSafeEqual(digest(credential), this.#deliveryDigest)
-      ) {
-        await reply.code(401).send();
-        return;
-      }
-      const delivery = request.body as ToolLogDelivery;
-      if (delivery.instanceId !== this.#logDelivery.instanceId) {
-        await reply.code(410).send();
-        return;
-      }
-      try {
-        // Commands acknowledge local admission; closure joins the active
-        // workflow channel before confirming that its scope is closed.
-        await this.#logDelivery.receive(delivery);
-        await reply.code(204).send();
-      } catch (error) {
-        await this.#failure(reply, error);
-      }
-    });
     this.#server.get(SANDBOX_CONTROL_LIVE_PATH, async (_request, reply) => {
       await reply.code(200).send({ status: "ok" });
     });
@@ -729,7 +627,6 @@ export class SandboxControlServer {
           healthy = this.#readiness?.() !== false;
           if (healthy) {
             await this.#broker.checkHealth();
-            this.#logDelivery?.checkHealth();
           }
         } catch {
           healthy = false;

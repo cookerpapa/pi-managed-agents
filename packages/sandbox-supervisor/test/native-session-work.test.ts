@@ -42,68 +42,6 @@ class Journal extends MemoryStorage {
   }
 }
 
-it("persists each dynamic hostcall once under its native Tool and retires its pending reference", async () => {
-  const f = await family();
-  const commands: CandidateControlToolCommand[] = [];
-  f.storage.beforeAdopt = (commit) => {
-    const prepared = f.runtime.preparePublication(commit);
-    for (const effect of prepared.tools)
-      if ("target" in effect.command && effect.command.target === "control")
-        commands.push(effect.command);
-    prepared.confirmed();
-  };
-  try {
-    const inspection = await f.runtime.harness.inspect(context);
-    const task = inspection.tasks.find(
-      ({ record }) => record.kind === "pi.tool" && record.conversationId === f.childIds[0],
-    )!.record;
-    const command: CandidateControlToolCommand = {
-      target: "control",
-      executionReference: createExecutionReference(randomUUID(), f.runId, 1),
-      operationId: randomUUID(),
-      toolCallId: "task:" + task.id,
-      nativeCallId: "task:" + task.id,
-      conversationId: f.childIds[0]!,
-      toolName: "subagent_control",
-      replyMode: "hostcall",
-      arguments: { action: "status", target: "fixture" },
-      contextAnchor: null,
-      occurredAt: new Date().toISOString(),
-    };
-    await f.runtime.publishControl(task.id, command);
-    await f.runtime.publishControl(task.id, command);
-    expect(commands).toHaveLength(1);
-    expect(commands[0]!.sourceDocumentId).toBeGreaterThan(0);
-    await expect(
-      f.runtime.publishControl(task.id, {
-        ...command,
-        arguments: { action: "status", target: "changed" },
-      }),
-    ).rejects.toThrow("identity changed");
-    await f.runtime.retireHostCall(task.id, command.operationId);
-    const record = await f.storage.findDocument(
-      {
-        kind: "pi-cloud.tool-hostcall",
-        scope: { kind: "task", taskId: task.id },
-        key: command.operationId,
-      },
-      "current",
-      context,
-    );
-    expect(record).toBeUndefined();
-    await f.children[0]!.abort(context);
-    await expect(
-      f.runtime.publishControl(task.id, {
-        ...command,
-        operationId: randomUUID(),
-      }),
-    ).rejects.toThrow("invocation has ended");
-    expect(commands).toHaveLength(1);
-  } finally {
-    await f.runtime.close();
-  }
-}, 15000);
-
 it("publishes an ordered native recovery reference before resolving a recovered remote Tool", async () => {
   const models = createModels(),
     provider = fauxProvider({ tokensPerSecond: 1_000_000 });

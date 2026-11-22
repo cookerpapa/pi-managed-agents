@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { createExecutionReference } from "@pi-cloud/protocol";
 import type { SandboxBindingRecord } from "../src/sandbox-bindings.ts";
@@ -64,7 +63,6 @@ function fixture() {
   const provider = {
     attachExecutionData: vi.fn(() => handle),
     clearExecutionData: vi.fn(),
-    openWorkflow: vi.fn(async () => new PassThrough()),
     preparePackage: vi.fn<CubeSandboxProvider["preparePackage"]>(async () => ({
       path: "/workspace/skill",
     })),
@@ -184,39 +182,6 @@ describe("Session execution without a management owner", () => {
     await expect(sibling).resolves.toMatchObject({ path: "/workspace/other" });
     expect(finishedBackground.type).toBe("tool_sandbox.package_prepared");
     expect(f.provider.preparePackage).toHaveBeenCalledTimes(3);
-    await f.execution.close();
-  });
-  it("cancels local workflow channels at partition loss without replaying their script", async () => {
-    const f = fixture();
-    const stream = new PassThrough();
-    const opened = Promise.withResolvers<void>();
-    f.provider.openWorkflow.mockImplementation(async () => {
-      opened.resolve();
-      return stream;
-    });
-    const request = {
-      toolBrokerProtocolVersion: 1 as const,
-      type: "tool_sandbox.operation" as const,
-      operation: "workflow.exec" as const,
-      activationId: f.first.bindingId,
-      operationId: randomUUID(),
-      toolCallId: "call",
-      toolName: "bash" as const,
-      script: "return 1",
-      cwd: "/workspace",
-      timeoutMs: 5000,
-      turnContextSha256: "a".repeat(64),
-      executionContextSha256: "b".repeat(64),
-      stepContextSequence: 1,
-      stepContextSha256: "d".repeat(64),
-    };
-    const result = f.execution.executeWorkflow(f.reference, request);
-    const rejected = expect(result).rejects.toBeDefined();
-    await opened.promise;
-    f.execution.reset();
-    await rejected;
-    expect(f.provider.openWorkflow).toHaveBeenCalledOnce();
-    expect(stream.destroyed).toBe(true);
     await f.execution.close();
   });
 });

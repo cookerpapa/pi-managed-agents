@@ -21,8 +21,6 @@ vi.mock("../src/sandbox-control-config.ts", () => ({
     serviceToken: "fixture-service-token".repeat(4),
     terminalToken: "fixture-terminal-token".repeat(4),
     kafkaBrokers: ["unused:9092"],
-    controlPlaneUrl: "http://127.0.0.1:1",
-    maximumActiveCommands: 32,
   }),
 }));
 vi.mock("../src/execution-backend-directory.ts", () => ({

@@ -54,7 +54,6 @@ export type GuestCommandResult = Readonly<{
 }>;
 
 export interface GuestRuntimeClient<I extends GuestRuntimeInstance = GuestRuntimeInstance> {
-  openProgram?(instance: I, input: { script: string; cwd: string }): Promise<Duplex>;
   openTcp?(instance: I, port: number, signal?: AbortSignal): Promise<Duplex>;
   checkHealth(): Promise<void>;
   create(input: GuestRuntimeCreateInput): Promise<I>;

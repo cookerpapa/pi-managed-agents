@@ -1,5 +1,4 @@
 import {
-  parseExecutionReference,
   type AcceptedToolCommand,
   type ExecutionLogPosition,
   type SandboxBindingChange,
@@ -8,21 +7,23 @@ import {
 } from "@pi-cloud/protocol";
 import type { ToolReply } from "@pi-cloud/event-log";
 import { operationalLog, type PiCloudMetrics } from "@pi-cloud/observability";
-import { Agent, fetch as internalFetch } from "undici";
 import type { SandboxToolExecutor, ToolExecutionCancellation } from "./tool-executor.ts";
 import type { ToolEnvironmentCoordinator } from "./tool-environment-coordinator.ts";
-import type { ToolLogFact, ToolLogRecord } from "./workflow-command-dispatcher.ts";
 import type { SandboxBinding, SandboxBindingReader } from "./sandbox-bindings.ts";
 import type { SandboxExecutionTarget } from "./sandbox-execution.ts";
 
-export const WORKFLOW_LOG_DELIVERY_PATH = "/internal/v1/workflow-log-delivery";
-export type ToolLogDelivery = Readonly<{
-  instanceId: string;
+export type ToolLogRecord<T> = Readonly<{
+  fact: T;
   topic: string;
   partition: number;
-  offset: string;
-  fact: ToolLogFact;
+  offset: bigint;
 }>;
+export type ToolLogFact = {
+  kind: string;
+  scope: Pick<AcceptedToolCommand["scope"], "runId" | "writerId"> &
+    Partial<AcceptedToolCommand["scope"]>;
+  bindingId?: string;
+};
 export function toolDeliveryFact(fact: ToolLogFact): ToolLogFact | undefined {
   if (fact.kind === "tool_command") return fact;
   if (fact.kind === "tool_cancel") return fact;
@@ -34,13 +35,6 @@ export function toolDeliveryFact(fact: ToolLogFact): ToolLogFact | undefined {
   return undefined;
 }
 
-type WorkflowDelivery = ((
-  route: Pick<SandboxBinding, "instanceId" | "baseUrl">,
-  delivery: ToolLogDelivery,
-) => Promise<void>) & { close?(): Promise<void> };
-
-/** Runs after the Projector's durable dispatch commit. Fixed Tools go straight
- * to their provider executor; interactive workflow channels use their owner. */
 export class ToolCommandDispatcher {
   readonly #preparing = new Map<
     string,
@@ -105,7 +99,6 @@ export class ToolCommandDispatcher {
       routes: SandboxBindingReader;
       executor: SandboxToolExecutor;
       environments?: Pick<ToolEnvironmentCoordinator, "ensure" | "retireWriter">;
-      workflow: WorkflowDelivery;
       publishReply(
         topic: string,
         reply: ToolReply,
@@ -121,6 +114,15 @@ export class ToolCommandDispatcher {
     const current = this.#current(isCurrent);
     const command = record.fact as AcceptedToolCommand;
     if (command.kind === "tool_command") {
+      if (command.request.operation === "workflow.exec") {
+        if (!current()) return;
+        await this.#fail(command, {
+          code: "tool_execution_not_started",
+          effect: "not_started",
+          message: "The workflow tool has been retired.",
+        });
+        return;
+      }
       const key = command.request.operationId;
       if (this.#preparing.has(key)) return;
       if (this.#preparing.size >= 4096) {
@@ -264,22 +266,14 @@ export class ToolCommandDispatcher {
     }
     const started = performance.now();
     try {
-      if (command.request.operation === "workflow.exec") {
-        await this.options.workflow(route, {
-          instanceId: route.instanceId,
-          topic: record.topic,
-          partition: record.partition,
-          offset: record.offset.toString(),
-          fact,
-        });
-      } else {
-        try {
-          this.options.onDispatch?.(command, route);
-        } catch {
-          /* Observation only. */
-        }
-        await this.options.executor.submit(route, command, source);
+      if (command.request.operation !== "tool.execute")
+        throw new Error("Unsupported Tool operation");
+      try {
+        this.options.onDispatch?.(command, route);
+      } catch {
+        /* Observation only. */
       }
+      await this.options.executor.submit(route, command, source);
       this.#delivered++;
     } catch (error) {
       this.#abandoned++;
@@ -364,34 +358,6 @@ export class ToolCommandDispatcher {
       },
     });
   }
-  /** Close interactive Agent orchestration, never accepted fixed Tool processes. */
-  async closeWorkflowBinding(
-    change: SandboxBindingChange,
-    route: SandboxBinding,
-    source: ExecutionLogPosition,
-    current: () => boolean,
-  ): Promise<void> {
-    if (!change.closed || !route.dispatchClosed) throw new Error("Binding is not closed");
-    if (!current()) throw new Error("Binding closure owner changed");
-    try {
-      await this.options.workflow(route, {
-        ...source,
-        instanceId: route.instanceId,
-        fact: {
-          kind: "binding_close",
-          bindingId: route.bindingId,
-          scope: {
-            tenantId: change.scope.tenantId,
-            runId: change.runId,
-            writerId: parseExecutionReference(route.snapshot.assignment.executionReference).leaseId,
-          },
-        },
-      });
-    } catch {
-      if (await this.options.routes.isAlive(route.instanceId))
-        throw new Error("Workflow closure is unconfirmed");
-    }
-  }
   async #fail(command: AcceptedToolCommand, failure: ToolExecutionFailureData): Promise<void> {
     if (!command.replyTopic) return;
     try {
@@ -433,28 +399,10 @@ export class ToolCommandDispatcher {
       ...[...this.#resourceTails.values()].map((p) => p.result),
       ...this.#partitionBarriers.values(),
     ]);
-    await this.options.workflow.close?.();
   }
   reset(): void {
     this.#generation++;
     for (const pending of this.#preparing.values())
       pending.controller.abort(new Error("Tool dispatch owner changed"));
   }
-}
-
-export function httpToolLogDelivery(token: string): WorkflowDelivery & { close(): Promise<void> } {
-  const dispatcher = new Agent();
-  const deliver: WorkflowDelivery = async (route, delivery) => {
-    const response = await internalFetch(new URL(WORKFLOW_LOG_DELIVERY_PATH, route.baseUrl), {
-      dispatcher,
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(delivery),
-      signal: AbortSignal.timeout(delivery.fact.kind === "execution_seal" ? 20000 : 5000),
-      redirect: "error",
-    });
-    await response.body?.cancel();
-    if (!response.ok) throw new Error(`Workflow delivery failed: HTTP ${response.status}`);
-  };
-  return Object.assign(deliver, { close: () => dispatcher.destroy() });
 }

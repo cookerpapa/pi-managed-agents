@@ -1,8 +1,6 @@
 import type { GuestRuntimeClient, GuestRuntimeInstance } from "./guest-runtime-client.ts";
 import type { SandboxExecutionDescriptor, SandboxExecutionTarget } from "./sandbox-execution.ts";
 import { executionTargetId } from "./sandbox-execution.ts";
-import { workflowGuestSource } from "./workflow-guest-source.ts";
-import type { Duplex } from "node:stream";
 import {
   isExpectedDefaultToolchain,
   MAX_TOOL_EXECUTION_TIMEOUT_MS,
@@ -1273,23 +1271,6 @@ export class FixedGuestSandboxProvider<
       admin: activation.lifetime === "development_environment",
     });
     return terminal;
-  }
-
-  async openWorkflow(
-    handle: SandboxHandle,
-    input: { script: string; operationId: string; cwd: string },
-  ): Promise<Duplex> {
-    const activation = this.#dataOwned(handle);
-    if (!this.#client.openProgram)
-      throw new SandboxControlError(
-        "workflow_unavailable",
-        "Cube process transport is unavailable",
-        false,
-      );
-    return this.#client.openProgram(activation.instance, {
-      script: workflowGuestSource(input),
-      cwd: input.cwd,
-    });
   }
 
   async openPreviewConnection(

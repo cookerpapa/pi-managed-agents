@@ -23,7 +23,6 @@ it.each([
     execution = "b".repeat(64);
   const runtime = createTrustedRemoteAgentTools({
     workingDirectory: cwd,
-    workflowUrl: "http://127.0.0.1:1/workflow",
     activationId: randomUUID(),
     executionReference: createExecutionReference(randomUUID(), randomUUID(), 1),
     turnContextSha256: turn,

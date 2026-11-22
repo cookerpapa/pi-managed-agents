@@ -1279,18 +1279,6 @@ export class OfficialCubeSandboxRuntimeClient implements CubeSandboxRuntimeClien
     return this.#openProgram(instance, script, "/tmp", "PI_CLOUD_TCP_CONNECTED\n", signal);
   }
 
-  async openProgram(
-    instance: CubeSandboxInstance,
-    input: { script: string; cwd: string },
-  ): Promise<Duplex> {
-    return this.#openProgram(
-      instance,
-      input.script,
-      this.#guestPath(input.cwd),
-      "PI_CLOUD_WORKFLOW_READY\n",
-    );
-  }
-
   async #openProgram(
     instance: CubeSandboxInstance,
     script: string,

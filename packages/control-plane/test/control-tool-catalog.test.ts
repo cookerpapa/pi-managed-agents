@@ -56,6 +56,7 @@ it("retains the last valid Worker catalog and rejects collisions without install
   expect(changed).not.toHaveBeenCalled();
   expect(() => update(worker, { ...snapshot, revision: "0".repeat(64) })).toThrow("digest");
   expect(() => controlToolCatalog([definition("bash")])).toThrow("fixed native");
+  expect(() => controlToolCatalog([definition("workflow")])).toThrow("fixed native");
   expect(worker.read()).toEqual(snapshot);
   stop();
 });
@@ -118,11 +119,6 @@ it("adds and withdraws an unknown Tool within one native submission while retain
         throw new Error("No safe Tool replay");
       },
     },
-    control: {
-      request: async () => {
-        throw new Error("No child command");
-      },
-    },
     wait: (id, callId, name, signal, scope) =>
       restoreToolReply(mailbox.wait(id, callId, name, signal), undefined, scope, signal),
   });
@@ -130,9 +126,6 @@ it("adds and withdraws an unknown Tool within one native submission while retain
     command,
     environment: () => {
       throw new Error("No guest required");
-    },
-    prepareWorkflow: async () => {
-      throw new Error("No workflow");
     },
   });
   const definitions = () => bindings.current().map((item) => item.tool);

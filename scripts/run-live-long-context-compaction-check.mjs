@@ -1110,7 +1110,7 @@ try {
       "Use the subagent tool for exactly two direct tasks, then wait for both results.",
       "First use context branch and tools []: ask the child to recall this algorithm project's exact invariant marker from its inherited conversation. Do not include the marker value in the child task.",
       "Second use context fresh and tools []: ask it to reply exactly FRESH-CONTEXT-OK. Do not send it parent history or project identifiers.",
-      "Both children must avoid tools, searches and further delegation. Do not use a workflow script or local file tools yourself. Briefly report the two results.",
+      "Both children must avoid tools, searches and further delegation. Do not use local file tools yourself. Briefly report the two results.",
     ].join(" "),
     true,
   );

@@ -1,20 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
 import PQueue from "p-queue";
-import { parseExecutionReference, type ToolSandboxAssignment } from "@pi-cloud/protocol";
+import { type ToolSandboxAssignment } from "@pi-cloud/protocol";
 import type { ConfiguredImageAttachments } from "@pi-cloud/session-attachments";
 import type { SandboxController } from "./sandbox-controller.ts";
 import type { SandboxBindingView } from "./sandbox-binding-view.ts";
 import type { FixedGuestSandboxProvider } from "./fixed-guest-sandbox-provider.ts";
 import type { SandboxBinding } from "./sandbox-bindings.ts";
 import { SandboxControlError } from "./sandbox-provider.ts";
-import { WorkflowChannels } from "./workflow-channels.ts";
 import type { SandboxHttpServiceRegistry } from "./sandbox-http-service-registry.ts";
-import type { ToolLogFact } from "./workflow-command-dispatcher.ts";
 
 type Provider = Pick<
   FixedGuestSandboxProvider,
   | "clearExecutionData"
-  | "openWorkflow"
   | "preparePackage"
   | "exportPackage"
   | "imageIo"
@@ -38,10 +35,8 @@ const unavailable = () =>
 
 /** Executes an existing binding. It cannot allocate, resume, adopt or delete a VM. */
 export class SessionBindingExecution {
-  readonly #channels = new WorkflowChannels();
   readonly #operations = new Map<string, Operation>();
   readonly #images = new PQueue({ concurrency: 1 });
-  readonly #steps = new Map<string, { sequence: number; sha256: string }>();
   #closed = false;
   constructor(
     readonly options: {
@@ -87,16 +82,6 @@ export class SessionBindingExecution {
       throw new Error("Binding physical data scope changed");
     return handle;
   }
-  ownsToolBinding(id: string): boolean {
-    if (this.#closed) return false;
-    try {
-      const route = this.options.bindings.binding(id);
-      return !!route && !route.dispatchClosed;
-    } catch {
-      // Reset/rebalance withdraws authority before asynchronous replies settle.
-      return false;
-    }
-  }
   #run<T>(
     route: SandboxBinding,
     key: string,
@@ -126,75 +111,6 @@ export class SessionBindingExecution {
     void result.then(forget, forget);
     return result;
   }
-  executeWorkflow: SandboxController["executeWorkflow"] = async (
-    reference,
-    request,
-    signal,
-    update,
-  ) => {
-    const route = this.#binding(request.activationId, reference);
-    const snapshot = route.snapshot;
-    if (
-      !snapshot.allowedTools.includes(request.toolName) ||
-      request.toolName !== "bash" ||
-      request.turnContextSha256 !== snapshot.turnContextSha256 ||
-      request.executionContextSha256 !== snapshot.executionContextSha256
-    )
-      throw new SandboxControlError(
-        "tool_context_mismatch",
-        "Workflow does not match its granted context",
-        false,
-      );
-    const step = this.#steps.get(route.bindingId);
-    if (
-      step &&
-      (request.stepContextSequence < step.sequence ||
-        (request.stepContextSequence === step.sequence &&
-          request.stepContextSha256 !== step.sha256))
-    )
-      throw new SandboxControlError(
-        "step_context_mismatch",
-        "Workflow used a stale or conflicting Step",
-        false,
-      );
-    this.#steps.set(route.bindingId, {
-      sequence: request.stepContextSequence,
-      sha256: request.stepContextSha256,
-    });
-    return this.#run(route, request.operationId, request, signal, async (current) => {
-      this.#binding(route.bindingId, route.snapshot.assignment.executionReference);
-      const handle = await this.#handle(route);
-      const stream = await this.options.provider.openWorkflow(handle, {
-        script: request.script,
-        operationId: request.operationId,
-        cwd: route.descriptor.attachment.toolRoot,
-      });
-      return this.#channels.run(request, stream, current, async (value) =>
-        update?.({
-          type: "tool_execution_update",
-          toolCallId: request.toolCallId,
-          toolName: request.toolName,
-          args: { script: request.script },
-          partialResult: {
-            content: [
-              { type: "text", text: typeof value === "string" ? value : JSON.stringify(value) },
-            ],
-            details: {},
-          },
-        }),
-      );
-    });
-  };
-  attachWorkflow: SandboxController["attachWorkflow"] = async (
-    id,
-    operation,
-    reference,
-    send,
-    signal,
-  ) => {
-    this.#binding(id, reference);
-    return this.#channels.attach(id, operation, send, signal);
-  };
   exportPackage: SandboxController["exportPackage"] = async (request, signal) => {
     const route = this.#binding(
       request.activationId,
@@ -456,20 +372,6 @@ export class SessionBindingExecution {
       ...discovery,
     });
   };
-  async stopWorkflowScope(fact: ToolLogFact): Promise<void> {
-    const pending: Promise<unknown>[] = [];
-    for (const operation of this.#operations.values()) {
-      if (
-        parseExecutionReference(operation.binding.snapshot.assignment.executionReference)
-          .leaseId !== fact.scope.writerId ||
-        (fact.kind === "binding_close" && operation.binding.bindingId !== fact.bindingId)
-      )
-        continue;
-      operation.controller.abort();
-      pending.push(operation.result);
-    }
-    await Promise.allSettled(pending);
-  }
   get activeCount(): number {
     return this.#operations.size;
   }
@@ -480,12 +382,10 @@ export class SessionBindingExecution {
         operation.controller.abort();
         pending.push(operation.result);
       }
-    this.#steps.delete(id);
     await Promise.allSettled(pending);
   }
   reset(): void {
     for (const operation of this.#operations.values()) operation.controller.abort();
-    this.#steps.clear();
     this.options.provider.clearExecutionData();
   }
   async close(): Promise<void> {

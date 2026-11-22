@@ -3,7 +3,6 @@ import { settleWorkerExecutions } from "./worker-retirement.ts";
 import { resourceLimit } from "@pi-cloud/domain";
 import type { PublicationAvailability } from "@pi-cloud/protocol";
 import { DirectSessionKafkaBus } from "@pi-cloud/runtime-core/direct-session-kafka";
-import { SubagentControlClient } from "@pi-cloud/sandbox-supervisor";
 import { RunCancellationExecutor } from "@pi-cloud/runtime-core/run-cancellation-executor";
 import type { ExecutionLogFactory } from "@pi-cloud/runtime-core/execution-log";
 import { WorkerExecutionLog } from "@pi-cloud/runtime-core/worker-execution-log";
@@ -90,7 +89,6 @@ function executionLogResolver(value: ExecutionLogFactory): ActiveExecutionLogRes
 
 export type SupervisorSandboxControl = Pick<
   ReplicatedSandboxControlClient,
-  | "workflowUrlFor"
   | "checkHealth"
   | "create"
   | "refreshServices"
@@ -148,7 +146,6 @@ export class PiWorkerRuntime {
     Pick<DurableSessionPublisher, "scoped" | "checkHealth" | "close"> | undefined;
   #ownsSessionMutationProducer = false;
   #nativeSessions: PostgresDurableSessionHost | undefined;
-  #subagentControl: SubagentControlClient | undefined;
   #executionTargets: ExecutionTargetClient | undefined;
   #agentRunner: RemoteToolSandboxTurnRunner | undefined;
   #images: ConfiguredImageAttachments | undefined;
@@ -346,8 +343,7 @@ export class PiWorkerRuntime {
       stopCurrentBoot: () => this.#stopCurrentBoot(),
       assignmentInventory: this.#sandboxControl,
       subagentCommand: async (command) => {
-        if (!this.#nativeSessions || !this.#subagentControl)
-          throw new Error("Subagent runtime is not ready");
+        if (!this.#nativeSessions) throw new Error("Subagent runtime is not ready");
         if (command.action === "input") {
           if (!this.#nativeSessions.hasExecution(command.executionReference) || !this.#agentRunner)
             throw Object.assign(new Error("Target Agent execution is not ready on this Worker"), {
@@ -515,14 +511,6 @@ export class PiWorkerRuntime {
       ...(images ? { images: images.codec } : {}),
     });
     this.#nativeSessions = nativeSessions;
-    this.#subagentControl = new SubagentControlClient(nativeSessions, {
-      topic: toolReplies.topic,
-      wait: (...args) => {
-        const reply = toolReplies.wait(...args);
-        // Hostcall results are structured control data, never inline images.
-        return reply as import("@pi-cloud/protocol").ToolReplyWait<ToolResultPayload>;
-      },
-    });
     const executionTargets = new ExecutionTargetClient(
       this.#config.controlPlaneBaseUrl,
       this.#config.managementToken,
@@ -538,7 +526,6 @@ export class PiWorkerRuntime {
           root: scope.sessionKind === "conversation",
         }),
       nativeConversations: nativeSessions,
-      control: this.#subagentControl,
       maximumDepth: this.#config.subagentMaximumDepth,
       prepareTarget: (command, target, signal) => executionTargets.bind(command, target, signal),
       wait: (id, callId, name, signal, scope, recovery) =>
@@ -909,7 +896,6 @@ export class PiWorkerRuntime {
       () => this.#catalogConsumer?.close(),
       () => this.#toolReplies?.shutdown(),
       () => this.#images?.blobs.close(),
-      () => this.#subagentControl?.close(),
       () => this.#executionTargets?.close(),
       () => this.#client?.stop(),
       () => this.#managementServer?.close(),
@@ -976,4 +962,3 @@ import {
   configuredImageAttachments,
   type ConfiguredImageAttachments,
 } from "@pi-cloud/session-attachments";
-import type { ToolResultPayload } from "@pi-cloud/protocol";

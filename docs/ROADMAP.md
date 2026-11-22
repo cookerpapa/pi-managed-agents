@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The candidate exposes direct subagent delegation and management. [ADR-0352](adr/0352-retire-workflow-tool.md) removes the guest-script orchestration path.
+
 The first implementation milestone for [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) is [#52, active child Tool recovery on the new store](https://github.com/cookerpapa/pi-managed-agents/issues/52). Its verified transaction and recovery boundaries will inform [#51, database placement](https://github.com/cookerpapa/pi-managed-agents/issues/51).
 
 [ADR-0342](adr/0342-context-status-and-gateway-usage.md) separates the two Session commands on the source candidate. [PG contention study](reports/status-usage-contention-20261120.md).

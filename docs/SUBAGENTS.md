@@ -1,19 +1,19 @@
 # Subagents
 
 PiCloud exposes `subagent` for direct delegation, `subagent_control` for discovery
-and management, and `workflow` for JavaScript orchestration. Users request these
+and management. Users request these
 in ordinary language; they do not configure Workers or Kafka.
 
 ## Direct task
 
 ```js
-subagent({ task: "Check the collision logic", context: "branch", sandbox: "shared" })
+subagent({ task: "Check the collision logic", context: "branch", workspace: { compute: "shared" } })
 ```
 
 `fresh` starts from the task. `branch` inherits the frozen history before the
 current parent prompt, not intermediate reasoning or Tool results produced
 during that Run; pass any such findings explicitly in the child task.
-`sandbox: "shared"` uses the parent's compute environment; `"ephemeral"` uses a
+`workspace: { compute: "shared" }` uses the parent's compute environment; `"ephemeral"` uses a
 separate temporary Cube with the **same persistent Volume**. Optional absolute
 `cwd` selects an existing directory and otherwise inherits the parent's frozen
 Run directory. Shared descendants keep the parent's compute scope. Context
@@ -43,46 +43,18 @@ mounted at `/home/user`. Other machine system-disk directories cannot be selecte
 for ephemeral compute. Missing or inaccessible directories fail before child
 execution, never fall back or create directories implicitly.
 
-Optional `tools` narrows file/shell permissions; `[]` disables those tools, not
-hosted search or delegation. Direct tasks allocate no Cube until an actual local
+Optional `workspace.tools` narrows file/shell permissions. `workspace: null` disables workspace access, while
+hosted search and delegation keep their own policies. Direct tasks allocate no Cube until an actual local
 operation. Temporary compute follows the existing elastic idle TTL; recycling
 compute does not remove the shared Volume or worktree.
 
-## Workflow
+## Communicating with a child
 
-```js
-workflow({ script: `
-  const results = await runs.all([
-    { key: "ui", task: "Review interaction errors", context: "branch" },
-    { key: "api", task: "Review API validation", context: "fresh" }
-  ]);
-  return results.map(result => result.output);
-` })
-```
-
-Scripts execute with the Bash capability inside Cube and are saved under
-`workflows/<operation-id>.js` in their Workspace. `runs.run(key, task)` waits for
-one child; `runs.all(tasks)` retains input order and returns individual failure
-results. A failed single child rejects its script call. Every launch must be
-awaited; conflicting reuse of a key fails. `console`/`emit` are progress, not the
-return value, and do not create model messages. Their newest bounded text may
-appear in the disposable Tool log preview; they never enter Kafka or PG. Actual
-`runs.*` control and messaging requests retain their durable execution path.
-
-Explicit returns and direct child/control results follow Pi's default limits:
-50 KiB of UTF-8 text or 2,000 lines. Small results are preserved
-exactly; an oversized value or error becomes an explicit `subagent_result_too_large`
-Tool error. The script may already have changed files or completed child tasks.
-Inspect those effects before retrying; write large data explicitly to the
-Workspace and return a summary or file path. No implicit result archive is created.
-
-The API also offers `runs.status`, `runs.wait`, `runs.cancel` and
-`runs.send(target, message, delivery)`. A target is a returned execution ID or
-workflow key. `notify` does not wake a closed Agent; `steer` is received at a safe
-model boundary, and `follow_up` queues work in an active Agent. Finished tasks
-report `missed`; background resurrection is not implied. Blocking requests for
-parent decisions use `contact_supervisor` and `subagent_supervisor`, also through
-the control log.
+The parent calls `subagent` once per task. It receives a result or a supervisor
+question. Use the child's execution ID with `subagent_control` to check progress,
+wait, send another message or cancel. `subagent_control({action:"list"})`
+recovers IDs when needed. A child asks for a decision using `contact_supervisor`;
+the parent answers with `subagent_supervisor` and the returned request ID.
 
 ## Cloud contract
 
@@ -120,15 +92,12 @@ Unsafe Tools inside the child remain unsafe; this wrapper does not replay Bash.
 It includes completed children of the current root work, source Task identity,
 parent relationship, state and a short task summary. Follow `nextCursor` for the
 next page. Use the returned execution ID with `status`, `wait`, `send` or `cancel`.
-These management operations and `workflow` are unsafe on native crash recovery.
+These management operations are unsafe on native crash recovery.
 Inspect existing effects before deciding to repeat them. Similar prompts in new
 Tool calls intentionally create distinct children.
 
 Children retain generation ownership so a direct delegation can return a
 supervisor question while the child remains available for the parent's answer.
-Workflow hostcall results are retained only while that script invocation is
-open; late hostcalls after disposal are rejected. No script replay or JS-memory
-resume is promised.
 
 See [ADR-0166](adr/0166-log-driven-subagents.md),
 [ADR-0171](adr/0171-shared-volume-subagent-compute.md),

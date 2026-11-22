@@ -90,14 +90,10 @@ vi.mock("../src/cubesandbox-runtime-client.ts", () => ({
 }));
 vi.mock("../src/tool-command-dispatcher.ts", () => ({
   ToolCommandDispatcher: class {
-    constructor(private readonly options: any) {}
     async close() {
       fixture.call("dispatcher.close");
-      await this.options.workflow.close();
     }
   },
-  httpToolLogDelivery: () =>
-    Object.assign(async () => {}, { close: async () => fixture.call("workflow-client.close") }),
 }));
 vi.mock("../src/workspace-volume-deletion-reaper.ts", () => ({
   WorkspaceVolumeDeletionReaper: class {
@@ -127,13 +123,6 @@ vi.mock("../src/sandbox-controller.ts", () => ({
       fixture.call("broker.close");
       await this.options.provider.close();
       await this.options.stateRepository.close();
-    }
-  },
-}));
-vi.mock("../src/workflow-command-dispatcher.ts", () => ({
-  WorkflowCommandDispatcher: class {
-    async close() {
-      fixture.call("commands.close");
     }
   },
 }));

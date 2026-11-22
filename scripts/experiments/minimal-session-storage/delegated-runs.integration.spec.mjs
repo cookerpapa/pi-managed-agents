@@ -187,7 +187,7 @@ it.skipIf(!url)(
         defineExtension({
           name: "delegated-run-study",
           tools: [
-            register("workflow", Type.Object({}), async (_args, api, context) => {
+            register("fixture_delegate_pair", Type.Object({}), async (_args, api, context) => {
               const anchor = await api.commit(
                 async (tx) =>
                   (await tx.scanEntries({ conversationId: 1 }, 8)).items.find(
@@ -316,7 +316,7 @@ it.skipIf(!url)(
           return say("BETA_PRIVATE");
         }
         if (messages.includes("ROOT_TWO") && last.role !== "toolResult")
-          return tool("workflow", {}, "family");
+          return tool("fixture_delegate_pair", {}, "family");
         return say("root done");
       }
       fake.setResponses(Array.from({ length: 32 }, () => response));

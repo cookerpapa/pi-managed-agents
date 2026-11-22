@@ -17,14 +17,12 @@ type SandboxConfigurationFields = {
   databaseUrl: string;
   databaseNotificationUrl: string;
   kafkaBrokers: readonly string[];
-  maximumActiveCommands: number;
   sandboxDomainId: string;
   advertisedBaseUrl: string;
   managementBaseUrl: string;
   ownershipLeaseMs: number;
   ownershipHeartbeatMs: number;
   serviceToken: string;
-  controlPlaneUrl: string;
   sessionExecutionBaseUrl: string;
   workspaceServiceToken?: string;
   terminalToken: string;
@@ -63,7 +61,7 @@ type ManagementFields =
   | "elasticRetentionMs"
   | "workspaceDeletionReaperIntervalMs"
   | "workspaceDeletionReaperBatchSize";
-type ExecutionFields = "kafkaBrokers" | "maximumActiveCommands" | "controlPlaneUrl";
+type ExecutionFields = "kafkaBrokers";
 type SandboxServingConfig = Omit<
   SandboxConfigurationFields,
   ManagementFields | ExecutionFields | "databaseUrl"
@@ -497,10 +495,5 @@ export async function loadSandboxExecutionConfig(
     kafkaBrokers: required(environment, "PI_CLOUD_KAFKA_BROKERS")
       .split(",")
       .map((value) => bounded(value.trim(), "Kafka broker", 256)),
-    maximumActiveCommands: integer(environment.PI_CLOUD_TOOL_MAXIMUM_ACTIVE_COMMANDS, 32, 1, 4096),
-    controlPlaneUrl: serviceUrl(
-      required(environment, "PI_CLOUD_CONTROL_PLANE_URL"),
-      "controlPlaneUrl",
-    ),
   };
 }

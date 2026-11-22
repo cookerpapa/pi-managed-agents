@@ -110,7 +110,6 @@ afterAll(async () => {
 function sandboxControl(): SupervisorSandboxControl {
   return {
     async refreshServices() {},
-    workflowUrlFor: () => "http://sandbox-control.test/internal/v1/tool-operation",
     async checkHealth() {},
     async create() {
       throw new Error("unused");

@@ -278,7 +278,6 @@ Do not commit proxy credentials or expose a local proxy publicly.
 | `PI_CLOUD_SESSION_MODEL_CONCURRENCY` | `unlimited` | simultaneous provider requests per physical Session; combines with any explicitly configured Worker limit |
 | `PI_CLOUD_MAXIMUM_ACTIVE_TOOL_SANDBOXES` | `unlimited` | optional active-Cube quota; physical Cube capacity still applies |
 | `PI_CLOUD_RUNTIME_PROBE_CONCURRENCY` | `4` | concurrent physical-runtime health checks per control plane, range 1–64; limits in-flight work, never the number of VMs covered |
-| `PI_CLOUD_TOOL_MAXIMUM_ACTIVE_COMMANDS` | `8` | simultaneous interactive workflows per control plane (Helm default 32); fixed Tools have a Cubelet-local limit of 32 |
 | `PI_CLOUD_ELASTIC_RETENTION_MS` | `1800000` | platform-owned elastic idle window, captured before creation; existing PG resource records own deadlines, range 1 second–24 hours |
 | `PI_CLOUD_SANDBOX_PROVIDER` | `cubesandbox` | explicitly select `cubesandbox` or `boxlite` for this resource domain; changing provider requires matched compute retirement |
 | `PI_CLOUD_BOXLITE_URL` | required for BoxLite | private node API base URL; no provider fallback |
@@ -441,11 +440,9 @@ and one-second deadline. Progress failure never changes execution status.
 Fixed Tools are handed directly from Projector to the recorded Cube API/node/boot.
 The native handoff is bounded to five seconds; ambiguous acceptance closes that
 operation scope and is not replayed. Closure blocks publication admission, joins
-Cube/workflow scopes, then publishes the ordered seal. The shared seal/control
+active Tool dispatches, then publishes the ordered seal. The shared seal/control
 Outbox uses LISTEN hints, known retry deadlines and a one-second idle fallback.
-Its 16 send slots progress independently; cleanup drains bounded batches separately. Interactive workflows use
-the private control-plane TCP/4300 endpoint and
-the Supervisor management credential. There is no completed-result GET/cache or
+Its 16 send slots progress independently; cleanup drains bounded batches separately. There is no completed-result GET/cache or
 commit-notification RPC.
 
 Worker Run admission refreshes the private publication partition mask every second;
@@ -583,7 +580,7 @@ overall Agent/Run duration limit or independent model-capability TTL. Deployment
 model connection establishment 15 s
 model valid-event inactivity 300 s (including first response after admission)
 native Pi retries 5; SDK retries 0; no overall Agent duration limit
-Sandbox management/workflow request 360 s; fixed Tool handoff 5 s
+Sandbox management request 360 s; fixed Tool handoff 5 s
 Worker natural-drain grace 30 s; retirement/settlement bound 660 s
 process cleanup hard bound: 30 + 660 + 60 = 750 s
 Worker termination grace 1320 s
@@ -782,8 +779,7 @@ The host uses the existing management service credential, attachment access and
 ordinary-tool provider credential, with no Cube management credential or native Pi.
 
 Workers use `PI_CLOUD_SESSION_EXECUTION_URL` (Helm
-`pi-workers.services.sessionExecutionUrl`) for logical input-image preparation and
-workflow attachments. Existing `PI_CLOUD_SANDBOX_CONTROL_URLS` remain for Worker
+`pi-workers.services.sessionExecutionUrl`) for logical input-image preparation. Existing `PI_CLOUD_SANDBOX_CONTROL_URLS` remain for Worker
 boot inventory/retirement. Model calls and canonical Session commits are unchanged.
 The scoped Tool catalog uses `pi-cloud.tool-catalog.v2`; it is configuration,
 not conversation history or a second dispatch consumer.

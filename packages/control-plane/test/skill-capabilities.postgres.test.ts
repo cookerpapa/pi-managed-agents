@@ -51,15 +51,7 @@ it("uses accepted root/child grants and the current catalog without confusing ma
       .execute();
     const root = await service.runCapabilities(f.scope.tenantId, f.scope.runId, 1);
     expect(root.tools).toEqual(
-      expect.arrayContaining([
-        "read",
-        "write",
-        "edit",
-        "bash",
-        "subagent",
-        "workflow",
-        "root_only",
-      ]),
+      expect.arrayContaining(["read", "write", "edit", "bash", "subagent", "root_only"]),
     );
     expect(
       skillAvailability({ runtime: "none", tools: ["subagent"], software: [] }, root).state,

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Retire the built-in workflow tool and guest control callbacks in the candidate. Keep native child delegation and its recovery path. [ADR-0352](adr/0352-retire-workflow-tool.md).
+
 - [x] Exercise root-only Session identity, delegated admission, sibling inputs, explicit continuation and loss of a Worker holding the original child waiter. [Isolated Run design](reports/delegated-runs-20261122.md).
 - [x] Read the root at cold start and the addressed child on continuation. Compare compaction, Worker replacement and the 1/100/500-child fixture. [Cold-read study](reports/lazy-delegated-history-20261122.md).
 - [x] Compare the Conversation Entry index against the existing schema under saturated and paced Projector replay, isolated PG appends, and cold reads. [Index cost experiment](reports/conversation-entry-index-cost-20261122.md).

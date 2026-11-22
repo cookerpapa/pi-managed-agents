@@ -8,7 +8,6 @@ The Worker only freezes native Lane context and appends commands. The Projector
 admits children and delivers controls; it never runs model-generated JavaScript.
 Pi Tool definitions and their per-Run assembly live in
 [`supervisor-host/src/tools`](../supervisor-host/src/tools). This package has no
-Runner dependency or model/Tool execution entry point. Workflow scripts run in
-Cube and return through the existing bounded duplex and Kafka reply transports.
+Runner dependency or model/Tool execution entry point. Direct delegation uses the same native tool request and reply transports as other control tools.
 
 See [the Subagent contract](../../docs/SUBAGENTS.md).

@@ -11,7 +11,6 @@ import {
   runWorkspaceRuntimeCleanup,
   type WorkspaceCleanupWake,
 } from "./workspace-runtime-cleanup.ts";
-import { WorkflowChannels, type WorkflowFrame } from "./workflow-channels.ts";
 import { SandboxAdmission } from "./sandbox-admission.ts";
 import PQueue from "p-queue";
 import type {
@@ -26,9 +25,6 @@ import type {
   ToolSandboxAssignment,
   ToolSandboxCreateRequest,
   ToolSandboxCreateResponse,
-  ToolSandboxOperationRequest,
-  ToolSandboxOperationResponse,
-  NativeToolUpdate,
   ToolSandboxReleaseRequest,
   ToolSandboxReleaseResponse,
   SandboxControlListWorkspaceDirectoryRequest,
@@ -98,7 +94,6 @@ import {
   type SandboxImages,
   type SandboxTerminals,
   type SandboxPreviews,
-  type SandboxWorkflows,
   type SandboxSourceCredentials,
   type SandboxTerminalSession,
   type SandboxTerminalSize,
@@ -153,7 +148,6 @@ type ManagedToolBinding = {
   assignment: ToolSandboxAssignment;
   turnContextSha256: string;
   executionContextSha256: string;
-  currentStep?: Readonly<{ sequence: number; sha256: string }>;
   allowedTools: ReadonlySet<CloudToolName>;
   spec: SandboxCreateSpec;
   reservation: WorkspaceRuntimeReservation;
@@ -166,11 +160,7 @@ type ManagedToolBinding = {
     Readonly<{
       requestSha256: string;
       result: Promise<
-        | ToolSandboxOperationResponse
-        | InputImageResponse
-        | ToolImageResponse
-        | ToolPackageResponse
-        | ToolPackageExportResponse
+        InputImageResponse | ToolImageResponse | ToolPackageResponse | ToolPackageExportResponse
       >;
       controller: AbortController;
     }>
@@ -248,13 +238,6 @@ function operationFailureCode(error: unknown): string {
     ? error.code
     : "tool_broker_failed";
 }
-
-const TOOL_OPERATIONS: Readonly<Record<CloudToolName, ReadonlySet<string>>> = {
-  read: new Set(["tool.execute"]),
-  write: new Set(["tool.execute"]),
-  edit: new Set(["tool.execute"]),
-  bash: new Set(["tool.execute", "workflow.exec"]),
-};
 
 function sameEnvironment(
   left: EnvironmentRuntimeSnapshot,
@@ -381,14 +364,12 @@ export class SandboxController {
   readonly #bindings: SandboxBindings;
   readonly #inputImages: (ImageAttachmentSource & Pick<ImageAttachmentStore, "put">) | undefined;
   readonly #inputPreparation = new PQueue({ concurrency: 1 });
-  readonly #workflowChannels = new WorkflowChannels();
   readonly #provider: SandboxLifecycle;
   readonly #execution: SandboxExecution;
   readonly #files: SandboxWorkspaceFiles;
   readonly #images: SandboxImages;
   readonly #terminalsProvider: SandboxTerminals;
   readonly #previews: SandboxPreviews;
-  readonly #workflows: SandboxWorkflows;
   readonly #credentials: SandboxSourceCredentials;
   readonly #workspaceFiles: WorkspaceFileAccess;
   readonly #ownerBaseUrl: string;
@@ -431,7 +412,6 @@ export class SandboxController {
     this.#images = options.provider;
     this.#terminalsProvider = options.provider;
     this.#previews = options.provider;
-    this.#workflows = options.provider;
     this.#credentials = options.provider;
     this.#workspaceFiles = new WorkspaceFileAccess(options.provider, {
       transfer: (request) => this.#authorizeFileTransfer(request),
@@ -2285,150 +2265,6 @@ export class SandboxController {
     };
   }
 
-  async executeWorkflow(
-    executionReference: string,
-    request: Extract<ToolSandboxOperationRequest, { operation: "workflow.exec" }>,
-    signal?: AbortSignal,
-    onUpdate?: (event: NativeToolUpdate) => Promise<void>,
-  ): Promise<ToolSandboxOperationResponse> {
-    if (request.operation !== "workflow.exec")
-      throw new Error("Fixed Tools require native Cube handoff");
-    const activation = this.#authorizedBinding(request.activationId, executionReference);
-    const elasticRuntime = activation.elasticRuntime;
-    if (!activation.allowedTools.has(request.toolName)) {
-      throw new SandboxControlError(
-        "tool_not_granted",
-        "Tool is not present in this Run capability snapshot",
-        false,
-      );
-    }
-    if (!TOOL_OPERATIONS[request.toolName].has(request.operation)) {
-      throw new SandboxControlError(
-        "tool_operation_not_granted",
-        "Tool operation does not match its granted Tool",
-        false,
-      );
-    }
-    if (request.turnContextSha256 !== activation.turnContextSha256) {
-      throw new SandboxControlError(
-        "turn_context_mismatch",
-        "Tool operation did not match the frozen Cloud Turn context",
-        false,
-      );
-    }
-    if (request.executionContextSha256 !== activation.executionContextSha256) {
-      throw new SandboxControlError(
-        "execution_context_mismatch",
-        "Tool operation did not match the current Cloud execution context",
-        false,
-      );
-    }
-    const requestSha256 = createHash("sha256")
-      .update(JSON.stringify(request), "utf8")
-      .digest("hex");
-    const existing = activation.operations.get(request.operationId);
-    if (existing !== undefined) {
-      if (existing.requestSha256 === requestSha256)
-        return existing.result as Promise<ToolSandboxOperationResponse>;
-      throw new SandboxControlError(
-        "tool_operation_identity_conflict",
-        "Tool operation ID was reused for a different request",
-        false,
-      );
-    }
-    const currentStep = activation.currentStep;
-    if (currentStep === undefined || request.stepContextSequence > currentStep.sequence) {
-      activation.currentStep = {
-        sequence: request.stepContextSequence,
-        sha256: request.stepContextSha256,
-      };
-    } else if (
-      request.stepContextSequence < currentStep.sequence ||
-      request.stepContextSha256 !== currentStep.sha256
-    ) {
-      throw new SandboxControlError(
-        "step_context_mismatch",
-        "Tool operation used a stale or conflicting Cloud Step",
-        false,
-      );
-    }
-    const operationController = new AbortController();
-    const operationSignal =
-      signal === undefined
-        ? operationController.signal
-        : AbortSignal.any([signal, operationController.signal]);
-    const durable = (async (): Promise<ToolSandboxOperationResponse> => {
-      activation.activeOperations += 1;
-      if (elasticRuntime !== undefined) elasticRuntime.activeOperations += 1;
-      try {
-        const handle = await this.#materialize(activation, operationSignal);
-        let response: ToolSandboxOperationResponse;
-        try {
-          {
-            if (!this.#workflows.openWorkflow)
-              throw new SandboxControlError(
-                "workflow_unavailable",
-                "Isolated workflow execution is unavailable",
-                false,
-              );
-            const stream = await this.#workflows.openWorkflow(handle, {
-              script: request.script,
-              operationId: request.operationId,
-              cwd: activation.spec.toolRoot ?? handle.workspaceRoot,
-            });
-            try {
-              response = await this.#workflowChannels.run(
-                request,
-                stream,
-                operationSignal,
-                async (value) => {
-                  await onUpdate?.({
-                    type: "tool_execution_update",
-                    toolCallId: request.toolCallId,
-                    toolName: request.toolName,
-                    args: { script: request.script },
-                    partialResult: {
-                      content: [
-                        {
-                          type: "text",
-                          text: typeof value === "string" ? value : JSON.stringify(value),
-                        },
-                      ],
-                      details: {},
-                    },
-                  });
-                },
-              );
-            } catch (error) {
-              throw new SandboxControlError(
-                "workflow_result_unknown",
-                "Workflow ended without a confirmed result; inspect effects before retrying",
-                false,
-                error,
-              );
-            }
-          }
-        } catch (error: unknown) {
-          throw error;
-        }
-        return response;
-      } finally {
-        activation.activeOperations -= 1;
-        if (elasticRuntime !== undefined) elasticRuntime.activeOperations -= 1;
-      }
-    })();
-    activation.operations.set(request.operationId, {
-      requestSha256,
-      result: durable,
-      controller: operationController,
-    });
-    // Only running operations belong here (cancellation and concurrent dedup).
-    // Completed results belong to Kafka. Do not retain them in the Broker.
-    const forget = () => activation.operations.delete(request.operationId);
-    void durable.then(forget, forget);
-    return durable;
-  }
-
   async exportPackage(
     request: ToolPackageExportRequest,
     signal?: AbortSignal,
@@ -2750,26 +2586,6 @@ export class SandboxController {
     return result;
   }
 
-  async stopWorkflowScope(
-    fact: import("./workflow-command-dispatcher.ts").ToolLogFact,
-  ): Promise<void> {
-    const pending: Promise<unknown>[] = [];
-    for (const activation of this.#toolBindings.values()) {
-      const identity = parseExecutionReference(activation.assignment.executionReference);
-      if (
-        identity.leaseId !== fact.scope.writerId ||
-        (fact.kind === "binding_close" && activation.activationId !== fact.bindingId)
-      )
-        continue;
-      for (const [key, operation] of activation.operations) {
-        if (key.startsWith("input:")) continue;
-        operation.controller.abort();
-        pending.push(operation.result);
-      }
-    }
-    await Promise.allSettled(pending);
-  }
-
   async quarantineExecutionTarget(target: SandboxExecutionTarget): Promise<void> {
     const failure = new SandboxControlError(
       "cubesandbox_tool_unavailable",
@@ -2800,17 +2616,6 @@ export class SandboxController {
 
   ownsToolBinding(activationId: string): boolean {
     return this.#toolBindings.has(activationId);
-  }
-
-  async attachWorkflow(
-    activationId: string,
-    operationId: string,
-    executionReference: string,
-    send: (frame: WorkflowFrame) => void,
-    signal: AbortSignal,
-  ) {
-    this.#authorizedBinding(activationId, executionReference);
-    return this.#workflowChannels.attach(activationId, operationId, send, signal);
   }
 
   async refreshServices(activationId: string, assignment: ToolSandboxAssignment): Promise<void> {
@@ -2863,7 +2668,7 @@ export class SandboxController {
       activation.assignment,
       request.cancelOutstanding === true,
     );
-    // These are interactive workflow/input-preparation channels. Fixed Tools
+    // These are bound data preparation operations. Fixed Tools
     // live in Cube and are not in this map; releasing their caller never kills them.
     const operations = [...activation.operations.values()];
     for (const operation of operations)
@@ -3568,21 +3373,6 @@ export class SandboxController {
       if (!retired.has(warm.physicalActivationId) || this.#warm.get(key) !== warm) continue;
       await this.#discardWarm(key, warm);
     }
-  }
-
-  #authorizedBinding(activationId: string, executionReference: string): ManagedToolBinding {
-    const activation = this.#toolBindings.get(activationId);
-    if (
-      activation === undefined ||
-      activation.assignment.executionReference !== executionReference
-    ) {
-      throw new SandboxControlError(
-        "stale_session_lease",
-        "Tool binding operation used a stale Session lease",
-        false,
-      );
-    }
-    return activation;
   }
 
   #ownedBinding(activationId: string, assignment: ToolSandboxAssignment): ManagedToolBinding {

@@ -83,7 +83,6 @@ spec:
             - { name: PI_CLOUD_SANDBOX_CONTROL_PORT, value: "4300" }
             - { name: PI_CLOUD_ELASTIC_RETENTION_MS, value: {{ .Values.sandboxPlane.elasticRetentionMs | quote }} }
             - { name: PI_CLOUD_MAXIMUM_ACTIVE_TOOL_SANDBOXES, value: {{ .Values.sandboxPlane.maximumActivePerReplica | default "unlimited" | quote }} }
-            - { name: PI_CLOUD_TOOL_MAXIMUM_ACTIVE_COMMANDS, value: {{ .Values.sandboxPlane.maximumActiveCommands | quote }} }
             - { name: PI_CLOUD_SANDBOX_CONTROL_TOKEN_FILE, value: /run/pi-cloud-secrets/sandbox-control-token }
             - { name: PI_CLOUD_CONTROL_PLANE_URL, value: {{ index .Values "pi-workers" "services" "controlPlaneUrl" | quote }} }
             - { name: PI_CLOUD_SESSION_EXECUTION_URL, value: {{ .Values.sessionRuntime.executionBaseUrl | quote }} }

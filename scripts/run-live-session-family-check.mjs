@@ -242,21 +242,21 @@ try {
   const first = await start(
     a,
     [
-      "Use workflow with runs.all to launch exactly three fresh shared-workspace children in parallel.",
+      "Use subagent exactly three times with fresh context and a shared workspace, once for each task.",
       "Their separate tasks: implement insertion_sort.py with unit tests; implement binary_search.py with unit tests; implement fibonacci.py with unit tests.",
       "Each child must write and test only its own file, covering empty/boundary/normal/error inputs where applicable.",
       "After tests pass, each child MUST execute bash with timeout:60 to append one line to its own marker (insertion_sort.py.done, binary_search.py.done or fibonacci.py.done) and sleep 35 seconds, then report success.",
-      "Put runnable unittest tests in those exact .py files. Return all three actual results from the workflow. Afterwards run python3 insertion_sort.py && python3 binary_search.py && python3 fibonacci.py yourself and answer exactly FAMILY-A-CODING-OK only if all tests pass.",
+      "Put runnable unittest tests in those exact .py files. Return all three actual results from the children. Afterwards run python3 insertion_sort.py && python3 binary_search.py && python3 fibonacci.py yourself and answer exactly FAMILY-A-CODING-OK only if all tests pass.",
     ].join(" "),
-    "parallel-coding",
+    "delegated-coding",
   );
   await until(
     async () =>
       Number(
         await sql(`select count(*) from subagent_executions e
     where e.root_run_id=${quote(first.accepted.runId)} and e.state='running'`),
-      ) >= 2,
-    "two active child Lanes",
+      ) >= 1,
+    "an active child Lane",
   );
   const ownerId = await owner(first.accepted.runId);
   const familyLease = await sql(

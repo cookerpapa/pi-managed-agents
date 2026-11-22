@@ -256,9 +256,6 @@ it.each([
       createAgentTools: ({ stepWorldState, captureSamplingStep }) => ({
         tools: [],
         systemPrompt: async (base) => base,
-        prepareWorkflow: async () => {
-          throw new Error("No workflow expected");
-        },
         prepareModelRequest: async (messages, _purpose, headers) => {
           await captureSamplingStep(async () => {
             const capture = await stepWorldState.capture();
@@ -350,9 +347,6 @@ it.each([
                   },
                 }
               : {}),
-            workflowUrlFor: () => {
-              throw new Error("No Workflow expected");
-            },
           },
           runtimeIdentity: { supervisorId: "s", bootId: crypto.randomUUID(), sandboxId: "worker" },
           trustedWorkspaceDirectory: directory,

@@ -71,11 +71,6 @@ type PrepareDisplay = (
 ) => NativeDisplayPreparation;
 export type ManagedNativeRuntime = {
   close(): Promise<void>;
-  publishControl?(
-    taskId: number,
-    command: import("@pi-cloud/protocol").CandidateControlToolCommand,
-  ): Promise<void>;
-  retireHostCall?(taskId: number, id: string): Promise<void>;
   stopConversation?(requestId: string): Promise<void>;
   activeConversationViews?(
     runId: string,
@@ -245,17 +240,6 @@ export class PostgresDurableSessionHost {
       if (id !== undefined) depth++;
     }
     return depth;
-  }
-  async publishControl(
-    taskId: number,
-    command: import("@pi-cloud/protocol").CandidateControlToolCommand,
-  ): Promise<void> {
-    const owner = this.#executions.get(command.executionReference);
-    if (!owner) throw new Error("Native hostcall owner is unavailable");
-    await owner.authority.assertCurrent();
-    const runtime = await owner.runtime;
-    if (!runtime?.publishControl) throw new Error("Native hostcall port is unavailable");
-    await runtime.publishControl(taskId, command);
   }
   async originalControlIntent(
     reference: string,
@@ -488,12 +472,6 @@ export class PostgresDurableSessionHost {
         throw new Error("Remote Tool reply recovery is not configured");
       await this.options.restoreReplies(references, signal);
     }
-  }
-  async retireHostCall(reference: string, taskId: number, id: string): Promise<void> {
-    const owner = this.#executions.get(reference);
-    if (!owner) return;
-    await owner.authority.assertCurrent();
-    await (await owner.runtime)?.retireHostCall?.(taskId, id);
   }
   async createChildConversation(input: {
     executionReference: string;

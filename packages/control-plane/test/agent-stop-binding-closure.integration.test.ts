@@ -105,7 +105,6 @@ it.skipIf(!postgres || !brokers)(
             }),
           },
         ),
-        workflow: async () => {},
         publishReply: async () => {},
         quarantine: async () => {
           throw new Error("unexpected quarantine");
@@ -138,7 +137,6 @@ it.skipIf(!postgres || !brokers)(
             positions.push(position);
             closureIds.add(change.factId);
             observedClosures.set(change.factId, change);
-            await dispatcher.closeWorkflowBinding(change, route, position, current);
           },
         },
       });

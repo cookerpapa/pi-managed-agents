@@ -79,8 +79,7 @@ execution transport or resource lifetime settings. Helm environment and secret
 mounts follow these consumers, retaining existing credential identities.
 
 With PG, Kafka, the Worker and its existing Cube binding available, stopping
-management leaves commits, projection, bound Tools and reads running. Workflow
-host calls and image/Skill/preview data access use recorded physical data channels
+management leaves commits, projection, bound Tools and reads running. Image, Skill and preview data access uses recorded physical data channels
 at the Session partition owner. They do not adopt resource ownership. New VM
 activation, pause/release and physical recovery require management. The API can
 persist new Run/configuration intent while that work waits; admission is not a
@@ -434,7 +433,6 @@ The provider boundary is divided by responsibility:
 | `SandboxImages` | Bound image normalization and placement |
 | `SandboxTerminals` | Human-operated PTY transport |
 | `SandboxPreviews` | Service discovery and application connections |
-| `SandboxWorkflows` | Fixed guest workflow transport |
 | `SandboxSourceCredentials` | Workspace-scoped Git credential operations |
 
 `SandboxProvider` composes these ports at construction. Management receives lifecycle
@@ -619,7 +617,7 @@ Availability is independent of the prompt policy controlling proactive delegatio
 
 Subagents are native child Conversations in the same Session family. Their identity
 and creation receipt survive parent interruption. Direct delegation recovers that
-receipt; management and arbitrary workflow scripts are unsafe for automatic replay.
+receipt; management operations are unsafe for automatic replay.
 Workspace selection, context inheritance and working directory are separate choices.
 Ultra enables proactive delegation. Model permits are local and fair and are not
 held while waiting on another Agent or Tool. See [SUBAGENTS](SUBAGENTS.md).

@@ -18,7 +18,7 @@ import {
 } from "@earendil-works/pi-ai/providers/faux";
 import { ToolReplyMailbox } from "@pi-cloud/event-log";
 import { PostgresDurableSessionHost } from "@pi-cloud/pi-session-postgres/durable";
-import { RemoteToolSandboxTurnRunner, SubagentControlClient } from "@pi-cloud/sandbox-supervisor";
+import { RemoteToolSandboxTurnRunner } from "@pi-cloud/sandbox-supervisor";
 import { WorkerToolRuntime } from "../../supervisor-host/src/tools/worker-tool-runtime.ts";
 import { ControlToolRegistry } from "../src/control-tool-registry.ts";
 import { CloudModelRegistry } from "../../sandbox-supervisor/src/durable/model-registry.ts";
@@ -139,18 +139,10 @@ it.each([false, true])(
         offset: "0",
       }),
     });
-    const control = new SubagentControlClient(native, {
-      topic: "pi-cloud.tool-replies.v4.10000000-0000-4000-8000-000000000009",
-      wait: (...args) =>
-        replies.wait(...args) as import("@pi-cloud/protocol").ToolReplyWait<
-          import("@pi-cloud/protocol").ToolResultPayload
-        >,
-    });
     const tools = new WorkerToolRuntime({
       implementation: () => ({ releaseId: "test-v1", generation: 1, replay: "never" }),
       catalog: new ControlToolRegistry(),
       nativeConversations: native,
-      control,
       maximumDepth: null,
       wait: (id, callId, name, signal) =>
         replies.wait(id, callId, name, signal) as import("@pi-cloud/protocol").ToolReplyWait<
@@ -170,7 +162,6 @@ it.each([false, true])(
       },
       broker: {
         prepareEnvironmentImages: create,
-        workflowUrlFor: () => "http://fixture.invalid",
       },
       conversations: native,
       openConversationLog: (command) => {
