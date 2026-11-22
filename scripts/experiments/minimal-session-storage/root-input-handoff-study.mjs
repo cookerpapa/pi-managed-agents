@@ -147,7 +147,7 @@ export function rootInputStudy(db, pool, topic, mode) {
         },
       };
     },
-    async exercise({ first, second, id, runId, api, endpoint, work, dispatchCount }) {
+    async exercise({ first, second, id, runId, api, endpoint, work, dispatchCount, afterReceipt }) {
       const queue = () => api.getInputQueue(id),
         active = actor;
       await until(() => blocked && backendReturned, "Worker published busy input before PG");
@@ -169,6 +169,7 @@ export function rootInputStudy(db, pool, topic, mode) {
           receipt.delivery === mode &&
           confirmed === 1,
       );
+      if (afterReceipt) return afterReceipt(active, receipt);
       const exited = once(active, "exit");
       active.kill("SIGKILL");
       assert.equal((await exited)[1], "SIGKILL");

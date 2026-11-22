@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Under #52, Stop a running root with accepted steer and follow-up input. Reload a modified draft before its return acknowledgement and explicitly continue on a cold Worker. [Stop and draft acceptance](reports/stopped-root-inputs-20261122.md).
+
 - [x] Under #52, interrupt a root Worker immediately after Chrome confirms steer or follow-up. Verify one placement, the original tool result, queue visibility through handoff and cold history. [Confirmed busy input](reports/root-input-handoff-20261122.md).
 
 - [x] Under #52, verify a normal root from the browser through a real Guest, reload and a second cold Worker using the candidate history only. [Ordinary root acceptance](reports/normal-root-message-store-20261122.md).

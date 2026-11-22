@@ -14,6 +14,7 @@ export type ComposerDraft = {
   text: string;
   items: Omit<ComposerUpload, "file">[];
   pending: PendingComposerDraft | null;
+  returned?: { requestId: string; through: number } | null;
 };
 export function composerDraftKey(tenant: string, user: string, session: string) {
   return `picloud.composer-draft.v1:${tenant}:${user}:${session}`;
@@ -43,6 +44,14 @@ export function readComposerDraft(key: string): ComposerDraft | undefined {
         !Array.isArray(value.pending.attached))
     )
       return;
+    if (
+      value.returned &&
+      (typeof value.returned.requestId !== "string" ||
+        !value.returned.requestId ||
+        !Number.isSafeInteger(value.returned.through) ||
+        value.returned.through < 1)
+    )
+      delete value.returned;
     return value;
   } catch {
     return;
@@ -60,7 +69,8 @@ export function saveComposerDraft(
       pending: null,
     };
     const next = { ...previous, ...patch, version: 1 };
-    if (!next.text && !next.items.length && !next.pending) localStorage.removeItem(key);
+    if (!next.text && !next.items.length && !next.pending && !next.returned)
+      localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(next));
     return true;
   } catch {

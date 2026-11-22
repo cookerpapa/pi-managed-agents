@@ -2,7 +2,7 @@ import { restoreReturnedInputs, type InputReturnRecovery } from "./returned-inpu
 import { UploadCards, ComposerUploadCards } from "./UploadCards.tsx";
 import { useComposerUploads, type ComposerUpload } from "./useComposerUploads.ts";
 import { longPasteFile } from "./pasted-text.ts";
-import type { UserUpload } from "@pi-cloud/protocol";
+import type { UserUpload, ReturnedInput } from "@pi-cloud/protocol";
 import {
   createContext,
   useContext,
@@ -32,6 +32,8 @@ export function InputQueueProvider({
   streamQueue,
   onSnapshot,
   onRestoreDraft,
+  onRestoreReturned,
+  onReturnAcknowledged,
   returnRecovery,
   children,
   onInitialWithdrawn,
@@ -45,10 +47,11 @@ export function InputQueueProvider({
   streamQueue: InputQueueResource | null;
   onSnapshot: (queue: InputQueueResource) => void;
   returnRecovery: InputReturnRecovery;
+  onRestoreReturned: (items: readonly ReturnedInput[], requestId: string) => boolean;
+  onReturnAcknowledged: (requestId: string) => void;
   onRestoreDraft: (
     text: string,
     uploads: UserUpload[],
-    returnedKeys?: readonly string[],
     localAttachments?: readonly ComposerUpload[],
   ) => boolean | void;
 }) {
@@ -81,8 +84,22 @@ export function InputQueueProvider({
     if (editing) editorUploads.restore(editing.uploads);
   }, [editing?.inputId]);
   const sequence = useRef(0);
-  const callbacks = useRef({ onSnapshot, onRestoreDraft, onInitialWithdrawn, t });
-  callbacks.current = { onSnapshot, onRestoreDraft, onInitialWithdrawn, t };
+  const callbacks = useRef({
+    onSnapshot,
+    onRestoreDraft,
+    onRestoreReturned,
+    onReturnAcknowledged,
+    onInitialWithdrawn,
+    t,
+  });
+  callbacks.current = {
+    onSnapshot,
+    onRestoreDraft,
+    onRestoreReturned,
+    onReturnAcknowledged,
+    onInitialWithdrawn,
+    t,
+  };
   useEffect(() => {
     if (!menuInputId) return;
     [...document.querySelectorAll("[data-input-id]")]
@@ -319,16 +336,9 @@ export function InputQueueProvider({
           api,
           sessionId,
           returnRecovery,
-          (items) =>
-            callbacks.current.onRestoreDraft(
-              items
-                .map((item) => item.text)
-                .filter(Boolean)
-                .join("\n\n"),
-              items.flatMap((item) => item.uploads),
-              items.map((item) => item.idempotencyKey),
-            ),
+          (items, requestId) => callbacks.current.onRestoreReturned(items, requestId),
           abort.signal,
+          (requestId) => callbacks.current.onReturnAcknowledged(requestId),
         );
         if (abort.signal.aborted) return;
         setReturnStatus(result === "pending" ? "pending" : "idle");
@@ -378,7 +388,7 @@ export function InputQueueProvider({
       text: string,
       uploads: UserUpload[],
       localAttachments?: readonly ComposerUpload[],
-    ) => callbacks.current.onRestoreDraft(text, uploads, undefined, localAttachments),
+    ) => callbacks.current.onRestoreDraft(text, uploads, localAttachments),
   };
   return <InputQueueContext.Provider value={model}>{children}</InputQueueContext.Provider>;
 }

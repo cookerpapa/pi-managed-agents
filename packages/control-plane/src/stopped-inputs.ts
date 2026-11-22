@@ -1,3 +1,4 @@
+import { rootReturnedInputState } from "./root-input-reads.ts";
 import { sql, type Kysely, type Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import {
@@ -34,12 +35,13 @@ export async function readReturnedInputs(
   tenantId: string,
   sessionId: string,
   page: { requestId?: string; afterPosition?: number } = {},
+  rootMessageHistory = false,
 ): Promise<ReturnedInputsResource> {
   if (!database.isTransaction)
     return database
       .transaction()
       .setIsolationLevel("repeatable read")
-      .execute((tx) => readReturnedInputs(tx, tenantId, sessionId, page));
+      .execute((tx) => readReturnedInputs(tx, tenantId, sessionId, page, rootMessageHistory));
   const afterPosition = page.afterPosition ?? 0;
   if (
     !Number.isSafeInteger(afterPosition) ||
@@ -89,11 +91,17 @@ export async function readReturnedInputs(
       sessionId: session.pi_session_id,
       conversationId: Number(session.pi_conversation_id),
     };
-    const native = await readNativeHumanInputs(database, { ...scope, runId: stop.runId });
-    const outcomes = await readHumanInputOutcomes(database, scope, native.state);
-    items = native.state.order
+    const read = async () => {
+      const { state } = await readNativeHumanInputs(database, { ...scope, runId: stop.runId });
+      return { state, outcomes: await readHumanInputOutcomes(database, scope, state) };
+    };
+    const { state, outcomes } =
+      rootMessageHistory && scope.conversationId === 1
+        ? await rootReturnedInputState(database, { ...scope, runId: stop.runId })
+        : await read();
+    items = state.order
       .flatMap((id, index) => {
-        const input = native.state.inputs[id],
+        const input = state.inputs[id],
           outcome = outcomes.get(id);
         if (
           !input ||

@@ -18,6 +18,7 @@ import {
   composerDraftKey,
   readComposerDraft,
   saveComposerDraft,
+  storedComposerItems,
   type PendingComposerDraft,
 } from "./composer-draft.ts";
 import { AttachmentActions } from "./AttachmentActions.tsx";
@@ -42,6 +43,7 @@ import {
 } from "react";
 import type {
   InputQueueResource,
+  ReturnedInput,
   UserUpload,
   ConversationTreeResource,
   ConversationTreeView,
@@ -246,6 +248,9 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const [sessionModel, setSessionModel] = useState<SessionModelResource | null>(null);
   const [conversationLoading, setConversationLoading] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
+  // Returned pages may arrive before React renders the previous append.
+  const composerText = useRef(prompt);
+  composerText.current = prompt;
   const draftKey = identity
     ? composerDraftKey(identity.tenantId, identity.userId, state.session?.sessionId ?? "new")
     : undefined;
@@ -1599,23 +1604,56 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   function restoreInputDraft(
     text: string,
     attached: UserUpload[],
-    returnedKeys: readonly string[] = [],
     localAttachments: readonly ComposerUpload[] = [],
   ) {
     const sessionId = state.session?.sessionId;
     if (!sessionId || currentStreamSession.current !== sessionId || !uploads.restore(attached))
       return false;
-    composerSubmission.current.retireReturned(sessionId, returnedKeys);
-    const pending = recoveredSubmission.current;
-    if (pending?.input.sessionId === sessionId && returnedKeys.includes(pending.key)) {
-      recoveredSubmission.current = null;
-      retrySubmission.current = null;
-      if (draftKey && readComposerDraft(draftKey)?.pending?.key === pending.key)
-        saveComposerDraft(draftKey, { pending: null });
-    }
     uploads.restoreDrafts(localAttachments);
     draftRevision.current++;
     setPrompt((current) => (current.trim() ? `${current}\n\n${text}` : text));
+    focusComposer();
+    return true;
+  }
+
+  function restoreReturnedDraft(items: readonly ReturnedInput[], requestId: string) {
+    const sessionId = state.session?.sessionId;
+    if (
+      !sessionId ||
+      currentStreamSession.current !== sessionId ||
+      !draftKey ||
+      draftScope.current !== draftKey
+    )
+      return false;
+    const saved = readComposerDraft(draftKey);
+    const through = saved?.returned?.requestId === requestId ? saved.returned.through : 0;
+    const fresh = items.filter((item) => item.mailboxPosition > through);
+    if (!fresh.length) return true;
+    const texts = fresh.map((item) => item.text).filter(Boolean);
+    const text = [...(composerText.current ? [composerText.current] : []), ...texts].join("\n\n");
+    const keys = fresh.map((item) => item.idempotencyKey);
+    const restored = uploads.restore(
+      fresh.flatMap((item) => item.uploads),
+      (merged) =>
+        saveComposerDraft(draftKey, {
+          text,
+          items: storedComposerItems(merged),
+          returned: { requestId, through: fresh[fresh.length - 1]!.mailboxPosition },
+          ...(saved?.pending && keys.includes(saved.pending.key) ? { pending: null } : {}),
+        }),
+    );
+    if (!restored) {
+      setDraftSaveFailed(true);
+      return false;
+    }
+    composerSubmission.current.retireReturned(sessionId, keys);
+    if (recoveredSubmission.current && keys.includes(recoveredSubmission.current.key)) {
+      recoveredSubmission.current = null;
+      retrySubmission.current = null;
+    }
+    draftRevision.current++;
+    composerText.current = text;
+    setPrompt(text);
     focusComposer();
     return true;
   }
@@ -2682,6 +2720,11 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
               update({ type: "queue.updated", queue });
             }}
             onRestoreDraft={restoreInputDraft}
+            onRestoreReturned={restoreReturnedDraft}
+            onReturnAcknowledged={(requestId) => {
+              if (draftKey && readComposerDraft(draftKey)?.returned?.requestId === requestId)
+                saveComposerDraft(draftKey, { returned: null });
+            }}
             onInitialWithdrawn={(item) => {
               if (!state.session || !item.runId) return;
               update({

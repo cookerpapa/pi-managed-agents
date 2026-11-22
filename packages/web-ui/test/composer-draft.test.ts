@@ -84,3 +84,29 @@ it("reports unavailable browser persistence without erasing an earlier draft", (
   expect(saveComposerDraft("draft", { text: "unsaved" })).toBe(false);
   expect(readComposerDraft("draft")?.text).toBe("saved");
 });
+
+it("keeps the Stop page receipt with a cleared draft until the acknowledgement", () => {
+  storage();
+  const returned = { requestId: "stop", through: 21 };
+  expect(saveComposerDraft("session", { text: "returned", items: [], returned })).toBe(true);
+  expect(saveComposerDraft("session", { text: "" })).toBe(true);
+  expect(readComposerDraft("session")).toMatchObject({ text: "", returned });
+  expect(saveComposerDraft("session", { returned: null })).toBe(true);
+  expect(readComposerDraft("session")).toBeUndefined();
+});
+it("preserves editable text when a saved return cursor is invalid", () => {
+  storage();
+  memory.set(
+    "session",
+    JSON.stringify({
+      version: 1,
+      text: "my edit",
+      items: [],
+      pending: null,
+      returned: { requestId: "stop", through: "unknown" },
+    }),
+  );
+  const saved = readComposerDraft("session");
+  expect(saved?.text).toBe("my edit");
+  expect(saved?.returned).toBeUndefined();
+});

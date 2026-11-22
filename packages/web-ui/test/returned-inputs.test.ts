@@ -74,7 +74,7 @@ describe("stopped inputs back to the composer", () => {
       "done",
     );
     expect(append).toHaveBeenCalledOnce();
-    expect(append).toHaveBeenCalledWith([item(1)]);
+    expect(append).toHaveBeenCalledWith([item(1)], page([]).requestId);
   });
 
   it("waits for Steer consumption, and retains the server copy if restoration fails", async () => {

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Stopped root input and cold continuation](stopped-root-inputs-20261122.md) verifies the two native busy-input modes, draft restoration across reload and explicit resubmission.
+
 - [Confirmed root input across Worker loss](root-input-handoff-20261122.md) checks the browser receipt, native Inbox and original tool across a sealed handoff.
 
 - [Ordinary root conversation on the new message store](normal-root-message-store-20261122.md) follows both a browser refresh during Bash and a cold continuation across API and Projector restart.

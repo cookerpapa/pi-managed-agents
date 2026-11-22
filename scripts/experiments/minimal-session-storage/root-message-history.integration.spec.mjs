@@ -1,3 +1,5 @@
+import { sql } from "kysely";
+import { readReturnedInputs } from "../../../packages/control-plane/src/stopped-inputs.ts";
 import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -266,5 +268,98 @@ it("binds the cold root projection to the sealed writer, the exact next native c
     await expect(reopenRootProjection(c, scope, point, 10)).rejects.toThrow("sealed input");
   } finally {
     await c.end();
+  }
+});
+
+it("returns only unplaced inputs of the sealed root Run, including retained attachment metadata", async () => {
+  const db = createDatabase({
+    connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL,
+    maxConnections: 1,
+  });
+  const tenant = randomUUID(),
+    session = randomUUID(),
+    run = randomUUID(),
+    stop = randomUUID(),
+    workspaceId = randomUUID();
+  const ids = Array.from({ length: 4 }, (_, i) => "input-" + String(i + 1).repeat(64));
+  const file = {
+    id: randomUUID(),
+    workspaceId,
+    sessionId: session,
+    name: "notes.txt",
+    path: "/workspace/notes.txt",
+    mimeType: "text/plain",
+    byteLength: 6,
+    sha256: "a".repeat(64),
+  };
+  const state = {
+    runId: run,
+    order: [ids[3], ids[0], ids[2], ids[1]],
+    receipts: {},
+    inputs: Object.fromEntries(
+      ids.map((id, i) => [
+        id,
+        {
+          text: "item " + i,
+          idempotencyKey: randomUUID(),
+          uploads: i === 3 ? [file] : [],
+          cancelled: i === 2,
+        },
+      ]),
+    ),
+  };
+  const outcomes = Object.fromEntries(
+    ids.map((id, i) => [
+      id,
+      i === 0 ? { status: "done", entry: 12 } : { status: "unanswered", reason: "aborted" },
+    ]),
+  );
+  try {
+    await db.transaction().execute(async (tx) => {
+      await sql
+        .raw(
+          "create temporary table sessions(id uuid,tenant_id uuid,pi_session_id text,pi_conversation_id bigint,pruned_at timestamptz) on commit drop",
+        )
+        .execute(tx);
+      await sql
+        .raw(
+          "create temporary table runs(id uuid,tenant_id uuid,session_id uuid,state text,lease_id uuid,output_sealed_at timestamptz,pruned_at timestamptz,root_human_inputs text,root_input_receipts jsonb) on commit drop",
+        )
+        .execute(tx);
+      await sql
+        .raw(
+          "create temporary table turn_control_requests(id uuid,tenant_id uuid,session_id uuid,target_run_id uuid,kind text,payload jsonb,created_at timestamptz default now()) on commit drop",
+        )
+        .execute(tx);
+      await sql`insert into sessions values(${session}::uuid,${tenant}::uuid,${session},1,null)`.execute(
+        tx,
+      );
+      await sql`insert into runs values(${run}::uuid,${tenant}::uuid,${session}::uuid,'cancelled',${randomUUID()}::uuid,null,null,${JSON.stringify(state)},${JSON.stringify(outcomes)}::jsonb),
+      (${randomUUID()}::uuid,${tenant}::uuid,${session}::uuid,'running',${randomUUID()}::uuid,null,null,null,null)`.execute(
+        tx,
+      );
+      await sql`insert into turn_control_requests(id,tenant_id,session_id,target_run_id,kind,payload) values(${stop},${tenant},${session},${run},'cancel','{"inputReturnPending":true}')`.execute(
+        tx,
+      );
+      const read = (page = {}) => readReturnedInputs(tx, tenant, session, page, true);
+      expect(await read()).toMatchObject({ pending: true, items: [] });
+      await sql`update runs set output_sealed_at=now() where id=${run}`.execute(tx);
+      expect((await read()).items.map((i) => [i.inputId, i.uploads, i.mailboxPosition])).toEqual([
+        [ids[3], [file], 1],
+        [ids[1], [], 4],
+      ]);
+      await sql`update turn_control_requests set payload='{"inputReturnPending":false}'`.execute(
+        tx,
+      );
+      expect((await read()).requestId).toBeNull();
+      expect(
+        (await read({ requestId: stop, afterPosition: 1 })).items.map((i) => i.inputId),
+      ).toEqual([ids[1]]);
+      await expect(readReturnedInputs(tx, randomUUID(), session, {}, true)).rejects.toThrow(
+        "not found",
+      );
+    });
+  } finally {
+    await db.destroy();
   }
 });

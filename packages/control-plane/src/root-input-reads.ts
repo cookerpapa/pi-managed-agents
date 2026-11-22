@@ -54,6 +54,29 @@ export async function rootHumanInputs(db: Kysely<Database>, s: Scope & { runId: 
     Number(r.seq),
   );
 }
+/** A stopped Run keeps immutable return evidence even after the Session Inbox moves on. */
+export async function rootReturnedInputState(
+  db: Kysely<Database>,
+  scope: Scope & { runId: string },
+) {
+  const {
+    rows: [row],
+  } = await sql<{
+    metadata: string | null;
+    receipts: Record<string, Submission> | null;
+  }>`select r.root_human_inputs as metadata,r.root_input_receipts as receipts
+    from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
+    where r.tenant_id=${scope.tenantId}::uuid and r.id=${scope.runId}::uuid and s.pi_session_id=${scope.sessionId} and s.pi_conversation_id=${scope.conversationId} and r.pruned_at is null`.execute(
+    db,
+  );
+  if (!row) throw Error("Missing root input Run");
+  const state: StoredHumanInputs = row.metadata
+    ? JSON.parse(row.metadata)
+    : emptyHumanInputs(scope.runId);
+  if (state.runId !== scope.runId || !Array.isArray(state.order) || !state.inputs)
+    throw Error("Invalid stopped input state");
+  return { state, outcomes: new Map(Object.entries(row.receipts ?? {})) };
+}
 export async function rootInputMetadata(
   db: Kysely<Database>,
   s: Omit<Scope, "conversationId">,

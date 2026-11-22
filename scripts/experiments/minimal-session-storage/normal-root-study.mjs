@@ -1,3 +1,4 @@
+import { verifyStoppedRoot } from "./stopped-root-study.mjs";
 import { rootInputStudy } from "./root-input-handoff-study.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -29,6 +30,7 @@ const {
   cube,
   browser,
   inputMode,
+  stopInputs,
 } = JSON.parse(await readFile(process.argv[2], "utf8"));
 assert(new URL(dbUrl).hostname === "127.0.0.1" && brokers.every((b) => b.startsWith("127.0.0.1:")));
 const topic = "pma-root-" + randomUUID(),
@@ -54,7 +56,9 @@ let composed,
   tenant,
   endpoint,
   evidence,
-  dispatches = 0;
+  dispatches = 0,
+  cancels = 0,
+  operation;
 let interruptedFinish,
   finishRollbackVerified = false;
 const busy = inputMode ? rootInputStudy(db, pool, topic, inputMode) : undefined;
@@ -68,7 +72,13 @@ async function open() {
       return {
         submit: async (...args) => {
           dispatches++;
+          operation = args[1].request.operationId;
           await endpoint.submit(...args);
+        },
+        async cancel(r, request) {
+          assert.equal(request.operationId, operation);
+          await endpoint.cancel(r, request);
+          cancels++;
         },
       };
     },
@@ -171,7 +181,16 @@ function work(runId, resumeInput = false) {
     });
   });
   void done.catch(() => {});
-  child.send({ dbUrl: url.href, topic, brokers, replyBrokers, runId, inputMode, resumeInput });
+  child.send({
+    dbUrl: url.href,
+    topic,
+    brokers,
+    replyBrokers,
+    runId,
+    inputMode,
+    resumeInput,
+    stopInputs,
+  });
   return done;
 }
 const items = (page) => page.turns.flatMap((t) => t.transcript?.items ?? []);
@@ -244,7 +263,9 @@ try {
       prompt2 = busy
         ? "Check the saved value " + randomUUID()
         : "What did the preceding command return?",
-      key = randomUUID();
+      key = randomUUID(),
+      third = "Additional instructions " + randomUUID(),
+      edited = "Use the revised plan " + randomUUID();
     async function browserRun(n) {
       return until(
         async () => {
@@ -266,6 +287,9 @@ try {
         id,
         token: tenant.credential.token,
         inputMode,
+        stopInputs,
+        third,
+        edited,
         preferenceKey: "pi-cloud:composer-enter:" + tenant.tenantId + ":" + tenant.ownerUserId,
         first: prompt1,
         second: prompt2,
@@ -298,6 +322,28 @@ try {
           endpoint,
           work,
           dispatchCount: () => dispatches,
+          ...(stopInputs
+            ? {
+                afterReceipt: (actor, receipt) =>
+                  verifyStoppedRoot({
+                    actor,
+                    receipt,
+                    first,
+                    originalPrompt: prompt1,
+                    second: prompt2,
+                    third,
+                    edited,
+                    id,
+                    api,
+                    pool,
+                    a,
+                    work,
+                    browserRun,
+                    endpoint,
+                    counts: () => ({ dispatches, cancels }),
+                  }),
+              }
+            : {}),
         }),
       ]);
       assert.deepEqual(await legacyCounts(), baseline);

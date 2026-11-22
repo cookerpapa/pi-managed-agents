@@ -783,7 +783,13 @@ export class QueuedInputService {
     sessionId: string,
     page: { requestId?: string; afterPosition?: number } = {},
   ) {
-    return readReturnedInputs(this.options.database, tenantId, sessionId, page);
+    return readReturnedInputs(
+      this.options.database,
+      tenantId,
+      sessionId,
+      page,
+      this.options.rootMessageHistory,
+    );
   }
   async acknowledgeReturned(
     tenantId: string,
@@ -792,9 +798,15 @@ export class QueuedInputService {
   ): Promise<void> {
     await this.options.database.transaction().execute(async (tx) => {
       await this.#session(tx, tenantId, sessionId, true);
-      const batch = await readReturnedInputs(tx, tenantId, sessionId, {
-        requestId: request.requestId,
-      });
+      const batch = await readReturnedInputs(
+        tx,
+        tenantId,
+        sessionId,
+        {
+          requestId: request.requestId,
+        },
+        this.options.rootMessageHistory,
+      );
       if (batch.pending) conflict("The stopped inputs have not finished settling");
       const result = await tx
         .updateTable("turn_control_requests")

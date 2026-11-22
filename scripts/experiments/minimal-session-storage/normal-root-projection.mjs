@@ -154,11 +154,15 @@ export function normalRootProjection(pool, topic, select, resolve) {
       },
     },
     async settle(tx, f, pos) {
-      assert(f.kind === "work_finished" && f.terminal.type === "turn.completed");
+      assert(
+        f.kind === "work_finished" &&
+          ["turn.completed", "turn.cancelled"].includes(f.terminal.type),
+      );
+      const stopped = f.terminal.type === "turn.cancelled";
       const s = view.sessions.get(f.scope.runId);
       assert(
         s &&
-          s.lastAnswerCommit !== undefined &&
+          (stopped || s.lastAnswerCommit !== undefined) &&
           s.seq === f.nativeSequence &&
           s.writer === f.scope.writerId,
       );
@@ -181,8 +185,8 @@ export function normalRootProjection(pool, topic, select, resolve) {
         h.bytes = Number(row.bytes);
       }
       const checked =
-        await sql`with bound as (update runs set history_head=${JSON.stringify(h)}::jsonb,projection_first=null,projection_partition=null,projection_pin=null,projection_state=null,native_work_handoff=null
-        where id=${f.scope.runId}::uuid and tenant_id=${f.scope.tenantId}::uuid and lease_id=${s.writer}::uuid and state='completed' and output_seal_offset=${String(pos.offset)}::bigint and projection_tools='{}'::jsonb returning id),
+        await sql`with bound as (update runs set history_head=${JSON.stringify(h)}::jsonb,projection_first=null,projection_partition=null,projection_pin=null,projection_state=null,native_work_handoff=null,cancel_positions='{}'::jsonb
+        where id=${f.scope.runId}::uuid and tenant_id=${f.scope.tenantId}::uuid and lease_id=${s.writer}::uuid and state=${stopped ? "cancelled" : "completed"} and output_seal_offset=${String(pos.offset)}::bigint and projection_tools='{}'::jsonb returning id),
         retired as (delete from workspace_route_spans where run_id in(select id from bound))select id from bound`.execute(
           tx,
         );

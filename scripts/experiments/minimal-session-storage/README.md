@@ -588,3 +588,7 @@ PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-sess
 ```
 
 Each case holds the projector before the busy input reaches PG, waits for the real HTTP receipt in Chrome, and terminates the first Worker. The replacement attaches to the original tool and consumes the original input. See the [acceptance report](../../../docs/reports/root-input-handoff-20261122.md).
+
+### Stop with two pending root inputs
+
+Run `PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/stopped-root.json --root-stop-web` with the browser and Cube prerequisites above. The fixture queues a follow-up and a steer, clicks Stop, holds the browser's acknowledgement of the returned inputs and edits the draft. It reloads before acknowledgement and again after acknowledgement, then sends the edited text to a fresh Worker. [Checks and failure evidence](../../../docs/reports/stopped-root-inputs-20261122.md).

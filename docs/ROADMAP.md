@@ -10,7 +10,7 @@ The first implementation milestone for [#48](https://github.com/cookerpapa/pi-ma
 
 ## Ordered Session projection under load
 
-The [ordinary root browser acceptance](reports/normal-root-message-store-20261122.md) exercises normal completion and cold continuation on the candidate. The [confirmed-input handoff](reports/root-input-handoff-20261122.md) exercises steer and follow-up across Worker loss on that composition. Stop with unconsumed input remains a separate public interaction gate.
+The [ordinary root browser acceptance](reports/normal-root-message-store-20261122.md) exercises normal completion and cold continuation on the candidate. The [confirmed-input handoff](reports/root-input-handoff-20261122.md) exercises steer and follow-up across Worker loss on that composition. The [root Stop acceptance](reports/stopped-root-inputs-20261122.md) covers unconsumed input, an edited draft and acknowledgement retry. Stop concurrent with a Worker handoff remains open on the matched candidate.
 
 The [atomic cold-handoff slice](reports/atomic-family-handoff-20261122.md) connects the real Session Projector and Worker Session host in an isolated composition. The full serving storage cutover, later-epoch and compacted-family coverage remain open under #52/#48.
 

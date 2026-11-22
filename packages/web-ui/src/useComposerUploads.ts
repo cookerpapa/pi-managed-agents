@@ -162,7 +162,7 @@ export function useComposerUploads(
       ),
     );
   }
-  function restore(uploads: UserUpload[]) {
+  function restore(uploads: UserUpload[], save?: (items: readonly ComposerUpload[]) => boolean) {
     const seen = new Set(
       current.current.flatMap((item) => [item.id, ...(item.source ? [item.source.id] : [])]),
     );
@@ -171,7 +171,7 @@ export function useComposerUploads(
       seen.add(upload.id);
       return true;
     });
-    replace([
+    const merged = [
       ...current.current,
       ...next.map((upload): ComposerUpload =>
         uploadMatchesWorkspace(upload, workspaceKey)
@@ -193,7 +193,9 @@ export function useComposerUploads(
               deferred: true,
             },
       ),
-    ]);
+    ];
+    if (save && !save(merged)) return false;
+    replace(merged, !save);
     return true;
   }
   function restoreDrafts(drafts: readonly ComposerUpload[]) {

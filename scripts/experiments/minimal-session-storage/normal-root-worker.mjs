@@ -116,7 +116,8 @@ models.setProvider(fake.provider);
 registry.install(defineExtension({ name: "workspace-bash", tools: [bash.tool] }));
 let harness,
   restoredUserPrompts,
-  acceptingInputs = true;
+  acceptingInputs = true,
+  stopWork;
 const extract = (m) =>
   typeof m.content === "string"
     ? m.content
@@ -184,6 +185,15 @@ try {
       );
     };
     fake.setResponses([answer, answer]);
+  } else if (cfg.stopInputs && prior.baseSequence) {
+    fake.setResponses([
+      (context) => {
+        restoredUserPrompts = context.messages.filter((m) => m.role === "user").map(extract);
+        assert.equal(restoredUserPrompts.length, 2);
+        assert.equal(restoredUserPrompts.at(-1), claim.request.input.prompt);
+        return fauxAssistantMessage("Received edited draft.");
+      },
+    ]);
   } else if (prior.baseSequence === 0) {
     fake.setResponses([
       fauxAssistantMessage(fauxToolCall("bash", { command: bash.command }), {
@@ -243,6 +253,14 @@ try {
       },
     });
     process.on("message", async (m) => {
+      if (m.stop && cfg.stopInputs) {
+        acceptingInputs = false;
+        stopWork ??= claim.cancel(() => root.abort(ctx));
+        void stopWork.catch((e) => {
+          console.error("Stop dispatch failed", e.name);
+        });
+        return;
+      }
       if (!m.command) return;
       try {
         const c = m.command;
@@ -273,7 +291,8 @@ try {
   if (cfg.resumeInput) harness.resume();
   await root.waitForIdle(ctx);
   acceptingInputs = false;
-  if (sub) assert.equal((await sub.wait(ctx)).status, "done");
+  await stopWork;
+  if (sub && !stopWork) assert.equal((await sub.wait(ctx)).status, "done");
   if (cfg.resumeInput) {
     const placed = await store.submissionByRequest(1, queuedInput.requestId, ctx);
     assert.equal(placed.status, "done");
@@ -281,17 +300,19 @@ try {
   }
   await harness.close(ctx);
   harness = undefined;
-  await claim.finish(() =>
-    publish({
-      kind: "work_finished",
-      scope,
-      factId: randomUUID(),
-      occurredAt: new Date().toISOString(),
-      agentId: "root",
-      baseSequence: base,
-      nativeSequence: store.nextSeq - 1,
-      terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
-    }),
+  await claim.finish(
+    (terminal) =>
+      publish({
+        kind: "work_finished",
+        scope,
+        factId: randomUUID(),
+        occurredAt: new Date().toISOString(),
+        agentId: "root",
+        baseSequence: base,
+        nativeSequence: store.nextSeq - 1,
+        terminal,
+      }),
+    Boolean(stopWork),
   );
   process.send({
     done: true,

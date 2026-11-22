@@ -14,7 +14,12 @@ const output = process.argv[2],
   bashFields = process.argv[3] === "--bash-fields",
   atomicHandoff = process.argv[3] === "--atomic-handoff",
   pgHandoff = atomicHandoff || bashFields || process.argv[3] === "--pg-handoff",
-  inputMode = process.argv[3] === "--root-input-web" ? process.argv[4] : undefined,
+  stopInputs = process.argv[3] === "--root-stop-web",
+  inputMode = stopInputs
+    ? "follow_up"
+    : process.argv[3] === "--root-input-web"
+      ? process.argv[4]
+      : undefined,
   browser = process.argv[3] === "--normal-root-web" || !!inputMode,
   normalRoot = browser || process.argv[3] === "--normal-root",
   serving = normalRoot || pgHandoff || process.argv[3] === "--serving";
@@ -39,6 +44,7 @@ try {
       pgHandoff,
       bashFields,
       inputMode,
+      stopInputs,
       browser,
       scene: process.argv[4],
     }),

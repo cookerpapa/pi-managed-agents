@@ -8,11 +8,21 @@ import { browserNote, browserMessage } from "./browser-signals.mjs";
 export async function verifyRootBrowser(dir) {
   let server;
   try {
-    const { origin, id, token, first, second, inputMode, preferenceKey } = await browserMessage(
-      dir,
-      "ready",
-    );
+    const {
+      origin,
+      id,
+      token,
+      first,
+      second,
+      inputMode,
+      preferenceKey,
+      stopInputs,
+      third,
+      edited,
+    } = await browserMessage(dir, "ready");
     assert(new URL(origin).hostname === "127.0.0.1");
+    let holdAck = stopInputs,
+      blockedAcks = 0;
     server = await createServer({
       configFile: false,
       root: resolve("packages/web-ui"),
@@ -29,6 +39,14 @@ export async function verifyRootBrowser(dir) {
           name: "isolated-web-config",
           configureServer(v) {
             v.middlewares.use((req, res, next) => {
+              if (
+                holdAck &&
+                req.method === "POST" &&
+                req.url === `/v1/sessions/${id}/returned-inputs/acknowledgements`
+              ) {
+                blockedAcks++;
+                return;
+              }
               if (req.url !== "/ui-config.json") return next();
               const base = "http://127.0.0.1:" + v.httpServer.address().port;
               res.setHeader("content-type", "application/json");
@@ -61,30 +79,39 @@ export async function verifyRootBrowser(dir) {
         }
       });
       const has = (text) => "document.body.innerText.includes(" + JSON.stringify(text) + ")";
-      async function submit(text) {
+      async function typeDraft(text) {
         await page.waitFor(
           "document.querySelector('.product-composer textarea') && !document.querySelector('.product-composer textarea').disabled",
         );
         await page.evaluate(
           `{const a=document.querySelector('.product-composer textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(a,${JSON.stringify(text)});a.dispatchEvent(new Event('input',{bubbles:true}));}`,
         );
+      }
+      async function submit(text) {
+        await typeDraft(text);
         await page.waitFor(
           "document.querySelector('.product-send-button') && !document.querySelector('.product-send-button').disabled",
         );
         await page.evaluate("document.querySelector('.product-send-button').click()");
       }
-      try {
+      async function openBeforeSubmission() {
+        const ready =
+          "document.querySelector('.product-conversation-heading strong')?.textContent==='normal root'";
         await page.navigate(url);
-        await page.waitFor(
-          "document.querySelector('.product-conversation-heading strong')?.textContent==='normal root'",
-        );
+        try {
+          await page.waitFor(ready, 10000);
+        } catch {
+          // A cold Vite dependency rebuild can replace the initial document.
+          // Retrying this navigation happens before any prompt is submitted.
+          await page.navigate(url);
+          await page.waitFor(ready);
+        }
+      }
+      try {
+        await openBeforeSubmission();
         if (inputMode) {
           await page.evaluate(
-            `localStorage.setItem(${JSON.stringify(preferenceKey)},${JSON.stringify(inputMode)})`,
-          );
-          await page.navigate(url);
-          await page.waitFor(
-            "document.querySelector('.product-conversation-heading strong')?.textContent==='normal root'",
+            `localStorage.setItem(${JSON.stringify(preferenceKey)},${JSON.stringify(inputMode)});window.dispatchEvent(new StorageEvent("storage",{key:${JSON.stringify(preferenceKey)}}));`,
           );
         }
         await submit(first);
@@ -128,6 +155,53 @@ export async function verifyRootBrowser(dir) {
           const queued = `[...document.querySelectorAll('.pending-input-row')].some(e=>e.dataset.inputId===${JSON.stringify(receipt.inputId)} && e.innerText.includes(${JSON.stringify(second)}))`;
           await page.waitFor(queued);
           await browserNote(dir, "accepted", { receipt, key, thinkingLevel: body.thinkingLevel });
+          if (stopInputs) {
+            await page.evaluate(
+              `localStorage.setItem(${JSON.stringify(preferenceKey)},"steer");window.dispatchEvent(new StorageEvent("storage",{key:${JSON.stringify(preferenceKey)}}))`,
+            );
+            finished = false;
+            await submit(third);
+            await until(() => finished && body.prompt === third, "second busy input response");
+            assert(body.whenBusy === "steer" && status >= 200 && status < 300);
+            const raw = await page.send("Network.getResponseBody", { requestId });
+            const another = JSON.parse(
+              raw.base64Encoded ? Buffer.from(raw.body, "base64").toString() : raw.body,
+            );
+            await page.waitFor(
+              "document.querySelectorAll('.pending-input-row').length===2 && document.querySelector('.product-stop-button:not(:disabled)')",
+            );
+            await page.evaluate("document.querySelector('.product-stop-button').click()");
+            await browserNote(dir, "stopClicked", { another });
+            await until(() => blockedAcks > 0, "return acknowledgement held", 45000);
+            const composer = "document.querySelector('.product-composer textarea')";
+            await page.waitFor(`${composer}?.value===${JSON.stringify(second + "\n\n" + third)}`);
+            await typeDraft(edited);
+            await page.navigate("about:blank");
+            holdAck = false;
+            await page.navigate(url);
+            await until(async () => {
+              const pageState = await page.evaluate(
+                `(async()=>{const q=await (await fetch("/v1/sessions/"+${JSON.stringify(id)}+"/queued-inputs")).json();return {pending:q.hasReturnedInputs,draft:${composer}?.value};})()`,
+              );
+              if (pageState.pending !== false || pageState.draft === undefined) return false;
+              assert.equal(
+                pageState.draft,
+                edited,
+                "Edited draft changed while retrying a Stop acknowledgement",
+              );
+              return true;
+            }, "restored draft survived refresh before acknowledgement");
+            await page.navigate(url);
+            await page.waitFor(`${composer}?.value===${JSON.stringify(edited)}`);
+            await browserNote(dir, "editedReload");
+            await browserMessage(dir, "sendEdited");
+            await page.evaluate("document.querySelector('.product-send-button').click()");
+            await page.waitFor(has("Received edited draft."), 60000);
+            await page.navigate(url);
+            await page.waitFor(has("Received edited draft."));
+            assert.deepEqual(failures, []);
+            return;
+          }
           await browserMessage(dir, "between");
           await page.navigate(url);
           await page.waitFor(queued);
@@ -196,9 +270,15 @@ export async function verifyRootBrowser(dir) {
     });
     await browserNote(dir, "done", {
       browser: "Chrome",
-      activeReload: true,
+      ...(stopInputs
+        ? {
+            originalTextRestoredInOrder: true,
+            refreshBeforeReturnAck: true,
+            editedDraftPersisted: true,
+          }
+        : { activeReload: true }),
       settledReload: true,
-      composerSubmissions: 2,
+      composerSubmissions: stopInputs ? 4 : 2,
       http5xx: 0,
     });
   } catch (e) {

@@ -1,0 +1,18 @@
+{
+  "browser": "Chrome",
+  "originalTextRestoredInOrder": true,
+  "refreshBeforeReturnAck": true,
+  "editedDraftPersisted": true,
+  "settledReload": true,
+  "composerSubmissions": 4,
+  "http5xx": 0,
+  "returnedInputs": 2,
+  "returnedPlacements": 0,
+  "runsBeforeExplicitSend": 1,
+  "explicitEditedPlacements": 1,
+  "modelCallsInStoppedRun": 1,
+  "physicalExecutions": 1,
+  "orderedCancellations": 1,
+  "legacyNativeRowsAdded": 0,
+  "cleanupVerified": true
+}

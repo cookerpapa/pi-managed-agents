@@ -22,6 +22,7 @@ export function continuationBash(mailbox, runId, measurement, fixedCommand, time
       assert(!operation);
       await mailbox.restore([original], controller.signal);
       operation = {
+        operationId: original.operationId,
         taskId: original.taskId,
         reply: original.reply,
         wait: mailbox.resumeWait(original.operationId, original.reply, controller.signal),
@@ -32,6 +33,15 @@ export function continuationBash(mailbox, runId, measurement, fixedCommand, time
       if (measurement && !measurement.remote) return intents;
       for (const write of writes) {
         const task = write.type === "task" && durableToolState(write.value);
+        if (
+          task?.aborted &&
+          operation?.taskId === task.id &&
+          !operation.cancelled &&
+          !operation.wait.executionSettled()
+        ) {
+          operation.cancelled = true;
+          intents.push({ action: "cancel", taskId: task.id, operationId: operation.operationId });
+        }
         if (!task?.intent) continue;
         if (operation) {
           assert.equal(operation.taskId, task.id);
@@ -62,7 +72,7 @@ export function continuationBash(mailbox, runId, measurement, fixedCommand, time
             () => {},
           );
         }
-        operation = { taskId: task.id, reply, wait };
+        operation = { operationId: id, taskId: task.id, reply, wait };
         intents.push({
           action: "execute",
           operationId: id,

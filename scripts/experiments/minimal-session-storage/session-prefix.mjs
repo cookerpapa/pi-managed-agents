@@ -5,7 +5,7 @@ import { claimBatchSql, hintedClaimSql } from "./fixture.mjs";
 // The same statement that claims a successor reads its already settled predecessor
 // and the authoritative current Inbox. A warm hint can promote at most one Run.
 const priorJoin = `left join runs prior on r.mailbox_position>1 and prior.tenant_id=r.tenant_id
- and prior.session_id=r.session_id and prior.mailbox_position=r.mailbox_position-1 and prior.state='completed'
+ and prior.session_id=r.session_id and prior.mailbox_position=r.mailbox_position-1 and prior.state in ('completed','cancelled') and prior.history_head is not null
  left join inboxes i on prior.id is not null and i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id and i.conversation_id=1`;
 const columns = "prior.history_head as prior_head,i.doc_id as inbox_id,i.items as inbox_items";
 const withHead = (sql) =>
@@ -14,7 +14,7 @@ export const claimWithHead = withHead(claimBatchSql);
 export const claimPreferredWithHead = withHead(
   hintedClaimSql(
     `and exists(select 1 from runs p where p.tenant_id=r.tenant_id and p.session_id=r.session_id
-   and p.mailbox_position=r.mailbox_position-1 and p.state='completed' and p.history_head->>'version'=$4)`,
+   and p.mailbox_position=r.mailbox_position-1 and p.state in ('completed','cancelled') and p.history_head->>'version'=$4)`,
   ),
 );
 const openHead = (extra) => `select r.state,r.lease_id,r.mailbox_position,${extra}${columns},
