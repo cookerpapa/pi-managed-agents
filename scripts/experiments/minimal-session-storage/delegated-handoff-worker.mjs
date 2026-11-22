@@ -1,3 +1,4 @@
+import { DelegatedMemoryStorage } from "./delegated-memory.mjs";
 // Process fixture. The parent owns the Projector; the actors share no JS state.
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
@@ -10,23 +11,17 @@ import {
   fauxAssistantMessage,
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
-import {
-  Harness,
-  MemoryStorage,
-  createRegistry,
-  defineExtension,
-  defineTool,
-} from "@earendil-works/pi-durable";
+import { Harness, createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { createDatabase } from "@pi-cloud/database";
 import { readSealedFamily, hydrateSealedFamily } from "@pi-cloud/pi-session-postgres/durable";
 import { delegatedControl } from "./delegated-runs.mjs";
-import { loadSettledDelegations } from "./delegated-cold.mjs";
+import { enableDelegatedArchive, loadSettledDelegations } from "./delegated-cold.mjs";
 import { runDelegation } from "./delegated-native.mjs";
 const [{ scope, url, topic, recover, phase, target }] = await once(process, "message");
 const pool = new pg.Pool({ connectionString: url }),
   control = delegatedControl(pool, scope);
-class Store extends MemoryStorage {
+class Store extends DelegatedMemoryStorage {
   async commit(w) {
     const p = this.prepareCommit(w);
     const receipt = once(process, "message");
@@ -50,14 +45,17 @@ class Store extends MemoryStorage {
   }
 }
 const store = new Store();
+let restoredLanes = [];
 try {
   if (recover) {
     const db = createDatabase({ connectionString: url, maxConnections: 1 });
     try {
-      await hydrateSealedFamily(
-        await readSealedFamily(db, scope, topic, { delegatedRuns: true }),
-        store,
-      );
+      const family = await readSealedFamily(db, scope, topic, { delegatedRuns: true });
+      enableDelegatedArchive(pool, scope, store);
+      restoredLanes = [...new Set(family.entries.map((r) => Number(r.conversation_id)))];
+      store.deferred = new Set(family.deferred);
+      for (const source of family.archives) await store.ensureSource(source);
+      await hydrateSealedFamily(family, store);
     } finally {
       await db.destroy();
     }
@@ -88,7 +86,11 @@ try {
             );
             assert.equal(
               got.output,
-              phase === "seed" ? "archived private answer" : "resumed child",
+              args.task === "sibling job"
+                ? "sibling private answer"
+                : phase === "seed"
+                  ? "archived private answer"
+                  : "resumed child",
             );
             return { content: [{ type: "text", text: got.output }] };
           },
@@ -114,6 +116,24 @@ try {
       const child = transcript.messages.some(
         (m) => m.role === "user" && JSON.stringify(m.content).includes("child work"),
       );
+      if (
+        phase === "seed" &&
+        transcript.messages.some(
+          (m) => m.role === "user" && JSON.stringify(m.content).includes("sibling job"),
+        )
+      )
+        return fauxAssistantMessage("sibling private answer");
+      if (
+        phase === "seed" &&
+        !child &&
+        last.role === "toolResult" &&
+        !transcript.messages.some(
+          (m) => m.role === "assistant" && JSON.stringify(m.content).includes("sibling job"),
+        )
+      )
+        return fauxAssistantMessage(fauxToolCall("subagent", { task: "sibling job" }, "sibling"), {
+          stopReason: "toolUse",
+        });
       if (child && phase === "seed") return fauxAssistantMessage("archived private answer");
       if (child && phase === "continuation")
         assert(
@@ -151,7 +171,12 @@ try {
   await root.waitForIdle(ctx);
   const context = await root.context(ctx);
   assert(JSON.stringify(context.messages.at(-1)).includes("resumed parent"));
-  process.send({ kind: "done", seq: store.nextSeq - 1 });
+  process.send({
+    kind: "done",
+    seq: store.nextSeq - 1,
+    archiveLanes: store.archiveReads.map((r) => r.lane),
+    restoredLanes,
+  });
   await h.close(ctx);
 } catch (error) {
   process.send({ kind: "error", message: error.stack });

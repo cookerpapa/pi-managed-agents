@@ -165,7 +165,11 @@ export async function saveSealedFamily(
 
 // Match Pi's nearest visible head at each native request cutoff, including an
 // inherited prefix. Outstanding Tasks may also reference individual older Entries.
-function sealedHistorySelection(state: SealedNativeState, retainDelegated = false) {
+function sealedHistorySelection(
+  state: SealedNativeState,
+  delegatedRuns = false,
+  previousNextId = 0,
+) {
   const conversations = new Map<number, ConversationRecord>(),
     activeTasks = new Set<number>(),
     points = new Map<number, Set<number>>(),
@@ -196,9 +200,41 @@ function sealedHistorySelection(state: SealedNativeState, retainDelegated = fals
     }
     if (t.kind === "pi.compaction" && typeof cp?.tail === "number") goal(t.conversationId, cp.tail);
   }
+  // Several children can share one generation owner. Only a still-live
+  // delegation Tool needs its child's original submission to return a result.
+  const callers = new Map<number, { task: number; request: string }>();
+  if (delegatedRuns)
+    for (const { write } of state.records) {
+      if (
+        write.type !== "document.create" ||
+        write.record.kind !== "pi-cloud.conversation-creation" ||
+        write.content.kind !== "base"
+      )
+        continue;
+      const v = write.content.value;
+      if (
+        typeof v.conversationId === "number" &&
+        typeof v.ownerTaskId === "number" &&
+        typeof write.record.key === "string"
+      )
+        callers.set(v.conversationId, { task: v.ownerTaskId, request: write.record.key });
+    }
+  for (const { write } of delegatedRuns ? state.records : []) {
+    if (
+      write.type !== "submission" ||
+      write.value.type !== "input" ||
+      write.value.status !== "done"
+    )
+      continue;
+    const caller = callers.get(write.value.conversationId);
+    if (caller && activeTasks.has(caller.task) && caller.request === write.value.requestId)
+      pinned.add(write.value.answer);
+  }
+  const archives = new Map<number, { at: number; cuts: Set<number> }>();
   for (const c of conversations.values()) {
-    if (retainDelegated || (c.owner && activeTasks.has(c.owner.taskId))) goal(c.id);
-    if (c.parent) pinned.add(c.parent.at);
+    const owner = callers.get(c.id)?.task ?? c.owner?.taskId;
+    if (owner !== undefined && activeTasks.has(owner)) goal(c.id);
+    if (!delegatedRuns && c.parent) pinned.add(c.parent.at);
   }
   const ranges: { lane: number; lo: number; hi: number }[] = [];
   for (const [lane, cutoffs] of points)
@@ -210,6 +246,24 @@ function sealedHistorySelection(state: SealedNativeState, retainDelegated = fals
         head: SealedNativeState["heads"][number] | undefined;
       for (;;) {
         const c = conversations.get(id);
+        if (
+          !c &&
+          delegatedRuns &&
+          path.length &&
+          id > 1 &&
+          id < previousNextId &&
+          hi < previousNextId
+        ) {
+          // The direct child fixes the fork point. A live task may also need
+          // an older cutoff on that path, e.g. while compacting the child.
+          const at = conversations.get(path[path.length - 1]!.lane)!.parent!.at;
+          if (at >= previousNextId) throw Error("Invalid archived fork position");
+          const source = archives.get(id) ?? { at, cuts: new Set<number>() };
+          if (source.at !== at) throw Error("Inconsistent delegated continuation anchor");
+          source.cuts.add(hi);
+          archives.set(id, source);
+          break;
+        }
         if (!c || seen.has(id)) throw Error("Incomplete sealed Conversation ancestry");
         seen.add(id);
         path.push({ lane: id, hi });
@@ -217,6 +271,7 @@ function sealedHistorySelection(state: SealedNativeState, retainDelegated = fals
           for (const m of state.heads)
             if (m.conversationId === id && m.id <= hi && (!head || m.id > head.id)) head = m;
         if (!c.parent) break;
+        if (delegatedRuns && conversations.has(c.parent.conversationId)) pinned.add(c.parent.at);
         id = c.parent.conversationId;
         hi = Math.min(hi, c.parent.at);
       }
@@ -224,7 +279,13 @@ function sealedHistorySelection(state: SealedNativeState, retainDelegated = fals
       for (const r of path)
         if (r.hi >= (head?.floor ?? 1)) ranges.push({ ...r, lo: head?.floor ?? 1 });
     }
-  return { ranges, pinned: [...pinned] };
+  return {
+    ranges,
+    pinned: [...pinned],
+    archives: [...archives].map(([lane, { at, cuts }]) => ({ lane, at, cuts: [...cuts] })),
+    deferred: [...conversations.keys()].filter((lane) => !points.has(lane)),
+    lanes: [...conversations.keys()],
+  };
 }
 
 export async function readSealedFamily(
@@ -252,7 +313,11 @@ export async function readSealedFamily(
         and active.writer_failed_at is null and active.writer_sealed_at is null`.execute(tx);
       if (!row) throw Error("No matching sealed native handoff for the claimed Run");
       const h = decodePredecessor(row.handoff, scope, topic);
-      const { ranges, pinned } = sealedHistorySelection(h.state, delegatedRuns);
+      const { ranges, pinned, archives, deferred, lanes } = sealedHistorySelection(
+        h.state,
+        delegatedRuns,
+        row.prior?.nextId,
+      );
       const prior = row.prior;
       if (
         Number(row.slot) > 1 &&
@@ -320,11 +385,17 @@ export async function readSealedFamily(
         commit_seq: string;
         items: unknown[];
       }>`select doc_id,conversation_id,created_seq,commit_seq,items
-      from inboxes where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}`.execute(
-        tx,
-      );
+      from inboxes where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}
+        ${delegatedRuns ? sql`and conversation_id=any(${lanes}::bigint[])` : sql``}`.execute(tx);
       const intents = pendingReferences(h.state, row.refs);
-      return { handoff: h, entries, queues, intents, settledThrough: prior?.seq ?? 0 };
+      return {
+        handoff: h,
+        entries,
+        queues,
+        intents,
+        ...(delegatedRuns ? { archives, deferred } : {}),
+        settledThrough: prior?.seq ?? 0,
+      };
     });
 }
 

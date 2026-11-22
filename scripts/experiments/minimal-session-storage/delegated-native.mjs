@@ -88,6 +88,7 @@ export async function runDelegation(api, storage, control, options, context, mem
     callerLane: api.conversationId,
     ...options,
   });
+  if (row.source) await storage.ensureSource(row.source);
   const lane = await openDelegatedInvocation(api, storage, row, row.source, context);
   const child = await api.conversation(lane, context);
   assert(child, "Registered child is missing");

@@ -1,172 +1,211 @@
-// Reopen a *normally settled* family. Historical Conversations can provide fork
-// context but have no runnable Tasks. An interrupted family uses its sealed
-// task/submission checkpoint instead. Keep original IDs and commit positions.
+// Cold reads are fenced by a settled head or by the exact source invocation.
+// Native sequence and allocation coordinates remain those of the shared Session.
 import assert from "node:assert/strict";
+import { MemoryStorage } from "@earendil-works/pi-durable";
 import { agentBaseWrite } from "./agent-configuration.mjs";
-import { openingHead, priorState } from "./session-prefix.mjs";
+import { openingRootOnly, priorState } from "./session-prefix.mjs";
 
-export async function loadSettledDelegations(pool, scope, store) {
+async function snapshot(pool, read) {
   const db = await pool.connect();
   try {
     await db.query("begin isolation level repeatable read read only");
-    const row = (await db.query(openingHead, [scope.runId, scope.tenantId, scope.piSessionId]))
-      .rows[0];
-    assert(row?.lease_id === scope.writerId && row.state === "running", "Unexpected root owner");
-    const head = priorState(row);
-    if (!head.version) {
-      await db.query("commit");
-      return { entries: 0 };
-    }
-    const args = [scope.tenantId, scope.piSessionId, head.seq];
-    const { rows: lanes } = await db.query(
-      `select c.native_lane as lane,c.context_at as at,c.native_created_seq as seq,c.native_owner as owner,
-      coalesce(caller.native_lane,1) as caller_lane,
-      coalesce(p.native_lane,1) as parent from runs c join runs p on p.id=coalesce(c.previous_run_id,c.caller_run_id)
-      join runs caller on caller.id=c.caller_run_id
-      where c.tenant_id=$1 and c.session_id=$2 and c.native_lane is not null and c.native_outcome_seq<=$3`,
-      args,
-    );
-    const groups = new Map();
-    function add(seq, write) {
-      const key = Number(seq);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(write);
-    }
-    add(1, { type: "conversation", value: { id: 1 } });
-    for (const child of lanes)
-      add(child.seq, {
-        type: "conversation",
-        value: {
-          id: Number(child.lane),
-          owner: { conversationId: Number(child.caller_lane), taskId: Number(child.owner) },
-          ...(child.at === null
-            ? {}
-            : { parent: { conversationId: Number(child.parent), at: Number(child.at) } }),
-        },
-      });
-    // Every retained leaf can be addressed by an agent. Also keep each frozen
-    // parent prefix that a fork inherited before a later parent compaction.
-    const { rows: entries } = await db.query(
-      `with tips as materialized (
-        select conversation_id as lane,max(entry_id) as tip from message_entries
-          where tenant_id=$1 and pi_session_id=$2 and commit_seq<=$3 group by conversation_id
-        union select p.lane,p.tip from unnest($4::bigint[],$5::bigint[]) p(lane,tip)
-      ), markers as materialized (
-        select conversation_id as lane,entry_id,(content::json->>'head')::bigint as floor from message_entries
-          where tenant_id=$1 and pi_session_id=$2 and commit_seq<=$3
-            and strpos(content,'"head"')>0 and content::json->>'head' is not null
-      ), windows as materialized (
-        select t.lane,t.tip,coalesce((select floor from markers m where m.lane=t.lane
-          and m.entry_id<=t.tip order by m.entry_id desc limit 1),1) as floor from tips t
-      ), visible as (
-        select lane,range_agg(int8range(floor,tip,'[]')) as ids from windows group by lane
-      )
-      select m.commit_seq,m.entry_id,m.conversation_id,m.content from message_entries m join visible v on v.lane=m.conversation_id and v.ids @> m.entry_id
-      where m.tenant_id=$1 and m.pi_session_id=$2 and m.commit_seq<=$3
-      order by m.commit_seq,m.ordinal`,
-      [
-        ...args,
-        lanes.filter((l) => l.at !== null).map((l) => l.parent),
-        lanes.filter((l) => l.at !== null).map((l) => l.at),
-      ],
-    );
-    let rootCount = 0,
-      rootBytes = 0;
-    for (const e of entries) {
-      const entry = JSON.parse(e.content);
-      assert(
-        entry.id === Number(e.entry_id) && entry.conversationId === Number(e.conversation_id),
-        "Mismatched settled entry",
-      );
-      if (entry.conversationId === 1 && entry.id >= head.floor && entry.id < head.nextId) {
-        rootCount++;
-        rootBytes += Buffer.byteLength(e.content);
-      }
-      add(e.commit_seq, { type: "entry", value: entry });
-    }
-    assert(rootCount === head.count && rootBytes === head.bytes, "Incomplete settled root");
-    const { rows: queues } = await db.query(
-      "select * from inboxes where tenant_id=$1 and pi_session_id=$2 and commit_seq<=$3",
-      args,
-    );
-    for (const q of queues) {
-      assert.equal(q.items.length, 0, "Only settled Inboxes can use cold continuation");
-      add(q.created_seq, {
-        type: "document.create",
-        record: {
-          id: Number(q.doc_id),
-          kind: "pi.inbox",
-          scope: { kind: "conversation", conversationId: Number(q.conversation_id) },
-          history: "latest",
-          fork: "initial",
-        },
-        content: { kind: "base", version: 1, value: { items: [] } },
-      });
-    }
-    const { rows: versions } = await db.query(
-      `select document_id,conversation_id,content,commit_seq from messages
-      where tenant_id=$1 and pi_session_id=$2 and commit_seq<=$3 and document_id is not null order by commit_seq,ordinal`,
-      args,
-    );
-    const seen = new Set();
-    for (const v of versions) {
-      const id = Number(v.document_id),
-        content = JSON.parse(v.content);
-      if (content === null) {
-        add(v.commit_seq, { type: "document.retire", id });
-        continue;
-      }
-      add(
-        v.commit_seq,
-        seen.has(id)
-          ? { type: "document.change", id, content }
-          : agentBaseWrite(id, content, Number(v.conversation_id)),
-      );
-      seen.add(id);
-    }
+    const result = await read(db);
     await db.query("commit");
-    if (store) {
-      for (const [seq, writes] of [...groups].sort(([a], [b]) => a - b))
-        store.prepareCommit(writes, seq).apply();
-      if (store.nextSeq <= head.seq) store.prepareCommit([], head.seq).apply();
-      store.nextId = Math.max(store.nextId, head.nextId);
-      return { entries: entries.length };
-    }
-    // Seed the same seal fold that will watch the next root. Keep bodies and
-    // Inbox values in their existing tables, including a previous child's path.
-    const records = new Map(),
-      heads = [];
-    for (const [seq, writes] of [...groups].sort(([a], [b]) => a - b))
-      for (const w of writes) {
-        if (w.type === "entry") {
-          if (w.value.head !== undefined)
-            heads.push({
-              conversationId: w.value.conversationId,
-              id: w.value.id,
-              floor: w.value.head,
-            });
-        } else if (w.type === "conversation") records.set(w.value.id, { seq, write: w });
-        else if (w.type === "document.create" && w.record.kind !== "pi.inbox")
-          records.set(w.record.id, { seq, write: w });
-        else if (w.type === "document.change")
-          records.set(w.id, { seq, write: { ...records.get(w.id).write, content: w.content } });
-        else if (w.type === "document.retire") records.delete(w.id);
-      }
-    return {
-      entries: entries.length,
-      state: {
-        seq: head.seq,
-        nextId: head.nextId,
-        heads,
-        records: [...records.values()],
-        sequences: [],
-      },
-      inboxIds: queues.map((q) => Number(q.doc_id)),
-    };
+    return result;
   } catch (error) {
     await db.query("rollback");
     throw error;
   } finally {
     db.release();
   }
+}
+function loadGroups(store, groups) {
+  for (const [seq, writes] of [...groups].sort(([a], [b]) => a - b))
+    store.prepareCommit(writes, seq).apply();
+}
+function add(groups, seq, write) {
+  const key = Number(seq);
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key).push(write);
+}
+async function loadConfigs(db, scope, lanes, through, groups) {
+  const { rows } = await db.query(
+    `select document_id,conversation_id,content,commit_seq from messages
+    where tenant_id=$1 and pi_session_id=$2 and conversation_id=any($3::bigint[]) and commit_seq<=$4 and document_id is not null order by commit_seq,ordinal`,
+    [scope.tenantId, scope.piSessionId, lanes, through],
+  );
+  const seen = new Map();
+  for (const row of rows) {
+    const id = Number(row.document_id),
+      lane = Number(row.conversation_id),
+      content = JSON.parse(row.content);
+    if (!content) {
+      add(groups, row.commit_seq, { type: "document.retire", id });
+      seen.delete(id);
+      continue;
+    }
+    add(
+      groups,
+      row.commit_seq,
+      seen.has(id) ? { type: "document.change", id, content } : agentBaseWrite(id, content, lane),
+    );
+    seen.set(id, { seq: Number(row.commit_seq), write: agentBaseWrite(id, content, lane) });
+  }
+  return seen;
+}
+function readEntry(row, groups) {
+  const entry = JSON.parse(row.content);
+  assert(
+    entry.id === Number(row.entry_id) && entry.conversationId === Number(row.conversation_id),
+    "Mismatched settled Entry",
+  );
+  if (groups) add(groups, row.commit_seq, { type: "entry", value: entry });
+  return entry;
+}
+
+export function enableDelegatedArchive(pool, scope, store) {
+  store.loadArchive = (source) => readDelegatedSource(pool, scope, source);
+}
+
+export async function loadSettledDelegations(pool, scope, store) {
+  const base = await snapshot(pool, async (db) => {
+    const row = (await db.query(openingRootOnly, [scope.runId, scope.tenantId, scope.piSessionId]))
+      .rows[0];
+    assert(row?.lease_id === scope.writerId && row.state === "running", "Unexpected root owner");
+    const head = priorState(row);
+    if (!head.version) return { entries: 0 };
+    const args = [scope.tenantId, scope.piSessionId, head.floor, head.nextId, head.seq];
+    const groups = new Map(),
+      root = { type: "conversation", value: { id: 1 } },
+      heads = [];
+    add(groups, 1, root);
+    const { rows } = await db.query(
+      `select entry_id,conversation_id,commit_seq,content from message_entries where tenant_id=$1 and pi_session_id=$2
+      and conversation_id=1 and entry_id>=$3 and entry_id<$4 and commit_seq<=$5 order by commit_seq,ordinal`,
+      args,
+    );
+    let bytes = 0;
+    for (const r of rows) {
+      const entry = readEntry(r, store ? groups : undefined);
+      bytes += Buffer.byteLength(r.content);
+      if (entry.head !== undefined)
+        heads.push({ conversationId: 1, id: entry.id, floor: entry.head });
+    }
+    assert(rows.length === head.count && bytes === head.bytes, "Incomplete settled root");
+    const docs = await loadConfigs(db, scope, [1], head.seq, groups);
+    const inboxId = Number(row.inbox_id);
+    if (store) {
+      add(groups, row.inbox_created, {
+        type: "document.create",
+        record: {
+          id: inboxId,
+          kind: "pi.inbox",
+          scope: { kind: "conversation", conversationId: 1 },
+          history: "latest",
+          fork: "initial",
+        },
+        content: { kind: "base", version: 1, value: { items: [] } },
+      });
+      return { entries: rows.length, groups, head };
+    }
+    return {
+      entries: rows.length,
+      state: {
+        seq: head.seq,
+        nextId: head.nextId,
+        heads,
+        records: [{ seq: 1, write: root }, ...docs.values()],
+        sequences: [],
+      },
+      inboxIds: [inboxId],
+    };
+  });
+  if (!store) return base;
+  if (base.groups) {
+    loadGroups(store, base.groups);
+    if (store.nextSeq <= base.head.seq) store.prepareCommit([], base.head.seq).apply();
+    store.nextId = Math.max(store.nextId, base.head.nextId);
+  }
+  enableDelegatedArchive(pool, scope, store);
+  return { entries: base.entries };
+}
+
+async function readDelegatedSource(pool, scope, { lane, at, cuts = [] }) {
+  assert(lane > 1 && Number.isSafeInteger(at) && at > 0, "Invalid delegated history source");
+  return snapshot(pool, async (db) => {
+    const groups = new Map(),
+      path = new Map();
+    let current = lane,
+      cut = at,
+      through;
+    for (;;) {
+      assert(!path.has(current), "Cycle in archived conversation ancestry");
+      path.set(current, cut);
+      if (current === 1) {
+        add(groups, 1, { type: "conversation", value: { id: 1 } });
+        break;
+      }
+      const {
+        rows: [r],
+      } = await db.query(
+        `select c.native_created_seq,c.native_owner,c.native_outcome_seq,c.state,c.context_at,
+        coalesce(caller.native_lane,1) as caller_lane,coalesce(p.native_lane,1) as parent_lane from runs c
+        join runs caller on caller.id=c.caller_run_id join runs p on p.id=coalesce(c.previous_run_id,c.caller_run_id)
+        where c.tenant_id=$1 and c.session_id=$2 and c.native_lane=$3`,
+        [scope.tenantId, scope.piSessionId, current],
+      );
+      assert(r, "Missing delegated history source");
+      if (through === undefined) {
+        assert(
+          ["completed", "failed", "cancelled"].includes(r.state),
+          "Delegated source has not settled",
+        );
+        through = Number(r.native_outcome_seq);
+      }
+      assert(Number(r.native_created_seq) <= through, "Conversation outside archived prefix");
+      const parent =
+        r.context_at === null
+          ? undefined
+          : { conversationId: Number(r.parent_lane), at: Number(r.context_at) };
+      add(groups, r.native_created_seq, {
+        type: "conversation",
+        value: {
+          id: current,
+          owner: { conversationId: Number(r.caller_lane), taskId: Number(r.native_owner) },
+          ...(parent ? { parent } : {}),
+        },
+      });
+      if (!parent) break;
+      current = parent.conversationId;
+      cut = Math.min(cut, parent.at);
+    }
+    // Select the nearest native head on the leaf's *visible* path. An ancestor
+    // which compacted after the fork cannot hide the prefix inherited by A.
+    const args = [scope.tenantId, scope.piSessionId, [...path.keys()], [...path.values()], through];
+    args.push([...new Set([at, ...cuts])]);
+    const { rows } = await db.query(
+      `with path as (select * from unnest($3::bigint[],$4::bigint[]) with ordinality p(lane,tip,depth)),
+      windows as materialized (select c.cut,coalesce((
+        select (m.content::json->>'head')::bigint from path p join message_entries m
+          on m.conversation_id=p.lane and m.entry_id<=least(c.cut,p.tip)
+          where m.tenant_id=$1 and m.pi_session_id=$2 and m.commit_seq<=$5 and strpos(m.content,'"head"')>0
+            and m.content::json->>'head' is not null order by p.depth,m.entry_id desc limit 1),1) as floor
+        from unnest($6::bigint[]) c(cut)),
+      visible as (select p.lane,range_agg(int8range(w.floor,least(w.cut,p.tip),'[]')) as ids
+        from path p join windows w on least(w.cut,p.tip)>=w.floor group by p.lane)
+      select m.entry_id,m.conversation_id,m.commit_seq,m.content from visible v join message_entries m
+        on m.conversation_id=v.lane and v.ids @> m.entry_id
+        where m.tenant_id=$1 and m.pi_session_id=$2 and m.commit_seq<=$5 order by m.commit_seq,m.ordinal`,
+      args,
+    );
+    for (const row of rows) readEntry(row, groups);
+    assert(
+      rows.some((r) => Number(r.conversation_id) === lane && Number(r.entry_id) === at),
+      "Missing delegated fork anchor",
+    );
+    const docs = await loadConfigs(db, scope, [lane], through, groups);
+    const store = new MemoryStorage();
+    loadGroups(store, groups);
+    return { store, entries: rows.length, docs: [...docs.keys()] };
+  });
 }

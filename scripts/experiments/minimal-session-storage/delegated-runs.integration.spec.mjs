@@ -1,3 +1,4 @@
+import { DelegatedMemoryStorage } from "./delegated-memory.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -10,13 +11,7 @@ import {
   fauxAssistantMessage,
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
-import {
-  Harness,
-  MemoryStorage,
-  createRegistry,
-  defineTool,
-  defineExtension,
-} from "@earendil-works/pi-durable";
+import { Harness, createRegistry, defineTool, defineExtension } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -98,7 +93,7 @@ it.skipIf(!url)(
         (r, d) => projectRecord(r, d, env),
       );
     };
-    class Store extends MemoryStorage {
+    class Store extends DelegatedMemoryStorage {
       async commit(writes) {
         const p = this.prepareCommit(writes);
         await project({
@@ -276,12 +271,21 @@ it.skipIf(!url)(
         requests.push(messages);
         const last = transcript.messages.at(-1);
         if (messages.includes("RESUME_ALPHA") && messages.includes("ALPHA_JOB")) {
-          assert(messages.includes("ALPHA_PRIVATE"));
+          assert(
+            messages.includes("ALPHA_PRIVATE") &&
+              messages.includes("ROOT_TWO") &&
+              !messages.includes("ROOT_SUMMARY"),
+          );
           assert(!messages.includes("BETA_PRIVATE"));
           return say("ALPHA_CONTINUED");
         }
         if (messages.includes("ROOT_THREE")) {
-          assert(!messages.includes("ALPHA_PRIVATE") && !messages.includes("BETA_PRIVATE"));
+          assert(
+            messages.includes("ROOT_SUMMARY") &&
+              !messages.includes("ROOT_TWO") &&
+              !messages.includes("ALPHA_PRIVATE") &&
+              !messages.includes("BETA_PRIVATE"),
+          );
           if (last.role === "toolResult") return say("root three finished");
           return tool(
             "subagent_control",
@@ -321,11 +325,14 @@ it.skipIf(!url)(
         {
           models,
           registry,
-          settings: { compaction: { enabled: false }, retry: { maxRetries: 0 } },
+          settings: {
+            compaction: { enabled: false, keepRecentTokens: 64 },
+            retry: { maxRetries: 0 },
+          },
         },
         ctx,
       );
-      return { root: await h.root(ctx, { agent }), restored };
+      return { root: await h.root(ctx, { agent }), restored, fake };
     }
     try {
       await pool.query("create schema " + schema);
@@ -343,7 +350,7 @@ it.skipIf(!url)(
       await pool.query("insert into sessions values($1,$2)", [piSessionId, tenantId]);
       await startRoot(1, "ROOT_TWO");
       r2 = scope;
-      const { root } = await openWorker();
+      const { root, fake } = await openWorker();
       const pending = await root.submit(
         { type: "input", requestId: scope.runId, content: "ROOT_TWO" },
         ctx,
@@ -400,6 +407,23 @@ it.skipIf(!url)(
         await sendToActiveConversation(h, { lane: bNative }, "late", "steer", randomUUID(), ctx),
         "missed",
       );
+      fake.setResponses([
+        say("tail one ".repeat(400)),
+        say("tail two ".repeat(400)),
+        say("ROOT_SUMMARY"),
+      ]);
+      for (const content of ["recent one", "recent two"]) {
+        const submitted = await root.submit(
+          { type: "input", requestId: randomUUID(), content },
+          ctx,
+        );
+        await root.waitForIdle(ctx);
+        assert.equal((await submitted.wait(ctx)).status, "done");
+      }
+      await root.compact(undefined, ctx);
+      await root.waitForIdle(ctx);
+      const compacted = JSON.stringify((await root.context(ctx)).messages);
+      assert(compacted.includes("ROOT_SUMMARY") && !compacted.includes("ROOT_TWO"));
       await settleRoot(0);
       const prevSeq = store.nextSeq - 1;
       await h.close(ctx);
@@ -417,7 +441,11 @@ it.skipIf(!url)(
         /writer/,
       );
       const next = await openWorker();
-      assert(next.restored.entries > 0);
+      const rootRows = await one("select (history_head->>'count')::int n from runs where id=$1", [
+        r2.runId,
+      ]);
+      assert.equal(next.restored.entries, rootRows.n);
+      assert.equal(store.archiveReads?.length ?? 0, 0);
       const r = await next.root.submit(
         { type: "input", requestId: scope.runId, content: "ROOT_THREE" },
         ctx,
@@ -435,6 +463,12 @@ it.skipIf(!url)(
           a2.state === "completed",
       );
       assert(requests.some((m) => m.includes("ALPHA_PRIVATE") && m.includes("RESUME_ALPHA")));
+      const previous = await one("select native_lane from runs where id=$1", [aId]);
+      assert.deepEqual(
+        store.archiveReads.map((r) => r.lane),
+        [Number(previous.native_lane)],
+      );
+      assert(!store.archiveReads.some((r) => r.lane === bNative));
       const history = await control.history(aId);
       assert.deepEqual(new Set(history.entries.map((e) => e.runId)), new Set([aId, a2.id]));
       const own = JSON.stringify(history.entries);

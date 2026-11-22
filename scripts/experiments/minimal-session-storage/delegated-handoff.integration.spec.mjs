@@ -45,6 +45,7 @@ it.skipIf(!source).each([false, true])(
       view,
       checkpoint = new AcceptedFamilyCheckpoint();
     const actors = [];
+    let previousLanes, replacementReads;
     const fresh = () => {
       const v = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
       v.delegatedRuns = true;
@@ -77,6 +78,7 @@ it.skipIf(!source).each([false, true])(
             return;
           }
           if (m.kind === "done") {
+            if (recover) replacementReads = m;
             done.resolve(m.seq);
             return;
           }
@@ -137,7 +139,13 @@ it.skipIf(!source).each([false, true])(
         const seed = actor(false, "seed"),
           seq = await seed.done();
         assert.equal((await seed.ended)[0], 0);
-        target = (await pool.query("select id from runs where root_run_id=$1", [root])).rows[0].id;
+        previousLanes = (
+          await pool.query("select id,native_lane,initial_input from runs where root_run_id=$1", [
+            root,
+          ])
+        ).rows;
+        assert.equal(previousLanes.length, 2);
+        target = previousLanes.find((r) => r.initial_input === "child work").id;
         await view.apply(
           [
             {
@@ -202,6 +210,12 @@ it.skipIf(!source).each([false, true])(
       assert.equal(await b.wait(), op);
       await b.done();
       assert.equal((await b.ended)[0], 0);
+      if (withPrior) {
+        const selected = Number(previousLanes.find((r) => r.id === target).native_lane),
+          sibling = Number(previousLanes.find((r) => r.id !== target).native_lane);
+        assert.deepEqual(replacementReads.archiveLanes, [selected]);
+        assert(!replacementReads.restoredLanes.includes(sibling));
+      }
       const rows = (
         await pool.query(
           "select state,native_lane,native_answer_id from runs where root_run_id=$1",

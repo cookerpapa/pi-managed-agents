@@ -1,3 +1,4 @@
+import { DelegatedMemoryStorage } from "./delegated-memory.mjs";
 // Isolated read-cost assay. Each earlier agent has its own equally sized,
 // uncompacted transcript; the next ordinary root has not requested any child.
 import assert from "node:assert/strict";
@@ -5,7 +6,6 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import pg from "pg";
-import { MemoryStorage } from "@earendil-works/pi-durable";
 import { loadSettledDelegations } from "./delegated-cold.mjs";
 const url = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
 assert(url, "Use run-with-test-postgres.mjs");
@@ -61,25 +61,80 @@ for (const children of [1, 100, 500]) {
       root,
     ]);
     await pool.query("analyze runs; analyze messages; analyze inboxes");
-    const times = [];
+    // Capture the actual body reads without including EXPLAIN in the timings.
+    const reads = new Map();
+    let phase;
+    const measuredPool = {
+      async connect() {
+        const c = await pool.connect();
+        return {
+          query(sql, args) {
+            if (/\bmessage_entries\b/.test(sql)) reads.set(phase, [sql, args]);
+            return c.query(sql, args);
+          },
+          release: () => c.release(),
+        };
+      },
+    };
+    const times = [],
+      mountTimes = [];
+    const selected = { lane: 2, at: bodyStart + 2 * count };
     for (let i = 0; i < 6; i++) {
-      const store = new MemoryStorage(),
+      const store = new DelegatedMemoryStorage(),
         start = performance.now();
+      phase = "root";
       const result = await loadSettledDelegations(
-        pool,
+        measuredPool,
         { tenantId: tenant, piSessionId: session, runId: next, writerId: writer },
         store,
       );
       if (i) times.push(performance.now() - start);
-      assert.equal(result.entries, all);
+      assert.equal(result.entries, count);
+      assert.equal(store.archiveReads?.length ?? 0, 0);
+      phase = "source";
+      const mountStart = performance.now();
+      await Promise.all([store.ensureSource(selected), store.ensureSource(selected)]);
+      if (i) mountTimes.push(performance.now() - mountStart);
+      assert.deepEqual(store.archiveReads, [{ ...selected, entries: count }]);
+      await store.ensureSource(selected);
+      assert.equal(store.archiveReads.length, 1);
     }
     times.sort((a, b) => a - b);
+    mountTimes.sort((a, b) => a - b);
+    async function explainReads() {
+      const plans = {};
+      for (const [label, [sql, args]] of reads) {
+        const { rows } = await pool.query("explain (analyze,buffers,format json) " + sql, args);
+        const plan = rows[0]["QUERY PLAN"][0].Plan;
+        plans[label] = {
+          rows: plan["Actual Rows"],
+          bufferAccesses: plan["Shared Hit Blocks"] + plan["Shared Read Blocks"],
+        };
+      }
+      assert(plans.root && plans.source);
+      return plans;
+    }
+    const plans = await explainReads();
+    let withTemporaryIndex;
+    if (children === 500 && process.argv.includes("--compare-index")) {
+      await pool.query(
+        "create index study_lane_entries on messages(tenant_id,pi_session_id,conversation_id,entry_id) where entry_id is not null",
+      );
+      await pool.query("analyze messages");
+      withTemporaryIndex = await explainReads();
+    }
     console.log(
       JSON.stringify({
         children,
-        entries: all,
+        storedEntries: all,
+        rootEntries: count,
+        mountedEntries: count,
+        mountMedianMs: +mountTimes[2].toFixed(1),
+        mountMaximumMs: +mountTimes.at(-1).toFixed(1),
         bodyBytes: 512,
         samples: times.length,
+        plans,
+        withTemporaryIndex,
         medianMs: +times[2].toFixed(1),
         maximumMs: +times.at(-1).toFixed(1),
       }),

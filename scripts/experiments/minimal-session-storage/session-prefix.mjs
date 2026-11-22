@@ -25,6 +25,9 @@ const openHead = (extra) => `select r.state,r.lease_id,r.mailbox_position,${extr
   and b.pi_session_id=r.session_id and b.created_seq<=(prior.history_head->>'seq')::bigint) as inbox_routes from runs r ${priorJoin}
  where r.id=$1 and r.tenant_id=$2 and r.session_id=$3`;
 export const openingHead = openHead("");
+export const openingRootOnly = `select r.state,r.lease_id,r.mailbox_position,prior.history_head as prior_head,
+ i.doc_id as inbox_id,i.items as inbox_items,i.created_seq as inbox_created from runs r ${priorJoin}
+ where r.id=$1 and r.tenant_id=$2 and r.session_id=$3`;
 export const rootOpeningHead = openHead("r.native_work_handoff is not null as has_handoff,");
 export const scopeKey = (tenant, session) => tenant + "/" + session + "/1";
 export const EMPTY_HEAD = Object.freeze({ seq: 0, nextId: 2, floor: 1, count: 0, bytes: 0 });
