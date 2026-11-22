@@ -3,7 +3,7 @@ import {
   humanPresentationSliceCharacters,
   type StoredHumanInput,
 } from "@pi-cloud/pi-session-postgres/durable";
-// Ordinary root Sessions in the matched message-store composition.
+// Matched history reader for root Runs and explicitly scoped child Conversations.
 import { sql, type Kysely } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import { HISTORY_PAGE_RECORDS, parseUserUploads, type UserUpload } from "@pi-cloud/protocol";
@@ -22,13 +22,73 @@ export const rootMessageTurns = sql<HistoryTurnRow>`(select r.tenant_id,r.sessio
   from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id where r.pruned_at is null and s.pruned_at is null
     and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact') and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)) root_turns`;
 
-export async function rootMessageHeaders(
+// Resolve the public child Session and Turn before looking at the shared
+// physical stream. The parent Run supplies the original pending Tool references.
+const childMessageRuns = sql`(select e.root_run_id as id,e.tenant_id,e.child_session_id as session_id,
+  e.child_turn_id as turn_id,e.created_at,e.output_display_seq,p.pruned_at,p.projection_tools,
+  null::text as root_human_inputs,'{}'::jsonb as root_input_receipts
+  from subagent_conversations e join runs p on p.tenant_id=e.tenant_id and p.id=e.root_run_id and p.session_id=e.root_session_id)`;
+
+export const childMessageTurns = (
+  state: string,
+) => sql<HistoryTurnRow>`(select e.tenant_id,e.child_session_id as session_id,e.child_session_id as origin_session_id,
+  e.child_turn_id as turn_id,e.root_run_id as run_id,s.pi_session_id,1::bigint as mailbox_position,'chat'::text as operation_kind,
+  case ${state}::text when 'preparing' then 'queued' when 'unknown' then 'failed' else ${state}::text end as state,
+  null::text as stop_reason,e.output_display_seq,e.output_display_native_seq,false as waiting_for_seal,e.created_at,false as frozen
+  from subagent_conversations e join sessions s on s.tenant_id=e.tenant_id and s.id=e.child_session_id and s.pruned_at is null
+  join runs p on p.tenant_id=e.tenant_id and p.id=e.root_run_id and p.pruned_at is null) child_turns`;
+
+const placedChildInput = sql`m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid
+  and m.conversation_id=s.pi_conversation_id and m.source_input_id=r.id::text and m.run_id=r.id and m.role='user'`;
+
+async function childMessageHeaders(
   db: Kysely<Database>,
   tenant: string,
   session: string,
   ids: readonly string[],
 ) {
+  const result = await sql<{
+    turn_id: string;
+    content: string | null;
+    coverage: string;
+  }>`select r.turn_id,
+    (select m.content from messages m where ${placedChildInput}) as content,r.output_display_seq as coverage
+    from ${childMessageRuns} r join sessions s on s.id=r.session_id and s.tenant_id=r.tenant_id
+    where r.tenant_id=${tenant}::uuid and r.session_id=${session}::uuid and r.turn_id=any(${[...ids]}::uuid[])
+      and r.pruned_at is null and s.pruned_at is null`.execute(db);
+  return new Map<string, HistoryHeader>(
+    result.rows.map((row) => {
+      const content = row.content === null ? "" : JSON.parse(row.content).model[0].content;
+      const text =
+        typeof content === "string"
+          ? content
+          : content
+              .filter((b: { type: string }) => b.type === "text")
+              .map((b: { text: string }) => b.text)
+              .join("");
+      return [
+        row.turn_id,
+        {
+          input_text: text,
+          input_source: null,
+          input_uploads: [],
+          scheduled_origin: null,
+          output_display_seq: row.coverage,
+        },
+      ];
+    }),
+  );
+}
+
+export async function rootMessageHeaders(
+  db: Kysely<Database>,
+  tenant: string,
+  session: string,
+  ids: readonly string[],
+  child = false,
+) {
   if (!ids.length) return new Map<string, HistoryHeader>();
+  if (child) return childMessageHeaders(db, tenant, session, ids);
   const rows = await sql<
     HistoryHeader & { turn_id: string }
   >`select turn_id,input_text,null::text as input_source,input_uploads,scheduled_origin,output_display_seq
@@ -44,22 +104,32 @@ export async function rootMessagePosition(
   turn: HistoryTurnRow,
   kind: "entry" | "task",
   id: string,
+  child = false,
 ) {
+  const lane = child
+    ? sql`(select s.pi_conversation_id from sessions s join subagent_conversations e
+    on e.tenant_id=s.tenant_id and e.child_session_id=s.id and e.child_turn_id=${turn.turn_id}::uuid and e.root_run_id=${turn.run_id}::uuid
+    where s.tenant_id=${tenant}::uuid and s.id=${turn.origin_session_id}::uuid and s.pi_session_id=${turn.pi_session_id} and s.pruned_at is null)`
+    : sql`1`;
   return (
     await sql<{ seq: string; ordinal: number }>`select * from (
-    select commit_seq as seq,ordinal from messages where tenant_id=${tenant}::uuid and run_id=${turn.run_id}::uuid and pi_session_id=${turn.pi_session_id} and conversation_id=1
+    select commit_seq as seq,ordinal from messages where tenant_id=${tenant}::uuid and run_id=${turn.run_id}::uuid and pi_session_id=${turn.pi_session_id} and conversation_id=${lane}
       and ${kind === "entry" ? sql`entry_id` : sql`tool_task_id`}=${id}::bigint
     ${
       kind === "task"
         ? sql`union all select (v->>'seq')::bigint,(v->>'ordinal')::int from runs r cross join lateral jsonb_each(r.projection_tools) t(k,v)
-      where r.id=${turn.run_id}::uuid and r.tenant_id=${tenant}::uuid and k=${id} and v->>'conversationId'='1'`
+      where r.id=${turn.run_id}::uuid and r.tenant_id=${tenant}::uuid and k=${id} and v->>'conversationId'=(${lane})::text`
         : sql``
     }
   ) refs order by seq desc,ordinal desc limit 1`.execute(db)
   ).rows[0];
 }
 
-export async function readRootMessageWindow(db: Kysely<Database>, input: HistoryWindowInput) {
+export async function readRootMessageWindow(
+  db: Kysely<Database>,
+  input: HistoryWindowInput,
+  child = false,
+) {
   if (!input.turns.length)
     return {
       transcripts: new Map(),
@@ -69,18 +139,30 @@ export async function readRootMessageWindow(db: Kysely<Database>, input: History
       bytes: 0,
       lastContinues: false,
     };
+  const runSource = child ? childMessageRuns : sql`runs`,
+    lane = child ? sql`s.pi_conversation_id` : sql`1`;
+  const headerBytes = child
+    ? sql`coalesce((select octet_length(m.content) from messages m where ${placedChildInput}),0)`
+    : sql`octet_length(r.input_text)+octet_length(r.input_uploads::text)`;
   const order = sql.raw(input.direction === "before" ? "desc" : "asc"),
     compare = sql.raw(
       input.direction === "before" ? (input.inclusive ? "<=" : "<") : input.inclusive ? ">=" : ">",
     ),
-    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]) with ordinality t(turn_id,through_seq,through_ordinal,turn_index)
-      join runs r on r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid and r.turn_id=t.turn_id and r.pruned_at is null
+    // Bind a per-Turn cursor. A disjunction on the outer Turn ID makes PG
+    // start at the end of a long Run and discard every row before the cursor.
+    cursor = input.position,
+    seek = cursor
+      ? sql`,${input.turns.map((t) => (t.turnId === cursor.turnId ? String(cursor.sequence) : input.direction === "before" ? "9223372036854775807" : "-1"))}::bigint[],
+      ${input.turns.map((t) => (t.turnId === cursor.turnId ? cursor.ordinal : 0))}::int[]`
+      : sql``,
+    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]${seek}) with ordinality t(turn_id,through_seq,through_ordinal${cursor ? sql`,seek_seq,seek_ordinal` : sql``},turn_index)
+      join ${runSource} r on r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid and r.turn_id=t.turn_id and r.pruned_at is null
       join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id and s.pruned_at is null`,
     bound = (
       seq: ReturnType<typeof sql.raw>,
       ord: ReturnType<typeof sql.raw>,
     ) => sql`and (${seq},${ord}) <= (t.through_seq,t.through_ordinal)
-        ${input.position ? sql`and (r.turn_id<>${input.position.turnId}::uuid or (${seq},${ord}) ${compare} (${input.position.sequence}::bigint,${input.position.ordinal}::int))` : sql``}`,
+        ${cursor ? sql`and (${seq},${ord}) ${compare} (t.seek_seq,t.seek_ordinal)` : sql``}`,
     limit = (input.maxRecords ?? HISTORY_PAGE_RECORDS) + 1;
   const meta = await sql<
     HistoryWindowPoint & { pending: boolean; run_id: string }
@@ -90,15 +172,15 @@ export async function readRootMessageWindow(db: Kysely<Database>, input: History
       (select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
         octet_length(m.content) as body_bytes,m.assistant_entry_id::text as assistant_id,
         case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,false as pending
-        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=1 and m.entry_id is not null and m.role not in ('system','pi.system')
+        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=${lane} and m.entry_id is not null and m.role not in ('system','pi.system')
           ${bound(sql.raw("m.commit_seq"), sql.raw("m.ordinal"))}
         order by m.commit_seq ${order},m.ordinal ${order} limit ${limit})
       union all select k,(v->>'seq')::bigint,(v->>'ordinal')::int,'{}'::jsonb,octet_length(v::text),v->>'assistantEntryId','"pi.tool"',false,true
-        from jsonb_each(r.projection_tools) q(k,v) where v->>'conversationId'='1'
+        from jsonb_each(r.projection_tools) q(k,v) where v->>'conversationId'=(${lane})::text
         ${bound(sql.raw("(v->>'seq')::bigint"), sql.raw("(v->>'ordinal')::int"))}
-      union all select '0',0,0,'{}'::jsonb,octet_length(r.input_text)+octet_length(r.input_uploads::text),null,null,true,false
+      union all select '0',0,0,'{}'::jsonb,${headerBytes},null,null,true,false
         where true ${bound(sql.raw("0"), sql.raw("0"))}
-    ) p left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.conversation_id=1 and a.run_id=r.id and a.entry_id=p.assistant_id::bigint
+    ) p left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.conversation_id=${lane} and a.run_id=r.id and a.entry_id=p.assistant_id::bigint
     order by t.turn_index,p.seq ${order},p.ordinal ${order} limit ${limit}`.execute(db);
   const { selected, bytes } = selectHistoryPoints(meta.rows, input);
   const picked = meta.rows.slice(0, selected.length).filter((p) => !p.header);
@@ -128,10 +210,10 @@ export async function readRootMessageWindow(db: Kysely<Database>, input: History
         substring(r.root_human_inputs from strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')+length(to_json(m.source_input_id)::text)+1 for p.human_limit) end as human,coalesce(m.created_at,r.created_at) as created_at,
         case when p.pending then r.projection_tools->p.id::text end as pending,a.entry_id::text as assistant_id,a.content as proposal
       from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
-      join runs r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid
+      join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid
       join sessions s on s.id=r.session_id and s.tenant_id=r.tenant_id
-      left join messages m on not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid and m.run_id=r.id and m.entry_id=p.id and m.conversation_id=1
-      left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.run_id=r.id and a.entry_id=p.assistant_id and a.conversation_id=1`.execute(
+      left join messages m on not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid and m.run_id=r.id and m.entry_id=p.id and m.conversation_id=${lane}
+      left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.run_id=r.id and a.entry_id=p.assistant_id and a.conversation_id=${lane}`.execute(
       db,
     );
     for (const r of bodies.rows) {
@@ -157,7 +239,7 @@ export async function readRootMessageWindow(db: Kysely<Database>, input: History
       rows.push(row);
       if (r.assistant_id && r.proposal)
         dependencies.push({ ...row, id: r.assistant_id, body: '{"value":' + r.proposal + "}" });
-      if (r.source_input_id?.startsWith("input-")) {
+      if (!child && r.source_input_id?.startsWith("input-")) {
         const human = r.human && (firstJsonObject(r.human) as StoredHumanInput | undefined);
         if (
           !human ||

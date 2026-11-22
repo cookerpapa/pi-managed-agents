@@ -499,7 +499,10 @@ try {
     writerId: randomUUID(),
     fencingToken: 1,
   };
-  if (process.argv[2] === "--probe-cube-fork") {
+  if (process.argv[2] === "--probe-child-stop") {
+    const { childStopEvidence } = await import("./child-stop-evidence.mjs");
+    await childStopEvidence(base, admin, scope, nativeHistory, pgHistory);
+  } else if (process.argv[2] === "--probe-cube-fork") {
     const { cubeForkEvidence } = await import("./fork-cube-evidence.mjs");
     await cubeForkEvidence(base, admin, scope, nativeHistory, pgHistory);
   } else {

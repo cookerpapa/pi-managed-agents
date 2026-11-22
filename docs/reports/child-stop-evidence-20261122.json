@@ -1,0 +1,28 @@
+{
+  "comparisons": 2,
+  "legacyStates": [
+    ["cancelled", "unknown"],
+    ["unknown", "cancelled"]
+  ],
+  "nativeStopReceipts": [
+    [true, false],
+    [false, true]
+  ],
+  "nativeCommitsPerArm": 14,
+  "comparedCandidateTables": [
+    "accepted_fact_projection_offsets",
+    "conversation_worlds",
+    "fork_completed_runs",
+    "fork_requests",
+    "fork_sessions",
+    "inboxes",
+    "messages",
+    "pi_history_nodes",
+    "pi_history_streams",
+    "runs",
+    "workspace_route_spans"
+  ],
+  "sameRetainedRows": true,
+  "sameForkPage": true,
+  "verdict": "settled_candidate_cannot_identify_the_child_whose_stop_was_accepted"
+}

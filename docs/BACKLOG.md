@@ -2,7 +2,8 @@
 
 ## Minimal Session storage feasibility
 
-- [ ] Serve child Conversation history and terminal status from the candidate. The later-Run acceptance found the actual child answer in PG and the parent, while the child HTTP page omitted it and the status view returned `unknown`. [Observed boundary](reports/later-root-handoff-20261122.md).
+- [ ] Decide how confirmed child outcomes survive settlement. A paired native Stop produces opposite legacy statuses and identical retained candidate rows. Validate original result, failure, cancellation and new input after the decision. [Read audit and release gates](reports/candidate-read-audit-20261122.md).
+- [x] Route child transcript pages and tool anchors through the candidate, preserve child coverage on stable commits, measure keyset pagination and isolate the task-ID scan. [SQL audit](reports/candidate-read-audit-20261122.md).
 - [x] Recover an interrupted second Run after a settled root, with a retained or compacted predecessor, original child reply, and no legacy native writes. [Results](reports/later-root-handoff-20261122.md).
 
 - [x] Verify two consecutive Worker losses during the first root Run with a real parent compaction, original child Bash wait, and both an edited Inbox and a claimant lost before native open. [Repeated family handoff](reports/repeated-family-handoff-20261122.md).

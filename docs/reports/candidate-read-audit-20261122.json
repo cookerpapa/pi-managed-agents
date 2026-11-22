@@ -1,0 +1,985 @@
+{
+  "postgresVersion": "17.6",
+  "samplesPerReader": 31,
+  "units": "client reader milliseconds, warm sequential; buffers count 8KiB blocks accessed, including repeated hits",
+  "paired": {
+    "8192": {
+      "root-latest": {
+        "before": {
+          "readerMs": {
+            "p50": 7.34,
+            "p95": 8.54
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.335,
+            "buffers": 19,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 33,
+              "blocks": 15
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 7.26,
+            "p95": 8.04
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.347,
+            "buffers": 19,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 33,
+              "blocks": 15
+            }
+          }
+        }
+      },
+      "root-older": {
+        "before": {
+          "readerMs": {
+            "p50": 7.24,
+            "p95": 7.85
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.199,
+            "buffers": 652,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4129,
+              "blocks": 648
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 6.52,
+            "p95": 7.57
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.469,
+            "buffers": 41,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 32,
+              "blocks": 37
+            }
+          }
+        }
+      },
+      "root-newer": {
+        "before": {
+          "readerMs": {
+            "p50": 7.27,
+            "p95": 7.77
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.166,
+            "buffers": 626,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4128,
+              "blocks": 622
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 6.52,
+            "p95": 7.42
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.384,
+            "buffers": 17,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 32,
+              "blocks": 13
+            }
+          }
+        }
+      },
+      "root-entry-anchor": {
+        "before": {
+          "readerMs": {
+            "p50": 0.67,
+            "p95": 0.86
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.054,
+            "buffers": 3,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 3
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 0.69,
+            "p95": 0.97
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.163,
+            "buffers": 3,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 3
+            }
+          }
+        }
+      },
+      "child-latest": {
+        "before": {
+          "readerMs": {
+            "p50": 8.12,
+            "p95": 9.05
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.333,
+            "buffers": 645,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 638
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 8.34,
+            "p95": 9.99
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.353,
+            "buffers": 645,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 638
+            }
+          }
+        }
+      },
+      "child-older": {
+        "before": {
+          "readerMs": {
+            "p50": 9.5,
+            "p95": 11.01
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.95,
+            "buffers": 1279,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 31,
+              "loops": 1,
+              "removed": 8161,
+              "blocks": 1272
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 8.72,
+            "p95": 10.46
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.392,
+            "buffers": 619,
+            "messageAccess": {
+              "type": "Bitmap Heap Scan",
+              "rows": 31,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 611
+            }
+          }
+        }
+      },
+      "child-newer": {
+        "before": {
+          "readerMs": {
+            "p50": 9.89,
+            "p95": 12.22
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 2.186,
+            "buffers": 1227,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 32,
+              "loops": 1,
+              "removed": 8160,
+              "blocks": 1222
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 8.6,
+            "p95": 9.81
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.564,
+            "buffers": 619,
+            "messageAccess": {
+              "type": "Bitmap Heap Scan",
+              "rows": 32,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 613
+            }
+          }
+        }
+      },
+      "child-entry-anchor": {
+        "before": {
+          "readerMs": {
+            "p50": 0.84,
+            "p95": 1.12
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.082,
+            "buffers": 7,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 7
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 0.83,
+            "p95": 1.14
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.075,
+            "buffers": 7,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 7
+            }
+          }
+        }
+      },
+      "navigation": {
+        "before": {
+          "readerMs": {
+            "p50": 1.89,
+            "p95": 2.45
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.895,
+            "buffers": 1275,
+            "messageAccess": {
+              "type": "Seq Scan",
+              "rows": 32,
+              "loops": 1,
+              "removed": 8160,
+              "blocks": 1171
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 2.17,
+            "p95": 2.63
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 1.068,
+            "buffers": 1275,
+            "messageAccess": {
+              "type": "Seq Scan",
+              "rows": 32,
+              "loops": 1,
+              "removed": 8160,
+              "blocks": 1171
+            }
+          }
+        }
+      }
+    },
+    "131072": {
+      "root-latest": {
+        "before": {
+          "readerMs": {
+            "p50": 6.55,
+            "p95": 8.44
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.358,
+            "buffers": 17,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 33,
+              "blocks": 13
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 6.59,
+            "p95": 9.69
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.334,
+            "buffers": 17,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 33,
+              "blocks": 13
+            }
+          }
+        }
+      },
+      "root-older": {
+        "before": {
+          "readerMs": {
+            "p50": 23.34,
+            "p95": 24.99
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 17.01,
+            "buffers": 10170,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 65569,
+              "blocks": 10166
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 7.54,
+            "p95": 8.5
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.722,
+            "buffers": 413,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 32,
+              "blocks": 409
+            }
+          }
+        }
+      },
+      "root-newer": {
+        "before": {
+          "readerMs": {
+            "p50": 25.01,
+            "p95": 26.08
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 32.331,
+            "buffers": 9774,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 65568,
+              "blocks": 9770
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 6.34,
+            "p95": 7.07
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 0.417,
+            "buffers": 18,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 32,
+              "blocks": 14
+            }
+          }
+        }
+      },
+      "root-entry-anchor": {
+        "before": {
+          "readerMs": {
+            "p50": 0.64,
+            "p95": 0.96
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.052,
+            "buffers": 4,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 4
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 0.64,
+            "p95": 1.05
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.049,
+            "buffers": 4,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 4
+            }
+          }
+        }
+      },
+      "child-latest": {
+        "before": {
+          "readerMs": {
+            "p50": 7.92,
+            "p95": 9.05
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.328,
+            "buffers": 646,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 639
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 8.01,
+            "p95": 9
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.234,
+            "buffers": 646,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 639
+            }
+          }
+        }
+      },
+      "child-older": {
+        "before": {
+          "readerMs": {
+            "p50": 25.93,
+            "p95": 27.49
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 36.929,
+            "buffers": 10817,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 69728,
+              "blocks": 10810
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 9.38,
+            "p95": 10.89
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 2.54,
+            "buffers": 1058,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4191,
+              "blocks": 1053
+            }
+          }
+        }
+      },
+      "child-newer": {
+        "before": {
+          "readerMs": {
+            "p50": 26.6,
+            "p95": 27.8
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 30.524,
+            "buffers": 10394,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 69727,
+              "blocks": 10389
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 8.14,
+            "p95": 9.49
+          },
+          "queries": 3,
+          "firstStatement": {
+            "executionMs": 1.146,
+            "buffers": 636,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_run",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4191,
+              "blocks": 633
+            }
+          }
+        }
+      },
+      "child-entry-anchor": {
+        "before": {
+          "readerMs": {
+            "p50": 0.81,
+            "p95": 1.29
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.068,
+            "buffers": 8,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 8
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 0.84,
+            "p95": 1.3
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.071,
+            "buffers": 8,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0,
+              "blocks": 8
+            }
+          }
+        }
+      },
+      "navigation": {
+        "before": {
+          "readerMs": {
+            "p50": 1.76,
+            "p95": 2.32
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.763,
+            "buffers": 791,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 649
+            }
+          }
+        },
+        "after": {
+          "readerMs": {
+            "p50": 1.88,
+            "p95": 2.54
+          },
+          "queries": 1,
+          "firstStatement": {
+            "executionMs": 0.628,
+            "buffers": 791,
+            "messageAccess": {
+              "type": "Index Scan",
+              "index": "messages_entry",
+              "rows": 33,
+              "loops": 1,
+              "removed": 4064,
+              "blocks": 649
+            }
+          }
+        }
+      }
+    }
+  },
+  "additional": {
+    "8192": {
+      "root-tool-anchor": {
+        "readerMs": {
+          "p50": 1.48,
+          "p95": 2
+        },
+        "queries": 1,
+        "firstStatement": {
+          "executionMs": 1.067,
+          "buffers": 1173,
+          "messageAccess": {
+            "type": "Seq Scan",
+            "rows": 1,
+            "loops": 1,
+            "removed": 8191,
+            "blocks": 1171
+          }
+        }
+      },
+      "child-tool-anchor": {
+        "readerMs": {
+          "p50": 2.1,
+          "p95": 2.69
+        },
+        "queries": 1,
+        "firstStatement": {
+          "executionMs": 1.017,
+          "buffers": 1177,
+          "messageAccess": {
+            "type": "Seq Scan",
+            "rows": 1,
+            "loops": 1,
+            "removed": 8191,
+            "blocks": 1175
+          }
+        }
+      }
+    },
+    "131072": {
+      "root-tool-anchor": {
+        "readerMs": {
+          "p50": 17.93,
+          "p95": 41.93
+        },
+        "queries": 1,
+        "firstStatement": {
+          "executionMs": 21.619,
+          "buffers": 18727,
+          "messageAccess": {
+            "type": "Seq Scan",
+            "rows": 0,
+            "loops": 3,
+            "removed": 43690,
+            "blocks": 18725
+          }
+        }
+      },
+      "child-tool-anchor": {
+        "readerMs": {
+          "p50": 19.92,
+          "p95": 40.4
+        },
+        "queries": 1,
+        "firstStatement": {
+          "executionMs": 22.387,
+          "buffers": 18731,
+          "messageAccess": {
+            "type": "Seq Scan",
+            "rows": 0,
+            "loops": 3,
+            "removed": 43690,
+            "blocks": 18725
+          }
+        }
+      },
+      "40-turns-before-exclusive": {
+        "readerMs": {
+          "p50": 6.87,
+          "p95": 7.76
+        },
+        "queries": 3,
+        "firstStatement": {
+          "executionMs": 0.458,
+          "buffers": 71,
+          "messageAccess": {
+            "type": "Index Scan",
+            "index": "messages_run",
+            "rows": 3,
+            "loops": 10,
+            "removed": 0,
+            "blocks": 49
+          }
+        }
+      },
+      "40-turns-before-inclusive": {
+        "readerMs": {
+          "p50": 6.68,
+          "p95": 7.46
+        },
+        "queries": 3,
+        "firstStatement": {
+          "executionMs": 0.492,
+          "buffers": 71,
+          "messageAccess": {
+            "type": "Index Scan",
+            "index": "messages_run",
+            "rows": 3,
+            "loops": 10,
+            "removed": 0,
+            "blocks": 49
+          }
+        }
+      },
+      "40-turns-after-exclusive": {
+        "readerMs": {
+          "p50": 6.78,
+          "p95": 7.41
+        },
+        "queries": 3,
+        "firstStatement": {
+          "executionMs": 0.447,
+          "buffers": 62,
+          "messageAccess": {
+            "type": "Index Scan",
+            "index": "messages_run",
+            "rows": 3,
+            "loops": 10,
+            "removed": 0,
+            "blocks": 40
+          }
+        }
+      },
+      "40-turns-after-inclusive": {
+        "readerMs": {
+          "p50": 6.65,
+          "p95": 7.89
+        },
+        "queries": 3,
+        "firstStatement": {
+          "executionMs": 0.459,
+          "buffers": 62,
+          "messageAccess": {
+            "type": "Index Scan",
+            "index": "messages_run",
+            "rows": 3,
+            "loops": 10,
+            "removed": 0,
+            "blocks": 40
+          }
+        }
+      }
+    }
+  },
+  "liveComparison": {
+    "checks": {
+      "headerMatches": true,
+      "completedBash": true,
+      "finalChildText": true,
+      "taskAnchor": true,
+      "inclusiveCursor": true,
+      "afterCursor": true,
+      "foreignCursorRejected": true
+    },
+    "legacyState": "completed",
+    "candidateState": "unknown",
+    "candidateCompletedBashItems": 1,
+    "candidateChildTerminalEvents": 0,
+    "originalExecutions": [1, 1],
+    "cleaned": true
+  },
+  "repeatAt131072": {
+    "root-latest": {
+      "p50Ms": 7.3,
+      "p95Ms": 9.85,
+      "firstStatementBuffers": 17
+    },
+    "root-older": {
+      "p50Ms": 8.16,
+      "p95Ms": 9.31,
+      "firstStatementBuffers": 413
+    },
+    "root-newer": {
+      "p50Ms": 6.73,
+      "p95Ms": 7.58,
+      "firstStatementBuffers": 18
+    },
+    "root-default64-older": {
+      "p50Ms": 10.98,
+      "p95Ms": 13.72,
+      "firstStatementBuffers": 422
+    },
+    "root-entry-anchor": {
+      "p50Ms": 0.69,
+      "p95Ms": 0.9,
+      "firstStatementBuffers": 4
+    },
+    "child-latest": {
+      "p50Ms": 9.85,
+      "p95Ms": 11.99,
+      "firstStatementBuffers": 646
+    },
+    "child-older": {
+      "p50Ms": 11.54,
+      "p95Ms": 13.11,
+      "firstStatementBuffers": 1058
+    },
+    "child-newer": {
+      "p50Ms": 9.13,
+      "p95Ms": 10.15,
+      "firstStatementBuffers": 636
+    },
+    "child-default64-older": {
+      "p50Ms": 14.98,
+      "p95Ms": 17.81,
+      "firstStatementBuffers": 1693
+    },
+    "child-entry-anchor": {
+      "p50Ms": 0.86,
+      "p95Ms": 1.07,
+      "firstStatementBuffers": 8
+    },
+    "navigation": {
+      "p50Ms": 1.9,
+      "p95Ms": 2.54,
+      "firstStatementBuffers": 791
+    },
+    "root-tool-anchor": {
+      "p50Ms": 21.51,
+      "p95Ms": 45.22,
+      "firstStatementBuffers": 18727
+    },
+    "child-tool-anchor": {
+      "p50Ms": 24.14,
+      "p95Ms": 47.09,
+      "firstStatementBuffers": 18731
+    },
+    "40-turns-before-exclusive": {
+      "p50Ms": 7.53,
+      "p95Ms": 8.3,
+      "firstStatementBuffers": 72
+    },
+    "40-turns-before-inclusive": {
+      "p50Ms": 7.29,
+      "p95Ms": 7.97,
+      "firstStatementBuffers": 72
+    },
+    "40-turns-after-exclusive": {
+      "p50Ms": 7.24,
+      "p95Ms": 8.37,
+      "firstStatementBuffers": 62
+    },
+    "40-turns-after-inclusive": {
+      "p50Ms": 7.32,
+      "p95Ms": 8.06,
+      "firstStatementBuffers": 62
+    }
+  }
+}

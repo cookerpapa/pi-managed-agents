@@ -546,8 +546,8 @@ async function scenario(guest, mode, replacement) {
     assert(JSON.stringify(history).includes(prompt));
     const childPage = await api.getConversation(child.childSessionId);
     const publicChildTranscript = JSON.stringify(childPage).includes("Run the gated Bash once.");
-    if (!laterCandidate) assert(publicChildTranscript);
-    let childEvidence;
+    assert(publicChildTranscript, "Public child transcript omitted its accepted input");
+    let childEvidence, childReaderParity;
     if (laterCandidate) {
       const token = await dir.result();
       const {
@@ -579,6 +579,42 @@ async function scenario(guest, mode, replacement) {
               JSON.stringify(item.output ?? null).includes(token),
           ).length,
         childTerminalEvents: e.terminals,
+      };
+    }
+    if (laterCandidate || mode === "serving-pending") {
+      const token = await dir.result(),
+        ct = childPage.turns.find((t) => t.turnId === child.childTurnId);
+      assert.equal(ct.prompt, "Run the gated Bash once.");
+      const items = (page) => page.turns.flatMap((t) => t.transcript?.items ?? []);
+      const tool = items(childPage).find((i) => i.kind === "tool" && i.toolName === "bash");
+      assert.equal(tool.status, "completed");
+      assert.equal(typeof tool.input.command, "string");
+      assert(tool.input.command.includes("executions"));
+      assert(JSON.stringify(tool.output).includes(token));
+      const anchored = await api.getConversation(child.childSessionId, {
+        turnId: child.childTurnId,
+        toolCallId: tool.toolCallId,
+      });
+      const around = await api.getConversation(child.childSessionId, { at: tool.historyCursor });
+      const after = await api.getConversation(child.childSessionId, { after: tool.historyCursor });
+      for (const page of [anchored, around])
+        assert(
+          items(page).some(
+            (i) => i.toolCallId === tool.toolCallId && JSON.stringify(i.output).includes(token),
+          ),
+        );
+      assert(!items(after).some((i) => i.toolCallId === tool.toolCallId));
+      assert(items(after).some((i) => i.kind === "text" && i.text.includes(token)));
+      await assert.rejects(api.getConversation(session.sessionId, { at: tool.historyCursor }));
+      assert(!items(childPage).some((i) => i.kind === "text" && i.text.startsWith("PARENT ")));
+      childReaderParity = {
+        headerMatches: true,
+        completedBash: true,
+        finalChildText: true,
+        taskAnchor: true,
+        inclusiveCursor: true,
+        afterCursor: true,
+        foreignCursorRejected: true,
       };
     }
     assert(!history.turns.some((t) => t.prompt === "Run the gated Bash once."));
@@ -681,12 +717,12 @@ async function scenario(guest, mode, replacement) {
       mode,
       terminal,
       publicChildView: publicChildTranscript,
+      ...(childReaderParity ? { childReaderParity, subagentStatus: relationship.state } : {}),
       ...(previous
         ? {
             previousRunCompacted: mode === "later-run-compacted",
             originalReplyBeforeReclaim: mode === "later-run-compacted",
             publicChildTurns: childPage.turns.length,
-            subagentStatus: relationship.state,
             ...childEvidence,
             mailboxPosition: input.mailboxPosition,
             previousAnswerInFinalRequest: outcome.priorAnswerInFinalRequest,

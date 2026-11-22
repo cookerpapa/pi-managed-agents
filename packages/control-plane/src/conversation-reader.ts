@@ -2,6 +2,7 @@ import {
   rootMessageHeaders,
   rootMessagePosition,
   rootMessageTurns,
+  childMessageTurns,
   readRootMessageWindow,
 } from "@pi-cloud/runtime-core/root-message-history";
 import { historyHeaders, type HistoryTurnRow } from "@pi-cloud/runtime-core/frozen-history";
@@ -354,11 +355,13 @@ export class ConversationReader {
       throw new ControlPlaneStoreError("not_found", "Conversation was not found");
     }
 
-    const messages =
+    const childMessages = this.rootMessageHistory && conversation.sessionKind === "subagent";
+    const rootMessages =
       this.rootMessageHistory &&
       conversation.sessionKind === "conversation" &&
       conversation.parentSessionId === null;
-    const relation = messages ? rootMessageTurns : sql`pi_history_turns`;
+    const messages = rootMessages || childMessages;
+    let childState = "unknown";
     if (this.rootMessageHistory && conversation.sessionKind === "subagent") {
       const row = await this.#database
         .selectFrom("subagent_executions")
@@ -366,6 +369,7 @@ export class ConversationReader {
         .where("tenant_id", "=", this.#tenantId)
         .where("child_session_id", "=", sessionId)
         .executeTakeFirst();
+      childState = row?.state ?? "unknown";
       conversation.sessionState =
         row?.state === "running"
           ? "running"
@@ -375,6 +379,11 @@ export class ConversationReader {
               ? "failed"
               : "cold";
     }
+    const relation = childMessages
+      ? childMessageTurns(childState)
+      : rootMessages
+        ? rootMessageTurns
+        : sql`pi_history_turns`;
     const owner = { tenantId: this.#tenantId, sessionId };
     const findTurn = async (id: string) =>
       (
@@ -422,7 +431,14 @@ export class ConversationReader {
         const kind = query.toolCallId?.startsWith("task:") ? "task" : "entry";
         let record: { seq: string; ordinal: number } | undefined;
         if (messages)
-          record = await rootMessagePosition(this.#database, this.#tenantId, anchor, kind, lookup);
+          record = await rootMessagePosition(
+            this.#database,
+            this.#tenantId,
+            anchor,
+            kind,
+            lookup,
+            childMessages,
+          );
         else if (anchor.frozen) {
           record = (
             await sql<{
@@ -492,24 +508,22 @@ export class ConversationReader {
       frozen: r.frozen,
     }));
     const sources = lineageTurnRows.slice(0, MAX_CONVERSATION_TURNS);
-    const window = await (messages ? readRootMessageWindow : readCanonicalHistoryWindow)(
-      this.#database,
-      {
-        tenantId: this.#tenantId,
-        sessionId,
-        turns: sources as HistoryTurnSource[],
-        direction,
-        ...(position ? { position } : {}),
-        inclusive,
-      },
-    );
-    const sourceByTurn = new Map(sources.map((r) => [r.turnId, r]));
-    const headerByTurn = await (messages ? rootMessageHeaders : historyHeaders)(
-      this.#database,
-      this.#tenantId,
+    const windowInput = {
+      tenantId: this.#tenantId,
       sessionId,
-      [...window.headers],
-    );
+      turns: sources as HistoryTurnSource[],
+      direction,
+      ...(position ? { position } : {}),
+      inclusive,
+    };
+    const window = messages
+      ? await readRootMessageWindow(this.#database, windowInput, childMessages)
+      : await readCanonicalHistoryWindow(this.#database, windowInput);
+    const sourceByTurn = new Map(sources.map((r) => [r.turnId, r]));
+    const ids = [...window.headers];
+    const headerByTurn = messages
+      ? await rootMessageHeaders(this.#database, this.#tenantId, sessionId, ids, childMessages)
+      : await historyHeaders(this.#database, this.#tenantId, sessionId, ids);
     const selectedTurns = [...new Set(window.positions.map((p) => p.turnId))];
     const turns = selectedTurns.map((id) => {
       const row = sourceByTurn.get(id)!;

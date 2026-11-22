@@ -366,19 +366,35 @@ export class ReadyProjection {
         }
       }
       if (r.rootPresentation && !covered && !draft.frame.rejected && draft.frame.ops.length) {
-        const shown = f.display.flatMap((d) => [
-          d.coveredThrough ?? 0,
-          ...d.events
-            .filter((e) => e.event.type === "tool.started" || e.event.type === "tool.completed")
-            .map((e) => e.event.seq),
-        ]);
-        if (opened || shown.length)
+        let rootThrough = opened ? 0 : undefined;
+        for (const d of f.display) {
+          const through = Math.max(
+            d.coveredThrough ?? 0,
+            ...d.events
+              .filter(
+                ({ event }) => event.type === "tool.started" || event.type === "tool.completed",
+              )
+              .map(({ event }) => event.seq),
+          );
+          if (d.scope.sessionId === f.scope.sessionId)
+            rootThrough = Math.max(rootThrough ?? 0, through);
+          else if (through > 0)
+            (draft.frame.childDisplays ??= []).push({
+              tenant: f.scope.tenantId,
+              run: f.scope.runId,
+              session: d.scope.sessionId,
+              turn: d.scope.turnId,
+              through,
+              seq: f.commit.seq,
+            });
+        }
+        if (rootThrough !== undefined)
           draft.frame.rootDisplay = {
             tenant: f.scope.tenantId,
             session: f.scope.piSessionId,
             run: f.scope.runId,
             writer: f.scope.writerId,
-            through: Math.max(0, ...shown),
+            through: rootThrough,
             seq: f.commit.seq,
           };
       }

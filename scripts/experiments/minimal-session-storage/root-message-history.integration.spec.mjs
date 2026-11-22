@@ -9,6 +9,7 @@ import { expect, it } from "vitest";
 import { createDatabase } from "@pi-cloud/database";
 import { nativeNavigation } from "@pi-cloud/pi-session-postgres/durable";
 import {
+  rootMessageHeaders,
   readRootMessageWindow,
   rootMessageNavigation,
   rootMessagePosition,
@@ -193,6 +194,75 @@ it("pages a Tool across proposal and result, and restores original input and com
     expect((await rootMessageNavigation(db, { ...scope, limit: 1 })).entries).toMatchObject([
       { id: 10, role: "user", text: "internal prompt�suffix" },
     ]);
+    const child = randomUUID(),
+      other = randomUUID(),
+      childTurn = randomUUID(),
+      otherTurn = randomUUID();
+    await pgClient.query(
+      "create table subagent_conversations(tenant_id uuid,root_run_id uuid,root_session_id uuid,child_session_id uuid unique,child_turn_id uuid unique,created_at timestamptz default now(),output_display_seq bigint)",
+    );
+    await pgClient.query(
+      "insert into sessions values($1,$2,$4::uuid::text,2,null),($1,$3,$4::uuid::text,3,null)",
+      [tenant, child, other, session],
+    );
+    await pgClient.query(
+      "insert into subagent_conversations values($1,$2,$3,$4,$5,now(),8),($1,$2,$3,$6,$7,now(),19)",
+      [tenant, run, session, child, childTurn, other, otherTurn],
+    );
+    async function childEntry(id, lane, role, model, source = null) {
+      await pgClient.query(
+        "insert into messages(tenant_id,pi_session_id,entry_id,conversation_id,run_id,role,content,source_input_id,commit_seq,ordinal) values($1,$2,$3,$4,$5,$6,$7,$8,$3,0)",
+        [
+          tenant,
+          session,
+          id,
+          lane,
+          run,
+          role,
+          JSON.stringify({
+            id,
+            conversationId: lane,
+            kind: "pi." + role,
+            model: [{ role, ...model }],
+          }),
+          source,
+        ],
+      );
+    }
+    const prompt = "检查子任务\u0000并保留换行\n下一步";
+    await childEntry(70, 2, "user", { content: [{ type: "text", text: prompt }] }, run);
+    await childEntry(71, 3, "user", { content: "Sibling private prompt" }, run);
+    await childEntry(73, 2, "assistant", { content: [proposal] });
+    await childEntry(78, 3, "assistant", { content: [{ type: "text", text: "sibling answer" }] });
+    await pgClient.query("update runs set projection_tools=$1", [
+      { 77: { ...wait[7], seq: 74, conversationId: 2, assistantEntryId: 73 } },
+    ]);
+    const q = {
+      ...input,
+      sessionId: child,
+      turns: [{ ...input.turns[0], turnId: childTurn, originSessionId: child }],
+    };
+    const target = { ...runRow, turn_id: childTurn, origin_session_id: child };
+    expect(
+      (await rootMessageHeaders(db, tenant, child, [childTurn], true)).get(childTurn).input_text,
+    ).toBe(prompt);
+    expect((await rootMessageHeaders(db, tenant, other, [childTurn], true)).size).toBe(0);
+    expect(
+      (await readRootMessageWindow(db, q, true)).transcripts.get(childTurn).items,
+    ).toMatchObject([{ status: "running", input: args, toolCallId: "task:77" }]);
+    expect(await rootMessagePosition(db, tenant, target, "task", "77", true)).toMatchObject({
+      seq: "74",
+    });
+    expect(await rootMessagePosition(db, tenant, target, "entry", "78", true)).toBeUndefined();
+    expect(
+      await rootMessagePosition(db, randomUUID(), target, "entry", "73", true),
+    ).toBeUndefined();
+    expect((await readRootMessageWindow(db, { ...q, sessionId: other }, true)).positions).toEqual(
+      [],
+    );
+    expect(
+      (await readRootMessageWindow(db, { ...q, tenantId: randomUUID() }, true)).positions,
+    ).toEqual([]);
   } finally {
     await db.destroy();
     await pgClient.end();
