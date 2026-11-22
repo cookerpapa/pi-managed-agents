@@ -594,3 +594,9 @@ Each case holds the projector before the busy input reaches PG, waits for the re
 Run `PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/stopped-root.json --root-stop-web` with the browser and Cube prerequisites above. The fixture queues a follow-up and a steer, clicks Stop, holds the browser's acknowledgement of the returned inputs and edits the draft. It reloads before acknowledgement and again after acknowledgement, then sends the edited text to a fresh Worker. [Checks and failure evidence](../../../docs/reports/stopped-root-inputs-20261122.md).
 
 To kill the old Worker before clicking Stop, use `--root-stop-handoff-web`. Append `already-returned` to publish the original Guest reply before the replacement claims the Run. Both cases verify zero model calls from the replacement and exercise the same draft recovery and edited continuation.
+
+### Release evidence for historical document Forks and throughput variance
+
+Run `node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/verify-fork-document-evidence.mjs` to compare the retained candidate rows with native `pi.agent` Fork snapshots. Exit 2 identifies an information gap. The diagnostic uses two disposable PG schemas and two deterministic Pi histories.
+
+For a diagnostic repetition of the million-Run load, add `PI_CLOUD_REPEAT_MILLION_RATE=1` to the existing `grants-million-day` command. After the live capture it replays 1.5×, 3×, 1.5× and 1.5× daily demand, each on a drained projection. Each paced arm in an invocation uses its captured tape. The standard suite retains the original load sequence.

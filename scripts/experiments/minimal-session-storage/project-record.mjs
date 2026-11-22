@@ -1,4 +1,5 @@
-import { nativeNavigation } from "@pi-cloud/pi-session-postgres/durable";
+// The isolated actor runs in a pinned operator image. Bundle its matching pure caption code.
+import { nativeNavigation } from "../../../packages/pi-session-postgres/src/durable/types.ts";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { isDeepStrictEqual } from "node:util";

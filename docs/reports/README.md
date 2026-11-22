@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Candidate release gate and historical Fork evidence](candidate-release-gate-20261122.md) covers the storage decision and repeated 20-tool load measurements.
+
 - [Stopped root input and cold continuation](stopped-root-inputs-20261122.md) verifies the two native busy-input modes, draft restoration across reload and explicit resubmission.
 
 - [Confirmed root input across Worker loss](root-input-handoff-20261122.md) checks the browser receipt, native Inbox and original tool across a sealed handoff.

@@ -1,0 +1,27 @@
+{
+  "nativeBatches": 13,
+  "anchor": 10,
+  "latestTools": ["bash"],
+  "identicalProviderMessages": true,
+  "providerRequestToolDeclarations": [["bash"], ["bash"]],
+  "nativeForkTools": [
+    ["bash", "read"],
+    ["bash", "edit"]
+  ],
+  "comparedTables": [
+    "accepted_fact_projection_offsets",
+    "fork_completed_runs",
+    "fork_requests",
+    "fork_sessions",
+    "inboxes",
+    "messages",
+    "pi_history_nodes",
+    "pi_history_streams",
+    "runs",
+    "workspace_route_spans"
+  ],
+  "identicalRetainedRows": true,
+  "identicalForkEntries": true,
+  "visibleForkEntries": 3,
+  "verdict": "insufficient_for_native_asof"
+}

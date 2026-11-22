@@ -303,8 +303,12 @@ function cases(suite) {
     const short = suite === "grants-million-day";
     // A fixed native 20-call trace has 187 Session records, including closure.
     const dailyRate = (187 * 1_000_000) / 86_400;
+    // Diagnostic only: replay the very same tape at 1.5x both before and after
+    // a saturated arm. The published daily-load profile keeps its original order.
+    const multipliers =
+      process.env.PI_CLOUD_REPEAT_MILLION_RATE === "1" ? [1.5, 3, 1.5, 1.5] : [1, 2, 3, 1.5, 1];
     const rates = short
-      ? [1, 2, 3, 1.5, 1].map((multiplier) => ({ rate: Math.round(multiplier * dailyRate) }))
+      ? multipliers.map((multiplier) => ({ rate: Math.round(multiplier * dailyRate) }))
       : [
           { rate: 2500 },
           { rate: 3500 },

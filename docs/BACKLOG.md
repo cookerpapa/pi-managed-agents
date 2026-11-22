@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [ ] Decide whether the candidate will retain rewindable native document changes for historical Forks or explicitly narrow the product Fork contract. Model request messages and the latest tool list are insufficient for the demonstrated case. [Reproduction and alternatives](reports/candidate-release-gate-20261122.md).
+
 - [x] Verify Stop after the root Worker is killed, with both a still-running tool and an original reply that arrives before reclaim. [Browser results](reports/stopped-root-inputs-20261122.md#stop-after-losing-the-worker).
 
 - [x] Under #52, Stop a running root with accepted steer and follow-up input. Reload a modified draft before its return acknowledgement and explicitly continue on a cold Worker. [Stop and draft acceptance](reports/stopped-root-inputs-20261122.md).
