@@ -199,6 +199,7 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
       values($1,$2,$3,1,$1,'same input','same','running',$4,$5,$5)`,
       [scope.runId, scope.tenantId, scope.piSessionId, scope.writerId, now],
     );
+    if (trace.registerChildren) await trace.registerChildren(pool);
     const presentation = new FamilyPresentation();
     presentation.bind(1, scope);
     for (const [i, commit] of trace.batches.entries()) {
@@ -265,6 +266,11 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
         )
       ).rows.map((r) => r.row);
     }
+    if (trace.registerChildren)
+      return {
+        retained,
+        states: (await pool.query("select id,state from subagent_executions order by id")).rows,
+      };
     const dest = await forks.fork(scope.tenantId, scope.piSessionId, {
       lane: 1,
       run: scope.runId,

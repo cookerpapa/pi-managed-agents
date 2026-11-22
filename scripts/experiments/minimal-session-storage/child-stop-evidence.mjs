@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { readFile } from "node:fs/promises";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { indexNative } from "../../../packages/pi-session-postgres/src/durable/types.ts";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
@@ -134,26 +135,46 @@ export async function childStopEvidence(base, admin, scope, nativeHistory, pgHis
     right = await deliver(trace, targets, 1);
   assert.equal(left.trace.batches.length, right.trace.batches.length);
   const ids = Array.from({ length: left.trace.batches.length + 1 }, () => randomUUID());
-  const a = await pgHistory(base, admin, scope, left.trace, ids),
-    b = await pgHistory(base, admin, scope, right.trace, ids);
-  assert.deepEqual(a.retained, b.retained);
-  assert.deepEqual(a.page, b.page);
+  async function registerChildren(pool) {
+    await pool.query(
+      "create table subagent_conversations(id uuid primary key,tenant_id uuid,root_run_id uuid,updated_at timestamptz)",
+    );
+    await pool.query("insert into subagent_conversations values($1,$3,$4,null),($2,$3,$4,null)", [
+      ...targets,
+      scope.tenantId,
+      scope.runId,
+    ]);
+    await pool.query(
+      await readFile(new URL("./child-outcome-schema.sql", import.meta.url), "utf8"),
+    );
+  }
+  const a = await pgHistory(base, admin, scope, { ...left.trace, registerChildren }, ids),
+    b = await pgHistory(base, admin, scope, { ...right.trace, registerChildren }, ids);
+  const { subagent_conversations: rowsA, ...otherA } = a.retained,
+    { subagent_conversations: rowsB, ...otherB } = b.retained;
+  assert.deepEqual(otherA, otherB);
+  assert.equal(rowsA.length, 2);
+  assert.equal(rowsB.length, 2);
+  const candidate = [a, b].map((arm) =>
+    targets.map((id) => arm.states.find((r) => r.id === id).state),
+  );
   const legacy = await referenceStates(base, admin, scope, targets, [left, right]);
   assert.deepEqual(legacy, [
     ["cancelled", "unknown"],
     ["unknown", "cancelled"],
   ]);
+  assert.deepEqual(candidate, legacy);
   console.log(
     JSON.stringify(
       {
         comparisons: 2,
         legacyStates: legacy,
+        candidateStates: candidate,
         nativeStopReceipts: [left.observed, right.observed],
         nativeCommitsPerArm: left.trace.batches.length,
         comparedCandidateTables: Object.keys(a.retained),
-        sameRetainedRows: true,
-        sameForkPage: true,
-        verdict: "settled_candidate_cannot_identify_the_child_whose_stop_was_accepted",
+        sameRowsOutsideChildRelationships: true,
+        verdict: "settled_candidate_matches_confirmed_child_stops",
       },
       null,
       2,

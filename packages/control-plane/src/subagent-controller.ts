@@ -44,6 +44,7 @@ export class SubagentController {
       managementToken: string;
       allowInsecureHttp: boolean;
       treePolicy?: CloudSubagentTreePolicy;
+      candidateMessages?: boolean;
       validateDirectory?(target: SubagentDirectoryTarget): Promise<void>;
       deliver?(lease: string, request: SubagentHostRequest): Promise<unknown>;
     },
@@ -51,6 +52,7 @@ export class SubagentController {
     this.#supervisor = new PostgresSubagentSupervisorChannel(options.database);
     this.#jobs = new PostgresSubagentConversations({
       database: options.database,
+      ...(options.candidateMessages ? { candidateMessages: true } : {}),
       ...(options.treePolicy ? { treePolicy: options.treePolicy } : {}),
       ...(options.validateDirectory ? { validateDirectory: options.validateDirectory } : {}),
       native: {

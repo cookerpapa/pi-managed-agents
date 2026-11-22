@@ -108,7 +108,13 @@ export function normalRootProjection(pool, topic, select, resolve, validateChild
             (await pool.query(rootOpeningHead, [scope.runId, scope.tenantId, scope.piSessionId]))
               .rows[0] ?? null;
           if (openingRow?.has_handoff)
-            previous = await reopenRootProjection(pool, scope, position, fact.commit.seq);
+            previous = await reopenRootProjection(
+              pool,
+              scope,
+              position,
+              fact.commit.seq,
+              !!validateChild,
+            );
           if (!current()) return { admitted: false, events: [], covers: [] };
           if (previous) view.sessions.set(scope.runId, previous);
         }

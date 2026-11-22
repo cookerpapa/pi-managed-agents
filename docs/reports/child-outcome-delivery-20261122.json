@@ -1,0 +1,135 @@
+{
+  "stopBeforeCreation": {
+    "nativeReceipts": [
+      [true, false],
+      [false, true]
+    ],
+    "referenceStates": [
+      ["cancelled", "unknown"],
+      ["unknown", "cancelled"]
+    ],
+    "candidateStates": [
+      ["cancelled", "unknown"],
+      ["unknown", "cancelled"]
+    ],
+    "sameOutsideChildRelationships": true
+  },
+  "childWorkload": {
+    "toolCalls": 20,
+    "nativeCommits": 185,
+    "outcomeCommits": 2
+  },
+  "liveComparisons": [
+    {
+      "mode": "serving-pending",
+      "terminal": "completed",
+      "subagentStatus": "completed",
+      "publicChildView": true,
+      "outcomeReads": {
+        "originalAnswer": true,
+        "latestAnswer": true,
+        "listed": true,
+        "wait": true,
+        "beforePlacement": {
+          "listed": true,
+          "captionMatchesOriginal": true
+        }
+      },
+      "guestExecutions": 1,
+      "replacementBashIntents": 0
+    },
+    {
+      "mode": "later-run",
+      "terminal": "completed",
+      "subagentStatus": "completed",
+      "publicChildView": true,
+      "outcomeReads": {
+        "originalAnswer": true,
+        "latestAnswer": true,
+        "listed": true,
+        "wait": true,
+        "beforePlacement": {
+          "listed": true,
+          "captionMatchesOriginal": false
+        }
+      },
+      "guestExecutions": 1,
+      "replacementBashIntents": 0
+    },
+    {
+      "mode": "later-run-compacted",
+      "terminal": "completed",
+      "subagentStatus": "completed",
+      "publicChildView": true,
+      "outcomeReads": {
+        "originalAnswer": true,
+        "latestAnswer": true,
+        "listed": true,
+        "wait": true,
+        "beforePlacement": {
+          "listed": true,
+          "captionMatchesOriginal": false
+        }
+      },
+      "guestExecutions": 1,
+      "replacementBashIntents": 0
+    }
+  ],
+  "cleanupVerified": true,
+  "reads": {
+    "pg": "17.6",
+    "historyRowsInTargetRun": 131072,
+    "otherTurns": 40,
+    "registeredChildrenInListCase": 31,
+    "samplesPerQuery": 31,
+    "mode": "warm sequential; result queries with known status",
+    "recentLatestBeforeRewrite": {
+      "p50Ms": 66.15,
+      "p95Ms": 69.05,
+      "sqlCount": 1,
+      "sharedBlocks": 19722,
+      "messageRowsFiltered": 130171
+    },
+    "after": {
+      "child-status": {
+        "p50Ms": 1.51,
+        "p95Ms": 1.96,
+        "sqlCount": 1,
+        "sharedBlocks": 4,
+        "messageRowsFiltered": 0
+      },
+      "child-list": {
+        "p50Ms": 2.05,
+        "p95Ms": 2.46,
+        "sqlCount": 1,
+        "sharedBlocks": 22,
+        "messageRowsFiltered": 0
+      },
+      "child-original-result": {
+        "p50Ms": 1.1,
+        "p95Ms": 1.64,
+        "sqlCount": 1,
+        "sharedBlocks": 6,
+        "messageRowsFiltered": 0
+      },
+      "child-latest-result": {
+        "p50Ms": 1.09,
+        "p95Ms": 1.39,
+        "sqlCount": 1,
+        "sharedBlocks": 46,
+        "messageRowsFiltered": 120
+      },
+      "child-early-latest-result": {
+        "p50Ms": 39.95,
+        "p95Ms": 43.83,
+        "sqlCount": 1,
+        "sharedBlocks": 20483,
+        "messageRowsFiltered": 130169
+      }
+    }
+  },
+  "transportRegression": {
+    "filesPassed": 18,
+    "testsPassed": 30
+  }
+}

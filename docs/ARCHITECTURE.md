@@ -188,7 +188,7 @@ means routing admission; neither it nor an absent binding diagnoses VM health or
 checks whether a directory still exists. No provider endpoint or credential is
 exposed. Physical observations remain disposable and separate from this read.
 
-The #52 storage prototype separately validates execution-owned original operation routing. Its Worker-facing protocol and experiment boundaries are described in [ADR-0344](adr/0344-execution-owned-operation-routing-study.md). In the candidate continuation path, human Run admission can extend an existing elastic allocation and freeze the outcome for the first model request. [ADR-0346](adr/0346-elastic-retention-at-run-admission.md).
+The #52 storage prototype retains confirmed child state, commit sequence and the original answer Entry on the child relationship. [ADR-0348](adr/0348-candidate-child-outcomes.md). It separately validates execution-owned original operation routing. Its Worker-facing protocol and experiment boundaries are described in [ADR-0344](adr/0344-execution-owned-operation-routing-study.md). In the candidate continuation path, human Run admission can extend an existing elastic allocation and freeze the outcome for the first model request. [ADR-0346](adr/0346-elastic-retention-at-run-admission.md).
 
 The Worker uses public Pi Tool hooks to prepare a reply waiter and an immutable
 logical environment (Workspace, compute scope, requested binding ID and execution

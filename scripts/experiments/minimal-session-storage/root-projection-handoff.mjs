@@ -1,11 +1,12 @@
 // Called only on a cold opening after the first incarnation. The public control
 // transaction has already sealed the old writer and admitted this one.
+import { projectChildOutcomes } from "./child-outcomes.mjs";
 import { foldWorld } from "./conversation-world.mjs";
 import assert from "node:assert/strict";
-import { NATIVE_HUMAN_INPUT_DOCUMENT } from "@pi-cloud/protocol";
+import { NATIVE_HUMAN_INPUT_DOCUMENT, parseSubagentTaskId } from "@pi-cloud/protocol";
 import { foldLive } from "./moving-checkpoint.mjs";
 
-export async function reopenRootProjection(pool, scope, position, sequence) {
+export async function reopenRootProjection(pool, scope, position, sequence, withChildren = false) {
   const {
     rows: [r],
   } = await pool.query(
@@ -61,6 +62,18 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
   const marker = state.heads.filter((h) => h.conversationId === 1).sort((a, b) => b.id - a.id)[0];
   const worlds = {};
   foldWorld(worlds, writes);
+  if (withChildren) {
+    const { rows } = await pool.query(
+      "select id,parent_tool_call_id from subagent_conversations where tenant_id=$1 and root_run_id=$2",
+      [scope.tenantId, scope.runId],
+    );
+    if (rows.length) {
+      worlds.childCallers = {};
+      for (const row of rows)
+        (worlds.childCallers[parseSubagentTaskId(row.parent_tool_call_id)] ??= []).push(row.id);
+    }
+  }
+  projectChildOutcomes(worlds, { scope, commit: { writes } });
   return {
     ...worlds,
     agentRoutes: Object.fromEntries(

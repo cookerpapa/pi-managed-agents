@@ -10,6 +10,8 @@
 
 - [Ordinary root conversation on the new message store](normal-root-message-store-20261122.md) follows both a browser refresh during Bash and a cold continuation across API and Projector restart.
 
+- [Confirmed child outcomes](child-outcome-delivery-20261122.md) checks native stops, lifecycle transitions, recovery and original/latest results.
+
 - [Candidate SQL and child outcome audit](candidate-read-audit-20261122.md) measures paging and anchors and reproduces a child status distinction lost after settlement.
 
 - [Later-Run family recovery](later-root-handoff-20261122.md) covers a previous root answer, real compaction and an early or late Guest reply. It identifies the separate child HTTP history gap.

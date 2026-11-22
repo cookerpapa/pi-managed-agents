@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import { Kysely, PostgresDialect } from "kysely";
+import { PostgresSubagentConversations } from "../../../packages/subagent-control/src/postgres-subagent-conversations.ts";
 import pg from "pg";
 import {
   readRootMessageWindow,
@@ -333,6 +334,109 @@ try {
                 ),
             );
         }
+    }
+    if (size === 131072 && process.argv.includes("--child-outcomes")) {
+      await pool.query(`alter table subagent_conversations add id uuid primary key default gen_random_uuid(),
+        add parent_execution_id uuid,add parent_tool_call_id text default 'task:22',add source_kind text default 'task',
+        add updated_at timestamptz default now();
+        create index child_outcome_root on subagent_conversations(tenant_id,root_run_id)`);
+      await pool.query(
+        await readFile(new URL("./child-outcome-schema.sql", import.meta.url), "utf8"),
+      );
+      for (let n = 2; n <= 32; n++) {
+        const logical = n === 2 ? child : randomUUID();
+        if (n !== 2) {
+          await pool.query("insert into sessions values($1,$2,$3::uuid::text,$4,null)", [
+            tenant,
+            logical,
+            root,
+            n,
+          ]);
+          await pool.query(
+            "insert into subagent_conversations(tenant_id,root_run_id,root_session_id,child_session_id,child_turn_id,output_display_seq) values($1,$2,$3,$4,$5,12)",
+            [tenant, run, root, logical, randomUUID()],
+          );
+        }
+        const [first, answer] = Array.from({ length: 1024 }, (_, i) => i + 1).filter(
+          (i) => lane(i) === n,
+        );
+        await pool.query(
+          `update messages set role='user',source_input_id=$4::uuid::text,
+          content=$5 where tenant_id=$1 and pi_session_id=$2 and entry_id=$3`,
+          [
+            tenant,
+            root,
+            first,
+            run,
+            JSON.stringify({ model: [{ role: "user", content: "child " + n }] }),
+          ],
+        );
+        await pool.query(
+          "update subagent_conversations set native_activity='completed',native_answer_id=$2,native_outcome_seq=$3 where child_session_id=$1",
+          [logical, answer, size],
+        );
+      }
+      await pool.query("analyze subagent_conversations;analyze sessions;analyze messages");
+      const {
+        rows: [target],
+      } = await pool.query(
+        "select id,native_answer_id from subagent_conversations where child_session_id=$1",
+        [child],
+      );
+      const jobs = new PostgresSubagentConversations({
+        database: db,
+        candidateMessages: true,
+        native: {
+          start: () => assert.fail("Unexpected start"),
+          stop: () => assert.fail("Unexpected stop"),
+        },
+      });
+      const current = await jobs.status(tenant, target.id);
+      arms["child-status"] = await measure(
+        () => jobs.status(tenant, target.id),
+        (v) => assert.equal(v.state, "completed"),
+      );
+      arms["child-original-result"] = await measure(
+        () => jobs.result(tenant, target.id, current, true),
+        (v) => assert(v.output.startsWith(target.native_answer_id + " ")),
+      );
+      arms["child-latest-result"] = await measure(
+        () => jobs.result(tenant, target.id, current),
+        (v) => assert(v.output.startsWith(size + " ")),
+      );
+      arms["child-list"] = await measure(
+        () => jobs.list(tenant, root, run),
+        (v) => {
+          assert.equal(v.agents.length, 24);
+          assert(v.agents.every((a) => a.task.startsWith("child ") && a.state === "completed"));
+          assert(v.nextCursor);
+        },
+      );
+      // This child finishes early. Every subsequent row belongs to another conversation.
+      // A bounded page does not guarantee a bounded backwards search for its last answer.
+      const earlyChild = randomUUID();
+      const {
+        rows: [early],
+      } = await pool.query(
+        `insert into subagent_conversations(tenant_id,root_run_id,root_session_id,child_session_id,child_turn_id,
+          output_display_seq,native_activity,native_answer_id,native_outcome_seq)
+         values($1,$2,$3,$4,$5,1,'completed',511,1024) returning id`,
+        [tenant, run, root, earlyChild, randomUUID()],
+      );
+      await pool.query("insert into sessions values($1,$2,$3::uuid::text,33,null)", [
+        tenant,
+        earlyChild,
+        root,
+      ]);
+      await pool.query(
+        "update messages set conversation_id=33 where tenant_id=$1 and pi_session_id=$2 and entry_id in (511,1023)",
+        [tenant, root],
+      );
+      const earlyStatus = await jobs.status(tenant, early.id);
+      arms["child-early-latest-result"] = await measure(
+        () => jobs.result(tenant, early.id, earlyStatus),
+        (v) => assert(v.output.startsWith("1023 ")),
+      );
     }
     reports.push({ entries: size, arms });
   }

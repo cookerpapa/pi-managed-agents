@@ -136,6 +136,7 @@ export class WorkspaceOperationRouter {
       rootPresentation: this.env.stage?.rootPresentation === true,
       fact: { ...f, tools, cancellations: cancels.map(({ op }) => op) },
       workspaceBatch: true,
+      nativeDispatches: f.tools,
     };
     const description =
       !covered &&

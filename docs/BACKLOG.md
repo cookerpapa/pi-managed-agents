@@ -2,7 +2,9 @@
 
 ## Minimal Session storage feasibility
 
-- [ ] Decide how confirmed child outcomes survive settlement. A paired native Stop produces opposite legacy statuses and identical retained candidate rows. Validate original result, failure, cancellation and new input after the decision. [Read audit and release gates](reports/candidate-read-audit-20261122.md).
+- [x] Project confirmed child outcomes and the original answer reference into the candidate relationship. Verify early Stop, failure, cancellation, reopening, handoff, status/list/wait and distinct answers. [Delivery](reports/child-outcome-delivery-20261122.md).
+- [ ] Decide whether the candidate list must retain the original task caption before Pi accepts the first input, including children stopped before placement. Both status and ID are already available. [Caption boundary](reports/child-outcome-delivery-20261122.md).
+- [ ] Compare end-to-end write overhead before adopting an index for latest answers of sparse, long-idle child conversations. [Read plans and latency](reports/child-outcome-delivery-20261122.md#长历史读取).
 - [x] Route child transcript pages and tool anchors through the candidate, preserve child coverage on stable commits, measure keyset pagination and isolate the task-ID scan. [SQL audit](reports/candidate-read-audit-20261122.md).
 - [x] Recover an interrupted second Run after a settled root, with a retained or compacted predecessor, original child reply, and no legacy native writes. [Results](reports/later-root-handoff-20261122.md).
 

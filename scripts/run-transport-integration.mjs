@@ -17,6 +17,7 @@ try {
     "scripts/experiments/minimal-session-storage/agent-configuration.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/admission-retention.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/conversation-world.integration.spec.mjs",
+    "scripts/experiments/minimal-session-storage/child-outcomes.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/family-inboxes.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/sealed-family.integration.spec.mjs",
     "packages/event-log/test/tool-reply-recovery.integration.test.ts",

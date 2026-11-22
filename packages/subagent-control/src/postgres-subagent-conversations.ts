@@ -103,6 +103,7 @@ export class PostgresSubagentConversations {
         stop(reference: string, id: string): Promise<void>;
       };
       treePolicy?: CloudSubagentTreePolicy;
+      candidateMessages?: boolean;
       validateDirectory?(target: SubagentDirectoryTarget): Promise<void>;
     },
   ) {
@@ -464,6 +465,20 @@ export class PostgresSubagentConversations {
   ): Promise<SubagentConversationStatus> {
     const status = knownStatus ?? (await this.status(tenantId, id));
     if (!["completed", "failed", "cancelled"].includes(status.state)) return status;
+    if (this.options.candidateMessages) {
+      const {
+        rows: [entry],
+      } = await sql<{ content: string }>`select m.content from subagent_conversations e
+        join sessions s on s.tenant_id=e.tenant_id and s.id=e.child_session_id
+        cross join lateral (select history.content from messages history
+          where history.tenant_id=e.tenant_id and history.pi_session_id=s.pi_session_id::uuid
+            and history.conversation_id=s.pi_conversation_id and history.run_id=e.root_run_id
+            and history.role='assistant' and history.entry_id is not null
+            ${originalInput ? sql`and history.entry_id=e.native_answer_id` : sql``}
+          order by history.entry_id desc limit 1) m
+        where e.tenant_id=${tenantId}::uuid and e.id=${id}::uuid`.execute(this.options.database);
+      return this.#withOutput(status, entry ? JSON.parse(entry.content) : undefined);
+    }
     let answerId: number | undefined;
     if (originalInput) {
       // Submissions are authoritative current values (ADR-0243), not log versions.
@@ -490,14 +505,16 @@ export class PostgresSubagentConversations {
         and r.fields->>'run'=${status.rootRunId} and r.fields->>'role'='assistant'
         and ${answerId === undefined ? sql`true` : sql`r.id=${answerId}`}
       order by r.id desc limit 1`.execute(this.options.database);
-    const message = rows.rows[0]
-      ? JSON.parse(rows.rows[0].body).value.model?.find(
-          (m: { role: string }) => m.role === "assistant",
-        )
-      : undefined;
+    return this.#withOutput(status, rows.rows[0] ? JSON.parse(rows.rows[0].body).value : undefined);
+  }
+  #withOutput(
+    status: SubagentConversationStatus,
+    entry: { model?: { role: string; content?: { type: string; text?: string }[] }[] } | undefined,
+  ) {
+    const message = entry?.model?.find((m) => m.role === "assistant");
     const output = message?.content
-      ?.filter((p: { type: string }) => p.type === "text")
-      .map((p: { text: string }) => p.text)
+      ?.filter((p) => p.type === "text" && typeof p.text === "string")
+      .map((p) => p.text)
       .join("");
     return { ...status, ...(output ? { output } : {}) };
   }
@@ -508,33 +525,50 @@ export class PostgresSubagentConversations {
     cursor?: string,
   ): Promise<Record<string, unknown>> {
     const pageSize = 24;
+    const source = this.options.candidateMessages
+      ? sql`
+        left join messages l on l.tenant_id=s.tenant_id and l.pi_session_id=s.pi_session_id::uuid and l.conversation_id=s.pi_conversation_id
+          and l.source_input_id=e.root_run_id::text and l.run_id=e.root_run_id and l.role='user'`
+      : sql`join pi_durable_log l on l.tenant_id=s.tenant_id and l.session_id=s.pi_session_id
+          and l.seq=e.source_sequence and l.record_id=e.source_record_id and l.record_kind=e.source_kind`;
     const rows = await sql<{
       id: string;
       state: SubagentExecutionState;
       parent_execution_id: string | null;
       parent_tool_call_id: string;
       source_kind: string;
-      body: string;
-    }>`select e.id::text,e.state,e.parent_execution_id::text,e.parent_tool_call_id,e.source_kind,l.body
+      body: string | null;
+    }>`select e.id::text,e.state,e.parent_execution_id::text,e.parent_tool_call_id,e.source_kind,
+        ${this.options.candidateMessages ? sql`l.content` : sql`l.body`} as body
       from subagent_executions e join sessions s on s.tenant_id=e.tenant_id and s.id=e.child_session_id
-      join pi_durable_log l on l.tenant_id=s.tenant_id and l.session_id=s.pi_session_id
-        and l.seq=e.source_sequence and l.record_id=e.source_record_id and l.record_kind=e.source_kind
-      where e.tenant_id=${tenantId}::uuid and s.pi_session_id=${piSessionId} and e.root_run_id=${runId}::uuid
-        and ${cursor === undefined ? sql`true` : sql`e.id>${cursor}::uuid`}
-      order by e.id limit ${pageSize + 1}`.execute(this.options.database);
+      ${source} where e.tenant_id=${tenantId}::uuid and s.pi_session_id=${piSessionId} and e.root_run_id=${runId}::uuid
+      and ${cursor === undefined ? sql`true` : sql`e.id>${cursor}::uuid`} order by e.id limit ${pageSize + 1}`.execute(
+      this.options.database,
+    );
     const agents = rows.rows.slice(0, pageSize).map((row) => {
-      const source = JSON.parse(row.body);
-      const args =
-        row.source_kind === "task"
-          ? source.value?.state?.checkpoint?.arguments
-          : source.content?.value?.arguments;
-      if (typeof args?.task !== "string") throw new Error("Child intent is unavailable");
+      let task: string;
+      if (this.options.candidateMessages) {
+        const content = row.body === null ? "" : JSON.parse(row.body).model[0].content;
+        task =
+          typeof content === "string"
+            ? content
+            : content
+                .filter((b: { type: string }) => b.type === "text")
+                .map((b: { text: string }) => b.text)
+                .join("");
+      } else {
+        const source = JSON.parse(row.body!);
+        const args =
+          row.source_kind === "task"
+            ? source.value?.state?.checkpoint?.arguments
+            : source.content?.value?.arguments;
+        if (typeof args?.task !== "string") throw new Error("Child intent is unavailable");
+        task = args.task;
+      }
       return {
         executionId: row.id,
         state: row.state,
-        task: Array.from(args.task.trim() as string)
-          .slice(0, 160)
-          .join(""),
+        task: Array.from(task.trim()).slice(0, 160).join(""),
         sourceTaskId: parseSubagentTaskId(row.parent_tool_call_id),
         ...(row.parent_execution_id ? { parentExecutionId: row.parent_execution_id } : {}),
       };

@@ -1,4 +1,5 @@
 import { projectWorld } from "./conversation-world.mjs";
+import { projectChildOutcomes } from "./child-outcomes.mjs";
 import { foldRootPresentation } from "./root-presentation-frame.mjs";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
@@ -305,7 +306,10 @@ export class ReadyProjection {
           if (this.persistUsage !== undefined)
             coCommittedUsage(view, f, draft.frame, this.persistUsage && !covered);
           projectWorld(view, f, draft.frame);
-          if (r.rootPresentation) foldRootPresentation(view, f, draft.frame);
+          if (r.rootPresentation) {
+            foldRootPresentation(view, f, draft.frame);
+            projectChildOutcomes(view, f, draft.frame, r.nativeDispatches);
+          }
           view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
           if (covered && owner?.projection_pin != null)
             view.pinOffset = BigInt(owner.projection_pin);

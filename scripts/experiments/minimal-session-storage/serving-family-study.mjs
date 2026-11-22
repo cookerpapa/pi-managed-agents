@@ -252,10 +252,18 @@ async function scenario(guest, mode, replacement) {
     a.proc.send({ kind: "start" });
     const request = await a.wait("delegateRequest");
     await wait(() => state.seq >= request.sequence, "accepted parent task");
+    let beforePlacement;
     const children = new PostgresSubagentConversations({
+      candidateMessages: laterCandidate,
       database,
       native: {
-        start: async ({ view }) => {
+        start: async ({ view, prompt: originalTask }) => {
+          if (laterCandidate || mode === "serving-pending") {
+            const list = await children.list(first.tenantId, first.piSessionId, runId);
+            const item = list.agents.find((v) => v.executionId === view.id);
+            assert(item && item.state === "preparing");
+            beforePlacement = { listed: true, captionMatchesOriginal: item.task === originalTask };
+          }
           a.proc.send({ kind: "startChild", view });
           return (await a.wait("childStarted")).id;
         },
@@ -637,6 +645,64 @@ async function scenario(guest, mode, replacement) {
       assert.equal(clean.rows[0].removed, true);
     }
     const relationship = await children.status(first.tenantId, child.executionId);
+    let outcomeReads;
+    if (laterCandidate || mode === "serving-pending") {
+      const entries = (
+        await pool.query(
+          "select content from messages where tenant_id=$1 and pi_session_id=$2 and conversation_id=$3 and run_id=$4 and role='assistant' order by entry_id",
+          [first.tenantId, first.piSessionId, child.conversationId, runId],
+        )
+      ).rows;
+      const answers = entries
+        .map((r) => JSON.parse(r.content).model[0])
+        .filter((m) => m.stopReason === "stop")
+        .map((m) =>
+          m.content
+            .filter((p) => p.type === "text")
+            .map((p) => p.text)
+            .join(""),
+        );
+      assert.equal(answers.length, 2);
+      assert.notEqual(answers[0], answers[1]);
+      const original = await children.result(first.tenantId, child.executionId, undefined, true);
+      const latest = await children.result(first.tenantId, child.executionId);
+      assert.equal(original.output, answers[0]);
+      assert.equal(latest.output, answers.at(-1));
+      const listed = await children.list(first.tenantId, first.piSessionId, runId);
+      assert.equal(listed.agents.length, 1);
+      assert.equal(listed.agents[0].state, "completed");
+      assert.equal(listed.agents[0].task, "Run the gated Bash once.");
+      const { SubagentController } =
+        await import("../../../packages/control-plane/src/subagent-controller.ts");
+      const reader = new SubagentController({
+        database,
+        managementToken: "study",
+        candidateMessages: laterCandidate,
+      });
+      try {
+        const outcome = await reader.executeTool(
+          {
+            scope: first,
+            taskId: request.taskId,
+            toolName: "subagent_control",
+            replyMode: "hostcall",
+            arguments: { action: "wait", target: child.executionId },
+          },
+          () => true,
+        );
+        assert.equal(outcome.result?.details?.value.state, "completed");
+        assert.equal(outcome.result.details.value.output, answers.at(-1));
+      } finally {
+        await reader.close();
+      }
+      outcomeReads = {
+        originalAnswer: true,
+        latestAnswer: true,
+        listed: true,
+        wait: true,
+        beforePlacement,
+      };
+    }
     assert.equal(relationship.conversationId, child.conversationId);
     if (previous) {
       const legacy = await pool.query(
@@ -717,6 +783,7 @@ async function scenario(guest, mode, replacement) {
       mode,
       terminal,
       publicChildView: publicChildTranscript,
+      ...(outcomeReads ? { outcomeReads } : {}),
       ...(childReaderParity ? { childReaderParity, subagentStatus: relationship.state } : {}),
       ...(previous
         ? {
@@ -1146,6 +1213,10 @@ if (initialProcess) {
     );
     const schema = await readFile(new URL("./schema.sql", import.meta.url), "utf8");
     await pool.query(schema.slice(schema.indexOf("create table messages")));
+    if (laterCandidate)
+      await pool.query(
+        await readFile(new URL("./child-outcome-schema.sql", import.meta.url), "utf8"),
+      );
     await view.install();
     await view.reset(new Map([[0, 0n]]), 16, "recorded-history");
     await pool.query(`create role family_reader login; alter role family_reader set search_path=candidate,public;
@@ -1160,6 +1231,8 @@ if (initialProcess) {
       ).rows[0].allowed,
       false,
     );
+    if (laterCandidate)
+      await pool.query("revoke select on candidate.subagent_executions from family_reader");
     await installWorkspaceRoutes(pool);
     if (pgHandoff && !atomicHandoff) await installStudyHandoff(pool);
     if (atomicHandoff)

@@ -94,6 +94,8 @@ export function checkpoint(view, record) {
     "liveId",
     "agentRoutes",
     "worldDocs",
+    "childOutcomes",
+    "childCallers",
     "usageDocs",
     "lastFact",
   ])

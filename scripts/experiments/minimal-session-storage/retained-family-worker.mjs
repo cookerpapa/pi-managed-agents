@@ -321,7 +321,9 @@ function finishChild(context) {
   return fauxAssistantMessage(
     mode === "reply-timeout"
       ? "CHILD UNKNOWN tool_reply_timeout: original Tool reply deadline elapsed"
-      : "CHILD " + text.trim(),
+      : "CHILD " +
+          text.trim() +
+          ((laterRun || mode === "serving-pending") && childModelCalls === 2 ? " (follow-up)" : ""),
   );
 }
 parentModel.setResponses([

@@ -35,6 +35,23 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
           if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin','world') and not (op->>'kind'='finish' and p_allow_finish)) or
             (op->>'kind'='inbox' and (a->>6)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
           case op->>'kind'
+          when 'child-outcomes' then
+            perform 1 from runs where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid
+              and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for share;
+            ok:=found; n:=1;
+            if ok then
+              for snap in select value from jsonb_array_elements(op->'changes') loop
+                update subagent_conversations e set native_activity=case when snap?'activity' then snap->>'activity' else e.native_activity end,
+                  native_stop_seen=e.native_stop_seen or (snap?'stopped'),
+                  native_caller=case when e.native_caller='aborted' then 'aborted' else coalesce(snap->>'caller',e.native_caller) end,
+                  native_answer_id=coalesce((snap->>'answer')::bigint,e.native_answer_id),
+                  native_outcome_seq=(op->>'seq')::bigint,native_outcome_at=(op->>'at')::timestamptz
+                where e.tenant_id=(a->>0)::uuid and e.root_run_id=(a->>2)::uuid and e.id=(snap->>'id')::uuid
+                  and e.native_outcome_seq<(op->>'seq')::bigint
+                  and (not (snap?'answer') or e.native_answer_id is null or e.native_answer_id=(snap->>'answer')::bigint);
+                if not found and (snap?'activity' or snap?'stopped') then raise exception 'Missing child outcome target or changed order' using errcode='PZ002'; end if;
+              end loop;
+            end if;
           when 'world' then
             perform 1 from runs where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid
               and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for share;

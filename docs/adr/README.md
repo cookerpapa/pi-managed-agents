@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0348](0348-candidate-child-outcomes.md) retains confirmed Pi child outcomes and original answer references on the existing relationship in the candidate.
+
 [ADR-0347](0347-conversation-compute-continuity.md) retains Conversation-scoped compute continuity across cold Forks in the candidate.
 
 [ADR-0346](0346-elastic-retention-at-run-admission.md) records elastic retention at chat Run admission in the #52 candidate.
