@@ -40,11 +40,11 @@ const currentEnvironment = {
   workspaceBindingSha256: "b".repeat(64),
   toolPolicySha256: "c".repeat(64),
 };
-async function nextEnvironmentMessages(h, id) {
-  const controller = await PiSessionWorldStateController.create(h, id, currentEnvironment);
+async function nextEnvironmentMessages(h, id, environment = currentEnvironment) {
+  const controller = await PiSessionWorldStateController.create(h, id, environment);
   return (await controller.capture()).modelMessages.map((m) => m.customType);
 }
-async function nativeHistory(extra, lastGeneration) {
+async function nativeHistory(extra, lastGeneration, physical) {
   const store = new RecordingStorage(),
     models = createModels(),
     registry = createRegistry();
@@ -84,7 +84,7 @@ async function nativeHistory(extra, lastGeneration) {
     async (context) => {
       started.resolve();
       await finish.promise;
-      return answer(context, "A");
+      return answer(context, physical ? "The workspace service is running." : "A");
     },
     (context) => answer(context, "B"),
   ]);
@@ -139,18 +139,26 @@ async function nativeHistory(extra, lastGeneration) {
     }
     const batches = store.batches.slice(),
       latest = await h.snapshot(AgentDoc, root.id, ctx);
+    const environment = physical
+      ? { ...currentEnvironment, continuityId: await physical.beforeFork() }
+      : currentEnvironment;
     const branch = await root.fork(anchor, { ownership: { kind: "ownerless" } }, ctx);
     const forked = await h.snapshot(AgentDoc, branch.id, ctx);
     assert.deepEqual(forked.tools, ["bash", extra]);
     assert.deepEqual(latest.tools, ["bash"]);
     assert.equal(suppliedTools.length, 2);
+    const nativeNotices = world
+      ? await nextEnvironmentMessages(h, branch.id, environment)
+      : undefined;
+    const firstRequest = physical ? await physical.sample(branch, provider) : undefined;
     return {
       batches,
       anchor,
       latest: latest.tools,
       forked: forked.tools,
       forkDocument: forked,
-      ...(world ? { nativeNotices: await nextEnvironmentMessages(h, branch.id) } : {}),
+      ...(nativeNotices ? { nativeNotices } : {}),
+      ...(physical ? { firstRequest } : {}),
       suppliedTools,
       providerInputs,
     };
@@ -160,7 +168,7 @@ async function nativeHistory(extra, lastGeneration) {
   }
 }
 
-async function pgHistory(base, admin, scope, trace, ids) {
+async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
   const schema = "fork_evidence_" + randomUUID().replaceAll("-", "");
   await admin.query("create schema " + schema);
   const pool = new pg.Pool({ connectionString: base, options: "-c search_path=" + schema, max: 3 });
@@ -273,6 +281,19 @@ async function pgHistory(base, admin, scope, trace, ids) {
     );
     assert(expected.some((e) => e.kind === "pi.system"));
     assert.equal(Number(page[0].entry_id), trace.anchor);
+    // Observe the newly forked branch before changing or collecting the source.
+    if (sampleFork) {
+      const memory = new MemoryStorage();
+      restoreForkPrefix(
+        memory,
+        page.toReversed().map((r) => ({
+          entry: JSON.parse(r.content),
+          seq: Number(r.commit_seq),
+        })),
+        await forks.agentConfiguration(scope.tenantId, dest),
+      );
+      return { retained, page, firstRequest: await sampleFork({ memory, pool, dest }) };
+    }
     const point = { lane: 1, run: scope.runId, entry: trace.anchor },
       forkKey = randomUUID();
     const lastAnswer = trace.batches
@@ -389,21 +410,7 @@ async function pgHistory(base, admin, scope, trace, ids) {
     await admin.query("drop schema " + schema + " cascade");
   }
 }
-const base = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
-assert(base, "Use run-with-test-postgres.mjs");
-const admin = new pg.Client({ connectionString: base });
-await admin.connect();
-try {
-  const sessionId = randomUUID();
-  const scope = {
-    tenantId: randomUUID(),
-    sessionId,
-    piSessionId: sessionId,
-    runId: randomUUID(),
-    turnId: randomUUID(),
-    writerId: randomUUID(),
-    fencingToken: 1,
-  };
+async function compareDocumentHistory(base, admin, scope) {
   const world = process.argv[2] === "--probe-current-world";
   const left = await nativeHistory("read", world ? currentEnvironment.continuityId : undefined);
   const right = await nativeHistory(
@@ -472,6 +479,28 @@ try {
         2,
       ),
     );
+  }
+}
+const base = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
+assert(base, "Use run-with-test-postgres.mjs");
+const admin = new pg.Client({ connectionString: base });
+await admin.connect();
+try {
+  const sessionId = randomUUID();
+  const scope = {
+    tenantId: randomUUID(),
+    sessionId,
+    piSessionId: sessionId,
+    runId: randomUUID(),
+    turnId: randomUUID(),
+    writerId: randomUUID(),
+    fencingToken: 1,
+  };
+  if (process.argv[2] === "--probe-cube-fork") {
+    const { cubeForkEvidence } = await import("./fork-cube-evidence.mjs");
+    await cubeForkEvidence(base, admin, scope, nativeHistory, pgHistory);
+  } else {
+    await compareDocumentHistory(base, admin, scope);
   }
 } finally {
   await admin.end();

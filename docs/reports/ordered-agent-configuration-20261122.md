@@ -33,3 +33,42 @@ Fork 通过选中回答的真实物理来源、Conversation ID 和提交序号�
 下一步需要确定该观察值的持久化位置和保留方式。可优先评估每个 Conversation 保存最新的已观察值，在 Fork 时捕获源的当前观察；还需核对旧锚点裁剪、嵌套分支和并发观察的读取边界。该诊断没有更改这项存储。复现时在同一配置验证命令末尾加 `--probe-current-world`，当前退出码为 2。[控制器及文档定义](../../packages/sandbox-supervisor/src/pi-sandbox-continuity.ts)
 
 RF3/PG 传输与恢复回归通过 26 项；另外通过原生共享历史、会话树、历史分页以及前缀和检查点专项测试。Fork 冒烟负载核对了并发重试、裁剪、独立追加、竞态与资源清理。
+
+## 真实 Cube 上的分叉首个请求
+
+两组都从助手回答“工作区服务正在运行”处 Fork。验收程序在专属 Workspace
+上启动只监听回环地址的网站，使用固定版 Pi Harness 和可检查请求的测试模型。
+先在 VM A 验证 HTTP 能读到卷上的随机标记。确认 A 已物理销毁后，把同一卷挂到 B。
+B 的内核启动编号改变，标记文件保持原值，同一端口返回连接被拒绝。此时用 A
+作为原会话最后观察到的实例做换机对照。随后在 B 启动同一个网站，确认 HTTP
+再次读到原标记，另一个原会话从 B 观察并分叉，作为环境延续的对照。两组分支
+首次请求时，当前资源都是 B。
+
+| 分支的真实情况 | Pi 原生 Fork 配合项目的环境控制器，首次请求中重置提示条数 | 从候选 PG 打开的新 Harness，首次请求中重置提示条数 |
+| --- | ---: | ---: |
+| 观察 B，继续用 B，网站仍在运行 | 0 | 0 |
+| 观察 A，换到 B，旧进程已结束 | 1 | 0 |
+
+程序逐项比较了两组分叉可见的 Entry 和分叉前候选会话库各表保留的内容。两组相同。
+控制器在冷读实验中也拿到了 B 的正确身份。候选登记事务在两组均返回已为现有 VM
+续期，模型首个请求中的登记提示也相同。缺失的证据是源 Conversation 最近实际
+观察到的计算实例。资源管理模块即使知道 A 和 B 都存在过，也无法据此确认每个
+Conversation 最后观察的是哪个实例。
+
+Cube、持久卷、Guest 中的 HTTP 服务、Pi Fork、候选 PG 投影和首次模型请求均实际执行。
+测试程序直接触发 Cube 删除，隔离 PG 的资源行由已核对的物理结果填入。该实验不计量
+闲置回收耗时、第三方模型延迟或完整 HTTP 入队链路。结束时核对了实验 VM、
+原生卷注册和 Workspace 的清理。仅记录断言结果。[聚合数据](fork-cube-world-20261122.json)
+
+在已配置本地 Cube 的工作区运行：
+
+```sh
+PI_CLOUD_RUNTIME_DIRECTORY=/path/to/deploy/production/runtime PI_CLOUD_RUNTIME_LOAD_CHECK=1 \
+  node scripts/run-with-test-postgres.mjs -- node --import tsx \
+  scripts/experiments/minimal-session-storage/verify-fork-document-evidence.mjs --probe-cube-fork
+```
+
+退出码 2 表示实测的原生提示与候选提示不同。存储决策仍待讨论。可评估复用
+每个 Conversation 的当前状态，保留最近一次确认的环境代次，在 Fork 的事务中给
+新分支冻结一份。只有实际观察变化才需更新。冷读只需判断连续性，具体 VM 的路由
+仍归执行侧。

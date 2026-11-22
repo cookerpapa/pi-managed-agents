@@ -4,7 +4,7 @@
 
 - [x] Verify atomic elastic retention on candidate chat admission, including expiry races, duplicate input and the first provider request on preferred and cold Workers. [Decision and evidence](adr/0346-elastic-retention-at-run-admission.md).
 
-- [ ] Determine the durable source for the last environment actually observed by a Conversation. The candidate cold Fork can miss a native sandbox-reset notice for its `current` world-state document. [Paired probe](reports/ordered-agent-configuration-20261122.md#下一项独立的存储门槛).
+- [ ] Determine the durable source for the last environment actually observed by a Conversation. The candidate cold Fork can miss a native sandbox-reset notice for its `current` world-state document. [Paired probe](reports/ordered-agent-configuration-20261122.md#下一项独立的存储门槛) and [first model requests after real Cube replacement](reports/ordered-agent-configuration-20261122.md#真实-cube-上的分叉首个请求).
 
 - [x] Persist ordered `pi.agent` versions in the candidate message table and confirm native Fork state after source removal. [Decision](adr/0345-ordered-agent-configuration.md) and [matched evidence](reports/ordered-agent-configuration-20261122.md).
 

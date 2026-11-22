@@ -1,0 +1,21 @@
+{
+  "cases": [
+    {
+      "scenario": "original process still serving",
+      "nativeResets": 0,
+      "candidateResets": 0
+    },
+    {
+      "scenario": "original process gone",
+      "nativeResets": 1,
+      "candidateResets": 0
+    }
+  ],
+  "identicalSourceRows": true,
+  "identicalVisibleEntries": true,
+  "bothAdmissionsRetained": true,
+  "previousVmConfirmedAbsent": true,
+  "distinctBoots": true,
+  "sameVolumeMarker": true,
+  "cleanupVerified": true
+}
