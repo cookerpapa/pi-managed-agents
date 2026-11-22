@@ -21,6 +21,7 @@ import type { KafkaAcceptedFactRecord } from "@pi-cloud/runtime-core/kafka-accep
 
 type Pending = {
   dispatch: DurableControlToolDispatch;
+  query?: AcceptedControlToolCommand;
   sequence: number;
   partition: number;
   dirty: boolean;
@@ -40,6 +41,36 @@ export type ControlToolOutcome = (
 ) & { execution?: import("@pi-cloud/protocol").ExecutionEvidence };
 type Cursor = { tenant: string; session: string; seq: string; operation: string };
 
+const agentAddress = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+// Keep only the small, validated pure query from an admitted Session record.
+// The original native intent is still required for every mutating tool.
+function admittedDelegatedQuery(
+  fact: Extract<KafkaAcceptedFactRecord["fact"], { kind: "durable_commit" }>,
+  reference: DurableControlToolDispatch,
+): AcceptedControlToolCommand | undefined {
+  if (reference.toolName !== "subagent_control" || reference.recovery || reference.implementation)
+    return;
+  const intent = durableControlIntent(fact.commit, reference),
+    args = intent.arguments;
+  const list =
+    args.action === "list" &&
+    (args.cursor === undefined ||
+      (typeof args.cursor === "string" && agentAddress.test(args.cursor))) &&
+    Object.keys(args).every((k) => k === "action" || k === "cursor");
+  const single =
+    (args.action === "status" || args.action === "wait") &&
+    typeof args.target === "string" &&
+    agentAddress.test(args.target) &&
+    Object.keys(args).every((k) => k === "action" || k === "target");
+  if (list || single)
+    return {
+      ...reference,
+      kind: "control_tool",
+      arguments: args,
+      nativeCallId: intent.callId,
+      nativeSequence: fact.commit.seq,
+    };
+}
 /** Reconciles repeatable control effects from native history. Pending memory
  * contains references; it is neither a task scheduler nor a durable command queue. */
 export class ControlToolDispatcher {
@@ -54,6 +85,7 @@ export class ControlToolDispatcher {
       database: Kysely<Database>;
       images?: ImageAttachmentCodec;
       partitions: number;
+      admittedDelegatedReads?: boolean;
       ownsPartition(partition: number): boolean;
       execute(
         command: AcceptedControlToolCommand,
@@ -122,11 +154,15 @@ export class ControlToolDispatcher {
         : this.options.replayable?.(reference.toolName) !== false;
       if (!repeatable && admitted === undefined) admitted = (await commitBeforeEffect?.()) ?? false;
       if (!current()) return;
+      const query = this.options.admittedDelegatedReads
+        ? admittedDelegatedQuery(fact, reference)
+        : undefined;
       this.#remember(
         reference,
         fact.commit.seq,
         record.partition,
         repeatable ? "repeatable" : admitted ? "once" : "unknown",
+        query,
       );
     }
     let changed = false;
@@ -182,12 +218,18 @@ export class ControlToolDispatcher {
     sequence: number,
     partition: number,
     execution: Pending["execution"] = "repeatable",
+    query?: AcceptedControlToolCommand,
   ): void {
     const key = this.#key(dispatch.scope, dispatch.operationId);
     const prior = this.#pending.get(key);
     if (prior) {
       if (!isDeepStrictEqual(prior.dispatch, dispatch) || prior.sequence !== sequence)
         throw new Error("Control dispatch identity changed");
+      if (query) {
+        if (prior.query && !isDeepStrictEqual(prior.query, query))
+          throw new Error("Admitted delegation query changed");
+        prior.query = query;
+      }
       return;
     }
     this.#pending.set(key, {
@@ -198,6 +240,7 @@ export class ControlToolDispatcher {
       due: Infinity,
       replyBytes: 0,
       execution,
+      ...(query ? { query } : {}),
       controller: new AbortController(),
     });
   }
@@ -404,7 +447,7 @@ export class ControlToolDispatcher {
     }
   }
   async #work(key: string, pending: Pending, current: () => boolean): Promise<void> {
-    const command = await this.#load(pending);
+    const command = pending.query ?? (await this.#load(pending));
     if (!current()) return;
     if (!command) {
       this.#remove(key);

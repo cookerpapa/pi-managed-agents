@@ -49,7 +49,7 @@ export async function runFanout({
     await call(projector, "fanoutReset", "fanoutResetDone");
     await db.query("truncate conversation_worlds,workspace_route_spans,messages,inboxes,runs");
     if (entryIndex !== undefined) {
-      await db.query("drop index if exists study_lane_entries");
+      await db.query("drop index if exists messages_conversation_entry");
       if (entryIndex) await db.query(studyEntryIndexSql);
     }
     await db.query(
@@ -180,7 +180,7 @@ export async function runFanout({
         storage = (
           await db.query(
             `select pg_wal_lsn_diff(pg_current_wal_insert_lsn(),$1::pg_lsn)::float8 as "walBytes",
-          coalesce(pg_relation_size(to_regclass('study_lane_entries')),0)::float8 as "entryIndexBytes",
+          coalesce(pg_relation_size(to_regclass('messages_conversation_entry')),0)::float8 as "entryIndexBytes",
           pg_indexes_size('messages')::float8 as "allMessageIndexBytes", pg_table_size('messages')::float8 as "messageTableBytes"`,
             [walStart],
           )

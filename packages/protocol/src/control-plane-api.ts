@@ -803,6 +803,52 @@ export const ConversationTranscriptItemResourceSchema = Type.Union([
   ),
 ]);
 
+export const DelegatedAgentDirectorySchema = Type.Object(
+  {
+    agents: Type.Array(
+      Type.Object(
+        { agentId: UuidSchema, task: Type.String(), state: DelegatedSessionStateSchema },
+        { additionalProperties: false },
+      ),
+      { maxItems: 24 },
+    ),
+    nextCursor: Type.Optional(UuidSchema),
+  },
+  { additionalProperties: false },
+);
+export const DelegatedAgentHistorySchema = Type.Object(
+  {
+    entries: Type.Array(
+      Type.Object(
+        {
+          entryId: PositiveSafeIntegerSchema,
+          runId: UuidSchema,
+          items: Type.Array(ConversationTranscriptItemResourceSchema),
+          calls: Type.Optional(
+            Type.Array(
+              Type.Object(
+                { name: Type.String(), input: Type.Unknown() },
+                { additionalProperties: false },
+              ),
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 32 },
+    ),
+    before: Type.Optional(Type.String({ maxLength: 256 })),
+  },
+  { additionalProperties: false },
+);
+export type DelegatedAgentDirectory = Static<typeof DelegatedAgentDirectorySchema>;
+export type DelegatedAgentHistory = Static<typeof DelegatedAgentHistorySchema>;
+export function parseDelegatedAgentDirectory(value: unknown): DelegatedAgentDirectory {
+  return parseSchema(DelegatedAgentDirectorySchema, value, "delegated agent directory");
+}
+export function parseDelegatedAgentHistory(value: unknown): DelegatedAgentHistory {
+  return parseSchema(DelegatedAgentHistorySchema, value, "delegated agent history");
+}
 export const ConversationTurnTranscriptResourceSchema = Type.Object(
   {
     schemaVersion: Type.Literal(1),

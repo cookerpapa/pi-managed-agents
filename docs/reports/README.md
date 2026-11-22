@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Direct delegation before and after admission](direct-delegation-handoff-20261123.md) checks the Worker handoff, original Kafka reference and candidate browser reads.
+
 - [Conversation Entry index cost](conversation-entry-index-cost-20261122.md) compares mixed projection throughput, PG append time, WAL, index size and long-history reads.
 
 - [Lazy child history on cold Workers](lazy-delegated-history-20261122.md) compares root and selected-child reads with 1, 100 and 500 settled agents.

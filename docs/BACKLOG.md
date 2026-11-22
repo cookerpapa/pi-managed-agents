@@ -2,12 +2,14 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Adopt the measured Conversation Entry index on the candidate. Verify the child directory, two invocations of one child after root compaction, projected control reads, and intersected Workspace grants through a cold owner.
+- [ ] Resolve PG-only handoff of an admitted native `subagent` intent when the child Run has yet to be registered. Keep independent recovery for an already registered child and late obsolete writers. [Direct delegation release gate](reports/direct-delegation-handoff-20261123.md).
+
 - [x] Retire the built-in workflow tool and guest control callbacks in the candidate. Keep native child delegation and its recovery path. [ADR-0352](adr/0352-retire-workflow-tool.md).
 
 - [x] Exercise root-only Session identity, delegated admission, sibling inputs, explicit continuation and loss of a Worker holding the original child waiter. [Isolated Run design](reports/delegated-runs-20261122.md).
 - [x] Read the root at cold start and the addressed child on continuation. Compare compaction, Worker replacement and the 1/100/500-child fixture. [Cold-read study](reports/lazy-delegated-history-20261122.md).
 - [x] Compare the Conversation Entry index against the existing schema under saturated and paced Projector replay, isolated PG appends, and cold reads. [Index cost experiment](reports/conversation-entry-index-cost-20261122.md).
-- [ ] Decide whether to adopt the measured partial index in the candidate schema. Exercise control tools through the serving Projector, directory and browser readers before replacing the matched family model.
 
 - [x] Project confirmed child outcomes and the original answer reference into the candidate relationship. Verify early Stop, failure, cancellation, reopening, handoff, status/list/wait and distinct answers. [Delivery](reports/child-outcome-delivery-20261122.md).
 - [ ] For the previous relation-based candidate, decide whether its list must retain the original task caption before Pi accepts the first input, including children stopped before placement. Both status and ID are already available. [Caption boundary](reports/child-outcome-delivery-20261122.md).

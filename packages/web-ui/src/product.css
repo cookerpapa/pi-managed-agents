@@ -5353,3 +5353,14 @@ body.product-panel-resizing {
     grid-template-columns: 1fr;
   }
 }
+
+.product-agent-history {
+  max-width: 52rem;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+  overflow-wrap: anywhere;
+}
+.product-agent-history section + section,
+.product-agent-history li + li {
+  margin-top: 0.75rem;
+}

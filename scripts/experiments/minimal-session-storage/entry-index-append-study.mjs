@@ -56,7 +56,7 @@ try {
   const ordered = [false, true, false, true, true, false, true, false, false, true];
   for (const [i, index] of ordered.entries()) {
     await db.query("truncate messages");
-    await db.query("drop index if exists study_lane_entries");
+    await db.query("drop index if exists messages_conversation_entry");
     if (index) await db.query(studyEntryIndexSql);
     assert.equal((await db.query(append("<3"))).rowCount, 3 * rows);
     await db.query("analyze messages");
@@ -67,7 +67,7 @@ try {
     ][0];
     const facts = await one(
       `select pg_wal_lsn_diff(pg_current_wal_insert_lsn(),$1::pg_lsn)::float8 as "walBytes",
-      coalesce(pg_relation_size(to_regclass('study_lane_entries')),0)::float8 as "entryIndexBytes",
+      coalesce(pg_relation_size(to_regclass('messages_conversation_entry')),0)::float8 as "entryIndexBytes",
       pg_indexes_size('messages')::float8 as "allMessageIndexBytes", pg_table_size('messages')::float8 as "messageTableBytes"`,
       [lsn],
     );

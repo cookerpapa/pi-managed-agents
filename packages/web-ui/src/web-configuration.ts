@@ -9,6 +9,7 @@ export const MANAGEMENT_SERVICES = [
 export type ManagementService = (typeof MANAGEMENT_SERVICES)[number];
 
 export interface WebConfiguration {
+  delegatedRunHistory?: true;
   productUrl: string;
   adminUrl: string;
   managementUrls: Record<ManagementService, string>;
@@ -39,6 +40,7 @@ export async function loadWebConfiguration(
     }
   }
   return {
+    ...(value.delegatedRunHistory === true ? { delegatedRunHistory: true as const } : {}),
     productUrl,
     adminUrl,
     managementUrls: Object.fromEntries(

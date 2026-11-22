@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { assertSubagentResultBudget } from "@pi-cloud/protocol";
-import { defineDocFamily, InboxDoc, LiveDoc } from "@earendil-works/pi-durable";
+import { AgentDoc, defineDocFamily, InboxDoc, LiveDoc } from "@earendil-works/pi-durable";
 
 // The creation receipt and conversation are one native commit. The projector
 // consumes the same creation kind as the existing child implementation.
@@ -48,6 +48,15 @@ export async function openDelegatedInvocation(api, storage, row, source, context
     const child = source
       ? await tx.forkConversation(source.lane, source.at, { ownership })
       : await tx.createConversation({ ownership });
+    const agent = await tx.doc(AgentDoc, child.id);
+    const denied = ["read", "write", "edit", "bash"].filter(
+      (name) => !row.grant?.tools.includes(name),
+    );
+    if (Array.isArray(agent.tools))
+      agent.tools = agent.tools.filter((name) => !denied.includes(name));
+    else agent.tools = { remove: [...new Set([...(agent.tools?.remove ?? []), ...denied])] };
+    if (row.grant) agent.cwd = row.grant.cwd;
+    else delete agent.cwd;
     receipt.conversationId = child.id;
     receipt.generationId = generation.id;
     return child.id;

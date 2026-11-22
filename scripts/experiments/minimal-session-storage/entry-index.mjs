@@ -1,3 +1,7 @@
-// Only installed in disposable comparison databases.
-export const studyEntryIndexSql =
-  "create index study_lane_entries on messages(tenant_id,pi_session_id,conversation_id,entry_id) where entry_id is not null";
+// Recover the exact candidate DDL when temporarily switching comparison arms.
+import { readFileSync } from "node:fs";
+const schema = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
+export const studyEntryIndexSql = schema
+  .split("\n")
+  .find((line) => line.startsWith("create index messages_conversation_entry "));
+if (!studyEntryIndexSql) throw Error("Missing candidate Conversation Entry index");

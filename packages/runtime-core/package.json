@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./canonical-pi-conversation": "./src/canonical-pi-conversation.ts",
     "./frozen-history": "./src/frozen-history.ts",
+    "./native-transcript-presentation": "./src/native-transcript-presentation.ts",
     "./root-message-history": "./src/root-message-history.ts",
     "./canonical-history-window": "./src/canonical-history-window.ts",
     "./history-position": "./src/history-position.ts",

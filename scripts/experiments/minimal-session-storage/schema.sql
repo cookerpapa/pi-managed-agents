@@ -18,6 +18,7 @@ create table messages (
     (entry_id is null and document_id is not null and role='pi.agent' and source_input_id is null and navigation_caption is null and assistant_entry_id is null and tool_task_id is null))
 );
 create unique index messages_entry on messages(tenant_id,pi_session_id,entry_id) where entry_id is not null;
+create index messages_conversation_entry on messages(tenant_id,pi_session_id,conversation_id,entry_id) where entry_id is not null;
 create index messages_agent_at on messages(tenant_id,pi_session_id,conversation_id,commit_seq desc,ordinal desc) where document_id is not null;
 create view message_entries as select * from messages where entry_id is not null;
 create function agent_config_at(t uuid,s uuid,lane bigint,through_seq bigint) returns setof messages language sql stable as $$

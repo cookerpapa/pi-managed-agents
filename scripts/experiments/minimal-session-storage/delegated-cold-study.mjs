@@ -124,6 +124,8 @@ for (const children of [1, 100, 500]) {
       assert(plans.root && plans.source);
       return plans;
     }
+    if (process.argv.includes("--compare-index"))
+      await pool.query("drop index messages_conversation_entry");
     const timings = await measureReads();
     const plans = await explainReads();
     let withTemporaryIndex, indexTimings, baselineRepeat;
@@ -132,7 +134,7 @@ for (const children of [1, 100, 500]) {
       await pool.query("analyze messages");
       indexTimings = await measureReads();
       withTemporaryIndex = await explainReads();
-      await pool.query("drop index study_lane_entries");
+      await pool.query("drop index messages_conversation_entry");
       baselineRepeat = await measureReads();
     }
     console.log(

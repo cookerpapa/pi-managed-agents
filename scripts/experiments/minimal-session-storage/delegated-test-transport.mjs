@@ -3,10 +3,7 @@
 import native from "@confluentinc/kafka-javascript";
 import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-consumer.ts";
 import { KafkaWorkerProducer } from "../../../packages/event-log/src/kafka-worker-producer.ts";
-import {
-  decodeSessionLogFact,
-  encodeSessionLogFact,
-} from "../../../packages/runtime-core/src/kafka-accepted-fact.ts";
+import { decodeWorkspaceFact, encodeWorkspaceFact } from "./workspace-operations.mjs";
 
 export async function openDelegatedTransport(brokers, topic, apply) {
   const kafka = new native.KafkaJS.Kafka({
@@ -25,7 +22,7 @@ export async function openDelegatedTransport(brokers, topic, apply) {
     replayOffsets: async (bounds) => new Map(bounds.map((b) => [b.partition, b.low])),
     decode: (v) => {
       try {
-        return decodeSessionLogFact(v).fact;
+        return decodeWorkspaceFact(v).fact;
       } catch (error) {
         for (const p of waiters.values()) p.reject(error);
         throw error;
@@ -90,7 +87,7 @@ export async function openDelegatedTransport(brokers, topic, apply) {
             producer.append(0, {
               sessionId: fact.scope.piSessionId,
               factId: fact.factId,
-              value: encodeSessionLogFact(fact),
+              value: encodeWorkspaceFact(fact),
             }),
             receipt.promise,
           ]);

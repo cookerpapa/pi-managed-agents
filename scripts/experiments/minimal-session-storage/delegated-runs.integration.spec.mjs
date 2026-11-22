@@ -31,9 +31,9 @@ import { openDelegatedTransport } from "./delegated-test-transport.mjs";
 import { loadSettledDelegations } from "./delegated-cold.mjs";
 
 const url = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
-it.skipIf(!url)(
-  "projects delegated Runs, delivers to a busy sibling and explicitly continues the original agent on a cold owner",
-  async () => {
+it.skipIf(!url).each([true, false])(
+  "projects delegated Runs and continues the original agent on a cold owner (caller retains read: %s)",
+  async (retainRead) => {
     const schema = "delegated_" + randomUUID().replaceAll("-", "");
     const pool = new pg.Pool({
       connectionString: url,
@@ -50,7 +50,8 @@ it.skipIf(!url)(
     const say = (s) => fauxAssistantMessage(s);
     const tool = (name, args, id) =>
       fauxAssistantMessage(fauxToolCall(name, args, id), { stopReason: "toolUse" });
-    let transport,
+    let queryChannel,
+      transport,
       scope,
       h,
       store,
@@ -64,7 +65,15 @@ it.skipIf(!url)(
     const effects = [],
       requests = [],
       errors = [];
-    const messagesAccepted = Promise.withResolvers();
+    const messagesAccepted = Promise.withResolvers(),
+      failure = Promise.withResolvers();
+    const checked = (p) =>
+      Promise.race([
+        p,
+        failure.promise.then((e) => {
+          throw e;
+        }),
+      ]);
     const projector = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
     projector.delegatedRuns = true;
     const env = {
@@ -102,7 +111,7 @@ it.skipIf(!url)(
           commit: { seq: p.seq, writes: p.writes, nextId: this.nextId },
           factId: randomUUID(),
           occurredAt: new Date().toISOString(),
-          tools: [],
+          tools: queryChannel ? await queryChannel.prepare(p.writes, scope) : [],
           display: [],
           cancellations: [],
           origins: [],
@@ -116,6 +125,17 @@ it.skipIf(!url)(
         "insert into runs(id,tenant_id,session_id,idempotency_key,mailbox_position,initial_input,model_ref,state) values($1,$2,$3,$1,$4,$5,'fake','queued')",
         [id, tenantId, piSessionId, position, prompt],
       );
+      await pool.query("update runs set workspace_grant=$1::jsonb where id=$2", [
+        JSON.stringify({
+          workspaceId: piSessionId,
+          volumeRoot: "/workspace",
+          cwd: "/workspace",
+          compute: "shared",
+          computeSessionId: piSessionId,
+          tools: position === 2 && !retainRead ? ["write"] : ["read", "write"],
+        }),
+        id,
+      ]);
       const rows = (await pool.query(claimBatchSql, [8])).rows;
       assert.deepEqual(
         rows.map((r) => r.id),
@@ -179,6 +199,7 @@ it.skipIf(!url)(
               return await exec(...args);
             } catch (e) {
               errors.push(e);
+              failure.resolve(e);
               throw e;
             }
           },
@@ -187,6 +208,9 @@ it.skipIf(!url)(
         defineExtension({
           name: "delegated-run-study",
           tools: [
+            ...["read", "write"].map((name) =>
+              register(name, Type.Object({}), () => assert.fail("file tool was not requested")),
+            ),
             register("fixture_delegate_pair", Type.Object({}), async (_args, api, context) => {
               const anchor = await api.commit(
                 async (tx) =>
@@ -200,7 +224,7 @@ it.skipIf(!url)(
                   api,
                   store,
                   control,
-                  { task: "ALPHA_JOB", mode: "branch", at: anchor },
+                  { task: "ALPHA_JOB", mode: "branch", at: anchor, workspace: { tools: ["read"] } },
                   context,
                   "alpha",
                 ),
@@ -208,7 +232,7 @@ it.skipIf(!url)(
                   api,
                   store,
                   control,
-                  { task: "BETA_JOB", mode: "fresh" },
+                  { task: "BETA_JOB", mode: "fresh", workspace: null },
                   context,
                   "beta",
                 ),
@@ -222,11 +246,13 @@ it.skipIf(!url)(
               "subagent_control",
               Type.Object({
                 action: Type.String(),
-                target: Type.String(),
-                message: Type.String(),
+                target: Type.Optional(Type.String()),
+                message: Type.Optional(Type.String()),
                 delivery: Type.Optional(Type.String()),
               }),
               async (args, api, context) => {
+                if (queryChannel && ["list", "status", "wait"].includes(args.action))
+                  return queryChannel.result(api.taskId, args);
                 if (args.action === "continue") {
                   const result = await runDelegation(
                     api,
@@ -270,7 +296,14 @@ it.skipIf(!url)(
         const messages = JSON.stringify(transcript.messages);
         requests.push(messages);
         const last = transcript.messages.at(-1);
+        const visible = new Set();
+        for (const m of transcript.messages.filter((m) => m.role === "system")) {
+          for (const tool of m.toolsRemoved ?? []) visible.delete(tool.name);
+          for (const tool of m.toolsAdded ?? []) visible.add(tool.name);
+        }
+        const fileTools = [...visible].filter((n) => n === "read" || n === "write").sort();
         if (messages.includes("RESUME_ALPHA") && messages.includes("ALPHA_JOB")) {
+          assert.deepEqual(fileTools, retainRead ? ["read"] : []);
           assert(
             messages.includes("ALPHA_PRIVATE") &&
               messages.includes("ROOT_TWO") &&
@@ -286,7 +319,17 @@ it.skipIf(!url)(
               !messages.includes("ALPHA_PRIVATE") &&
               !messages.includes("BETA_PRIVATE"),
           );
-          if (last.role === "toolResult") return say("root three finished");
+          if (last.role === "toolResult") {
+            if (queryChannel && queryChannel.seen.length < 3) {
+              const action = ["list", "status", "wait"][queryChannel.seen.length];
+              return tool(
+                "subagent_control",
+                { action, ...(action === "list" ? {} : { target: aId }) },
+                "query-" + action,
+              );
+            }
+            return say("root three finished");
+          }
           return tool(
             "subagent_control",
             { action: "continue", target: aId, message: "RESUME_ALPHA" },
@@ -294,8 +337,9 @@ it.skipIf(!url)(
           );
         }
         if (messages.includes("ALPHA_JOB")) {
+          assert.deepEqual(fileTools, ["read"]);
           assert(messages.includes("ROOT_TWO"));
-          await ready.promise;
+          await checked(ready.promise);
           if (sent < 2) {
             const mode = sent++ === 0 ? "steer" : "follow_up";
             return tool(
@@ -307,6 +351,7 @@ it.skipIf(!url)(
           return say("ALPHA_PRIVATE");
         }
         if (messages.includes("BETA_JOB")) {
+          assert.deepEqual(fileTools, []);
           assert(!messages.includes("ROOT_TWO"));
           const b = (await control.list()).agents.find((r) => r.task === "BETA_JOB");
           bId = b.agent_id;
@@ -319,7 +364,16 @@ it.skipIf(!url)(
           return tool("fixture_delegate_pair", {}, "family");
         return say("root done");
       }
-      fake.setResponses(Array.from({ length: 32 }, () => response));
+      fake.setResponses(
+        Array.from({ length: 32 }, () => async (t) => {
+          try {
+            return await response(t);
+          } catch (e) {
+            failure.resolve(e);
+            throw e;
+          }
+        }),
+      );
       h = await Harness.open(
         store,
         {
@@ -340,13 +394,24 @@ it.skipIf(!url)(
         await pool.query(await readFile(new URL(file, import.meta.url), "utf8"));
       await projector.install();
       await projector.reset(new Map([[0, 0n]]), 16, "recorded-history");
-      if (process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS)
-        transport = await openDelegatedTransport(
-          process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS.split(","),
-          topic,
-          (r, current) =>
-            projector.apply([r], current, (record, d) => projectRecord(record, d, env)),
-        );
+      if (process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS) {
+        const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS.split(",");
+        const { servingDelegatedQueries } = await import("./serving-delegated-queries.mjs");
+        queryChannel = await servingDelegatedQueries(brokers, url, schema);
+        const { WorkspaceOperationRouter } = await import("./workspace-operation-router.mjs");
+        const router = new WorkspaceOperationRouter({
+          pool,
+          view: projector,
+          env,
+          select: () => assert.fail(),
+          resolve: () => assert.fail(),
+        });
+        transport = await openDelegatedTransport(brokers, topic, async (r, current) => {
+          if (r.fact.kind === "durable_commit") await router.projectOperation(r, current);
+          else await projector.apply([r], current, (record, d) => projectRecord(record, d, env));
+          await queryChannel.dispatcher.consume(r, current, async () => true);
+        });
+      }
       await pool.query("insert into sessions values($1,$2)", [piSessionId, tenantId]);
       await startRoot(1, "ROOT_TWO");
       r2 = scope;
@@ -355,7 +420,7 @@ it.skipIf(!url)(
         { type: "input", requestId: scope.runId, content: "ROOT_TWO" },
         ctx,
       );
-      await ready.promise;
+      await checked(ready.promise);
       const before = (await control.list()).agents;
       const beta = before.find((r) => r.task === "BETA_JOB");
       const source = await one("select source_task_id from runs where id=$1", [beta.id]);
@@ -365,6 +430,7 @@ it.skipIf(!url)(
         taskId: Number(source.source_task_id),
         task: "BETA_JOB",
         mode: "fresh",
+        workspace: null,
       };
       assert.equal((await admitDelegatedRun(pool, r2, duplicate)).id, beta.id);
       await assert.rejects(
@@ -385,7 +451,7 @@ it.skipIf(!url)(
         pool.query("update runs set state='completed' where id=$1", [scope.runId]),
         /open child/,
       );
-      await messagesAccepted.promise;
+      await checked(messagesAccepted.promise);
       release.resolve();
       await root.waitForIdle(ctx);
       if (errors.length) throw errors[0];
@@ -463,6 +529,11 @@ it.skipIf(!url)(
           a2.state === "completed",
       );
       assert(requests.some((m) => m.includes("ALPHA_PRIVATE") && m.includes("RESUME_ALPHA")));
+      assert.deepEqual(
+        (await one("select workspace_grant from runs where id=$1", [a2.id])).workspace_grant
+          ?.tools ?? [],
+        retainRead ? ["read"] : [],
+      );
       const previous = await one("select native_lane from runs where id=$1", [aId]);
       assert.deepEqual(
         store.archiveReads.map((r) => r.lane),
@@ -478,7 +549,29 @@ it.skipIf(!url)(
           !own.includes("BETA_PRIVATE") &&
           !own.includes("ROOT_THREE"),
       );
+      if (queryChannel) {
+        assert.deepEqual(
+          queryChannel.seen.map(([a]) => a),
+          ["list", "status", "wait"],
+        );
+        assert(
+          queryChannel.seen[0][1].agents.some((r) => r.executionId === aId && r.runId === a2.id),
+        );
+        assert.equal(queryChannel.seen[1][1].state, "completed");
+        assert.equal(queryChannel.seen[2][1].output, "ALPHA_CONTINUED");
+      }
       await settleRoot(prevSeq);
+      if (process.env.PI_CLOUD_DELEGATED_BROWSER === "1") {
+        const { verifyDelegatedHistory } = await import("./delegated-history-browser.mjs");
+        await verifyDelegatedHistory({
+          url,
+          schema,
+          tenantId,
+          sessionId: piSessionId,
+          agentId: aId,
+          secondRunId: a2.id,
+        });
+      }
       assert.equal(claims, 2);
       assert.equal((await one("select count(*)::int n from sessions")).n, 1);
       assert.equal((await one("select count(*)::int n from runs where lease_id is not null")).n, 2);
@@ -491,6 +584,7 @@ it.skipIf(!url)(
         await h?.close(ctx);
       } finally {
         await transport?.close();
+        await queryChannel?.close();
         await pool.query("drop schema if exists " + schema + " cascade");
         await pool.end();
       }

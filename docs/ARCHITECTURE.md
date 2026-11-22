@@ -615,6 +615,8 @@ Worker Tool availability and Skill requirements use the same effective-capabilit
 resolver, including child grants, depth, roles and accepted device targets.
 Availability is independent of the prompt policy controlling proactive delegation.
 
+The #52 candidate reads addressed child history across invocations under one root Session and narrows Workspace capabilities on continuation. Its API and browser composition are opt-in. [Candidate contract](adr/0351-serving-delegated-history.md).
+
 Subagents are native child Conversations in the same Session family. Their identity
 and creation receipt survive parent interruption. Direct delegation recovers that
 receipt; management operations are unsafe for automatic replay.

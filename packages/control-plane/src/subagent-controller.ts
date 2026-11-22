@@ -44,6 +44,10 @@ export class SubagentController {
       allowInsecureHttp: boolean;
       treePolicy?: CloudSubagentTreePolicy;
       candidateMessages?: boolean;
+      delegatedReads?: Pick<
+        import("./delegated-history-reader.ts").DelegatedHistoryReader,
+        "readTool"
+      >;
       validateDirectory?(target: SubagentDirectoryTarget): Promise<void>;
       deliver?(lease: string, request: SubagentHostRequest): Promise<unknown>;
     },
@@ -182,7 +186,19 @@ export class SubagentController {
         call.toolName === "subagent"
           ? { action: "run" as const, ...prepareSubagentArguments(call.arguments) }
           : prepareSubagentControlArguments(call.arguments);
-      if (args.action === "run") {
+      if (
+        this.options.delegatedReads &&
+        (args.action === "list" || args.action === "status" || args.action === "wait")
+      ) {
+        const result = await this.options.delegatedReads.readTool(
+          scope.tenantId,
+          scope.piSessionId,
+          scope.runId,
+          args.action === "list" ? args : { action: args.action, target: args.target },
+        );
+        if (!result) return { waiting: true };
+        value = result;
+      } else if (args.action === "run") {
         const child = await this.#jobs.start({
           id: call.recovery?.operationId ?? call.operationId,
           tenantId: scope.tenantId,

@@ -64,6 +64,7 @@ import type {
 import { DEFAULT_EXCLUSIVE_WORKING_DIRECTORY } from "@pi-cloud/protocol";
 import { PiCloudApi } from "./api.ts";
 import { PiCloudApiError, newIdempotencyKey } from "@pi-cloud/session-client";
+import { delegatedHistoryUrl } from "./DelegatedAgentHistory.tsx";
 import { AccountMenu } from "./AccountMenu.tsx";
 import { AuthScreen } from "./AuthScreen.tsx";
 import { ConversationTreeNavigator } from "./ConversationTreeNavigator.tsx";
@@ -2184,6 +2185,9 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
             )}
           </div>
           <div className="product-topbar-actions">
+            {configuration.delegatedRunHistory && state.session && !selectedDelegatedSession ? (
+              <a href={delegatedHistoryUrl(state.session.sessionId)}>{t("agents.directory")}</a>
+            ) : null}
             <button
               type="button"
               disabled={state.session === null || selectedDelegatedSession !== null}

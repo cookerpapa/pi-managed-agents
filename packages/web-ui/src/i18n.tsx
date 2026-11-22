@@ -15,6 +15,13 @@ const STORAGE_KEY = "pi-cloud:ui-language";
 
 const zhCN = {
   "app.name": "Pi Managed Agents",
+  "agents.directory": "子 Agent",
+  "agents.history": "子 Agent 历史",
+  "agents.root": "返回主会话",
+  "agents.older": "加载更早的消息",
+  "agents.empty": "还没有子 Agent",
+  "agents.noHistory": "暂无历史消息",
+  "agents.compacted": "上下文已压缩",
   "schedule.title": "定时任务",
   "schedule.origin": "定时任务",
   "schedule.name": "名称",
@@ -580,6 +587,13 @@ export type UiTextKey = keyof typeof zhCN;
 
 const enUS: Record<UiTextKey, string> = {
   "app.name": "Pi Managed Agents",
+  "agents.directory": "Subagents",
+  "agents.history": "Subagent history",
+  "agents.root": "Back to conversation",
+  "agents.older": "Load earlier messages",
+  "agents.empty": "No subagents yet",
+  "agents.noHistory": "No history yet",
+  "agents.compacted": "Context compacted",
   "schedule.title": "Scheduled tasks",
   "schedule.origin": "Scheduled task",
   "schedule.name": "Name",

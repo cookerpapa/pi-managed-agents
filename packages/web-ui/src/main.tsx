@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { DelegatedAgentHistoryPage } from "./DelegatedAgentHistory.tsx";
 import ChatApp from "./ChatApp.tsx";
 import { I18nProvider } from "./i18n.tsx";
 import "./product.css";
@@ -8,13 +9,19 @@ import { loadWebConfiguration } from "./web-configuration.ts";
 const root = document.getElementById("root");
 if (root === null) throw new Error("Pi Managed Agents root element is missing");
 
+const params = new URLSearchParams(window.location.search);
+const session = params.get("session");
 const renderer = createRoot(root);
 void loadWebConfiguration().then(
   (configuration) =>
     renderer.render(
       <StrictMode>
         <I18nProvider>
-          <ChatApp configuration={configuration} />
+          {configuration.delegatedRunHistory && session && params.has("agents") ? (
+            <DelegatedAgentHistoryPage session={session} agent={params.get("agents") || null} />
+          ) : (
+            <ChatApp configuration={configuration} />
+          )}
         </I18nProvider>
       </StrictMode>,
     ),

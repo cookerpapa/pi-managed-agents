@@ -1,6 +1,11 @@
 // Control-side adapter for the root-only Session prototype. Native callers pass
 // stable operation IDs; the root claim remains the single execution authority.
 import assert from "node:assert/strict";
+import { isDeepStrictEqual } from "node:util";
+import {
+  childWorkspaceGrant,
+  continuedWorkspaceGrant,
+} from "@pi-cloud/subagent-control/delegated-workspace-grant";
 import { assertSubagentTaskInputBudget } from "@pi-cloud/protocol";
 
 export async function admitDelegatedRun(pool, scope, request) {
@@ -28,8 +33,31 @@ export async function admitDelegatedRun(pool, scope, request) {
       )
     ).rows[0];
     assert(owner, "Root writer is no longer active");
+    const caller = (
+      await db.query(
+        `select id,native_lane,state,workspace_grant from runs
+      where tenant_id=$1 and session_id=$2 and id=$3 and (id=$4 or root_run_id=$4)`,
+        [scope.tenantId, scope.piSessionId, callerRunId, scope.runId],
+      )
+    ).rows[0];
+    assert(
+      caller && (caller.id === scope.runId || caller.native_lane),
+      "Caller is outside this root",
+    );
     const existing = (await db.query("select * from runs where id=$1", [id])).rows[0];
     if (existing) {
+      const expected =
+        mode === "continue"
+          ? continuedWorkspaceGrant(
+              (
+                await db.query("select workspace_grant from runs where id=$1 and agent_id=$2", [
+                  existing.previous_run_id,
+                  agentId,
+                ])
+              ).rows[0]?.workspace_grant,
+              caller.workspace_grant,
+            )
+          : childWorkspaceGrant(caller.workspace_grant, request.workspace, agentId);
       assert(
         existing.root_run_id === scope.runId &&
           existing.caller_run_id === callerRunId &&
@@ -37,29 +65,20 @@ export async function admitDelegatedRun(pool, scope, request) {
           existing.context_mode === mode &&
           existing.initial_input === task &&
           Number(existing.source_task_id) === taskId &&
-          (mode !== "branch" || Number(existing.context_at) === at),
+          (mode !== "branch" || Number(existing.context_at) === at) &&
+          isDeepStrictEqual(existing.workspace_grant, expected),
         "Delegation identity changed",
       );
       await db.query("commit");
       return existing;
     }
-    const caller = (
-      await db.query(
-        `select id,native_lane from runs where tenant_id=$1 and session_id=$2
-      and id=$3 and (id=$4 or root_run_id=$4) and state='running'`,
-        [scope.tenantId, scope.piSessionId, callerRunId, scope.runId],
-      )
-    ).rows[0];
-    assert(
-      caller && (caller.id === scope.runId || caller.native_lane),
-      "Caller is not active in this root",
-    );
+    assert(caller.state === "running", "Caller is not active in this root");
     let previous,
       anchor = at;
     if (mode === "continue") {
       previous = (
         await db.query(
-          `select r.id,r.state,r.native_lane from runs r where r.tenant_id=$1 and r.session_id=$2
+          `select r.id,r.state,r.native_lane,r.workspace_grant from runs r where r.tenant_id=$1 and r.session_id=$2
         and r.agent_id=$3 and not exists(select 1 from runs n where n.previous_run_id=r.id)`,
           [scope.tenantId, scope.piSessionId, agentId],
         )
@@ -80,11 +99,14 @@ export async function admitDelegatedRun(pool, scope, request) {
       assert(tail, "Previous conversation has no continuation anchor");
       anchor = tail.entry_id;
     }
+    const grant = previous
+      ? continuedWorkspaceGrant(previous.workspace_grant, caller.workspace_grant)
+      : childWorkspaceGrant(caller.workspace_grant, request.workspace, agentId);
     const row = (
       await db.query(
         `insert into runs(id,tenant_id,session_id,idempotency_key,initial_input,model_ref,state,root_run_id,
-        caller_run_id,agent_id,previous_run_id,source_task_id,context_mode,context_at)
-      values($1,$2,$3,$1,$4,$5,'preparing',$6,$7,$8,$9,$10,$11,$12) returning *`,
+        caller_run_id,agent_id,previous_run_id,source_task_id,context_mode,context_at,workspace_grant)
+      values($1,$2,$3,$1,$4,$5,'preparing',$6,$7,$8,$9,$10,$11,$12,$13::jsonb) returning *`,
         [
           id,
           scope.tenantId,
@@ -98,6 +120,7 @@ export async function admitDelegatedRun(pool, scope, request) {
           taskId,
           mode,
           anchor,
+          grant === null ? null : JSON.stringify(grant),
         ],
       )
     ).rows[0];
@@ -138,7 +161,7 @@ export async function delegatedSource(pool, row) {
 // logical operation and the native source returned by the adapter.
 export function delegatedControl(pool, scope) {
   return {
-    async start({ operationId, callerLane, taskId, task, mode, agentId, at }) {
+    async start({ operationId, callerLane, taskId, task, mode, agentId, at, workspace }) {
       const caller =
         callerLane === 1
           ? scope.runId
@@ -155,6 +178,7 @@ export function delegatedControl(pool, scope) {
         taskId,
         task,
         mode,
+        workspace,
         agentId,
         at,
       });
@@ -162,6 +186,7 @@ export function delegatedControl(pool, scope) {
         id: row.id,
         agentId: row.agent_id,
         task: row.initial_input,
+        grant: row.workspace_grant,
         source: await delegatedSource(pool, row),
         sourceTaskId: Number(row.source_task_id),
       };

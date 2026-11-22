@@ -26,10 +26,19 @@ function checkShape(op) {
     fields(op, ["action", "operationId", "taskId", "conversationId"]);
   }
 }
+function delegationReference(t) {
+  return (
+    t?.target === "control" &&
+    ["subagent", "subagent_control"].includes(t.toolName) &&
+    t.bindingId === undefined &&
+    t.environment === undefined &&
+    t.implementation === undefined
+  );
+}
 export function encodeWorkspaceFact(fact) {
   const { workspaceOperations, ...base } = fact;
   assert(
-    !base.tools?.length &&
+    (base.tools ?? []).every(delegationReference) &&
       !base.cancellations?.length &&
       !(base.kind === "path_probe" && base.execution),
     "Worker cannot publish a routed operation",
@@ -42,7 +51,7 @@ export function encodeWorkspaceFact(fact) {
 export function decodeWorkspaceFact(bytes) {
   const { workspaceOperations = [], ...wire } = JSON.parse(bytes.toString());
   assert(
-    !wire.tools?.length &&
+    (wire.tools ?? []).every(delegationReference) &&
       !wire.cancellations?.length &&
       !(wire.kind === "path_probe" && wire.execution),
     "Worker sent a routed command",

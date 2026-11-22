@@ -4,6 +4,7 @@ alter table runs
   add foreign key(tenant_id,session_id) references sessions(tenant_id,id),
   alter mailbox_position drop not null,
   drop constraint runs_state_check,
+  add workspace_grant jsonb check(workspace_grant is null or (jsonb_typeof(workspace_grant)='object' and octet_length(workspace_grant::text)<=16384)),
   add root_run_id uuid references runs(id),
   add caller_run_id uuid references runs(id),
   add agent_id uuid references runs(id),

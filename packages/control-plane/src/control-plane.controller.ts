@@ -1,3 +1,4 @@
+import { abortableHistoryRead } from "./abortable-history-read.ts";
 import { SessionScheduleService } from "./session-schedule-service.ts";
 import { parseScheduleChange, parseDeleteSchedule } from "@pi-cloud/protocol";
 import { withDatabaseReadSignal } from "@pi-cloud/database";
@@ -1511,20 +1512,5 @@ function validateHistoryQuery(value: unknown) {
     return parseConversationHistoryQuery(value ?? {});
   } catch {
     throw new ControlPlaneApiValidationError("Invalid history position");
-  }
-}
-async function abortableHistoryRead<T>(
-  request: FastifyRequest,
-  read: (signal: AbortSignal) => Promise<T>,
-): Promise<T> {
-  const abort = new AbortController();
-  const closed = () => abort.abort(new Error("History reader disconnected"));
-  request.raw.once("aborted", closed);
-  request.raw.socket.once("close", closed);
-  try {
-    return await read(abort.signal);
-  } finally {
-    request.raw.off("aborted", closed);
-    request.raw.socket.off("close", closed);
   }
 }

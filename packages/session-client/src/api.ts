@@ -1,3 +1,4 @@
+import { parseDelegatedAgentDirectory, parseDelegatedAgentHistory } from "@pi-cloud/protocol";
 import {
   parseExecutionTargetList,
   parseSessionExecutionTarget,
@@ -212,6 +213,33 @@ export class SessionApi {
       this.#authorizationToken,
     );
     return value === null ? null : parseConversationCompactResource(value);
+  }
+  async listDelegatedAgents(root: string, cursor?: string, signal?: AbortSignal) {
+    const url =
+      `/v1/conversations/${encodeURIComponent(root)}/agents` +
+      (cursor ? "?cursor=" + encodeURIComponent(cursor) : "");
+    return parseDelegatedAgentDirectory(
+      await request(
+        this.#fetch,
+        url,
+        { method: "GET", ...(signal ? { signal } : {}) },
+        this.#authorizationToken,
+      ),
+    );
+  }
+
+  async delegatedAgentHistory(root: string, agent: string, before?: string, signal?: AbortSignal) {
+    const url =
+      `/v1/conversations/${encodeURIComponent(root)}/agents/${encodeURIComponent(agent)}/history` +
+      (before ? "?before=" + encodeURIComponent(before) : "");
+    return parseDelegatedAgentHistory(
+      await request(
+        this.#fetch,
+        url,
+        { method: "GET", ...(signal ? { signal } : {}) },
+        this.#authorizationToken,
+      ),
+    );
   }
   async getConversation(
     sessionId: string,

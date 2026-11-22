@@ -1,3 +1,5 @@
+import { DelegatedHistoryController } from "./delegated-history-controller.ts";
+import { DelegatedHistoryReader } from "./delegated-history-reader.ts";
 import { McpConnectionController } from "./mcp/connection-controller.ts";
 import { McpConnectionService } from "./mcp/connection-service.ts";
 import { ResourceBackendController } from "./resource-backend-controller.ts";
@@ -60,6 +62,7 @@ export type ControlPlaneModuleOptions = Omit<
   ControlPlaneStoreOptions,
   "tenantId" | "defaultModelProfileId"
 > & {
+  delegatedRunHistory?: boolean;
   mcp?: McpConnectionService;
   executionTargets?: ExecutionTargetService;
   schedules?: SessionScheduleService;
@@ -133,6 +136,7 @@ export class ControlPlaneModule {
     return {
       module: ControlPlaneModule,
       controllers: [
+        ...(options.delegatedRunHistory ? [DelegatedHistoryController] : []),
         McpConnectionController,
         ResourceBackendController,
         WorkspaceCapacityController,
@@ -143,6 +147,16 @@ export class ControlPlaneModule {
         WorkspaceFileTransferController,
       ],
       providers: [
+        ...(options.delegatedRunHistory
+          ? [
+              {
+                provide: DelegatedHistoryReader,
+                useValue: new DelegatedHistoryReader(
+                  options.conversationReadDatabase ?? options.database,
+                ),
+              },
+            ]
+          : []),
         {
           provide: McpConnectionService,
           useValue: options.mcp ?? new McpConnectionService(options.database),

@@ -2,6 +2,8 @@
 
 [ADR-0352](0352-retire-workflow-tool.md) retires sandbox-scripted delegation in the candidate and retains native subagent tools.
 
+[ADR-0351](0351-serving-delegated-history.md) defines the candidate delegated directory, child history and Workspace grants on continuation.
+
 [ADR-0350](0350-lazy-delegated-history.md) loads the settled root at admission and a child transcript at explicit continuation in the #52 prototype.
 
 [ADR-0349](0349-delegated-runs-prototype.md) tests root-only Sessions and separately addressed delegated Runs in #52.
