@@ -233,7 +233,13 @@ models.setProvider({
     return stream;
   },
 });
-const oldAnswer = "PREVIOUS_PG_ONLY_ANSWER";
+const oldAnswer = init.oldAnswer ?? "PREVIOUS_PG_ONLY_ANSWER";
+const laterRun = ["later-run", "later-run-compacted"].includes(mode);
+let priorAnswerInFinalRequest = false;
+const sawPriorAnswer = (context) =>
+  context.messages.some(
+    (m) => m.role === "assistant" && hashKey(textOf(m)) === init.priorAnswerHash,
+  );
 
 const command =
   'printf "once\\n" >> executions; while [ ! -f release ]; do sleep 0.1; done; cat result';
@@ -254,6 +260,8 @@ function checkCompacted(context) {
 }
 function beginParent(context) {
   parentModelCalls++;
+  if (laterRun)
+    assert(sawPriorAnswer(context), "Initial model call of second Run lost the preceding answer");
   if (claim)
     assert(
       context.messages.some(
@@ -270,7 +278,11 @@ function beginParent(context) {
 }
 function finishParent(context) {
   parentModelCalls++;
-  if (twice) checkCompacted(context);
+  if (twice || mode === "later-run-compacted") checkCompacted(context);
+  if (laterRun) {
+    priorAnswerInFinalRequest = sawPriorAnswer(context);
+    assert(priorAnswerInFinalRequest, "Recovered parent model lost the preceding answer");
+  }
   const text = resultText(context, "delegate");
   assert.match(
     text,
@@ -313,7 +325,7 @@ function finishChild(context) {
   );
 }
 parentModel.setResponses([
-  ...(twice && !takeover
+  ...((twice || init.compactSeed) && !takeover
     ? [
         fauxAssistantMessage("old text ".repeat(600)),
         fauxAssistantMessage("recent text ".repeat(240)),
@@ -495,7 +507,9 @@ try {
   }
   await producer.start();
   await mailbox.start();
-  const prior = await loadPriorRoot(db, scope, store);
+  const prior = init.atomicHandoff && takeover ? undefined : await loadPriorRoot(db, scope, store);
+  if (presentation && claim && !takeover)
+    presentation.sequences.set(scope.sessionId, Number(claim.request.nextEventSeq) - 1);
   if (takeover) {
     const start = performance.now();
     let pgEvidence = {};
@@ -545,6 +559,10 @@ try {
               intents: rows.intents,
               stats: {
                 candidateEntries: rows.entries.length,
+                priorPgEntries: rows.entries.filter(
+                  (e) => Number(e.commit_seq) <= rows.settledThrough,
+                ).length,
+                baseSequence: rows.settledThrough,
                 sealNativeSeq: native.seq,
                 source: "worker-session-host/sealed-candidate-pg",
               },
@@ -647,7 +665,10 @@ try {
       remoteTools: [],
       infrastructureTools: [delegate, workspaceBash],
       settings: {
-        compaction: { enabled: false, ...(twice ? { keepRecentTokens: 64 } : {}) },
+        compaction: {
+          enabled: false,
+          ...(twice || init.compactSeed ? { keepRecentTokens: 64 } : {}),
+        },
         retry: { maxRetries: 0 },
       },
     });
@@ -744,7 +765,7 @@ try {
         send("error", { message: e.message });
       }
     });
-    if (twice) {
+    if (twice || init.compactSeed) {
       for (const text of ["expired-history-marker " + "old ".repeat(1500), "keep the tail"]) {
         const seed = await root.submit({ type: "input", content: text }, ctx);
         await root.waitForIdle(ctx);
@@ -822,6 +843,7 @@ try {
     assert.equal((await store.submissionByRequest(child.id, queuedKey, ctx)).status, "done");
     send("finished", {
       finalModelAt,
+      ...(laterRun ? { priorAnswerInFinalRequest } : {}),
       parentText: textOf(rootHistory.at(-1)),
       results: results.length,
       newIntents,

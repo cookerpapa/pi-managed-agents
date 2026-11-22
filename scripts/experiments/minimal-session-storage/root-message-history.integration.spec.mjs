@@ -208,7 +208,7 @@ it("binds the cold root projection to the sealed writer, the exact next native c
   const c = new pg.Client({ connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL });
   await c.connect();
   try {
-    await c.query(`create temporary table runs(id uuid,session_id uuid,tenant_id uuid,lease_id uuid,fencing_token int,mailbox_position bigint,native_work_handoff jsonb,projection_tools jsonb,projection_pin bigint);
+    await c.query(`create temporary table runs(id uuid,session_id uuid,tenant_id uuid,lease_id uuid,fencing_token int,mailbox_position bigint,native_work_handoff jsonb,projection_tools jsonb,projection_pin bigint,history_head jsonb,state text);
       create temporary table session_leases(tenant_id uuid,lease_id uuid,pi_session_id text,fencing_token int,writer_seal_offset bigint,released_at timestamptz);
       create temporary table inboxes(tenant_id uuid,pi_session_id uuid,doc_id bigint,conversation_id int,commit_seq bigint,items jsonb)`);
     const session = randomUUID(),
@@ -264,6 +264,18 @@ it("binds the cold root projection to the sealed writer, the exact next native c
     ]) {
       await expect(reopenRootProjection(c, s, p, seq)).rejects.toThrow(/sealed root|sealed input/);
     }
+    await c.query("update runs set mailbox_position=2");
+    await expect(reopenRootProjection(c, scope, point, 10)).rejects.toThrow("Missing predecessor");
+    await c.query(
+      "insert into runs(id,tenant_id,session_id,mailbox_position,history_head,state) values($1,$2,$3,1,$4,'completed')",
+      [randomUUID(), scope.tenantId, session, { seq: 5, nextId: 12, floor: 7 }],
+    );
+    await c.query("insert into inboxes values($1,$2,16,15,9,'[]')", [scope.tenantId, session]);
+    expect(await reopenRootProjection(c, scope, point, 10)).toMatchObject({
+      floor: 7,
+      baseSeq: 5,
+      inboxes: { 4: { conversation: 1 }, 16: { conversation: 15 } },
+    });
     await c.query("update inboxes set commit_seq=10");
     await expect(reopenRootProjection(c, scope, point, 10)).rejects.toThrow("sealed input");
   } finally {

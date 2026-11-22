@@ -2,6 +2,9 @@
 
 ## Minimal Session storage feasibility
 
+- [ ] Serve child Conversation history and terminal status from the candidate. The later-Run acceptance found the actual child answer in PG and the parent, while the child HTTP page omitted it and the status view returned `unknown`. [Observed boundary](reports/later-root-handoff-20261122.md).
+- [x] Recover an interrupted second Run after a settled root, with a retained or compacted predecessor, original child reply, and no legacy native writes. [Results](reports/later-root-handoff-20261122.md).
+
 - [x] Verify two consecutive Worker losses during the first root Run with a real parent compaction, original child Bash wait, and both an edited Inbox and a claimant lost before native open. [Repeated family handoff](reports/repeated-family-handoff-20261122.md).
 
 - [x] Verify atomic elastic retention on candidate chat admission, including expiry races, duplicate input and the first provider request on preferred and cold Workers. [Decision and evidence](adr/0346-elastic-retention-at-run-admission.md).

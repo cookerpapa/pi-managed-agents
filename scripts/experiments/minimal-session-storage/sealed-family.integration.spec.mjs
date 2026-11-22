@@ -71,7 +71,7 @@ it.skipIf(!source)(
       await sql.raw("create schema " + schema).execute(admin);
       await sql
         .raw(
-          `create table runs(id uuid,tenant_id uuid,session_id uuid,turn_id uuid,lease_id uuid,fencing_token bigint,state text,mailbox_position int,recovery_requested_at timestamptz,output_seal_id uuid,output_first_topic text,output_first_partition int,output_first_offset bigint,native_work_handoff jsonb,projection_tools jsonb);
+          `create table runs(id uuid,tenant_id uuid,session_id uuid,turn_id uuid,lease_id uuid,fencing_token bigint,state text,mailbox_position int,recovery_requested_at timestamptz,output_seal_id uuid,output_first_topic text,output_first_partition int,output_first_offset bigint,native_work_handoff jsonb,projection_tools jsonb,history_head jsonb);
       create table session_leases(tenant_id uuid,pi_session_id text,lease_id uuid,fencing_token bigint,writer_sealed_at timestamptz,writer_seal_offset bigint,released_at timestamptz,writer_failed_at timestamptz);
       create table messages(tenant_id uuid,pi_session_id text,run_id uuid,entry_id bigint,conversation_id bigint,commit_seq bigint,ordinal int,content text);
       create table inboxes(tenant_id uuid,pi_session_id text,doc_id bigint,conversation_id bigint,created_seq bigint,commit_seq bigint,items jsonb)`,
@@ -177,6 +177,53 @@ it.skipIf(!source)(
       expect(Number(await store.mintId())).toBe(4);
       expect(Number(store.prepareCommit([]).seq)).toBe(3);
       await store.close(ctx);
+      // The third Run can need an Entry written two Runs ago. Only the
+      // settled root range belongs to its base. A missing retained body fails closed.
+      await db.transaction().execute(async (tx) => {
+        const origin = randomUUID(),
+          priorRun = randomUUID(),
+          text = JSON.stringify({ id: 3, conversationId: 1, kind: "old" });
+        const head = {
+          version: randomUUID(),
+          seq: 1,
+          nextId: 4,
+          floor: 3,
+          count: 1,
+          bytes: Buffer.byteLength(text),
+        };
+        await sql`update runs set mailbox_position=3 where id=${scope.runId}::uuid`.execute(tx);
+        await sql`insert into runs(id,tenant_id,session_id,mailbox_position,state,history_head) values
+          (${priorRun}::uuid,${scope.tenantId}::uuid,${scope.sessionId}::uuid,2,'completed',${JSON.stringify(head)}::jsonb),
+          (${origin}::uuid,${scope.tenantId}::uuid,${scope.sessionId}::uuid,1,'completed',null)`.execute(
+          tx,
+        );
+        await sql`insert into messages values
+          (${scope.tenantId}::uuid,${scope.piSessionId},${origin}::uuid,3,1,1,0,${text}),
+          (${scope.tenantId}::uuid,${scope.piSessionId},${origin}::uuid,2,1,1,1,'discarded before floor'),
+          (${scope.tenantId}::uuid,${scope.piSessionId},${scope.runId}::uuid,4,1,3,0,'past the seal')`.execute(
+          tx,
+        );
+        // readSealedFamily owns its own REPEATABLE READ transaction; commit
+        // setup for the real reader below, not an uncommitted savepoint.
+      });
+      const later = await readSealedFamily(db, successor, topic);
+      expect(later.settledThrough).toBe(1);
+      expect(later.entries.map((e) => JSON.parse(e.content).kind)).toEqual(["old"]);
+      await sql`delete from messages where commit_seq=1 and entry_id=3`.execute(db);
+      await expect(readSealedFamily(db, successor, topic)).rejects.toThrow(/Incomplete inherited/);
+      await sql`delete from runs where id<>${scope.runId}::uuid`.execute(db);
+      await expect(readSealedFamily(db, successor, topic)).rejects.toThrow(
+        /Missing matched settled/,
+      );
+      await expect(
+        db
+          .transaction()
+          .execute((tx) =>
+            saveSealedFamily(tx, successor, { ...position, offset: 20n }, seal, family.snapshot()),
+          ),
+      ).rejects.toThrow(/requested Run seal/);
+      await sql`update runs set mailbox_position=1`.execute(db);
+      await sql`delete from messages`.execute(db);
       // One current root, one child inheriting an older parent cutoff, and an
       // unrelated idle lane. The waiting tool pins one entry before compaction.
       const bounded = new AcceptedFamilyCheckpoint();

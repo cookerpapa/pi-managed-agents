@@ -218,13 +218,11 @@ export async function readPrefix(db, row, head, cache) {
   return { records, status: hit ? "hit" : "cold", readBytes: hit ? 0 : bytes };
 }
 
-export function restoreSettled(store, row, head, records) {
-  if (!head.version) return;
-  const groups = new Map();
-  const add = (seq, write) => {
-    if (!groups.has(seq)) groups.set(seq, []);
-    groups.get(seq).push(write);
-  };
+// Non-Entry records reconstructed at normal cold open. The recovery fold
+// needs these identities and values, but never needs to read prior Entry bodies.
+export function settledRootWrites(row, head) {
+  const records = [];
+  const add = (seq, write) => records.push({ seq, write });
   add(1, { type: "conversation", value: { id: 1 } });
   add(head.seq, {
     type: "document.create",
@@ -257,6 +255,17 @@ export function restoreSettled(store, row, head, records) {
     add(Number(v.seq), agentBaseWrite(Number(v.id), JSON.parse(v.content)));
   } else if (Object.values(head.agentRoutes ?? {}).includes(1))
     throw Error("Settled root lacks its agent configuration");
+  return records;
+}
+
+export function restoreSettled(store, row, head, records) {
+  if (!head.version) return;
+  const groups = new Map();
+  const add = (seq, write) => {
+    if (!groups.has(seq)) groups.set(seq, []);
+    groups.get(seq).push(write);
+  };
+  for (const { seq, write } of settledRootWrites(row, head)) add(seq, write);
   for (const r of records) add(r.seq, { type: "entry", value: r.entry });
   for (const [seq, writes] of [...groups].sort(([a], [b]) => a - b))
     store.prepareCommit(writes, seq).apply();

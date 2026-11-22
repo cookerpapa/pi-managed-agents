@@ -1,0 +1,53 @@
+{
+  "results": [
+    {
+      "mode": "later-run",
+      "terminal": "completed",
+      "mailboxPosition": 2,
+      "previousRunCompacted": false,
+      "previousAnswerInFinalRequest": true,
+      "originalReplyBeforeReclaim": false,
+      "firstRunKafkaRemoved": true,
+      "sealedPrefixUnavailableBeforeB": true,
+      "originalRunReclaimed": true,
+      "guestExecutions": 1,
+      "canonicalBashResults": 1,
+      "replacementBashIntents": 0,
+      "publicChildView": false,
+      "publicChildAnswer": false,
+      "publicChildTurns": 1,
+      "subagentStatus": "unknown",
+      "candidateChildAnswer": true,
+      "childTerminalEvents": 0,
+      "projectorColdRestart": false,
+      "sealedEntries": 8,
+      "inheritedEntries": 3,
+      "publicChildBashResults": 0
+    },
+    {
+      "mode": "later-run-compacted",
+      "terminal": "completed",
+      "mailboxPosition": 2,
+      "previousRunCompacted": true,
+      "previousAnswerInFinalRequest": true,
+      "originalReplyBeforeReclaim": true,
+      "firstRunKafkaRemoved": true,
+      "sealedPrefixUnavailableBeforeB": true,
+      "originalRunReclaimed": true,
+      "guestExecutions": 1,
+      "canonicalBashResults": 1,
+      "replacementBashIntents": 0,
+      "publicChildView": false,
+      "publicChildAnswer": false,
+      "publicChildTurns": 1,
+      "subagentStatus": "unknown",
+      "candidateChildAnswer": true,
+      "childTerminalEvents": 0,
+      "projectorColdRestart": false,
+      "sealedEntries": 10,
+      "inheritedEntries": 5,
+      "publicChildBashResults": 0
+    }
+  ],
+  "cleanupVerified": true
+}

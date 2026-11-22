@@ -9,21 +9,22 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
   const {
     rows: [r],
   } = await pool.query(
-    `select r.native_work_handoff as h,r.projection_tools,r.projection_pin,
-      i.doc_id,i.commit_seq,i.items,old.writer_seal_offset,old.fencing_token as predecessor
+    `select r.native_work_handoff as h,r.projection_tools,r.projection_pin,r.mailbox_position,
+      (select p.history_head from runs p where r.mailbox_position>1 and p.tenant_id=r.tenant_id and p.session_id=r.session_id
+        and p.mailbox_position=r.mailbox_position-1 and p.state in ('completed','cancelled')) as prior_head,
+      (select jsonb_agg(jsonb_build_object('id',i.doc_id::text,'lane',i.conversation_id::text,'seq',i.commit_seq::text,'items',i.items)) from inboxes i where i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id) as queues,old.writer_seal_offset,old.fencing_token as predecessor
     from runs r join session_leases active on active.tenant_id=r.tenant_id and active.lease_id=r.lease_id
     left join session_leases old on old.tenant_id=r.tenant_id and old.pi_session_id=active.pi_session_id
       and old.lease_id=(r.native_work_handoff#>>'{scope,writerId}')::uuid and old.released_at is not null
-    left join inboxes i on i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id and i.conversation_id=1
     where r.id=$1 and r.session_id=$2 and r.tenant_id=$3 and r.lease_id=$4 and r.fencing_token=$5
-      and active.fencing_token=r.fencing_token and active.pi_session_id=$2::uuid::text and r.mailbox_position=1`,
+      and active.fencing_token=r.fencing_token and active.pi_session_id=$2::uuid::text`,
     [scope.runId, scope.piSessionId, scope.tenantId, scope.writerId, scope.fencingToken],
   );
   assert(r?.h, "No sealed root projection for the admitted writer");
   const h = r.h,
     state = JSON.parse(h.nativeText);
   assert(
-    r.doc_id &&
+    r.queues?.some((q) => Number(q.lane) === 1) &&
       h.scope.runId === scope.runId &&
       h.scope.turnId === scope.turnId &&
       h.scope.sessionId === scope.sessionId &&
@@ -36,9 +37,18 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
       h.partition === position.partition &&
       BigInt(h.offset) < position.offset &&
       state.seq + 1 === sequence &&
-      Number(r.commit_seq) <= state.seq,
+      r.queues.every((q) => Number(q.seq) <= state.seq),
     "Root projection does not match sealed input",
   );
+  if (Number(r.mailbox_position) > 1)
+    assert(
+      r.prior_head &&
+        Number.isSafeInteger(r.prior_head.floor) &&
+        r.prior_head.floor >= 1 &&
+        r.prior_head.nextId <= state.nextId &&
+        r.prior_head.seq < state.seq,
+      "Missing predecessor at projection reopen",
+    );
   const writes = state.records.map((v) => v.write),
     liveDocs = foldLive({}, writes);
   const human = writes.find(
@@ -61,8 +71,8 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
     writer: scope.writerId,
     seq: state.seq,
     nextId: state.nextId,
-    baseSeq: 0,
-    floor: marker?.floor ?? 1,
+    baseSeq: r.prior_head?.seq ?? 0,
+    floor: marker?.floor ?? r.prior_head?.floor ?? 1,
     markerId: marker?.id,
     floorChanged: true,
     count: 0,
@@ -72,6 +82,8 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
     pendingTools: r.projection_tools,
     ...(r.projection_pin == null ? {} : { pinOffset: BigInt(r.projection_pin) }),
     ...(human ? { rootInputDoc: { id: human.record.id, value: human.content.value } } : {}),
-    inboxes: { [r.doc_id]: { conversation: 1, value: { items: r.items } } },
+    inboxes: Object.fromEntries(
+      r.queues.map((q) => [q.id, { conversation: Number(q.lane), value: { items: q.items } }]),
+    ),
   };
 }

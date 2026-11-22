@@ -10,6 +10,8 @@
 
 - [Ordinary root conversation on the new message store](normal-root-message-store-20261122.md) follows both a browser refresh during Bash and a cold continuation across API and Projector restart.
 
+- [Later-Run family recovery](later-root-handoff-20261122.md) covers a previous root answer, real compaction and an early or late Guest reply. It identifies the separate child HTTP history gap.
+
 - [Repeated Worker loss during a compacted family Run](repeated-family-handoff-20261122.md) verifies the original reply and latest Inbox across A, B and C.
 
 - [Atomic recovery after Worker and Projector process loss](atomic-family-handoff-20261122.md) verifies the new store, original reply, public family history and a rolled-back recovery seal.

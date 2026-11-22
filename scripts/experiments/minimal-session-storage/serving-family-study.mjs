@@ -1,7 +1,7 @@
 // All authority and Session log traffic here must use the disposable cluster.
 // The installed completion service only sees the fixture's original reply Topic.
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import pg from "pg";
 import { sql } from "kysely";
@@ -25,6 +25,8 @@ import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-consumer.ts";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
+import { settledFamilyBase } from "./settled-family-base.mjs";
+import { normalRootProjection } from "./normal-root-projection.mjs";
 import { projectRecord } from "./project-record.mjs";
 import { compareQueuedRequests, installStudyHandoff, SealStudy } from "./pg-family-handoff.mjs";
 import { familyWorker, until } from "./family-process.mjs";
@@ -48,7 +50,12 @@ assert(
 // The dual-store comparator keeps control tables (including its own Kafka
 // offset) in public. The candidate-only Inbox is in the second schema.
 const controlUrl = new URL(dbUrl);
-if (atomicHandoff) controlUrl.searchParams.set("options", "-c search_path=public,candidate");
+const laterCandidate = ["later-run", "later-run-compacted"].includes(scene);
+if (atomicHandoff)
+  controlUrl.searchParams.set(
+    "options",
+    laterCandidate ? "-c search_path=candidate,public" : "-c search_path=public,candidate",
+  );
 const database = createDatabase({ connectionString: controlUrl.href, maxConnections: 10 });
 const pool = new pg.Pool({
   connectionString: dbUrl,
@@ -110,12 +117,69 @@ const newRouter = () =>
     resolve: (id) => resources.get(id),
   });
 let router = newRouter();
+async function previousTurn(session, compactSeed) {
+  const marker = "Previous answer " + randomUUID();
+  const first = await api.acceptTurn(
+    session.sessionId,
+    "Remember the workspace reference " + randomUUID(),
+    randomUUID(),
+  );
+  const s = { mode: "seed", seq: 0 };
+  cases.set(first.runId, s);
+
+  const worker = familyWorker({
+    mode: "seed",
+    oldAnswer: marker,
+    compactSeed,
+    dbUrl: readerUrl.toString(),
+    controlUrl: dbUrl,
+    runId: first.runId,
+    topic,
+    brokers,
+    replyBrokers,
+    pgHandoff,
+    atomicHandoff,
+  });
+  try {
+    const claimed = await worker.wait("claimed");
+    replyBoots.add(claimed.bootId);
+    worker.proc.send({ kind: "start" });
+    await worker.wait("seedFinished");
+    assert.equal((await worker.ended).code, 0);
+    await until(async () => {
+      await projector.checkHealth();
+      return (
+        await pool.query(
+          "select 1 from runs where id=$1 and state='completed' and history_head is not null",
+          [first.runId],
+        )
+      ).rowCount;
+    }, "settled first Run head");
+    assert.equal(first.mailboxPosition, 1);
+    assert(JSON.stringify(await api.getConversation(session.sessionId)).includes(marker));
+    const [end] = await sessionAdmin.fetchTopicOffsets(topic);
+    const low = String(end.high ?? end.offset);
+    await sessionAdmin.deleteTopicRecords({ topic, partitions: [{ partition: 0, offset: low }] });
+    await until(
+      async () => BigInt((await sessionAdmin.fetchTopicOffsets(topic))[0].low) >= BigInt(low),
+      "first Run prefix rotation",
+    );
+    return { marker, run: first.runId };
+  } finally {
+    await worker.close();
+  }
+}
+
 async function scenario(guest, mode, replacement) {
   const prompt = "Delegate to the child " + randomUUID(),
     project = await api.createProject(mode),
     session = await api.createSession(project.projectId, project.workspaceId, mode, "elastic"),
+    previous = laterCandidate
+      ? await previousTurn(session, mode === "later-run-compacted")
+      : undefined,
     input = await api.acceptTurn(session.sessionId, prompt, randomUUID());
   assert(input.runId && input.state === "queued");
+  if (previous) assert.equal(input.mailboxPosition, 2);
   const stopped = mode === "user-stop" || mode === "active-stop";
   const runId = input.runId,
     binding = randomUUID(),
@@ -156,6 +220,9 @@ async function scenario(guest, mode, replacement) {
   function spawn(seal) {
     return familyWorker({
       mode,
+      ...(previous
+        ? { priorAnswerHash: createHash("sha256").update(previous.marker).digest("hex") }
+        : {}),
       dbUrl: readerUrl.toString(),
       controlUrl: dbUrl,
       runId,
@@ -254,7 +321,7 @@ async function scenario(guest, mode, replacement) {
       const killed = Date.now();
       a.proc.kill("SIGKILL");
       assert.equal((await a.ended).signal, "SIGKILL");
-      if (atomicHandoff) {
+      if (atomicHandoff && !laterCandidate) {
         await app.close();
         await projector.close();
         // Explicitly discard all candidate reconstruction state as on process loss.
@@ -336,7 +403,7 @@ async function scenario(guest, mode, replacement) {
         const c = await api.cancelTurn(session.sessionId, input.turnId, randomUUID());
         state.stopReceipt = c.controlRequestId;
       }
-      if (mode === "already-returned") {
+      if (mode === "already-returned" || mode === "later-run-compacted") {
         await dir.release();
         await wait(() => reply, "Guest completion before B");
         await replyCopies.send({
@@ -394,7 +461,7 @@ async function scenario(guest, mode, replacement) {
             assert(state.ambiguous && state.requestAbsentFromMemory && state.snapshotBytes > 0);
           } else
             assert(
-              state.restarted &&
+              (state.restarted || laterCandidate) &&
                 state.atomicReady &&
                 state.rollbackVerified &&
                 state.snapshotBytes > 0,
@@ -405,7 +472,7 @@ async function scenario(guest, mode, replacement) {
           assert.equal(wait.originalTopic, state.ref.topic);
           assert.equal(wait.operationId, state.operation);
           assert.equal(wait.deadline, state.ref.deadlineAt);
-          if (mode === "serving-pending") await dir.release();
+          if (mode === "serving-pending" || mode === "later-run") await dir.release();
         }
       }
       if (twice) {
@@ -478,14 +545,50 @@ async function scenario(guest, mode, replacement) {
     const history = await api.getConversation(session.sessionId);
     assert(JSON.stringify(history).includes(prompt));
     const childPage = await api.getConversation(child.childSessionId);
-    assert(JSON.stringify(childPage).includes("Run the gated Bash once."));
+    const publicChildTranscript = JSON.stringify(childPage).includes("Run the gated Bash once.");
+    if (!laterCandidate) assert(publicChildTranscript);
+    let childEvidence;
+    if (laterCandidate) {
+      const token = await dir.result();
+      const {
+        rows: [e],
+      } = await pool.query(
+        `select
+        exists(select 1 from messages where tenant_id=$1 and pi_session_id=$2 and conversation_id=$3 and run_id=$4 and role='assistant' and position($5 in content)>0) as answer,
+        (select count(*)::int from session_terminal_events where tenant_id=$1 and session_id=$6 and turn_id=$7) as terminals`,
+        [
+          first.tenantId,
+          first.piSessionId,
+          child.conversationId,
+          runId,
+          token,
+          child.childSessionId,
+          child.childTurnId,
+        ],
+      );
+      assert(e.answer, "Child answer was not materialized");
+      childEvidence = {
+        candidateChildAnswer: true,
+        publicChildAnswer: JSON.stringify(childPage).includes(token),
+        publicChildBashResults: childPage.turns
+          .flatMap((t) => t.transcript?.items ?? [])
+          .filter(
+            (item) =>
+              item.kind === "tool" &&
+              item.toolName === "bash" &&
+              JSON.stringify(item.output ?? null).includes(token),
+          ).length,
+        childTerminalEvents: e.terminals,
+      };
+    }
     assert(!history.turns.some((t) => t.prompt === "Run the gated Bash once."));
     assert(!JSON.stringify(childPage).includes(prompt));
     if (atomicHandoff) {
       const displayed = childPage.turns
         .flatMap((t) => t.transcript?.items ?? [])
         .filter((x) => x.kind === "tool" && x.toolName === "bash");
-      assert.equal(displayed.length, 1, "HTTP history duplicated the Bash call");
+      if (!laterCandidate || publicChildTranscript)
+        assert.equal(displayed.length, 1, "HTTP history duplicated the Bash call");
       const count = await pool.query(
         "select count(*)::int as n from messages where run_id=$1 and conversation_id=$2 and role='user' and content like '%queued-child-input%'",
         [runId, child.conversationId],
@@ -499,7 +602,31 @@ async function scenario(guest, mode, replacement) {
     }
     const relationship = await children.status(first.tenantId, child.executionId);
     assert.equal(relationship.conversationId, child.conversationId);
-    if (twice || ["normal", "serving-pending", "already-returned"].includes(mode))
+    if (previous) {
+      const legacy = await pool.query(
+        "select count(*)::int n from public.pi_durable_commits where tenant_id=$1 and session_id=$2",
+        [first.tenantId, first.piSessionId],
+      );
+      assert.equal(legacy.rows[0].n, 0, "Later-Run check wrote to legacy native storage");
+      const { rows: heads } = await pool.query(
+        "select history_head from runs where tenant_id=$1 and session_id=$2 order by mailbox_position",
+        [first.tenantId, session.sessionId],
+      );
+      assert.equal(heads.length, 2);
+      assert.equal(
+        heads[1].history_head.floor,
+        heads[0].history_head.floor,
+        "Second settlement changed the kept root floor",
+      );
+      if (mode === "later-run-compacted") assert(heads[0].history_head.floor > 1);
+      assert(cold.stats.priorPgEntries > 0);
+      assert.equal(history.turns.length, 2);
+      assert.equal(history.turns[0].runId, previous.run);
+      assert.equal(history.turns[1].runId, runId);
+      assert(JSON.stringify(history.turns[0]).includes(previous.marker));
+      assert(outcome.priorAnswerInFinalRequest);
+    }
+    if (previous || twice || ["normal", "serving-pending", "already-returned"].includes(mode))
       assert(JSON.stringify(history).includes(await dir.result()));
     if (mode === "reply-timeout")
       assert(JSON.stringify(history).includes("PARENT CHILD UNKNOWN tool_reply_timeout"));
@@ -553,7 +680,19 @@ async function scenario(guest, mode, replacement) {
     return {
       mode,
       terminal,
-      publicChildView: true,
+      publicChildView: publicChildTranscript,
+      ...(previous
+        ? {
+            previousRunCompacted: mode === "later-run-compacted",
+            originalReplyBeforeReclaim: mode === "later-run-compacted",
+            publicChildTurns: childPage.turns.length,
+            subagentStatus: relationship.state,
+            ...childEvidence,
+            mailboxPosition: input.mailboxPosition,
+            previousAnswerInFinalRequest: outcome.priorAnswerInFinalRequest,
+            firstRunKafkaRemoved: true,
+          }
+        : {}),
       ...(twice
         ? {
             successiveWorkerLosses: 2,
@@ -582,8 +721,8 @@ async function scenario(guest, mode, replacement) {
       replyAfterTerminal: mode === "reply-timeout",
       ...(atomicHandoff && b
         ? {
-            projectorColdRestart: true,
-            projectorSigkill: state.killedProjectorPid !== process.pid,
+            projectorColdRestart: !!state.restarted,
+            projectorSigkill: !!state.restarted && state.killedProjectorPid !== process.pid,
             atomicHandoff: true,
             rollbackVerified: state.rollbackVerified,
             matchedOriginalRequestId: true,
@@ -640,17 +779,43 @@ function adoptFamily(record) {
   prior.writer = scope.writerId;
 }
 async function startProjector() {
+  let primary;
+  if (laterCandidate) {
+    primary = normalRootProjection(
+      pool,
+      topic,
+      (scope) => cases.get(scope.runId).currentBinding,
+      (id) => resources.get(id),
+      async (root, child) => {
+        const x = await pool.query(
+          "select 1 from subagent_conversations where tenant_id=$1 and root_run_id=$2 and child_session_id=$3 and child_turn_id=$4",
+          [root.tenantId, root.runId, child.sessionId, child.turnId],
+        );
+        assert.equal(x.rowCount, 1);
+      },
+    );
+    view = primary.view;
+  }
   projector = new SessionProjector(
     {
       database,
       publicationDatabase: database,
+      ...(primary ? { nativeStore: primary.nativeStore } : {}),
       ...(atomicHandoff
         ? {
             recoveryCheckpoint: {
+              ...(primary
+                ? { openSettled: (scope, seq) => settledFamilyBase(pool, scope, seq) }
+                : {}),
               tracks: (scope) =>
                 cases.has(scope.runId) &&
                 (scope.fencingToken === 1 ||
-                  ["double-pending", "double-before-open"].includes(cases.get(scope.runId).mode)),
+                  [
+                    "double-pending",
+                    "double-before-open",
+                    "later-run",
+                    "later-run-compacted",
+                  ].includes(cases.get(scope.runId).mode)),
               async advance(tx, f, pos, current, nativeSequence) {
                 const s = cases.get(f.scope.runId);
                 assert(s && current());
@@ -749,24 +914,33 @@ async function startProjector() {
         },
       },
       controlTools: {
-        historyBatch: {
-          accepts: (r) => cases.has(r.fact.scope.runId) && router.canBatch(r.fact),
-          consume: async (records, current) => {
-            for (let i = 0; i < records.length && current();) {
-              adoptFamily(records[i]);
-              const n = await router.prepareHistory(records.slice(i), current);
-              assert(n > 0);
-              if (!current()) return;
-              for (const r of records.slice(i, i + n)) {
-                const s = cases.get(r.fact.scope.runId);
-                if (s.study && !s.seal && r.fact.commit.seq > s.study.seq) s.study.observe(r.fact);
-                progress(s, r.fact);
-              }
-              i += n;
-            }
-          },
-        },
+        ...(primary
+          ? {}
+          : {
+              historyBatch: {
+                accepts: (r) => cases.has(r.fact.scope.runId) && router.canBatch(r.fact),
+                consume: async (records, current) => {
+                  for (let i = 0; i < records.length && current();) {
+                    adoptFamily(records[i]);
+                    const n = await router.prepareHistory(records.slice(i), current);
+                    assert(n > 0);
+                    if (!current()) return;
+                    for (const r of records.slice(i, i + n)) {
+                      const s = cases.get(r.fact.scope.runId);
+                      if (s.study && !s.seal && r.fact.commit.seq > s.study.seq)
+                        s.study.observe(r.fact);
+                      progress(s, r.fact);
+                    }
+                    i += n;
+                  }
+                },
+              },
+            }),
         async consume(r, current, grant) {
+          if (primary) {
+            await primary.dispatch(r, current, grant);
+            return;
+          }
           const f = r.fact,
             s = cases.get(f.scope.runId);
           if (!s || f.kind !== "durable_commit") return;
@@ -796,6 +970,7 @@ async function startProjector() {
             s = cases.get(f.scope.runId);
           if (!s) return;
           try {
+            if (primary && f.kind === "durable_commit") progress(s, f);
             if (f.kind === "work_finished" || f.kind === "execution_seal") {
               const from = view.next.get(0);
               if (atomicHandoff && f.kind === "execution_seal" && f.recover) {
@@ -814,7 +989,7 @@ async function startProjector() {
                   typeof v === "bigint" ? String(v) : v,
                 ).includes(s.queuedId);
                 s.snapshotBytes = await s.study.seal(pool, r, from, bashFields);
-              } else
+              } else if (!primary)
                 assert.equal(
                   (
                     await pool.query(
@@ -867,6 +1042,7 @@ async function startProjector() {
   await until(() => projector.ownsPartition(0), "serving assignment");
   app = await createControlPlaneApplication({
     database,
+    ...(primary ? { rootMessageHistory: true } : {}),
     eventRuntime: { eventHub: projector.eventHub, eventStore: projector.eventStore },
     productionHttpGateway: new ProductionHttpGateway({
       authenticator: new PostgresTenantApiAuthenticator({ database }),
@@ -959,17 +1135,19 @@ if (initialProcess) {
     });
 
     const handoffs = ["serving-pending", "already-returned", "reply-timeout", "user-stop"];
-    const modes = atomicHandoff
-      ? ["double-before-open", "double-pending", ...handoffs]
-      : bashFields
-        ? ["active-stop", "serving-pending", "user-stop"]
-        : pgHandoff
-          ? ["active-stop", ...handoffs]
-          : ["normal", "active-stop", ...handoffs];
+    const modes = laterCandidate
+      ? [scene]
+      : atomicHandoff
+        ? ["double-before-open", "double-pending", ...handoffs]
+        : bashFields
+          ? ["active-stop", "serving-pending", "user-stop"]
+          : pgHandoff
+            ? ["active-stop", ...handoffs]
+            : ["normal", "active-stop", ...handoffs];
     if (scene) assert(modes.includes(scene), "Unknown scene for this study");
-    if (!atomicHandoff) await startProjector();
+    if (!atomicHandoff || laterCandidate) await startProjector();
     for (const mode of scene ? [scene] : modes) {
-      if (atomicHandoff) {
+      if (atomicHandoff && !laterCandidate) {
         await app?.close();
         await projector?.close();
         const { startInitialProjector } = await import("./family-projector-process.mjs");

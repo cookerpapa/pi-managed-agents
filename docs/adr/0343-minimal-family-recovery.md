@@ -95,3 +95,15 @@ output prefix exists for this incarnation. Verify tenant, physical Session, Run,
 turn, adjacent lease epoch, original partition and earlier seal position. Reuse
 the single Run field and its atomic seal/requeue transaction. Ordinary publication
 and the tool reply channel keep their existing authorities and absolute deadlines.
+
+## Handoff after a settled root Run
+
+For a fresh writer starting the next Run, the checkpoint fold starts at the
+same settled root as the Worker. Its existing PG header supplies the native
+sequence, next ID and kept floor. Seed the surviving document identities and
+configuration. No earlier Entry bodies are needed to start the Projector fold.
+For a replacement within the same Run, require the matching ordered seal.
+A cold Worker opens one sealed family in empty native storage. The bounded root
+prefix belonging to earlier completed work and this Run's selected history come
+from the same physical Session and sealed sequence, in one PG snapshot. Keep
+ordinary admissions, tool-effect permissions, reply floors and deadlines intact.

@@ -83,6 +83,10 @@ export class SessionProjector {
       nativeStore?: import("./execution-stream-projection.ts").SessionNativeStore;
       recoveryCheckpoint?: {
         tracks(scope: AcceptedFactScope): boolean;
+        openSettled?(
+          scope: AcceptedFactScope,
+          firstSequence: number,
+        ): Promise<AcceptedFamilyCheckpoint | undefined>;
         advance(
           ...args: [...Parameters<RecoverySealCheckpoint>, nativeSequence: number]
         ): Promise<void>;
@@ -404,7 +408,8 @@ export class SessionProjector {
                     family =
                       fact.commit.seq === 1 && fact.scope.fencingToken === 1
                         ? new AcceptedFamilyCheckpoint()
-                        : await resumeFamilyCheckpoint(options.database, fact.scope, record);
+                        : ((await recovery.openSettled?.(fact.scope, fact.commit.seq)) ??
+                          (await resumeFamilyCheckpoint(options.database, fact.scope, record)));
                     if (current?.() === false) return;
                     families.set(fact.scope.writerId, family);
                   }

@@ -1,4 +1,4 @@
-// Matched source for ordinary text/tool root Sessions; never opens a legacy
+// Matched source for root Runs and explicitly validated child displays. No legacy
 // native projection. One SessionProjector owns admission, live events and grant.
 import { worldRoutes } from "./conversation-world.mjs";
 import { rootOpeningHead } from "./session-prefix.mjs";
@@ -13,7 +13,7 @@ import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { assertFamilySettled } from "./moving-checkpoint.mjs";
 import { emptyInboxRoutes } from "./family-inboxes.mjs";
 
-export function normalRootProjection(pool, topic, select, resolve) {
+export function normalRootProjection(pool, topic, select, resolve, validateChild) {
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
   view.configure(16, "recorded-history");
   const env = {
@@ -36,7 +36,8 @@ export function normalRootProjection(pool, topic, select, resolve) {
     send() {},
   };
   const router = new WorkspaceOperationRouter({ pool, view, env, select, resolve });
-  const deliveries = new WeakMap();
+  const deliveries = new WeakMap(),
+    childDisplays = new Map();
   const nativeStore = {
     brokerTimedRetention: {
       replyFloors(database, topics) {
@@ -58,6 +59,7 @@ export function normalRootProjection(pool, topic, select, resolve) {
       reset() {
         view.revoke();
         router.spans.reset();
+        childDisplays.clear();
       },
       statistics() {
         let pendingDocuments = 0,
@@ -80,6 +82,24 @@ export function normalRootProjection(pool, topic, select, resolve) {
             (fact.inputQueueSessions ?? []).every((id) => id === fact.scope.sessionId),
           "Unsupported root accounting or cross-session input",
         );
+        for (const { scope: child } of fact.display) {
+          if (child.sessionId === fact.scope.sessionId) continue;
+          assert(
+            validateChild &&
+              child.tenantId === fact.scope.tenantId &&
+              child.piSessionId === fact.scope.piSessionId &&
+              child.runId === fact.scope.runId &&
+              child.writerId === fact.scope.writerId &&
+              child.fencingToken === fact.scope.fencingToken,
+            "Unmatched child display scope",
+          );
+          let known = childDisplays.get(fact.scope.writerId);
+          if (known?.get(child.sessionId) === child.turnId) continue;
+          await validateChild(fact.scope, child);
+          if (!current()) return { admitted: false, events: [], covers: [] };
+          if (!known) childDisplays.set(fact.scope.writerId, (known = new Map()));
+          known.set(child.sessionId, child.turnId);
+        }
         const { scope } = fact;
         let previous = view.sessions.get(scope.runId),
           openingRow;
@@ -106,7 +126,6 @@ export function normalRootProjection(pool, topic, select, resolve) {
         if (admitted) {
           if (plan) deliveries.set(fact, plan);
           for (const d of fact.display) {
-            assert.equal(d.scope.sessionId, fact.scope.sessionId);
             for (const e of d.events)
               events.push(
                 resolveDurableDisplay(fact.commit, e, (id) => session.liveDocs[id]?.value),
@@ -148,6 +167,7 @@ export function normalRootProjection(pool, topic, select, resolve) {
         return () => {};
       },
       releaseSettled(scope) {
+        childDisplays.delete(scope.writerId);
         if (view.sessions.get(scope.runId)?.writer === scope.writerId) {
           view.sessions.delete(scope.runId);
           router.spans.forget(scope);

@@ -1,4 +1,4 @@
-// Candidate cold-open contract for a fresh physical Session. Only the sealed
+// Candidate cold-open contract for an interrupted Run. Only the sealed
 // native current values cross the ownership boundary. Guest addresses do not.
 import type {
   ConversationRecord,
@@ -81,7 +81,7 @@ function predecessor(scope: FamilyScope) {
         and old.fencing_token+1=active.fencing_token and old.writer_sealed_at is not null
         and old.released_at is not null and old.writer_seal_offset=(r.native_work_handoff->>'offset')::bigint
       where r.id=${scope.runId}::uuid and r.tenant_id=${scope.tenantId}::uuid and r.session_id=${scope.sessionId}::uuid
-        and r.turn_id=${scope.turnId}::uuid and r.mailbox_position=1
+        and r.turn_id=${scope.turnId}::uuid
         and active.pi_session_id=${scope.piSessionId} and active.lease_id=${scope.writerId}::uuid
         and r.fencing_token=active.fencing_token and active.fencing_token=${scope.fencingToken}`;
 }
@@ -142,10 +142,15 @@ export async function saveSealedFamily(
   const result = await sql<{
     refs: Record<string, PendingNativeTool>;
   }>`with durable as materialized (select set_config('synchronous_commit','on',true), ${JSON.stringify(handoff)}::jsonb as handoff)
-      update runs set native_work_handoff=durable.handoff from durable
+      update runs as target set native_work_handoff=durable.handoff from durable
     where id=${scope.runId}::uuid and tenant_id=${scope.tenantId}::uuid and session_id=${scope.sessionId}::uuid
       and turn_id=${scope.turnId}::uuid and lease_id=${scope.writerId}::uuid and fencing_token=${scope.fencingToken}
-      and output_seal_id=${sealId}::uuid and recovery_requested_at is not null and mailbox_position=1
+      and output_seal_id=${sealId}::uuid and recovery_requested_at is not null
+      and (target.mailbox_position=1 or exists (
+        select 1 from runs prior where prior.tenant_id=target.tenant_id and prior.session_id=target.session_id
+          and prior.mailbox_position=target.mailbox_position-1 and prior.state in ('completed','cancelled')
+          and (prior.history_head->>'seq')::bigint between 1 and ${state.seq - 1}
+          and (prior.history_head->>'nextId')::bigint between 2 and ${state.nextId}))
       and ((output_first_topic=${position.topic} and output_first_partition=${position.partition} and output_first_offset<=${String(position.offset)}::bigint)
         or (output_first_offset is null and output_first_topic is null and output_first_partition is null
           and exists (select 1 ${predecessor(scope)}
@@ -233,22 +238,64 @@ export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope,
       } = await sql<{
         handoff: StoredHandoff;
         refs: Record<string, PendingNativeTool>;
-      }>`select r.native_work_handoff as handoff,r.projection_tools as refs
+        slot: string;
+        prior: { seq: number; nextId: number; floor: number; count: number; bytes: number } | null;
+      }>`select r.native_work_handoff as handoff,r.projection_tools as refs,r.mailbox_position as slot,
+       (select p.history_head from runs p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and
+        r.mailbox_position>1 and p.mailbox_position=r.mailbox_position-1 and p.state in ('completed','cancelled')) as prior
       ${predecessor(scope)} and r.state in ('running','cancel_requested') and active.released_at is null
         and active.writer_failed_at is null and active.writer_sealed_at is null`.execute(tx);
       if (!row) throw Error("No matching sealed native handoff for the claimed Run");
       const h = decodePredecessor(row.handoff, scope, topic);
       const { ranges, pinned } = sealedHistorySelection(h.state);
+      const prior = row.prior;
+      if (
+        Number(row.slot) > 1 &&
+        (!prior ||
+          !Number.isSafeInteger(prior.seq) ||
+          prior.seq < 1 ||
+          prior.seq >= h.state.seq ||
+          !Number.isSafeInteger(prior.floor) ||
+          !Number.isSafeInteger(prior.nextId) ||
+          prior.floor < 1 ||
+          prior.nextId <= prior.floor ||
+          prior.nextId > h.state.nextId ||
+          !Number.isSafeInteger(prior.count) ||
+          prior.count < 1 ||
+          !Number.isSafeInteger(prior.bytes) ||
+          prior.bytes < 0)
+      )
+        throw Error("Missing matched settled root before family handoff");
+      const selected = sql`(entry_id=any(${pinned}::bigint[]) or exists(select 1 from
+        unnest(${ranges.map((r) => r.lane)}::bigint[],${ranges.map((r) => r.lo)}::bigint[],${ranges.map((r) => r.hi)}::bigint[])
+        as v(lane,lo,hi) where v.lane=messages.conversation_id and messages.entry_id between v.lo and v.hi))`;
+      const bodies = sql`select entry_id,commit_seq,ordinal,content from messages
+        where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}`;
+      // Each arm can use its own index: this Run's ID, or the inherited root Entry range.
+      // Their native sequence intervals are disjoint.
+      const inherited = prior
+        ? sql`union all ${bodies} and conversation_id=1
+        and entry_id>=${prior.floor} and entry_id<${prior.nextId} and commit_seq<=${prior.seq} and ${selected}`
+        : sql``;
       const { rows: entries } = await sql<{
         entry_id: string;
         commit_seq: string;
         ordinal: number;
         content: string;
-      }>`select entry_id,commit_seq,ordinal,content from messages
-      where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId} and run_id=${scope.runId}::uuid
-        and (entry_id=any(${pinned}::bigint[]) or exists(select 1 from unnest(${ranges.map((r) => r.lane)}::bigint[],${ranges.map((r) => r.lo)}::bigint[],${ranges.map((r) => r.hi)}::bigint[]) as v(lane,lo,hi)
-          where v.lane=messages.conversation_id and messages.entry_id between v.lo and v.hi))
-      order by commit_seq,ordinal`.execute(tx);
+      }>`${bodies} and run_id=${scope.runId}::uuid and commit_seq>${prior?.seq ?? 0}
+        and commit_seq<=${h.state.seq} and ${selected}
+        ${inherited} order by commit_seq,ordinal`.execute(tx);
+      if (
+        prior &&
+        ranges.some((r) => r.lane === 1 && r.lo <= prior.floor && r.hi >= prior.nextId - 1)
+      ) {
+        const prefix = entries.filter((e) => Number(e.commit_seq) <= prior.seq);
+        if (
+          prefix.length !== prior.count ||
+          prefix.reduce((n, e) => n + Buffer.byteLength(e.content), 0) !== prior.bytes
+        )
+          throw Error("Incomplete inherited root at the sealed boundary");
+      }
       const ids = new Set(entries.map((r) => Number(r.entry_id)));
       if (pinned.some((id) => !ids.has(id)))
         throw Error("Referenced native history is missing at the sealed boundary");
@@ -263,7 +310,7 @@ export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope,
         tx,
       );
       const intents = pendingReferences(h.state, row.refs);
-      return { handoff: h, entries, queues, intents };
+      return { handoff: h, entries, queues, intents, settledThrough: prior?.seq ?? 0 };
     });
 }
 

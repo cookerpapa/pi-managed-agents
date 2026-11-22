@@ -559,6 +559,14 @@ removal of the handoff after closure. A second Guest witnesses exact cancellatio
 in the Stop case. Neither the deployed Worker configuration nor its live
 Projector is switched by this command.
 
+Use `--atomic-handoff later-run` or `--atomic-handoff later-run-compacted` on a
+separate invocation to select the candidate-only composition. Both remove
+Run 1’s Session log before accepting Run 2, kill the Worker while the child Bash
+is pending, and rotate Run 2 through its seal before cold-open. The compacted
+variant also delivers the Guest reply twice before the replacement starts.
+The model requests, PG history, HTTP root and HTTP child readers are checked
+independently. [Outcomes and child-reader scope](../../../docs/reports/later-root-handoff-20261122.md).
+
 The `double-pending` scene also kills B after it has reattached to the original
 operation and committed an edit to the child's Inbox. `double-before-open` kills
 B after claim and before starting Pi. Both scenes compact the original parent's
