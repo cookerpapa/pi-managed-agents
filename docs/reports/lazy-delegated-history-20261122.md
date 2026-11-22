@@ -18,7 +18,7 @@
 
 对实际发出的两条正文查询执行 `EXPLAIN (ANALYZE, BUFFERS)`。500 子 Agent 的样本中，主线与子 Agent 正文查询都返回 32 行，累计共享缓冲页访问分别为 **1,604 和 1,613**。这个指标包含重复访问，不能直接当作物理磁盘读取次数。
 
-在同一个临时库添加按租户、物理 Session、Conversation、Entry ID 排列的正文部分索引，重复执行相同的 SQL，访问数降到 **7 和 14**。只测试了索引的读效果。正式采用前应测混合 Projector 写入吞吐、WAL 和索引体积。原型 schema 和线上索引沿用现有版本。
+在同一个临时库添加按租户、物理 Session、Conversation、Entry ID 排列的正文部分索引，重复执行相同的 SQL，访问数降到 **7 和 14**。只测试了索引的读效果。正式采用前应测混合 Projector 写入吞吐、WAL 和索引体积。原型 schema 和线上索引沿用现有版本。后续已完成[混合写入与索引成本对照](conversation-entry-index-cost-20261122.md)。
 
 ## 正确性与故障
 

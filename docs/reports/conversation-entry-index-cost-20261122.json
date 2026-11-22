@@ -1,0 +1,460 @@
+{
+  "workload": {
+    "runs": 1024,
+    "partitions": 32,
+    "connections": 12,
+    "callsPerRun": 20,
+    "resultBytes": 1024,
+    "mockAckMs": 100,
+    "kafkaRecords": 191488,
+    "completeHistoryRows": 44032,
+    "entryKinds": {
+      "pi.user": 1024,
+      "pi.system": 1024,
+      "pi.assistant": 21504,
+      "pi.tool-result": 20480
+    },
+    "traceHash": "689be31f185214796c9b5d32d0d9db9707cdf21dc70b8ccfae21911def263ad9",
+    "pg": "17.6"
+  },
+  "mixed": {
+    "arms": [
+      {
+        "mode": "backlog",
+        "index": false,
+        "elapsedMs": 48709.62,
+        "recordsPerSec": 3931.22,
+        "historyRowsPerSec": 903.97,
+        "runsPerSec": 21.023,
+        "toolPgP95UpperMs": 9.401,
+        "pgTransactions": 108393,
+        "walBytes": 175145168,
+        "entryIndexBytes": 0,
+        "messageTableBytes": 45473792,
+        "allMessageIndexBytes": 10936320,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": true,
+        "elapsedMs": 52860.18,
+        "recordsPerSec": 3622.54,
+        "historyRowsPerSec": 832.99,
+        "runsPerSec": 19.372,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108393,
+        "walBytes": 181066992,
+        "entryIndexBytes": 4210688,
+        "messageTableBytes": 45563904,
+        "allMessageIndexBytes": 15376384,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": true,
+        "elapsedMs": 45989.48,
+        "recordsPerSec": 4163.73,
+        "historyRowsPerSec": 957.44,
+        "runsPerSec": 22.266,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108352,
+        "walBytes": 181332448,
+        "entryIndexBytes": 4120576,
+        "messageTableBytes": 45506560,
+        "allMessageIndexBytes": 14991360,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": false,
+        "elapsedMs": 49711.04,
+        "recordsPerSec": 3852.02,
+        "historyRowsPerSec": 885.76,
+        "runsPerSec": 20.599,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108369,
+        "walBytes": 177742504,
+        "entryIndexBytes": 0,
+        "messageTableBytes": 45563904,
+        "allMessageIndexBytes": 11075584,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": true,
+        "elapsedMs": 49384.68,
+        "recordsPerSec": 3877.48,
+        "historyRowsPerSec": 891.61,
+        "runsPerSec": 20.735,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108354,
+        "walBytes": 181082736,
+        "entryIndexBytes": 3989504,
+        "messageTableBytes": 45539328,
+        "allMessageIndexBytes": 14835712,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": false,
+        "elapsedMs": 47725.49,
+        "recordsPerSec": 4012.28,
+        "historyRowsPerSec": 922.61,
+        "runsPerSec": 21.456,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108375,
+        "walBytes": 174034720,
+        "entryIndexBytes": 0,
+        "messageTableBytes": 45432832,
+        "allMessageIndexBytes": 11059200,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": false,
+        "elapsedMs": 48284.96,
+        "recordsPerSec": 3965.79,
+        "historyRowsPerSec": 911.92,
+        "runsPerSec": 21.207,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108373,
+        "walBytes": 175028000,
+        "entryIndexBytes": 0,
+        "messageTableBytes": 45522944,
+        "allMessageIndexBytes": 10838016,
+        "finalLag": 0
+      },
+      {
+        "mode": "backlog",
+        "index": true,
+        "elapsedMs": 50247.95,
+        "recordsPerSec": 3810.86,
+        "historyRowsPerSec": 876.29,
+        "runsPerSec": 20.379,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108374,
+        "walBytes": 181511920,
+        "entryIndexBytes": 4079616,
+        "messageTableBytes": 45547520,
+        "allMessageIndexBytes": 15081472,
+        "finalLag": 0
+      },
+      {
+        "mode": "paced",
+        "index": false,
+        "elapsedMs": 59622.42,
+        "recordsPerSec": 3211.68,
+        "historyRowsPerSec": 738.51,
+        "runsPerSec": 17.175,
+        "toolPgP95UpperMs": 9.921,
+        "pgTransactions": 108756,
+        "walBytes": 174718520,
+        "entryIndexBytes": 0,
+        "messageTableBytes": 45572096,
+        "allMessageIndexBytes": 10559488,
+        "finalLag": 0,
+        "offered": 3247,
+        "inputRecordsPerSec": 3242.86,
+        "peakLag": 138,
+        "drainAfterInputMs": 573.27
+      },
+      {
+        "mode": "paced",
+        "index": true,
+        "elapsedMs": 59623.94,
+        "recordsPerSec": 3211.6,
+        "historyRowsPerSec": 738.5,
+        "runsPerSec": 17.174,
+        "toolPgP95UpperMs": 10.467,
+        "pgTransactions": 108767,
+        "walBytes": 181134768,
+        "entryIndexBytes": 4022272,
+        "messageTableBytes": 45596672,
+        "allMessageIndexBytes": 14532608,
+        "finalLag": 0,
+        "offered": 3247,
+        "inputRecordsPerSec": 3239.88,
+        "peakLag": 956,
+        "drainAfterInputMs": 520.59
+      },
+      {
+        "mode": "paced",
+        "index": true,
+        "elapsedMs": 59621.82,
+        "recordsPerSec": 3211.71,
+        "historyRowsPerSec": 738.52,
+        "runsPerSec": 17.175,
+        "toolPgP95UpperMs": 9.401,
+        "pgTransactions": 108786,
+        "walBytes": 181155616,
+        "entryIndexBytes": 4005888,
+        "messageTableBytes": 45629440,
+        "allMessageIndexBytes": 14573568,
+        "finalLag": 0,
+        "offered": 3247,
+        "inputRecordsPerSec": 3242.6,
+        "peakLag": 121,
+        "drainAfterInputMs": 567.96
+      },
+      {
+        "mode": "paced",
+        "index": false,
+        "elapsedMs": 59625.71,
+        "recordsPerSec": 3211.5,
+        "historyRowsPerSec": 738.47,
+        "runsPerSec": 17.174,
+        "toolPgP95UpperMs": 11.041,
+        "pgTransactions": 108757,
+        "walBytes": 174532144,
+        "entryIndexBytes": 0,
+        "messageTableBytes": 45531136,
+        "allMessageIndexBytes": 10559488,
+        "finalLag": 0,
+        "offered": 3247,
+        "inputRecordsPerSec": 3243.15,
+        "peakLag": 1120,
+        "drainAfterInputMs": 581.92
+      }
+    ],
+    "byMode": {
+      "backlog": {
+        "medians": {
+          "runsPerSec": {
+            "off": 21.11,
+            "on": 20.56,
+            "changePct": -2.64
+          },
+          "recordsPerSec": {
+            "off": 3948.5,
+            "on": 3844.17,
+            "changePct": -2.64
+          },
+          "historyRowsPerSec": {
+            "off": 907.94,
+            "on": 883.95,
+            "changePct": -2.64
+          },
+          "toolPgP95UpperMs": {
+            "off": 9.92,
+            "on": 9.92,
+            "changePct": 0
+          },
+          "walBytes": {
+            "off": 175086584,
+            "on": 181207592,
+            "changePct": 3.5
+          },
+          "entryIndexBytes": {
+            "off": 0,
+            "on": 4100096,
+            "changePct": null
+          },
+          "allMessageIndexBytes": {
+            "off": 10997760,
+            "on": 15036416,
+            "changePct": 36.72
+          },
+          "messageTableBytes": {
+            "off": 45498368,
+            "on": 45543424,
+            "changePct": 0.1
+          }
+        },
+        "pairedThroughputChangesPct": [-7.85, 8.09, -3.36, -3.91]
+      },
+      "paced": {
+        "medians": {
+          "runsPerSec": {
+            "off": 17.17,
+            "on": 17.17,
+            "changePct": 0
+          },
+          "recordsPerSec": {
+            "off": 3211.59,
+            "on": 3211.65,
+            "changePct": 0
+          },
+          "historyRowsPerSec": {
+            "off": 738.49,
+            "on": 738.51,
+            "changePct": 0
+          },
+          "toolPgP95UpperMs": {
+            "off": 10.48,
+            "on": 9.93,
+            "changePct": -5.22
+          },
+          "walBytes": {
+            "off": 174625332,
+            "on": 181145192,
+            "changePct": 3.73
+          },
+          "entryIndexBytes": {
+            "off": 0,
+            "on": 4014080,
+            "changePct": null
+          },
+          "allMessageIndexBytes": {
+            "off": 10559488,
+            "on": 14553088,
+            "changePct": 37.82
+          },
+          "messageTableBytes": {
+            "off": 45551616,
+            "on": 45613056,
+            "changePct": 0.13
+          },
+          "drainAfterInputMs": {
+            "off": 577.6,
+            "on": 544.28,
+            "changePct": -5.77
+          }
+        },
+        "pairedThroughputChangesPct": [0, 0.01]
+      }
+    }
+  },
+  "append": {
+    "seedRows": 132096,
+    "appendedRows": 44032,
+    "physicalSessions": 8,
+    "conversationsPerSession": 128,
+    "pg": "17.6",
+    "trials": [
+      {
+        "index": false,
+        "ms": 1968.708,
+        "walBytes": 68397280,
+        "entryIndexBytes": 0,
+        "allMessageIndexBytes": 53288960,
+        "messageTableBytes": 188547072
+      },
+      {
+        "index": true,
+        "ms": 1760.777,
+        "walBytes": 84222880,
+        "entryIndexBytes": 16982016,
+        "allMessageIndexBytes": 70270976,
+        "messageTableBytes": 188547072
+      },
+      {
+        "index": true,
+        "ms": 1543.439,
+        "walBytes": 90108768,
+        "entryIndexBytes": 16982016,
+        "allMessageIndexBytes": 70270976,
+        "messageTableBytes": 188088320
+      },
+      {
+        "index": false,
+        "ms": 1308.848,
+        "walBytes": 68397256,
+        "entryIndexBytes": 0,
+        "allMessageIndexBytes": 53288960,
+        "messageTableBytes": 188547072
+      },
+      {
+        "index": true,
+        "ms": 1525.738,
+        "walBytes": 84222856,
+        "entryIndexBytes": 16982016,
+        "allMessageIndexBytes": 70270976,
+        "messageTableBytes": 188547072
+      },
+      {
+        "index": false,
+        "ms": 1357.999,
+        "walBytes": 68397256,
+        "entryIndexBytes": 0,
+        "allMessageIndexBytes": 53288960,
+        "messageTableBytes": 188547072
+      },
+      {
+        "index": false,
+        "ms": 1307.352,
+        "walBytes": 68397280,
+        "entryIndexBytes": 0,
+        "allMessageIndexBytes": 53288960,
+        "messageTableBytes": 188547072
+      },
+      {
+        "index": true,
+        "ms": 1562.031,
+        "walBytes": 84222856,
+        "entryIndexBytes": 16982016,
+        "allMessageIndexBytes": 70270976,
+        "messageTableBytes": 188547072
+      }
+    ],
+    "medians": {
+      "ms": {
+        "off": 1333.42,
+        "on": 1552.74,
+        "changePct": 16.45
+      },
+      "walBytes": {
+        "off": 68397268,
+        "on": 84222868,
+        "changePct": 23.14
+      },
+      "entryIndexBytes": {
+        "off": 0,
+        "on": 16982016,
+        "changePct": null
+      }
+    },
+    "pairedTimeChangesPct": [-10.56, 17.92, 12.35, 19.48]
+  },
+  "read500": {
+    "children": 500,
+    "storedEntries": 16032,
+    "rootEntries": 32,
+    "mountedEntries": 32,
+    "medianMs": 6.6,
+    "maximumMs": 7,
+    "mountMedianMs": 7.8,
+    "mountMaximumMs": 9.2,
+    "samples": 5,
+    "bodyBytes": 512,
+    "plans": {
+      "root": {
+        "rows": 32,
+        "bufferAccesses": 1604
+      },
+      "source": {
+        "rows": 32,
+        "bufferAccesses": 1613
+      }
+    },
+    "withTemporaryIndex": {
+      "root": {
+        "rows": 32,
+        "bufferAccesses": 7
+      },
+      "source": {
+        "rows": 32,
+        "bufferAccesses": 14
+      }
+    },
+    "indexTimings": {
+      "medianMs": 4.1,
+      "maximumMs": 4.3,
+      "mountMedianMs": 5,
+      "mountMaximumMs": 5.5,
+      "samples": 5
+    },
+    "baselineRepeat": {
+      "medianMs": 5.6,
+      "maximumMs": 6.3,
+      "mountMedianMs": 6.3,
+      "mountMaximumMs": 7.2,
+      "samples": 5
+    }
+  },
+  "indexedMiBPer44032Rows": 3.91,
+  "fixtureCleanup": {
+    "temporaryPodsRemoved": true,
+    "temporaryServiceRemoved": true,
+    "temporaryAuthRemoved": true
+  }
+}

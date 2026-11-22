@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Conversation Entry index cost](conversation-entry-index-cost-20261122.md) compares mixed projection throughput, PG append time, WAL, index size and long-history reads.
+
 - [Lazy child history on cold Workers](lazy-delegated-history-20261122.md) compares root and selected-child reads with 1, 100 and 500 settled agents.
 
 - [Root-only Sessions and delegated Runs](delegated-runs-20261122.md) covers sibling inputs, cross-root continuation and forced Worker loss in the isolated candidate.

@@ -2,6 +2,7 @@ import { DelegatedMemoryStorage } from "./delegated-memory.mjs";
 // Isolated read-cost assay. Each earlier agent has its own equally sized,
 // uncompacted transcript; the next ordinary root has not requested any child.
 import assert from "node:assert/strict";
+import { studyEntryIndexSql } from "./entry-index.mjs";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
@@ -76,31 +77,40 @@ for (const children of [1, 100, 500]) {
         };
       },
     };
-    const times = [],
-      mountTimes = [];
-    const selected = { lane: 2, at: bodyStart + 2 * count };
-    for (let i = 0; i < 6; i++) {
-      const store = new DelegatedMemoryStorage(),
-        start = performance.now();
-      phase = "root";
-      const result = await loadSettledDelegations(
-        measuredPool,
-        { tenantId: tenant, piSessionId: session, runId: next, writerId: writer },
-        store,
-      );
-      if (i) times.push(performance.now() - start);
-      assert.equal(result.entries, count);
-      assert.equal(store.archiveReads?.length ?? 0, 0);
-      phase = "source";
-      const mountStart = performance.now();
-      await Promise.all([store.ensureSource(selected), store.ensureSource(selected)]);
-      if (i) mountTimes.push(performance.now() - mountStart);
-      assert.deepEqual(store.archiveReads, [{ ...selected, entries: count }]);
-      await store.ensureSource(selected);
-      assert.equal(store.archiveReads.length, 1);
+    async function measureReads() {
+      const times = [],
+        mountTimes = [];
+      const selected = { lane: 2, at: bodyStart + 2 * count };
+      for (let i = 0; i < 6; i++) {
+        const store = new DelegatedMemoryStorage(),
+          start = performance.now();
+        phase = "root";
+        const result = await loadSettledDelegations(
+          measuredPool,
+          { tenantId: tenant, piSessionId: session, runId: next, writerId: writer },
+          store,
+        );
+        if (i) times.push(performance.now() - start);
+        assert.equal(result.entries, count);
+        assert.equal(store.archiveReads?.length ?? 0, 0);
+        phase = "source";
+        const mountStart = performance.now();
+        await Promise.all([store.ensureSource(selected), store.ensureSource(selected)]);
+        if (i) mountTimes.push(performance.now() - mountStart);
+        assert.deepEqual(store.archiveReads, [{ ...selected, entries: count }]);
+        await store.ensureSource(selected);
+        assert.equal(store.archiveReads.length, 1);
+      }
+      times.sort((a, b) => a - b);
+      mountTimes.sort((a, b) => a - b);
+      return {
+        medianMs: +times[2].toFixed(1),
+        maximumMs: +times.at(-1).toFixed(1),
+        mountMedianMs: +mountTimes[2].toFixed(1),
+        mountMaximumMs: +mountTimes.at(-1).toFixed(1),
+        samples: times.length,
+      };
     }
-    times.sort((a, b) => a - b);
-    mountTimes.sort((a, b) => a - b);
     async function explainReads() {
       const plans = {};
       for (const [label, [sql, args]] of reads) {
@@ -114,14 +124,16 @@ for (const children of [1, 100, 500]) {
       assert(plans.root && plans.source);
       return plans;
     }
+    const timings = await measureReads();
     const plans = await explainReads();
-    let withTemporaryIndex;
+    let withTemporaryIndex, indexTimings, baselineRepeat;
     if (children === 500 && process.argv.includes("--compare-index")) {
-      await pool.query(
-        "create index study_lane_entries on messages(tenant_id,pi_session_id,conversation_id,entry_id) where entry_id is not null",
-      );
+      await pool.query(studyEntryIndexSql);
       await pool.query("analyze messages");
+      indexTimings = await measureReads();
       withTemporaryIndex = await explainReads();
+      await pool.query("drop index study_lane_entries");
+      baselineRepeat = await measureReads();
     }
     console.log(
       JSON.stringify({
@@ -129,14 +141,12 @@ for (const children of [1, 100, 500]) {
         storedEntries: all,
         rootEntries: count,
         mountedEntries: count,
-        mountMedianMs: +mountTimes[2].toFixed(1),
-        mountMaximumMs: +mountTimes.at(-1).toFixed(1),
+        ...timings,
         bodyBytes: 512,
-        samples: times.length,
         plans,
         withTemporaryIndex,
-        medianMs: +times[2].toFixed(1),
-        maximumMs: +times.at(-1).toFixed(1),
+        indexTimings,
+        baselineRepeat,
       }),
     );
   } finally {

@@ -540,6 +540,36 @@ the rates describe the Session Projector and warm tool dispatch. Each arm
 verifies completion, original ordered call/result pairs, displays, receipts
 and committed partition positions.
 
+### Conversation Entry index cost
+
+With the same 32-partition, 12-connection `workspace-fanout` setup, set
+`PI_CLOUD_FANOUT_SUITE=grants-million-day` and `PI_CLOUD_COMPARE_ENTRY_INDEX=1`.
+After live Pi capture, the driver replays the identical 1,024-Run tape eight times
+from a backlog (off/on/on/off/on/off/off/on) and four times at 3,247 records/s
+(off/on/on/off). It installs the index only on the empty scratch message table
+for indexed arms. Both arms checkpoint their dedicated PG after preparing Runs
+and routes. The interval from projection start through drain excludes index
+construction, seed and verification reads from the WAL sample. Each arm reports
+the actual index and table sizes. Tool PG P95 is the upper edge of the existing
+5% histogram buckets for the projection phase of a Tool intent or intent group.
+
+Run the two independent calibrations serially after the cluster fixture exits:
+
+```sh
+node --import tsx scripts/experiments/minimal-session-storage/entry-index-append-study.mjs > /tmp/entry-append.json
+node scripts/run-with-test-postgres.mjs -- node --import tsx \
+  scripts/experiments/minimal-session-storage/delegated-cold-study.mjs --compare-index > /tmp/entry-reads.jsonl
+node scripts/experiments/minimal-session-storage/summarize-entry-index.mjs \
+  /path/to/cluster-output /tmp/entry-append.json /tmp/entry-reads.jsonl
+```
+
+The append control uses an exclusive, disposable PG. It stages one native
+20-Tool payload shape across eight physical Sessions and 128 Conversations each,
+prepopulates 132,096 Entries and measures one server-side INSERT of 44,032 fresh
+Entries. The timing includes FK trigger execution and excludes statement input
+generation and commit acknowledgement. The regular Projector measurement above
+includes its ordered admission, mixed transactions and simulated device replies.
+
 ### Atomic handoff after loss of the Worker and Session Projector (#52)
 
 Run `PI_CLOUD_RUNTIME_LOAD_CHECK=1 node --import tsx scripts/experiments/minimal-session-storage/run-retained-family.mjs /private/atomic-handoff.json --atomic-handoff`

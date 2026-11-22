@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { studyEntryIndexSql } from "./entry-index.mjs";
 import { createHash } from "node:crypto";
 import { fanoutFixture, targets, offered, partitions } from "./fanout-fixture.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
@@ -44,9 +45,13 @@ export async function runFanout({
     trials: [],
   });
   const owners = fixture.owners;
-  async function seed(arm, displayRounds, mixed) {
+  async function seed(arm, displayRounds, mixed, entryIndex) {
     await call(projector, "fanoutReset", "fanoutResetDone");
     await db.query("truncate conversation_worlds,workspace_route_spans,messages,inboxes,runs");
+    if (entryIndex !== undefined) {
+      await db.query("drop index if exists study_lane_entries");
+      if (entryIndex) await db.query(studyEntryIndexSql);
+    }
     await db.query(
       `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id)
       select r,$1,s,1,r,'fixture','fixture','running',w from unnest($2::uuid[],$3::uuid[],$4::uuid[]) a(r,s,w)`,
@@ -108,13 +113,14 @@ export async function runFanout({
       mixed = false,
       liveSource = false,
       rate = offered,
+      entryIndex,
     },
   ] of cases(suite).entries()) {
     const arm = mixed ? 1 : i + 1,
       count = rounds * targets;
-    if (mode !== "direct") await seed(arm, display ? rounds : 0, mixed);
+    if (mode !== "direct") await seed(arm, display ? rounds : 0, mixed, entryIndex);
     await call(receiver, "fanoutArm", "fanoutArmed", { arm, delay: ms, mixed });
-    let source, result, bytes, ends, mix;
+    let source, result, bytes, ends, mix, storage;
     if (mode === "direct") {
       ({ result } = await call(projector, "fanoutDirect", "fanoutDirectDone", {
         mode,
@@ -132,6 +138,13 @@ export async function runFanout({
           callsPerRun: rounds,
           displayRounds: display ? rounds : 0,
         }));
+      // This comparison owns a dedicated PG Pod. Keep seed/DDL WAL out of the
+      // window and give each arm the same full-page-image starting condition.
+      let walStart;
+      if (entryIndex !== undefined) {
+        await db.query("checkpoint");
+        walStart = (await db.query("select pg_current_wal_insert_lsn() as lsn")).rows[0].lsn;
+      }
       const start = wall() + 250;
       await call(projector, "fanoutBegin", "fanoutBegun", {
         mode,
@@ -163,6 +176,18 @@ export async function runFanout({
       source.rate = ((mix?.records ?? count) * 1000) / (source.acknowledgedAt - start);
       if (preload) await call(projector, "fanoutRelease", "fanoutReleased", { start: wall() });
       ({ result, ends } = await call(projector, "fanoutFinish", "fanoutFinished"));
+      if (entryIndex !== undefined) {
+        storage = (
+          await db.query(
+            `select pg_wal_lsn_diff(pg_current_wal_insert_lsn(),$1::pg_lsn)::float8 as "walBytes",
+          coalesce(pg_relation_size(to_regclass('study_lane_entries')),0)::float8 as "entryIndexBytes",
+          pg_indexes_size('messages')::float8 as "allMessageIndexBytes", pg_table_size('messages')::float8 as "messageTableBytes"`,
+            [walStart],
+          )
+        ).rows[0];
+        assert(storage.walBytes > 0);
+        assert.equal(storage.entryIndexBytes > 0, entryIndex);
+      }
       assert.equal(ends.length, partitions);
       if (mode === "offset-control") {
         const { rows } = await db.query(
@@ -250,6 +275,7 @@ export async function runFanout({
       source,
       result,
       network,
+      ...(storage ? { entryIndex, storage } : {}),
     };
     study.trials.push(trial);
     await save();
@@ -325,6 +351,23 @@ function cases(suite) {
     const short = suite === "grants-million-day";
     // A fixed native 20-call trace has 187 Session records, including closure.
     const dailyRate = (187 * 1_000_000) / 86_400;
+    if (short && process.env.PI_CLOUD_COMPARE_ENTRY_INDEX === "1") {
+      const ordered = [false, true, true, false, true, false, false, true];
+      const fixedRate = Math.round(1.5 * dailyRate);
+      return [
+        { liveSource: true },
+        ...ordered.map((entryIndex) => ({ entryIndex, preload: true, rate: 16000 })),
+        ...ordered.slice(0, 4).map((entryIndex) => ({ entryIndex, rate: fixedRate })),
+      ].map((options) =>
+        trial("concurrent", 100, 20, {
+          grantWidth: 8,
+          batchProjection: true,
+          display: true,
+          mixed: true,
+          ...options,
+        }),
+      );
+    }
     // Diagnostic only: replay the very same tape at 1.5x both before and after
     // a saturated arm. The published daily-load profile keeps its original order.
     const multipliers =
