@@ -308,8 +308,9 @@ export class ReadyProjection {
           projectWorld(view, f, draft.frame);
           if (r.rootPresentation) {
             foldRootPresentation(view, f, draft.frame);
-            projectChildOutcomes(view, f, draft.frame, r.nativeDispatches);
           }
+          if (r.rootPresentation || this.delegatedRuns)
+            projectChildOutcomes(view, f, draft.frame, r.nativeDispatches, this.delegatedRuns);
           view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
           if (covered && owner?.projection_pin != null)
             view.pinOffset = BigInt(owner.projection_pin);

@@ -11,7 +11,13 @@ function activity(lane) {
   return null;
 }
 
-export function projectChildOutcomes(view, fact, frame, dispatches = fact.tools) {
+export function projectChildOutcomes(
+  view,
+  fact,
+  frame,
+  dispatches = fact.tools,
+  delegatedRuns = false,
+) {
   const writes = fact.commit.writes;
   let lanes = view.childOutcomes,
     callers = view.childCallers;
@@ -81,6 +87,7 @@ export function projectChildOutcomes(view, fact, frame, dispatches = fact.tools)
       if (lanes === view.childOutcomes) lanes = { ...lanes };
       lanes[lane] = { id: record.key, active: {} };
       trackCaller(v.ownerTaskId, record.key);
+      if (delegatedRuns) patch(record.key, { lane, owner: v.generationId });
     }
   }
   if (!lanes && !callers && !patches.size) return;
@@ -104,7 +111,8 @@ export function projectChildOutcomes(view, fact, frame, dispatches = fact.tools)
     const active =
       w.type === "task" ? t.state.status !== "terminal" : ["queued", "placed"].includes(t.status);
     const old = lanes[lane],
-      original = w.type === "submission" && t.requestId === fact.scope.runId;
+      original =
+        w.type === "submission" && t.requestId === (delegatedRuns ? old.id : fact.scope.runId);
     const unanswered =
       w.type === "submission" && t.status === "unanswered" && (original || t.entry != null);
     const answer = original && t.status === "done" && t.type === "input" ? t.answer : undefined;
@@ -140,7 +148,7 @@ export function projectChildOutcomes(view, fact, frame, dispatches = fact.tools)
     view.childCallers = Object.keys(callers).length ? callers : undefined;
   if (patches.size && frame)
     frame.ops.push({
-      kind: "child-outcomes",
+      kind: delegatedRuns ? "delegated-outcomes" : "child-outcomes",
       count: 1,
       args: [fact.scope.tenantId, fact.scope.piSessionId, fact.scope.runId, fact.scope.writerId],
       seq: fact.commit.seq,

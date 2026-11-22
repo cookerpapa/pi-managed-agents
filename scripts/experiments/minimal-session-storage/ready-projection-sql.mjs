@@ -35,12 +35,19 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
           if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin','world') and not (op->>'kind'='finish' and p_allow_finish)) or
             (op->>'kind'='inbox' and (a->>6)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
           case op->>'kind'
-          when 'child-outcomes' then
+          when 'child-outcomes','delegated-outcomes' then
             perform 1 from runs where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid
               and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for share;
             ok:=found; n:=1;
             if ok then
               for snap in select value from jsonb_array_elements(op->'changes') loop
+                if op->>'kind'='delegated-outcomes' then
+                  if not project_delegated_outcome(a,snap,(op->>'seq')::bigint,(op->>'at')::timestamptz)
+                    and (snap?'activity' or snap?'stopped' or snap?'lane') then
+                    raise exception 'Missing delegated Run or conflicting outcome' using errcode='PZ002';
+                  end if;
+                  continue;
+                end if;
                 update subagent_conversations e set native_activity=case when snap?'activity' then snap->>'activity' else e.native_activity end,
                   native_stop_seen=e.native_stop_seen or (snap?'stopped'),
                   native_caller=case when e.native_caller='aborted' then 'aborted' else coalesce(snap->>'caller',e.native_caller) end,

@@ -6,7 +6,14 @@ import assert from "node:assert/strict";
 import { NATIVE_HUMAN_INPUT_DOCUMENT, parseSubagentTaskId } from "@pi-cloud/protocol";
 import { foldLive } from "./moving-checkpoint.mjs";
 
-export async function reopenRootProjection(pool, scope, position, sequence, withChildren = false) {
+export async function reopenRootProjection(
+  pool,
+  scope,
+  position,
+  sequence,
+  withChildren = false,
+  delegatedRuns = false,
+) {
   const {
     rows: [r],
   } = await pool.query(
@@ -62,18 +69,22 @@ export async function reopenRootProjection(pool, scope, position, sequence, with
   const marker = state.heads.filter((h) => h.conversationId === 1).sort((a, b) => b.id - a.id)[0];
   const worlds = {};
   foldWorld(worlds, writes);
-  if (withChildren) {
+  if (withChildren || delegatedRuns) {
     const { rows } = await pool.query(
-      "select id,parent_tool_call_id from subagent_conversations where tenant_id=$1 and root_run_id=$2",
+      delegatedRuns
+        ? "select id, source_task_id from runs where tenant_id=$1 and root_run_id=$2"
+        : "select id,parent_tool_call_id from subagent_conversations where tenant_id=$1 and root_run_id=$2",
       [scope.tenantId, scope.runId],
     );
     if (rows.length) {
       worlds.childCallers = {};
       for (const row of rows)
-        (worlds.childCallers[parseSubagentTaskId(row.parent_tool_call_id)] ??= []).push(row.id);
+        (worlds.childCallers[
+          delegatedRuns ? Number(row.source_task_id) : parseSubagentTaskId(row.parent_tool_call_id)
+        ] ??= []).push(row.id);
     }
   }
-  projectChildOutcomes(worlds, { scope, commit: { writes } });
+  projectChildOutcomes(worlds, { scope, commit: { writes } }, undefined, undefined, delegatedRuns);
   return {
     ...worlds,
     agentRoutes: Object.fromEntries(

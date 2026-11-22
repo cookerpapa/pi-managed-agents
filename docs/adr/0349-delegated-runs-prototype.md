@@ -1,0 +1,9 @@
+# ADR-0349. Address child agents by their first delegated Run
+
+Try the root-only Session model in the isolated #52 storage prototype. A root Run owns the physical Session writer, a mailbox position and a Worker slot. A delegated Run belongs to that root and has no mailbox position or lease. Its first Run ID is its stable agent address. A continuation records both the invoking Run and the previous Run of that agent. Registering the same tool operation twice must return the same invocation.
+
+Use Pi Durable 1.0's existing task ownership, conversation fork, submission, Inbox and checkpoint APIs. The first invocation can start fresh or inherit the calling conversation at a fixed Entry. An explicit continuation forks the last settled child transcript at its own head under the new caller's live generation. The stable cloud address survives the replacement of the native owner. Do not traverse the caller edge to assemble continuation context. Root messages keep their physical Session partition and writer. Normal family closure waits for active children; a stale writer cannot create, settle or resume one.
+
+Agent-to-agent delivery targets a specific active invocation of an agent. Pin that choice on the calling native tool when retrying. Enqueue a steer or follow-up on the recipient's native busy Inbox. A late message to an idle invocation returns missed. Only an explicit continuation creates a new child Run. No extra cloud message queue. Child registration retains the task as its initial input, including before placement.
+
+Exercise the candidate with real PostgreSQL and the pinned Pi SDK. Use the existing ordered projector for bodies, Inbox and child outcomes. Keep the existing serving deployment and previous acceptance fixtures separate until their read APIs and release checks have been ported.

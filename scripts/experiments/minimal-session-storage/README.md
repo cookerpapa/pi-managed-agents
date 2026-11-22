@@ -1,5 +1,7 @@
 # Minimal Session lifecycle load test
 
+For the isolated root-only Session and delegated-Run schema, see the [design, cold-read measurements and reproduction commands](../../../docs/reports/delegated-runs-20261122.md).
+
 This experiment measures the proposed Run queue, immutable messages and one current Pi Inbox per Conversation. It runs the actual pinned Pi Harness on two Worker Pods with a deterministic local model, using the maintained RF3 producer and partition-ordered consumer. A separate Projector process inside the Session runtime Pod uses a private topic and a disposable logged PostgreSQL database. Each role is invoked through kubectl exec. Source changes to these experiment files do not replace any application image.
 
 The original storage controls use fresh physical Sessions. The `wake-throughput` suites also run successive roots in the same Sessions. The input driver uses direct SQL and an experiment channel for post-commit confirmations. HTTP/SSE, charging, tool sandboxes and restoration of in-flight native Tasks are additional costs of the maintained runtime. The benchmark's only tool returns a fixed observation. Each worker applies its in-memory native batch after Kafka acknowledgement. Steer and follow-up pass through Pi's actual busy submission and placement. Only the explicitly labelled replay controls read a previously captured plain trace.

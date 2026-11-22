@@ -13,8 +13,16 @@ import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { assertFamilySettled } from "./moving-checkpoint.mjs";
 import { emptyInboxRoutes } from "./family-inboxes.mjs";
 
-export function normalRootProjection(pool, topic, select, resolve, validateChild) {
+export function normalRootProjection(
+  pool,
+  topic,
+  select,
+  resolve,
+  validateChild,
+  { delegatedRuns = false } = {},
+) {
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
+  view.delegatedRuns = delegatedRuns;
   view.configure(16, "recorded-history");
   const env = {
     pool,
@@ -114,6 +122,7 @@ export function normalRootProjection(pool, topic, select, resolve, validateChild
               position,
               fact.commit.seq,
               !!validateChild,
+              delegatedRuns,
             );
           if (!current()) return { admitted: false, events: [], covers: [] };
           if (previous) view.sessions.set(scope.runId, previous);

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Root-only Sessions and delegated Runs](delegated-runs-20261122.md) covers sibling inputs, cross-root continuation and forced Worker loss in the isolated candidate.
+
 - [Ordered agent configuration in the message store](ordered-agent-configuration-20261122.md) verifies native historical Forks, independent cold restoration and mixed-load projection.
 
 - [Candidate release gate and historical Fork evidence](candidate-release-gate-20261122.md) covers the storage decision and repeated 20-tool load measurements.

@@ -165,7 +165,7 @@ export async function saveSealedFamily(
 
 // Match Pi's nearest visible head at each native request cutoff, including an
 // inherited prefix. Outstanding Tasks may also reference individual older Entries.
-function sealedHistorySelection(state: SealedNativeState) {
+function sealedHistorySelection(state: SealedNativeState, retainDelegated = false) {
   const conversations = new Map<number, ConversationRecord>(),
     activeTasks = new Set<number>(),
     points = new Map<number, Set<number>>(),
@@ -197,7 +197,7 @@ function sealedHistorySelection(state: SealedNativeState) {
     if (t.kind === "pi.compaction" && typeof cp?.tail === "number") goal(t.conversationId, cp.tail);
   }
   for (const c of conversations.values()) {
-    if (c.owner && activeTasks.has(c.owner.taskId)) goal(c.id);
+    if (retainDelegated || (c.owner && activeTasks.has(c.owner.taskId))) goal(c.id);
     if (c.parent) pinned.add(c.parent.at);
   }
   const ranges: { lane: number; lo: number; hi: number }[] = [];
@@ -227,7 +227,12 @@ function sealedHistorySelection(state: SealedNativeState) {
   return { ranges, pinned: [...pinned] };
 }
 
-export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope, topic: string) {
+export async function readSealedFamily(
+  db: Kysely<Database>,
+  scope: FamilyScope,
+  topic: string,
+  { delegatedRuns = false } = {},
+) {
   return db
     .transaction()
     .setIsolationLevel("repeatable read")
@@ -247,7 +252,7 @@ export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope,
         and active.writer_failed_at is null and active.writer_sealed_at is null`.execute(tx);
       if (!row) throw Error("No matching sealed native handoff for the claimed Run");
       const h = decodePredecessor(row.handoff, scope, topic);
-      const { ranges, pinned } = sealedHistorySelection(h.state);
+      const { ranges, pinned } = sealedHistorySelection(h.state, delegatedRuns);
       const prior = row.prior;
       if (
         Number(row.slot) > 1 &&
@@ -269,16 +274,20 @@ export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope,
       const selected = sql`(entry_id=any(${pinned}::bigint[]) or exists(select 1 from
         unnest(${ranges.map((r) => r.lane)}::bigint[],${ranges.map((r) => r.lo)}::bigint[],${ranges.map((r) => r.hi)}::bigint[])
         as v(lane,lo,hi) where v.lane=messages.conversation_id and messages.entry_id between v.lo and v.hi))`;
-      const bodies = sql`select entry_id,commit_seq,ordinal,content from messages
+      const bodies = sql`select entry_id,conversation_id,commit_seq,ordinal,content from messages
         where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}`;
       // Each arm can use its own index: this Run's ID, or the inherited root Entry range.
       // Their native sequence intervals are disjoint.
+      const inheritedRoot = delegatedRuns
+        ? sql`true`
+        : sql`conversation_id=1 and entry_id>=${prior?.floor ?? 1}`;
       const inherited = prior
-        ? sql`union all ${bodies} and conversation_id=1
-        and entry_id>=${prior.floor} and entry_id<${prior.nextId} and commit_seq<=${prior.seq} and ${selected}`
+        ? sql`union all ${bodies} and ${inheritedRoot}
+        and entry_id<${prior.nextId} and commit_seq<=${prior.seq} and ${selected}`
         : sql``;
       const { rows: entries } = await sql<{
         entry_id: string;
+        conversation_id: string;
         commit_seq: string;
         ordinal: number;
         content: string;
@@ -289,7 +298,12 @@ export async function readSealedFamily(db: Kysely<Database>, scope: FamilyScope,
         prior &&
         ranges.some((r) => r.lane === 1 && r.lo <= prior.floor && r.hi >= prior.nextId - 1)
       ) {
-        const prefix = entries.filter((e) => Number(e.commit_seq) <= prior.seq);
+        const prefix = entries.filter(
+          (e) =>
+            Number(e.commit_seq) <= prior.seq &&
+            Number(e.conversation_id) === 1 &&
+            Number(e.entry_id) >= prior.floor,
+        );
         if (
           prefix.length !== prior.count ||
           prefix.reduce((n, e) => n + Buffer.byteLength(e.content), 0) !== prior.bytes

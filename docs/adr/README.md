@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0349](0349-delegated-runs-prototype.md) tests root-only Sessions and separately addressed delegated Runs in #52.
+
 [ADR-0348](0348-candidate-child-outcomes.md) retains confirmed Pi child outcomes and original answer references on the existing relationship in the candidate.
 
 [ADR-0347](0347-conversation-compute-continuity.md) retains Conversation-scoped compute continuity across cold Forks in the candidate.
