@@ -10,7 +10,7 @@ The first implementation milestone for [#48](https://github.com/cookerpapa/pi-ma
 
 ## Ordered Session projection under load
 
-The latest [release gate](reports/candidate-release-gate-20261122.md) isolates a historical native Fork state that identical candidate PG rows cannot distinguish. The storage contract needs an owner decision before cutover.
+The [release gate](reports/candidate-release-gate-20261122.md) isolated lost historical agent configuration. [ADR-0345](adr/0345-ordered-agent-configuration.md) and the [positive Fork control](reports/ordered-agent-configuration-20261122.md) close that gap for `pi.agent`. The separate `current` environment observation, full serving composition and later-epoch recovery remain release gates.
 
 The [ordinary root browser acceptance](reports/normal-root-message-store-20261122.md) exercises normal completion and cold continuation on the candidate. The [confirmed-input handoff](reports/root-input-handoff-20261122.md) exercises steer and follow-up across Worker loss on that composition. The [root Stop acceptance](reports/stopped-root-inputs-20261122.md) covers unconsumed input, an edited draft and acknowledgement retry. The [Stop during Worker loss cases](reports/stopped-root-inputs-20261122.md#stop-after-losing-the-worker) exercise both an outstanding tool and an already-published original reply.
 

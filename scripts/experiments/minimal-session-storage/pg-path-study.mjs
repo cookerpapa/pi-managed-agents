@@ -101,12 +101,12 @@ export class PgPathStudy {
       rows: [r],
     } = await this.pool.query(`select
       (select count(*)::int from runs r join path_owners o using(id) where r.state='completed' and r.history_head is not null) completed,
-      (select count(*)::int from messages m join path_owners o on o.id=m.run_id) message_rows,
+      (select count(*)::int from message_entries m join path_owners o on o.id=m.run_id) message_rows,
       (select count(*)::int from inboxes i join path_owners o on o.session_id=i.pi_session_id) inbox_rows,
       (select md5(string_agg(md5(to_jsonb(r.history_head)::text || r.state),'' order by r.id))
          from runs r join path_owners o using(id)) heads,
       (select md5(string_agg(md5((to_jsonb(m)-'created_at')::text),'' order by m.pi_session_id,m.entry_id))
-         from messages m join path_owners o on o.id=m.run_id) messages,
+         from message_entries m join path_owners o on o.id=m.run_id) messages,
       (select md5(string_agg(md5(to_jsonb(i)::text),'' order by i.pi_session_id,i.conversation_id))
          from inboxes i join path_owners o on o.session_id=i.pi_session_id) inboxes`);
     return r;

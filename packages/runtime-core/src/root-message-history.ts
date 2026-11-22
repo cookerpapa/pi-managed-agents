@@ -90,7 +90,7 @@ export async function readRootMessageWindow(db: Kysely<Database>, input: History
       (select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
         octet_length(m.content) as body_bytes,m.assistant_entry_id::text as assistant_id,
         case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,false as pending
-        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=1 and m.role not in ('system','pi.system')
+        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=1 and m.entry_id is not null and m.role not in ('system','pi.system')
           ${bound(sql.raw("m.commit_seq"), sql.raw("m.ordinal"))}
         order by m.commit_seq ${order},m.ordinal ${order} limit ${limit})
       union all select k,(v->>'seq')::bigint,(v->>'ordinal')::int,'{}'::jsonb,octet_length(v::text),v->>'assistantEntryId','"pi.tool"',false,true

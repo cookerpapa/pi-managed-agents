@@ -49,6 +49,11 @@ export async function reopenRootProjection(pool, scope, position, sequence) {
   const liveId = Object.keys(liveDocs).find((id) => liveDocs[id].conversation === 1);
   const marker = state.heads.filter((h) => h.conversationId === 1).sort((a, b) => b.id - a.id)[0];
   return {
+    agentRoutes: Object.fromEntries(
+      writes
+        .filter((w) => w.type === "document.create" && w.record.kind === "pi.agent")
+        .map((w) => [w.record.id, w.record.scope.conversationId]),
+    ),
     writer: scope.writerId,
     seq: state.seq,
     nextId: state.nextId,

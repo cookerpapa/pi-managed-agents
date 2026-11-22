@@ -171,7 +171,7 @@ export async function forkSeed(db, tenant, source) {
     );
     await c.query(
       `insert into messages(tenant_id,pi_session_id,entry_id,conversation_id,run_id,role,content,commit_seq,ordinal)
-      select tenant_id,$3,entry_id,conversation_id,$4,role,content,commit_seq,ordinal from messages
+      select tenant_id,$3,entry_id,conversation_id,$4,role,content,commit_seq,ordinal from message_entries
       where tenant_id=$1 and pi_session_id=$2 and run_id=$5`,
       [tenant, source.session, session, run, p.id],
     );

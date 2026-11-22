@@ -597,6 +597,6 @@ To kill the old Worker before clicking Stop, use `--root-stop-handoff-web`. Appe
 
 ### Release evidence for historical document Forks and throughput variance
 
-Run `node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/verify-fork-document-evidence.mjs` to compare the retained candidate rows with native `pi.agent` Fork snapshots. Exit 2 identifies an information gap. The diagnostic uses two disposable PG schemas and two deterministic Pi histories.
+Run `node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/verify-fork-document-evidence.mjs` to compare the retained candidate rows with native `pi.agent` Fork snapshots. At `872950bb` this diagnostic exited 2. With ADR-0345 it requires equality with each native Fork in a fresh Harness, repeated Fork after source prune/deletion, and final collection. The diagnostic uses two disposable PG schemas and two deterministic Pi histories. The separate `--probe-current-world` option holds agent configuration constant and compares the next environment-reset notice after Fork. Exit 2 identifies the remaining observation-state gap.
 
 For a diagnostic repetition of the million-Run load, add `PI_CLOUD_REPEAT_MILLION_RATE=1` to the existing `grants-million-day` command. After the live capture it replays 1.5×, 3×, 1.5× and 1.5× daily demand, each on a drained projection. Each paced arm in an invocation uses its captured tape. The standard suite retains the original load sequence.

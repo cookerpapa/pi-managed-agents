@@ -66,10 +66,10 @@ export class ForkStorage {
     const c = await this.pool.connect();
     try {
       await c.query("begin");
-      await c.query("insert into pi_history_streams select $1,x::text from unnest($2::uuid[]) x", [
-        tenant,
-        ids,
-      ]);
+      await c.query(
+        "insert into pi_history_streams(tenant_id,id) select $1,x::text from unnest($2::uuid[]) x",
+        [tenant, ids],
+      );
       await c.query("insert into fork_sessions select $1,x,x,$3 from unnest($2::uuid[]) x", [
         tenant,
         ids,
@@ -104,11 +104,13 @@ export class ForkStorage {
     assert(!s.root_id || lane === 1, "An inherited child requires its own ancestry mapping");
     const {
       rows: [target],
-    } = await sql`select m.entry_id from ${this.visible(t, s, lane)}
+    } =
+      await sql`select m.entry_id,a.pi_session_id as agent_stream,a.commit_seq as agent_seq,a.ordinal as agent_ordinal from ${this.visible(t, s, lane)}
+      left join lateral fork_agent_at(m.tenant_id,m.pi_session_id,m.conversation_id,m.commit_seq) a on true
       join fork_completed_runs h on h.tenant_id=m.tenant_id and h.stream_id=m.pi_session_id and h.run_id=m.run_id
       where m.entry_id=${entry} and m.run_id=${run}::uuid and m.role='assistant' and m.content::jsonb#>>'{model,0,stopReason}'='stop'`.execute(
-      tx,
-    );
+        tx,
+      );
     assert(target, "Missing completed assistant anchor");
     const {
       rows: [head],
@@ -132,7 +134,16 @@ export class ForkStorage {
       if (local) root = await directory.join(root, directory.range(local));
     }
     assert(root);
-    return directory.persist(root);
+    return {
+      root: await directory.persist(root),
+      agent: { stream: target.agent_stream, seq: target.agent_seq, ordinal: target.agent_ordinal },
+    };
+  }
+  async branchStream(tx, tenant, id, agent) {
+    await sql`insert into pi_history_streams(tenant_id,id,agent_base_stream,agent_base_seq,agent_base_ordinal)
+      values(${tenant}::uuid,${id},${agent.stream}::uuid,${agent.seq}::bigint,${agent.ordinal}::int)`.execute(
+      tx,
+    );
   }
   async lock(tx, t, exclusive) {
     if (exclusive) await sql`select pg_advisory_xact_lock(hashtextextended(${t},17))`.execute(tx);
@@ -159,11 +170,9 @@ export class ForkStorage {
       }
       const s = await this.session(tx, t, source);
       assert(s, "Unknown Fork source");
-      const root = await this.freeze(tx, t, s, point),
+      const { root, agent } = await this.freeze(tx, t, s, point),
         target = randomUUID();
-      await sql`insert into pi_history_streams(tenant_id,id) values(${t}::uuid,${target})`.execute(
-        tx,
-      );
+      await this.branchStream(tx, t, target, agent);
       await sql`insert into fork_sessions values(${t}::uuid,${target}::uuid,${target}::uuid,${root}::uuid)`.execute(
         tx,
       );
@@ -172,6 +181,15 @@ export class ForkStorage {
       );
       return target;
     });
+  }
+  async agentConfiguration(t, id) {
+    const {
+      rows: [r],
+    } = await sql`select a.content from fork_sessions s left join lateral
+      fork_agent_at(s.tenant_id,s.stream_id,1,9223372036854775807) a on true
+      where s.tenant_id=${t}::uuid and s.id=${id}::uuid`.execute(this.db);
+    assert(r, "Unknown Fork session");
+    return r.content === null ? null : JSON.parse(r.content);
   }
   async page(t, id, limit = 30) {
     return this.db.transaction().execute(async (tx) => {
@@ -199,7 +217,7 @@ export class ForkStorage {
           tx,
         );
       assert(!active.rows.length, "Source still running");
-      const root = point ? await this.freeze(tx, t, s, point) : null;
+      const frozen = point ? await this.freeze(tx, t, s, point) : null;
       await sql`delete from inboxes where tenant_id=${t}::uuid and pi_session_id=${stream}::uuid`.execute(
         tx,
       );
@@ -213,10 +231,8 @@ export class ForkStorage {
         return;
       }
       const fresh = randomUUID();
-      await sql`insert into pi_history_streams(tenant_id,id) values(${t}::uuid,${fresh})`.execute(
-        tx,
-      );
-      await sql`update fork_sessions set root_id=${root}::uuid,stream_id=${fresh}::uuid where tenant_id=${t}::uuid and id=${id}::uuid`.execute(
+      await this.branchStream(tx, t, fresh, frozen.agent);
+      await sql`update fork_sessions set root_id=${frozen.root}::uuid,stream_id=${fresh}::uuid where tenant_id=${t}::uuid and id=${id}::uuid`.execute(
         tx,
       );
       return fresh;
@@ -232,10 +248,29 @@ export class ForkStorage {
         delete from pi_history_nodes n where tenant_id=${t}::uuid and not exists(select from keep k where k.id=n.id)`.execute(
         tx,
       );
-      await sql`delete from messages m where tenant_id=${t}::uuid and not exists(select from fork_sessions s where s.tenant_id=m.tenant_id and s.stream_id=m.pi_session_id)
+      await sql`update pi_history_streams g set agent_base_stream=null,agent_base_seq=null,agent_base_ordinal=null
+        where g.tenant_id=${t}::uuid and g.agent_base_stream is not null
+        and not exists(select from fork_sessions s where s.tenant_id=g.tenant_id and s.stream_id=g.stream_uuid)
+        and not exists(select from pi_history_nodes n where n.tenant_id=g.tenant_id and n.source_id=g.id)`.execute(
+        tx,
+      );
+      await sql`delete from messages m where m.entry_id is not null and m.tenant_id=${t}::uuid and not exists(select from fork_sessions s where s.tenant_id=m.tenant_id and s.stream_id=m.pi_session_id)
         and not exists(select from pi_history_nodes n where n.tenant_id=m.tenant_id and n.source_id=m.pi_session_id::text and n.conversation_id=m.conversation_id
         and m.entry_id between n.min_id and n.max_id and m.commit_seq<=n.through_seq)`.execute(tx);
-      await sql`delete from fork_completed_runs h where tenant_id=${t}::uuid and not exists(select from messages m where m.run_id=h.run_id and m.pi_session_id=h.stream_id and m.tenant_id=h.tenant_id)`.execute(
+      // Entries still reachable through a frozen leaf can themselves be selected
+      // for another Fork. Retain their effective version, including retirement.
+      await sql`delete from messages v where v.tenant_id=${t}::uuid and v.document_id is not null
+        and not exists(select from fork_sessions s where s.tenant_id=v.tenant_id and s.stream_id=v.pi_session_id)
+        and not exists(select from pi_history_streams s where s.tenant_id=v.tenant_id and
+          (s.agent_base_stream,s.agent_base_seq,s.agent_base_ordinal)=(v.pi_session_id,v.commit_seq,v.ordinal))
+        and not exists(select from message_entries e where e.tenant_id=v.tenant_id and e.pi_session_id=v.pi_session_id
+          and e.conversation_id=v.conversation_id and e.commit_seq>=v.commit_seq and e.commit_seq<coalesce((
+            select n.commit_seq from messages n where n.tenant_id=v.tenant_id and n.pi_session_id=v.pi_session_id
+              and n.conversation_id=v.conversation_id and n.document_id is not null
+              and (n.commit_seq,n.ordinal)>(v.commit_seq,v.ordinal) order by n.commit_seq,n.ordinal limit 1),9223372036854775807))`.execute(
+        tx,
+      );
+      await sql`delete from fork_completed_runs h where tenant_id=${t}::uuid and not exists(select from message_entries m where m.run_id=h.run_id and m.pi_session_id=h.stream_id and m.tenant_id=h.tenant_id)`.execute(
         tx,
       );
       await sql`delete from pi_history_streams g where tenant_id=${t}::uuid and not exists(select from fork_sessions s where s.tenant_id=g.tenant_id and s.stream_id=g.stream_uuid)

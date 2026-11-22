@@ -683,7 +683,7 @@ async function verify(sc, records, cohort) {
   const rr = (await db.query("select * from runs where id=any($1::uuid[])", [ids])).rows;
   const msgs = (
     await db.query(
-      "select run_id,role,entry_id,source_input_id,content,commit_seq,ordinal from messages where run_id=any($1::uuid[]) order by run_id,commit_seq,ordinal",
+      "select run_id,role,entry_id,source_input_id,content,commit_seq,ordinal from message_entries where run_id=any($1::uuid[]) order by run_id,commit_seq,ordinal",
       [ids],
     )
   ).rows;

@@ -77,5 +77,5 @@ export async function verifyProjection(db) {
     assert([63, 64].includes(r.seq));
     assert.deepEqual(r.value, usageValue(32));
   }
-  assert.equal((await db.query("select count(*)::int as n from messages")).rows[0].n, 1024);
+  assert.equal((await db.query("select count(*)::int as n from message_entries")).rows[0].n, 1024);
 }

@@ -1,3 +1,4 @@
+import { agentBaseWrite } from "./agent-configuration.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { claimBatchSql, hintedClaimSql } from "./fixture.mjs";
@@ -7,7 +8,8 @@ import { claimBatchSql, hintedClaimSql } from "./fixture.mjs";
 const priorJoin = `left join runs prior on r.mailbox_position>1 and prior.tenant_id=r.tenant_id
  and prior.session_id=r.session_id and prior.mailbox_position=r.mailbox_position-1 and prior.state in ('completed','cancelled') and prior.history_head is not null
  left join inboxes i on prior.id is not null and i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id and i.conversation_id=1`;
-const columns = "prior.history_head as prior_head,i.doc_id as inbox_id,i.items as inbox_items";
+const columns =
+  "prior.history_head as prior_head,i.doc_id as inbox_id,i.items as inbox_items, (select json_build_object('id',v.document_id::text,'seq',v.commit_seq::text,'content',v.content) from agent_config_at(r.tenant_id,r.session_id,1,(prior.history_head->>'seq')::bigint) v where prior.history_head ? 'agentRoutes' and v.content<>'null') as agent_config";
 const withHead = (sql) =>
   `with taken as (${sql}) select r.*, prior.environment_snapshot as previous_environment, ${columns} from taken r ${priorJoin}`;
 export const claimWithHead = withHead(claimBatchSql);
@@ -234,9 +236,44 @@ export function restoreSettled(store, row, head, records) {
     },
     content: { kind: "base", version: 1, value: { items: row.inbox_items } },
   });
+  if (row.agent_config) {
+    const v = row.agent_config;
+    assert(
+      Number(v.seq) > 0 &&
+        Number(v.seq) <= head.seq &&
+        (!head.agentRoutes || head.agentRoutes[v.id] === 1),
+      "Settled agent configuration is outside its native head",
+    );
+    add(Number(v.seq), agentBaseWrite(Number(v.id), JSON.parse(v.content)));
+  } else if (Object.values(head.agentRoutes ?? {}).includes(1))
+    throw Error("Settled root lacks its agent configuration");
   for (const r of records) add(r.seq, { type: "entry", value: r.entry });
   for (const [seq, writes] of [...groups].sort(([a], [b]) => a - b))
     store.prepareCommit(writes, seq).apply();
+}
+
+// Import the retained single path selected by the Fork directory into fresh
+// native storage. Inbox and AgentDoc receive independent destination IDs.
+export function restoreForkPrefix(store, records, agent) {
+  assert(records.length > 0);
+  let maximumId = 1,
+    maximumSeq = 0;
+  for (const r of records) {
+    maximumId = Math.max(maximumId, r.entry.id);
+    maximumSeq = Math.max(maximumSeq, r.seq);
+  }
+  const seq = maximumSeq + 1,
+    inboxId = maximumId + 1;
+  restoreSettled(
+    store,
+    {
+      inbox_id: inboxId,
+      inbox_items: [],
+      ...(agent ? { agent_config: { id: inboxId + 1, seq, content: JSON.stringify(agent) } } : {}),
+    },
+    { version: "fork", seq },
+    records,
+  );
 }
 
 // A cheap independent model-input witness for measured runs. The correctness

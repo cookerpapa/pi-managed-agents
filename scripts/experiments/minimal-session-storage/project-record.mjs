@@ -1,5 +1,6 @@
 // The isolated actor runs in a pinned operator image. Bundle its matching pure caption code.
 import { nativeNavigation } from "../../../packages/pi-session-postgres/src/durable/types.ts";
+import { agentLane, agentVersion } from "./agent-configuration.mjs";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { isDeepStrictEqual } from "node:util";
@@ -41,6 +42,7 @@ export async function projectRecord(
   const borrow = () =>
     draft ? draft.acquire(f) : pathStudy?.mode ? pathStudy.acquire(f) : pool.connect();
   let s = views.get(runId);
+  if (s && !draft && f.kind === "durable_commit") s = { ...s };
   const trace = tailProbe?.begin(partition, offset, f);
   const measure = (kind, poolMs = 0, pgMs = 0, io) => {
     if (draft && (kind === "obsolete" || kind === "duplicate")) draft.frame.rejected = true;
@@ -99,6 +101,7 @@ export async function projectRecord(
           floor: s.floor,
           count: s.count,
           bytes: s.bytes,
+          ...(s.agentRoutes ? { agentRoutes: s.agentRoutes } : {}),
           ...(s.usageDocs ? { usageDocs: s.usageDocs } : {}),
         };
       }
@@ -189,6 +192,7 @@ export async function projectRecord(
       count: prior.count,
       bytes: prior.bytes,
       nextId: prior.nextId,
+      ...(prior.agentRoutes ? { agentRoutes: prior.agentRoutes } : {}),
       ...(prior.usageDocs ? { usageDocs: prior.usageDocs } : {}),
       floor: prior.floor,
       inboxes,
@@ -222,6 +226,9 @@ export async function projectRecord(
       w.record.scope.conversationId === 1
     )
       s.liveId = w.record.id;
+    const lane = stage?.integrated ? agentLane(s.agentRoutes, w) : undefined;
+    if (lane !== undefined)
+      messages.push(await agentVersion(pool, s, f.scope, batch.seq, w, lane, ordinal));
     if (w.type === "entry") {
       const role = w.value.model?.[0]?.role;
       if (stage?.integrated || ["user", "assistant", "toolResult"].includes(role)) {
@@ -257,7 +264,7 @@ export async function projectRecord(
       }
     }
   }
-  const rootMessages = messages.filter((m) => m.conversation === 1);
+  const rootMessages = messages.filter((m) => m.id !== undefined && m.conversation === 1);
   const lastAssistant = rootMessages.some((m) => m.role === "assistant");
   const kind =
     changed.length > 0 && messages.length

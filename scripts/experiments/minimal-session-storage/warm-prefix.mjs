@@ -34,7 +34,7 @@ export async function measureWarmPrefix(db) {
       const read = async () =>
         (
           await db.query(
-            "select content from messages where tenant_id=$1 and pi_session_id=$2 and run_id=$3 order by commit_seq,ordinal",
+            "select content from message_entries where tenant_id=$1 and pi_session_id=$2 and run_id=$3 order by commit_seq,ordinal",
             [tenant, session, previous],
           )
         ).rows.map((r) => JSON.parse(r.content));

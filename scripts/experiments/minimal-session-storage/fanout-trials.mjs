@@ -180,8 +180,8 @@ export async function runFanout({
           targets,
         );
         assert.equal(
-          (await db.query("select count(*)::int n from messages where role='toolResult'")).rows[0]
-            .n,
+          (await db.query("select count(*)::int n from message_entries where role='toolResult'"))
+            .rows[0].n,
           count,
         );
         if (rounds > 1) await verifyLoopHistory(db, owners, mix, rounds);
@@ -272,15 +272,28 @@ async function verifyLoopHistory(db, owners, mix, rounds) {
 
   const counts = Object.fromEntries(
     (
-      await db.query("select content::jsonb->>'kind' k,count(*)::int n from messages group by 1")
+      await db.query(
+        "select content::jsonb->>'kind' k,count(*)::int n from message_entries group by 1",
+      )
     ).rows.map((r) => [r.k, r.n]),
   );
+  const {
+    rows: [configs],
+  } = await db.query(
+    "select count(*)::int n,count(distinct run_id)::int runs from messages where document_id is not null",
+  );
+  assert.equal(
+    configs.runs,
+    owners.length,
+    "Expected a projected pi.agent configuration for every tool Run",
+  );
+  mix.agentConfigurationRows = configs.n;
   assert.deepEqual(counts, mix.entries);
   assert.equal(counts["pi.assistant"], count + targets);
   assert.equal(counts["pi.user"], targets);
   assert.equal(counts["pi.compaction"] ?? 0, rounds === 200 ? targets : 0);
   const pairs = await db.query(`with history as (
-            select run_id,commit_seq,ordinal,role,content::jsonb->'model'->0 msg from messages where role in ('assistant','toolResult')
+            select run_id,commit_seq,ordinal,role,content::jsonb->'model'->0 msg from message_entries where role in ('assistant','toolResult')
           ), calls as (select run_id,commit_seq,ordinal,msg->'content'->0->>'id' id from history where role='assistant' and msg->'content'->0->>'type'='toolCall'),
           replies as (select run_id,commit_seq,ordinal,msg->>'toolCallId' id,length(msg->'content'->0->>'text') size from history where role='toolResult')
           select calls.run_id as run,count(*)::int n,md5(string_agg(calls.id,',' order by calls.commit_seq,calls.ordinal)) digest

@@ -298,8 +298,8 @@ it.skipIf(!url)(
         { lane: root.id, source_input_id: "parent-follow-up" },
       ]);
       expect(view.sessions.get(scope.runId).count).toBe(
-        (await db.query("select count(*)::int as n from messages where conversation_id=1")).rows[0]
-          .n,
+        (await db.query("select count(*)::int as n from message_entries where conversation_id=1"))
+          .rows[0].n,
       );
       const rootFloor = view.sessions.get(scope.runId).floor;
       const childBoundary = (await child.context(ctx)).entries.at(-1).id;

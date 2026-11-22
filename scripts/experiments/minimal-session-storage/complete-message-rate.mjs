@@ -393,7 +393,7 @@ export async function messageTrials(
       `select run_id as id,count(*)::int n,md5(string_agg(md5(content),'' order by commit_seq,ordinal)) digest,
       count(*) filter(where commit_seq between 3 and 202 and role='toolResult')::int results,
       count(*) filter(where commit_seq between 3 and 202 and role='assistant')::int calls
-      from messages ${fork ? "where run_id=any($1::uuid[])" : ""} group by run_id`,
+      from message_entries ${fork ? "where run_id=any($1::uuid[])" : ""} group by run_id`,
       fork ? [owners.map((o) => o.runId)] : [],
     );
     assert.deepEqual(rows.map((r) => [r.id, r.digest]).sort(), expected);

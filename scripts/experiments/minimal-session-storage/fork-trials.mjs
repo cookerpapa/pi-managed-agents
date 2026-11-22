@@ -437,7 +437,10 @@ async function verifyForkOwnership(pool, storage, t) {
     (await storage.page(t, nested)).map((r) => Number(r.entry_id)),
     [12, 8, 6, 4],
   );
-  await verifyModelContext(await storage.page(t, nested));
+  await verifyModelContext(
+    await storage.page(t, nested),
+    await storage.agentConfiguration(t, nested),
+  );
   for (const id of [nested, side]) await storage.retire(t, id);
   await storage.collect(t);
   for (const table of [
@@ -508,13 +511,13 @@ async function verifyForkOwnership(pool, storage, t) {
   };
 }
 
-async function verifyModelContext(rows) {
+async function verifyModelContext(rows, agentConfig) {
   const { Harness, MemoryStorage, createRegistry } = await import("@earendil-works/pi-durable");
   const { BACKGROUND_CONTEXT: ctx } = await import("@earendil-works/chord/context");
   const { createModels } = await import("@earendil-works/pi-ai/models");
   const { fauxProvider, fauxAssistantMessage } =
     await import("@earendil-works/pi-ai/providers/faux");
-  const { restoreSettled } = await import("./session-prefix.mjs");
+  const { restoreForkPrefix } = await import("./session-prefix.mjs");
   const history = [...rows]
     .reverse()
     .map((r) => ({ entry: JSON.parse(r.content), seq: Number(r.commit_seq) }));
@@ -522,12 +525,7 @@ async function verifyModelContext(rows) {
   const store = new MemoryStorage(),
     models = createModels(),
     fake = fauxProvider({ tokensPerSecond: 0, models: [{ id: "local-load" }] });
-  restoreSettled(
-    store,
-    { inbox_id: Math.max(...history.map((r) => r.entry.id)) + 1, inbox_items: [] },
-    { version: "fork", seq: Math.max(...history.map((r) => r.seq)) + 1 },
-    history,
-  );
+  restoreForkPrefix(store, history, agentConfig);
   models.setProvider(fake.provider);
   let observed;
   fake.setResponses([

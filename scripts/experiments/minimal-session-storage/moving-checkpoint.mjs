@@ -92,6 +92,7 @@ export function checkpoint(view, record) {
     "floorChanged",
     "markerId",
     "liveId",
+    "agentRoutes",
     "usageDocs",
     "lastFact",
   ])
@@ -282,7 +283,8 @@ export function replayableMetadata(frame, fact) {
       );
     if (op.kind !== "message") return false;
     return JSON.parse(op.args[4]).every(
-      (entry) => entry.role === "user" && entry.input === fact.scope.runId,
+      (entry) =>
+        entry.document !== undefined || (entry.role === "user" && entry.input === fact.scope.runId),
     );
   });
 }

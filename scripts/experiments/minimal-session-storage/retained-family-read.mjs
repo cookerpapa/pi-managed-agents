@@ -72,7 +72,7 @@ export async function readRetainedFamily(
     "Missing successor authority or unprojected seal",
   );
   const { rows } = await db.query(
-    "select entry_id::int as id, conversation_id::int as lane,commit_seq::int as seq,ordinal,content from messages where tenant_id=$1 and pi_session_id=$2 and run_id=$3",
+    "select entry_id::int as id, conversation_id::int as lane,commit_seq::int as seq,ordinal,content from message_entries where tenant_id=$1 and pi_session_id=$2 and run_id=$3",
     [scope.tenantId, scope.piSessionId, scope.runId],
   );
   const { rows: queues } = await db.query(

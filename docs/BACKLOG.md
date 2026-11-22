@@ -2,7 +2,9 @@
 
 ## Minimal Session storage feasibility
 
-- [ ] Decide whether the candidate will retain rewindable native document changes for historical Forks or explicitly narrow the product Fork contract. Model request messages and the latest tool list are insufficient for the demonstrated case. [Reproduction and alternatives](reports/candidate-release-gate-20261122.md).
+- [ ] Determine the durable source for the last environment actually observed by a Conversation. The candidate cold Fork can miss a native sandbox-reset notice for its `current` world-state document. [Paired probe](reports/ordered-agent-configuration-20261122.md#下一项独立的存储门槛).
+
+- [x] Persist ordered `pi.agent` versions in the candidate message table and confirm native Fork state after source removal. [Decision](adr/0345-ordered-agent-configuration.md) and [matched evidence](reports/ordered-agent-configuration-20261122.md).
 
 - [x] Verify Stop after the root Worker is killed, with both a still-running tool and an original reply that arrives before reclaim. [Browser results](reports/stopped-root-inputs-20261122.md#stop-after-losing-the-worker).
 

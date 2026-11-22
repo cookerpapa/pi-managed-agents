@@ -16,11 +16,13 @@ import {
 } from "@earendil-works/pi-durable";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
+import { PiSessionWorldStateController } from "../../../packages/sandbox-supervisor/src/pi-sandbox-continuity.ts";
 import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor/src/fixed-remote-tool-definitions.ts";
 import { FamilyPresentation } from "./family-presentation.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
-import { ForkStorage } from "./fork-storage.mjs";
+import { ForkStorage, setForkLayout } from "./fork-storage.mjs";
+import { restoreForkPrefix } from "./session-prefix.mjs";
 
 const now = "2026-11-22T00:00:00.000Z";
 class RecordingStorage extends MemoryStorage {
@@ -31,7 +33,18 @@ class RecordingStorage extends MemoryStorage {
     return seq;
   }
 }
-async function nativeHistory(extra) {
+const currentEnvironment = {
+  continuity: "warm_reuse",
+  continuityId: "fixture-generation-one",
+  environmentSha256: "a".repeat(64),
+  workspaceBindingSha256: "b".repeat(64),
+  toolPolicySha256: "c".repeat(64),
+};
+async function nextEnvironmentMessages(h, id) {
+  const controller = await PiSessionWorldStateController.create(h, id, currentEnvironment);
+  return (await controller.capture()).modelMessages.map((m) => m.customType);
+}
+async function nativeHistory(extra, lastGeneration) {
   const store = new RecordingStorage(),
     models = createModels(),
     registry = createRegistry();
@@ -90,6 +103,14 @@ async function nativeHistory(extra) {
     const root = await h.root(ctx, {
       agent: { model: { provider: model.provider, modelId: model.id }, tools: select(["bash"]) },
     });
+    let world;
+    if (lastGeneration) {
+      world = await PiSessionWorldStateController.create(h, root.id, {
+        ...currentEnvironment,
+        continuity: "cold_restore",
+      });
+      await world.withInitialObservation((write) => root.commit(write, ctx));
+    }
     const first = await root.submit(
       { type: "input", requestId: "request-1", content: "First input" },
       ctx,
@@ -111,6 +132,11 @@ async function nativeHistory(extra) {
     );
     await root.waitForIdle(ctx);
     assert.equal((await second.wait(ctx)).status, "done");
+    if (world) {
+      // The first confirmed activation updates the observed state without adding a model message.
+      await world.recordActive({ continuity: "warm_reuse", continuityId: lastGeneration });
+      assert.deepEqual((await world.capture()).modelMessages, []);
+    }
     const batches = store.batches.slice(),
       latest = await h.snapshot(AgentDoc, root.id, ctx);
     const branch = await root.fork(anchor, { ownership: { kind: "ownerless" } }, ctx);
@@ -123,6 +149,8 @@ async function nativeHistory(extra) {
       anchor,
       latest: latest.tools,
       forked: forked.tools,
+      forkDocument: forked,
+      ...(world ? { nativeNotices: await nextEnvironmentMessages(h, branch.id) } : {}),
       suppliedTools,
       providerInputs,
     };
@@ -153,8 +181,9 @@ async function pgHistory(base, admin, scope, trace, ids) {
     );
     await view.install();
     await view.reset(new Map([[0, 0n]]), 16, "recorded-history");
-    await installWorkspaceRoutes(pool);
     await pool.query(await readFile(new URL("./fork-layout.sql", import.meta.url), "utf8"));
+    await setForkLayout(pool, true, false);
+    await installWorkspaceRoutes(pool);
     await forks.register(scope.tenantId, [scope.piSessionId]);
     await pool.query(
       `insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id,created_at,started_at)
@@ -244,7 +273,117 @@ async function pgHistory(base, admin, scope, trace, ids) {
     );
     assert(expected.some((e) => e.kind === "pi.system"));
     assert.equal(Number(page[0].entry_id), trace.anchor);
-    return { retained, page };
+    const point = { lane: 1, run: scope.runId, entry: trace.anchor },
+      forkKey = randomUUID();
+    const lastAnswer = trace.batches
+      .flatMap((b) => b.writes)
+      .findLast((w) => w.type === "entry" && w.value.kind === "pi.assistant").value.id;
+    const later = await forks.fork(scope.tenantId, scope.piSessionId, {
+      ...point,
+      entry: lastAnswer,
+    });
+    assert.deepEqual(
+      (await forks.agentConfiguration(scope.tenantId, later)).value.tools,
+      trace.latest,
+    );
+    const repeated = await forks.fork(scope.tenantId, scope.piSessionId, point, forkKey);
+    assert.equal(await forks.fork(scope.tenantId, scope.piSessionId, point, forkKey), repeated);
+    await forks.retire(scope.tenantId, repeated);
+    await forks.retire(scope.tenantId, scope.piSessionId, point);
+    await forks.collect(scope.tenantId);
+    assert.deepEqual(
+      (await forks.agentConfiguration(scope.tenantId, scope.piSessionId)).value,
+      trace.forkDocument,
+    );
+    await forks.retire(scope.tenantId, scope.piSessionId);
+    await forks.collect(scope.tenantId);
+    const nested = await forks.fork(scope.tenantId, dest, point);
+    await forks.retire(scope.tenantId, dest);
+    await forks.collect(scope.tenantId);
+    const config = await forks.agentConfiguration(scope.tenantId, nested),
+      visible = await forks.page(scope.tenantId, nested);
+    assert.deepEqual(visible, page);
+    assert.deepEqual(config.value, trace.forkDocument);
+    const memory = new MemoryStorage(),
+      records = visible
+        .toReversed()
+        .map((r) => ({ entry: JSON.parse(r.content), seq: Number(r.commit_seq) }));
+    restoreForkPrefix(memory, records, config);
+    const cold = await Harness.open(
+      memory,
+      { models: createModels(), registry: createRegistry() },
+      ctx,
+    );
+    let coldState, coldNotices;
+    try {
+      coldState = await cold.snapshot(AgentDoc, 1, ctx);
+      assert.deepEqual(coldState, trace.forkDocument);
+      if (trace.nativeNotices) coldNotices = await nextEnvironmentMessages(cold, 1);
+    } finally {
+      await cold.close(ctx);
+    }
+    await forks.retire(scope.tenantId, nested);
+    await forks.collect(scope.tenantId);
+    // Only the branch at B survives now. Its base points to the later version,
+    // but its visible A must still be forkable with the earlier configuration.
+    const older = await forks.fork(scope.tenantId, later, point);
+    assert.deepEqual(
+      (await forks.agentConfiguration(scope.tenantId, older)).value,
+      trace.forkDocument,
+    );
+    await forks.retire(scope.tenantId, later);
+    await forks.collect(scope.tenantId);
+    // A first locally authored Entry can precede any local configuration change.
+    const run = randomUUID(),
+      writer = randomUUID(),
+      own = trace.anchor + 100;
+    await pool.query(
+      "insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,lease_id) values($1,$2,$3,1,$1,'local','same','running',$4)",
+      [run, scope.tenantId, older, writer],
+    );
+    const local = {
+      id: own,
+      conversation: 1,
+      ordinal: 0,
+      role: "assistant",
+      content: JSON.stringify({ ...expected[0], id: own }),
+    };
+    assert.equal(
+      (
+        await pool.query("select * from prefix_message($1,$2,$3,1,$4,$5)", [
+          scope.tenantId,
+          older,
+          run,
+          JSON.stringify([local]),
+          writer,
+        ])
+      ).rows[0].writes,
+      1,
+    );
+    await pool.query("select prefix_finish($1,$2,$3,$4,$5)", [
+      scope.tenantId,
+      older,
+      run,
+      writer,
+      "{}",
+    ]);
+    const leaf = await forks.fork(scope.tenantId, older, { lane: 1, run, entry: own });
+    await forks.retire(scope.tenantId, older);
+    await forks.collect(scope.tenantId);
+    assert.deepEqual(
+      (await forks.agentConfiguration(scope.tenantId, leaf)).value,
+      trace.forkDocument,
+    );
+    await forks.retire(scope.tenantId, leaf);
+    await forks.collect(scope.tenantId);
+    assert.equal((await pool.query("select count(*)::int n from messages")).rows[0].n, 0);
+    return {
+      retained,
+      page,
+      coldState,
+      coldNotices,
+      versions: retained.messages.filter((r) => r.document_id !== null).length,
+    };
   } finally {
     await forks.db.destroy();
     await admin.query("drop schema " + schema + " cascade");
@@ -265,40 +404,75 @@ try {
     writerId: randomUUID(),
     fencingToken: 1,
   };
-  const left = await nativeHistory("read"),
-    right = await nativeHistory("edit");
+  const world = process.argv[2] === "--probe-current-world";
+  const left = await nativeHistory("read", world ? currentEnvironment.continuityId : undefined);
+  const right = await nativeHistory(
+    world ? "read" : "edit",
+    world ? "fixture-generation-two" : undefined,
+  );
   assert.equal(left.anchor, right.anchor);
   assert.equal(left.batches.length, right.batches.length);
   assert.deepEqual(left.latest, right.latest);
   assert.deepEqual(left.suppliedTools, right.suppliedTools);
   assert.deepEqual(left.providerInputs, right.providerInputs);
-  assert.notDeepEqual(left.forked, right.forked);
+  if (world) {
+    assert.deepEqual(left.nativeNotices, []);
+    assert.deepEqual(right.nativeNotices, ["pi-cloud.sandbox_reset"]);
+  } else assert.notDeepEqual(left.forked, right.forked);
   const ids = Array.from({ length: left.batches.length + 1 }, () => randomUUID());
   const a = await pgHistory(base, admin, scope, left, ids),
     b = await pgHistory(base, admin, scope, right, ids);
   const sameData = isDeepStrictEqual(a.retained, b.retained),
     sameFork = isDeepStrictEqual(a.page, b.page);
-  console.log(
-    JSON.stringify(
-      {
-        nativeBatches: left.batches.length,
-        anchor: left.anchor,
-        latestTools: left.latest,
-        identicalProviderMessages: true,
-        providerRequestToolDeclarations: left.suppliedTools,
-        nativeForkTools: [left.forked, right.forked],
-        comparedTables: Object.keys(a.retained),
-        identicalRetainedRows: sameData,
-        identicalForkEntries: sameFork,
-        visibleForkEntries: a.page.length,
-        verdict: sameData && sameFork ? "insufficient_for_native_asof" : "check_cold_native_fork",
-      },
-      null,
-      2,
-    ),
-  );
-  // A differing representation warrants further inspection, never an automatic pass.
-  if (sameData && sameFork) process.exitCode = 2;
+  if (world) {
+    console.log(
+      JSON.stringify(
+        {
+          nativeBatches: left.batches.length,
+          identicalAgentConfigurations: isDeepStrictEqual(a.coldState, b.coldState),
+          identicalRetainedRows: sameData,
+          identicalForkEntries: sameFork,
+          nativeNextEnvironmentMessages: [left.nativeNotices, right.nativeNotices],
+          candidateNextEnvironmentMessages: [a.coldNotices, b.coldNotices],
+        },
+        null,
+        2,
+      ),
+    );
+    if (
+      !isDeepStrictEqual(a.coldNotices, left.nativeNotices) ||
+      !isDeepStrictEqual(b.coldNotices, right.nativeNotices)
+    )
+      process.exitCode = 2;
+  } else {
+    assert(!sameData && sameFork);
+    console.log(
+      JSON.stringify(
+        {
+          nativeBatches: left.batches.length,
+          anchor: left.anchor,
+          latestTools: left.latest,
+          identicalProviderMessages: true,
+          providerRequestToolDeclarations: left.suppliedTools,
+          nativeForkTools: [left.forked, right.forked],
+          comparedTables: Object.keys(a.retained),
+          identicalRetainedRows: sameData,
+          identicalForkEntries: sameFork,
+          visibleForkEntries: a.page.length,
+          coldForkTools: [a.coldState.tools, b.coldState.tools],
+          configRows: [a.versions, b.versions],
+          sourcePruneAndDelete: true,
+          nestedFork: true,
+          olderAnchorAfterCollection: true,
+          localEntryInheritedConfig: true,
+          finalCollection: true,
+          verdict: "matches_native_agent_asof",
+        },
+        null,
+        2,
+      ),
+    );
+  }
 } finally {
   await admin.end();
 }

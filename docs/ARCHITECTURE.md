@@ -401,6 +401,8 @@ reasoning, unfinished Tool structures and provider replay signatures are not
 promoted. Cold and active context preparation use the same rule.
 See [ADR-0283](adr/0283-interrupted-assistant-text-context.md).
 
+In the isolated #52 storage candidate, the same physical message stream also holds typed agent-configuration versions at native commit coordinates. The branch directory retains an immutable reference selected at the anchor. [ADR-0345](adr/0345-ordered-agent-configuration.md).
+
 ## Tools and Cube
 
 Whole fixed file/shell Tools execute in Cube. The guest has the fixed Tool code,

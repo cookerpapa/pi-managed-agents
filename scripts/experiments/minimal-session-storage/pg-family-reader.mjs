@@ -24,7 +24,7 @@ async function readCandidateAtSeal(db, scope, topic) {
       BigInt(owner.next_offset) > BigInt(owner.writer_seal_offset),
   );
   const { rows: entries } = await db.query(
-    "select commit_seq,ordinal,content from candidate.messages where run_id=$1 order by commit_seq,ordinal",
+    "select commit_seq,ordinal,content from candidate.message_entries where run_id=$1 order by commit_seq,ordinal",
     [scope.runId],
   );
   const { rows: queues } = await db.query(

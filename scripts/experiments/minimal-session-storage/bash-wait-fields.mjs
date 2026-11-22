@@ -72,7 +72,7 @@ export async function omitVerifiedBashWait(db, runId, state) {
   } = await db.query("select projection_tools from runs where id=$1", [runId]);
   const ops = Object.values(r.projection_tools);
   const { rows: entries } = await db.query(
-    "select commit_seq,content from messages where run_id=$1",
+    "select commit_seq,content from message_entries where run_id=$1",
     [runId],
   );
   const records = singleBashRecords({ entries, ops });

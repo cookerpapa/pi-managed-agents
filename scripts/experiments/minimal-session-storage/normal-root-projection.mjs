@@ -168,6 +168,7 @@ export function normalRootProjection(pool, topic, select, resolve) {
       );
       const h = {
         version: f.factId,
+        ...(s.agentRoutes ? { agentRoutes: s.agentRoutes } : {}),
         seq: s.seq,
         nextId: s.nextId,
         floor: s.floor,

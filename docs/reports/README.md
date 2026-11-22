@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Ordered agent configuration in the message store](ordered-agent-configuration-20261122.md) verifies native historical Forks, independent cold restoration and mixed-load projection.
+
 - [Candidate release gate and historical Fork evidence](candidate-release-gate-20261122.md) covers the storage decision and repeated 20-tool load measurements.
 
 - [Stopped root input and cold continuation](stopped-root-inputs-20261122.md) verifies the two native busy-input modes, draft restoration across reload and explicit resubmission.
