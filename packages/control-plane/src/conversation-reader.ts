@@ -3,6 +3,7 @@ import {
   rootMessagePosition,
   rootMessageTurns,
   flowRootMessageTurns,
+  flowMessagePage,
   childMessageTurns,
   readRootMessageWindow,
 } from "@pi-cloud/runtime-core/root-message-history";
@@ -503,25 +504,21 @@ export class ConversationReader {
         position.ordinal = record.ordinal;
       } else direction = "after";
     }
-    const pageRelation = flows
-      ? flowRootMessageTurns(this.#tenantId, sessionId, {
+    const pageQuery = flows
+      ? flowMessagePage(this.#tenantId, sessionId, {
           direction,
-          ...(anchor ? { position: anchor.mailbox_position } : {}),
-          ...(cutoff ? { cutoff: cutoff.mailbox_position } : {}),
-          completed: !!filters.completedOnly,
+          position: anchor?.mailbox_position,
+          cutoff: cutoff?.mailbox_position,
+          completedOnly: !!filters.completedOnly,
           limit: MAX_CONVERSATION_TURNS + 1,
         })
-      : relation;
-    const rows = conversation.emptyHistory
-      ? []
-      : (
-          await sql<HistoryTurnRow>`select * from ${pageRelation} where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
+      : sql<HistoryTurnRow>`select * from ${relation} where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
       ${filters.completedOnly ? sql`and state in ('completed','failed','cancelled','timed_out') and not waiting_for_seal` : sql``}
       ${cutoff ? sql`and mailbox_position<=${cutoff.mailbox_position}::bigint` : sql``}
       ${anchor ? sql`and mailbox_position ${sql.raw(direction === "before" ? "<=" : ">=")} ${anchor.mailbox_position}::bigint` : sql``}
       order by mailbox_position ${sql.raw(direction === "before" ? "desc" : "asc")},turn_id ${sql.raw(direction === "before" ? "desc" : "asc")}
-      limit ${MAX_CONVERSATION_TURNS + 1}`.execute(this.#database)
-        ).rows;
+      limit ${MAX_CONVERSATION_TURNS + 1}`;
+    const rows = conversation.emptyHistory ? [] : (await pageQuery.execute(this.#database)).rows;
     const lineageTurnRows: ConversationHistoryRow[] = rows.map((r) => ({
       piSessionId: r.pi_session_id,
       coverage: r.output_display_seq,

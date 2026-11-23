@@ -42,7 +42,7 @@ function visibleContent(page) {
     t.transcript?.items.map((i) => [i.kind, i.text]),
   ]);
 }
-export async function withMatchedPageFixture(url, tenant, work) {
+export async function withMatchedPageFixture(url, tenant, work, referenceRoot) {
   const meta = createDatabase({ connectionString: url, maxConnections: 3 });
   const pools = [],
     apps = [],
@@ -140,9 +140,21 @@ export async function withMatchedPageFixture(url, tenant, work) {
         (path, opts) => fetch(new URL(path, app.origin), opts),
         auth.credential.token,
       );
+      let old;
+      if (referenceRoot && flow) {
+        const reference = await openPageApi(url, dsn.href, true, referenceRoot);
+        apps.push(reference);
+        old = {
+          app: reference,
+          client: new PiCloudApi(
+            (path, opts) => fetch(new URL(path, reference.origin), opts),
+            auth.credential.token,
+          ),
+        };
+      }
       for (const name of flow ? ["root", "branch"] : ["direct"]) {
         const id = name === "branch" ? branch : root,
-          page = (q) => client.getConversation(id, q);
+          page = (q, window = id) => client.getConversation(window, q);
         const latest = await page({}),
           older = await page({ before: latest.history.before });
         const queries = [{}, { before: latest.history.before }, { after: older.history.after }];
@@ -152,6 +164,16 @@ export async function withMatchedPageFixture(url, tenant, work) {
           topic,
           page,
           queries,
+          id,
+          capture: (q, window = id) => app.capture(auth.credential.token, window, q),
+          ...(old
+            ? {
+                reference: {
+                  page: (q, window = id) => old.client.getConversation(window, q),
+                  capture: (q, window = id) => old.app.capture(auth.credential.token, window, q),
+                },
+              }
+            : {}),
           profile: () => app.profile(auth.credential.token, id, latest.history.before, name),
         };
       }
@@ -181,7 +203,14 @@ export async function withMatchedPageFixture(url, tenant, work) {
         }),
       );
     }
-    await work({ db: arms.root.db, topic, arms });
+    await work({
+      db: arms.root.db,
+      topic,
+      arms,
+      createWindow: async (title) =>
+        (await store.createSession(project.projectId, project.workspaceId, title, "elastic"))
+          .sessionId,
+    });
   } finally {
     for (const app of apps) await app.close();
     for (const pool of pools) await pool.end();
@@ -230,8 +259,21 @@ export async function measurePageCpu(arms) {
     }
 }
 
-export function pageCostTrials(fixedRateOnly) {
-  if (fixedRateOnly) {
+export function pageCostTrials(suite) {
+  if (suite === "selector") {
+    const order = [
+      "reference",
+      "candidate",
+      "candidate",
+      "reference",
+      "candidate",
+      "reference",
+      "reference",
+      "candidate",
+    ];
+    return [["candidate", "writer"], ...order.map((arm) => [arm, 32]), ["candidate", "writer"]];
+  }
+  if (suite === "fixed32") {
     // Alternate a writer-only control and a fixed 32 pages/s for each layout,
     // then reverse both layout order and the order of each paired comparison.
     // The root and branch controls have the same physical Flow writer.

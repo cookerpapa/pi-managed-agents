@@ -36,9 +36,14 @@ export async function installFlowHistory(
       .replaceAll("RUN_FLOW", projection ? "session_id" : "flow_id")
       .replace("GC_FAMILY", withDelegates ? "or root_run_id=victim" : ""),
   );
+  if (projection && base) {
+    const page = await readFile(new URL("./flow-page-turns.sql", import.meta.url), "utf8");
+    for (const order of ["asc", "desc"]) await db.query(page.replaceAll("PAGE_ORDER", order));
+  }
 }
 export async function removeFlowOverlay(db) {
-  await db.query(`drop function if exists flow_read_ranges(uuid,uuid); drop function flow_swap_pending(uuid,uuid,uuid,uuid),flow_collect(uuid,int),flow_detach(uuid,uuid,uuid,uuid),flow_fork(uuid,uuid,uuid,uuid,uuid),flow_visible(uuid,uuid,uuid),flow_admit(uuid,uuid,uuid,uuid,text); drop view flow_session_tips;
+  await db.query(`drop function if exists flow_page_turns_asc(uuid,uuid,bigint,bigint,boolean,integer), flow_page_turns_desc(uuid,uuid,bigint,bigint,boolean,integer);
+   drop function if exists flow_read_ranges(uuid,uuid); drop function flow_swap_pending(uuid,uuid,uuid,uuid),flow_collect(uuid,int),flow_detach(uuid,uuid,uuid,uuid),flow_fork(uuid,uuid,uuid,uuid,uuid),flow_visible(uuid,uuid,uuid),flow_admit(uuid,uuid,uuid,uuid,text); drop view flow_session_tips;
    drop table sessions,flow_gc_outbox; drop index flow_unsettled;
    alter table runs drop constraint flow_predecessor,drop constraint flow_run_identity,drop column prev_run_id`);
 }

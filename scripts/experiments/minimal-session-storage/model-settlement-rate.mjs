@@ -112,7 +112,8 @@ const own = await testPostgres({});
 try {
   const waitStudy = process.argv[3] === "flow-page-locks";
   const pageCost = process.argv[3] === "flow-page-cost" && (process.argv[4] ?? "main");
-  if (pageCost) assert(["main", "fixed32"].includes(pageCost));
+  if (pageCost) assert(["main", "fixed32", "selector"].includes(pageCost));
+  if (pageCost === "selector") assert(process.argv[5], "Pass the reference checkout");
   const comparePages = pageCost || waitStudy || process.argv[3] === "flow-pages";
   if (comparePages) {
     const { studyFlowPaging } = await import("./flow-paging-load.mjs");
@@ -124,6 +125,7 @@ try {
       visiblePerRun,
       waitStudy ? own.setCpuLimit : undefined,
       pageCost,
+      pageCost === "selector" ? process.argv[5] : undefined,
     );
   }
   const compareFlow = process.argv[3] === "flow",

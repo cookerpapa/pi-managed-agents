@@ -68,6 +68,7 @@ export async function studyFlowPaging(
   visiblePerRun,
   setCpuLimit,
   pageCost = false,
+  referenceRoot,
 ) {
   const presenters = new Map();
   for (const group of groups)
@@ -84,9 +85,21 @@ export async function studyFlowPaging(
     }
   const live = scopes[0],
     total = groups.reduce((n, g) => n + g.length, 0);
-  const fixture = pageCost ? withMatchedPageFixture : withPagingFixture;
+  const fixture = pageCost
+    ? (url, tenant, work) => withMatchedPageFixture(url, tenant, work, referenceRoot)
+    : withPagingFixture;
   await fixture(url, tenant, async (api) => {
-    if (pageCost) await measurePageCpu(api.arms);
+    let arms = api.arms;
+    if (pageCost === "selector") {
+      const candidate = arms.branch,
+        reference = { ...candidate, page: candidate.reference.page };
+      arms = { candidate, reference };
+      for (const q of candidate.queries) {
+        assert.deepEqual(await reference.page(q), await candidate.page(q));
+        for (const arm of [reference, candidate])
+          await Promise.all(Array.from({ length: 8 }, () => arm.page(q)));
+      }
+    } else if (pageCost) await measurePageCpu(arms);
     const kafka = await testKafka({});
     const { topic } = api;
     const k = new native.KafkaJS.Kafka({
@@ -146,7 +159,7 @@ export async function studyFlowPaging(
         );
       }
       const trials = pageCost
-        ? pageCostTrials(pageCost === "fixed32")
+        ? pageCostTrials(pageCost)
         : setCpuLimit
           ? [
               [2, "writer"],
@@ -163,7 +176,7 @@ export async function studyFlowPaging(
               mode,
             ]);
       for (const [layout, mode] of trials) {
-        const arm = pageCost ? api.arms[layout] : api;
+        const arm = pageCost ? arms[layout] : api;
         const { db, projector } = arm;
         if (setCpuLimit) await setCpuLimit(layout);
         const ids = scopes.map((s) => s.runId);

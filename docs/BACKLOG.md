@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare and simplify the visible-Run page query, verify a scoped plan on the public reader and test early stopping across 128 physical history ranges. [Experiment](reports/flow-page-selector-20261124.md).
+
 - [x] Measure database CPU per complete page and replay the same Kafka workload with direct, ordinary Flow and nested Flow reads. [Matched benchmark](reports/matched-paging-cpu-20261123.md).
 
 - [x] Distinguish row locking from CPU and WAL contention during public paging using same-Run open transactions and paired CPU quotas. [Evidence](reports/flow-tree-and-paging-20261123.md#do-history-reads-block-projection-writes).

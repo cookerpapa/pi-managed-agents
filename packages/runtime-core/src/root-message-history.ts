@@ -24,29 +24,37 @@ export const rootMessageTurns = sql<HistoryTurnRow>`(select r.tenant_id,r.sessio
 
 // The Session ID identifies the public window. The message stream belongs to
 // the Run's writing flow, which may outlive the window that created it.
-export const flowRootMessageTurns = (
+export const flowRootMessageTurns = (tenant: string, session: string) =>
+  sql<HistoryTurnRow>`(select r.tenant_id,${session}::uuid as session_id,${session}::uuid as origin_session_id,
+    r.id as turn_id,r.id as run_id,r.session_id::text as pi_session_id,
+    (f.prior_positions+r.mailbox_position) as mailbox_position,r.operation_kind,r.state,r.stop_reason,
+    r.output_display_seq,r.output_display_native_seq,(r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
+    from flow_read_ranges(${tenant}::uuid,${session}::uuid) f
+    cross join lateral(select * from runs r where r.tenant_id=${tenant}::uuid and r.session_id=f.physical and r.mailbox_position<=f.through_position and r.mailbox_position is not null
+    and r.pruned_at is null and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact')
+    and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)) r) root_turns`;
+
+export function flowMessagePage(
   tenant: string,
   session: string,
-  page?: {
+  page: {
     direction: "before" | "after";
-    position?: string;
-    cutoff?: string;
-    completed: boolean;
+    position: string | undefined;
+    cutoff: string | undefined;
+    completedOnly: boolean;
     limit: number;
   },
-) =>
-  sql<HistoryTurnRow>`(select r.tenant_id,${session}::uuid as session_id,${session}::uuid as origin_session_id,
-   r.id as turn_id,r.id as run_id,r.session_id::text as pi_session_id,
-   (f.prior_positions+r.mailbox_position) as mailbox_position,r.operation_kind,r.state,r.stop_reason,
-   r.output_display_seq,r.output_display_native_seq,(r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
-   from flow_read_ranges(${tenant}::uuid,${session}::uuid) f
-   cross join lateral(select * from runs r where r.tenant_id=${tenant}::uuid and r.session_id=f.physical and r.mailbox_position<=f.through_position and r.mailbox_position is not null
-   and r.pruned_at is null and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact')
-   and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)
-   ${page?.position ? sql`and r.mailbox_position ${sql.raw(page.direction === "before" ? "<=" : ">=")} ${page.position}::bigint-f.prior_positions` : sql``}
-   ${page?.cutoff ? sql`and r.mailbox_position<=${page.cutoff}::bigint-f.prior_positions` : sql``}
-   ${page?.completed ? sql`and r.state in ('completed','failed','cancelled','timed_out') and (r.output_seal_id is null or r.output_sealed_at is not null)` : sql``}
-   ${page ? sql`order by r.mailbox_position ${sql.raw(page.direction === "before" ? "desc" : "asc")} limit ${page.limit}` : sql``}) r) root_turns`;
+) {
+  const { direction, position, cutoff, completedOnly, limit } = page;
+  const before = direction === "before";
+  const selector = before ? sql`flow_page_turns_desc` : sql`flow_page_turns_asc`;
+  const last = "9223372036854775807";
+  return sql<HistoryTurnRow>`select ${tenant}::uuid as tenant_id,${session}::uuid as session_id,${session}::uuid as origin_session_id,
+    p.run_id as turn_id,p.*,false as frozen
+    from ${selector}(${tenant}::uuid,${session}::uuid,${before ? "1" : (position ?? "1")}::bigint,
+      least(${before ? (position ?? last) : last}::bigint,${cutoff ?? last}::bigint),${completedOnly}::boolean,${limit}::int) p
+    order by p.mailbox_position ${before ? sql`desc` : sql`asc`}`;
+}
 
 // Resolve the public child Session and Turn before looking at the shared
 // physical stream. The parent Run supplies the original pending Tool references.

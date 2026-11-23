@@ -5,6 +5,7 @@ import pg from "pg";
 import { cpuMillis } from "./page-backend-cpu.mjs";
 
 function label(sql) {
+  if (sql.includes("flow_page_turns_")) return "select visible runs";
   if (sql.includes("from unnest(") && sql.includes("assistant_bytes")) return "locate page entries";
   if (sql.includes("as proposal") && sql.includes("as human"))
     return "load bodies and tool dependencies";
@@ -68,13 +69,10 @@ async function tracePageCpu(diag, read, query) {
     msPerPage: +(o.ns / 48 / 1e6).toFixed(3),
   }));
 }
-export async function profilePage(url, read, query, cpuLabel) {
+export async function capturePageQueries(read, query) {
   const original = pg.Client.prototype.query,
     statements = [];
-  const diag = new pg.Client({ connectionString: url });
   try {
-    await diag.connect();
-    for (let i = 0; i < 6; i++) await read(query);
     pg.Client.prototype.query = function (...args) {
       const cfg = typeof args[0] === "string" ? { text: args[0], values: args[1] } : args[0];
       const promise = original.apply(this, args);
@@ -97,7 +95,17 @@ export async function profilePage(url, read, query, cpuLabel) {
     const start = performance.now();
     await read(query);
     const httpMs = performance.now() - start;
+    return { httpMs, statements };
+  } finally {
     pg.Client.prototype.query = original;
+  }
+}
+export async function profilePage(url, read, query, cpuLabel) {
+  const diag = new pg.Client({ connectionString: url });
+  try {
+    await diag.connect();
+    for (let i = 0; i < 6; i++) await read(query);
+    const { httpMs, statements } = await capturePageQueries(read, query);
     const result = [];
     for (const s of statements) {
       const r = (
@@ -205,7 +213,6 @@ export async function profilePage(url, read, query, cpuLabel) {
       }),
     );
   } finally {
-    pg.Client.prototype.query = original;
     await diag.end();
   }
 }
