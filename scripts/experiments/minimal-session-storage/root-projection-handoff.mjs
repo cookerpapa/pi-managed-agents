@@ -19,7 +19,7 @@ export async function reopenRootProjection(
   } = await pool.query(
     `select r.native_work_handoff as h,r.projection_tools,r.projection_pin,r.mailbox_position,
       (select p.history_head from runs p where r.mailbox_position>1 and p.tenant_id=r.tenant_id and p.session_id=r.session_id
-        and p.mailbox_position=r.mailbox_position-1 and p.state in ('completed','cancelled')) as prior_head,
+        and p.mailbox_position=r.mailbox_position-1 and p.state in ('completed','cancelled','failed')) as prior_head,
       (select jsonb_agg(jsonb_build_object('id',i.doc_id::text,'lane',i.conversation_id::text,'seq',i.commit_seq::text,'items',i.items)) from inboxes i where i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id) as queues,old.writer_seal_offset,old.fencing_token as predecessor
     from runs r join session_leases active on active.tenant_id=r.tenant_id and active.lease_id=r.lease_id
     left join session_leases old on old.tenant_id=r.tenant_id and old.pi_session_id=active.pi_session_id

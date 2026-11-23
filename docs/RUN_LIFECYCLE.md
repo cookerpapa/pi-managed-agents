@@ -1,5 +1,10 @@
 # Run lifecycle
 
+Under [ADR-0356](adr/0356-run-flow-head-and-directory-stop.md) the fixed Guest can return an error result with `details.code=workspace_directory_missing`, `execution=not_started` and the selected directory. The Worker accepts this reason only from a fixed filesystem Tool's canonical error result on its own conversation. It aborts through Pi after the native commit is acknowledged and seals with `turn.failed` and the same non-retryable code. A replacement checks the unfinished submission's last tool round before enabling model or tool I/O. Missing files, shell diagnostics and volume/transport errors have their own outcomes.
+
+The public Session exposes optional `workingDirectoryMissing: true` until the user rebinds. Waiting independent Runs retain their original input and configuration and may be withdrawn through the queue editor. Returned steer/follow-up drafts use the existing return and acknowledgement routes. `PUT /v1/conversations/:sessionId/workspace` accepts an idle Session with a healthy or deleted source Workspace. It can select another directory on the same owned development machine, or another permitted Workspace. All queued, active and recoverable work must settle or be withdrawn before rebinding.
+
+
 The current contract is one root cloud Run, one physical Pi Session execution
 lease/writer, and native child Conversations. Pi Durable 1.0 owns task execution
 and continuation. PG owns cloud admission and lease decisions. See

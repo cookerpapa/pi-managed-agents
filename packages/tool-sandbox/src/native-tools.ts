@@ -52,13 +52,27 @@ export async function executeAttachedNativeTool(
       error.code === "tool_root_unavailable" &&
       resolve(attachment.toolRoot) !== "/workspace"
     )
-      return nativeToolError(request, new Error(`${error.code}: ${error.message}`));
+      return nativeToolError(
+        request,
+        new Error(
+          `tool_root_unavailable: The selected working directory ${JSON.stringify(attachment.toolRoot)} is missing or is not a directory. This ${request.toolName} tool did not start. Select a directory or Workspace to continue.`,
+        ),
+        {
+          code: "workspace_directory_missing",
+          execution: "not_started",
+          directory: attachment.toolRoot,
+        },
+      );
     throw error;
   }
   return executeNativeTool(request, cwd, signal, onUpdate, attachment.webProxy);
 }
 
-function nativeToolError(request: NativeToolRequest, error: unknown): NativeToolEnd {
+function nativeToolError(
+  request: NativeToolRequest,
+  error: unknown,
+  details?: unknown,
+): NativeToolEnd {
   return {
     type: "tool_execution_end",
     toolCallId: request.toolCallId,
@@ -71,7 +85,7 @@ function nativeToolError(request: NativeToolRequest, error: unknown): NativeTool
           text: redactToolText(error instanceof Error ? error.message : String(error)),
         },
       ],
-      details: undefined,
+      details,
     },
   };
 }

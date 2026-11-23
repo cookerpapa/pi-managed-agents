@@ -15,6 +15,7 @@ type Choice = "existing" | "new" | "machine";
 export function WorkspaceRebindDialog({
   api,
   sessionId,
+  initialMachineId,
   workspaces,
   environments,
   canMutate,
@@ -25,6 +26,7 @@ export function WorkspaceRebindDialog({
 }: {
   api: PiCloudApi;
   sessionId: string;
+  initialMachineId?: string | undefined;
   workspaces: readonly WorkspaceSummaryResource[];
   environments: readonly DevelopmentEnvironmentResource[];
   canMutate: boolean;
@@ -36,7 +38,7 @@ export function WorkspaceRebindDialog({
   const { t } = useI18n();
   const [selectedChoice, setChoice] = useState<Choice | null>(null);
   const [workspaceId, setWorkspaceId] = useState("");
-  const [machineId, setMachineId] = useState("");
+  const [machineId, setMachineId] = useState(initialMachineId ?? "");
   const [name, setName] = useState("");
   const [cwd, setCwd] = useState<string>(DEFAULT_EXCLUSIVE_WORKING_DIRECTORY);
   const [picker, setPicker] = useState(false);
@@ -48,7 +50,14 @@ export function WorkspaceRebindDialog({
   >(undefined);
   const machines = environments.filter((m) => ["running", "paused"].includes(m.state));
   const choice =
-    selectedChoice ?? (workspaces.length ? "existing" : machines.length ? "machine" : "new");
+    selectedChoice ??
+    (initialMachineId && machines.some((m) => m.environmentId === initialMachineId)
+      ? "machine"
+      : workspaces.length
+        ? "existing"
+        : machines.length
+          ? "machine"
+          : "new");
   const workspace =
     workspaces.find((w) => w.workspaceId === workspaceId) ??
     (workspaceId ? undefined : workspaces[0]);
@@ -171,7 +180,6 @@ export function WorkspaceRebindDialog({
         <header>
           <div>
             <h2>{t("chat.rebind.title")}</h2>
-            <p>{t("chat.rebind.description")}</p>
           </div>
           <button disabled={busy} onClick={onClose} type="button">
             ×

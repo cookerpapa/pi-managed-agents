@@ -12,6 +12,8 @@ The first implementation milestone for [#48](https://github.com/cookerpapa/pi-ma
 
 The matched storage candidate keeps model usage at the gateway. Completed user-visible Kafka records per second are the primary mixed-load metric. [ADR-0355](adr/0355-provider-usage-outside-session-projection.md).
 
+The isolated Run-linked Flow layout and the directory recovery release candidate are tracked under [ADR-0356](adr/0356-run-flow-head-and-directory-stop.md). Public Flow cutover remains gated on the matched service integration.
+
 ## Ordered Session projection under load
 
 The [named subagent executor](adr/0354-named-subagent-executor.md) registers stable child names and per-invocation return routes on the candidate. [Failure acceptance](reports/named-subagent-executor-20261123.md).

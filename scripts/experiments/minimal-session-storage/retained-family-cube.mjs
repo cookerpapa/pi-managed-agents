@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
-import { randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { stat, readFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import { OfficialCubeSandboxRuntimeClient } from "../../../packages/sandbox-control/src/cubesandbox-runtime-client.ts";
 import { executionTargetId } from "../../../packages/sandbox-control/src/sandbox-execution.ts";
 import { FixedGuestToolExecutor } from "../../../packages/sandbox-control/src/fixed-guest-tool-executor.ts";
@@ -61,6 +63,22 @@ export async function withFamilyGuest(config, run) {
     }
     return await run({
       allocationId: fixture,
+      async installToolWorker(path) {
+        const dest = "/tmp/pma-worker-" + fixture + ".mjs";
+        await client.writeGuestFileStream(
+          vm,
+          dest,
+          createReadStream(path),
+          (await stat(path)).size,
+        );
+        assert.equal(
+          (await command("sha256sum " + dest)).split(" ")[0],
+          createHash("sha256")
+            .update(await readFile(path))
+            .digest("hex"),
+        );
+        await command("install -m 0555 " + dest + " /opt/pi-cloud/bin/envd-tool-exec.mjs");
+      },
       command,
       submitAt,
       async directory(id) {

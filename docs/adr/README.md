@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0356](0356-run-flow-head-and-directory-stop.md) scopes the Run-linked Flow experiment and directory recovery.
+
 [ADR-0355](0355-provider-usage-outside-session-projection.md) moves model usage entirely outside the Session projection path.
 
 [ADR-0354](0354-named-subagent-executor.md) moves named child admission and callback recovery to an independent candidate executor.

@@ -54,6 +54,7 @@ const rates = trials.map((t) => {
   }
   const lagAtInputFraction = (f) => inputSample(f).lag;
   return {
+    ...(t.flowHistory === undefined ? {} : { flowHistory: t.flowHistory }),
     configuredAckDelayMs: t.delay,
     observedMeanAckMs: rounded(r.phases.ack.mean),
     peakReservedDispatches: r.peakActive,

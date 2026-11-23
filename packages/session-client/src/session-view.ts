@@ -747,6 +747,11 @@ function applyEvent(state: SessionViewState, event: PiCloudEvent): SessionViewSt
     ?.items.at(-1)?.pageKey;
   return {
     ...state,
+    ...(state.session &&
+    event.type === "turn.failed" &&
+    event.payload.code === "workspace_directory_missing"
+      ? { session: { ...state.session, workingDirectoryMissing: true as const } }
+      : {}),
     turns: tailPageKey
       ? turns.map((turn) =>
           turn.turnId === event.turnId && turn.items.some((item) => !item.pageKey)

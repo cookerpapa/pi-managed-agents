@@ -598,6 +598,7 @@ export interface ModelProfileTable {
 }
 
 export interface SessionTable {
+  workspace_directory_missing: Generated<boolean>;
   compute_session_id: GeneratedNullable<string>;
   id: string;
   pi_session_id: string;

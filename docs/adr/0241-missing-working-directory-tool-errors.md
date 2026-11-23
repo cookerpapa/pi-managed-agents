@@ -8,6 +8,8 @@ admission walkthrough. PG Workspace admission and its deletion lock remain
 unchanged: a platform resource and a directory inside its Volume are different
 things. This refines ADR-0227's existing native/error boundary.
 
+The matched candidate supersedes same-Run continuation on the confirmed directory error under [ADR-0356](0356-run-flow-head-and-directory-stop.md).
+
 ## Decision
 
 For a fixed Tool, a missing or non-directory user-selected working directory,

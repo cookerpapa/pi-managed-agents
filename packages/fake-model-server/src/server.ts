@@ -46,6 +46,7 @@ export type FakeModelServerOptions = {
   scenarioSequence?: readonly FakeModelScenario[];
   maxRequestBytes?: number;
   promptTokens?: number;
+  holdCommand?: string;
 };
 
 type ChatCompletionRequest = {
@@ -367,6 +368,7 @@ export class FakeModelServer {
   readonly #scenarioSequence: readonly FakeModelScenario[];
   readonly #maxRequestBytes: number;
   readonly #promptTokens: number;
+  readonly #holdCommand: string;
   readonly #server: Server;
   readonly #sockets = new Set<Socket>();
   readonly #heldResponses = new Map<ServerResponse, FakeModelRequestObservation>();
@@ -382,6 +384,7 @@ export class FakeModelServer {
     if (this.#apiKey.length === 0) {
       throw new Error("apiKey must not be empty");
     }
+    this.#holdCommand = options.holdCommand ?? "exec sleep 300";
     this.#defaultScenario = options.defaultScenario ?? "text";
     this.#scenarioSequence = Object.freeze([...(options.scenarioSequence ?? [])]);
     this.#maxRequestBytes = parsePositiveSafeInteger(
@@ -711,7 +714,7 @@ export class FakeModelServer {
         payload.model,
         "call_picloud_cancellation_hold",
         "bash",
-        { command: "exec sleep 300", timeout: 300 },
+        { command: this.#holdCommand, timeout: 300 },
       );
       return;
     }

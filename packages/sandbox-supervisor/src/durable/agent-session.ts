@@ -1,3 +1,4 @@
+import { directoryFailure } from "./workspace-directory-failure.ts";
 import { durableToolState } from "@pi-cloud/protocol";
 import { skillCatalogSection } from "./skill-context.ts";
 import { withToolInvocation } from "../tool-invocation.ts";
@@ -124,6 +125,7 @@ export type DurableRunConfiguration = {
   tools: readonly ToolRegistration[];
   assertCurrent(): Promise<void>;
   beforeEffect?(signal?: AbortSignal): Promise<void>;
+  onDirectoryFailure?(failure: PiTurnError): void;
   prepareRemote(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation>;
   openModel(
     request: CloudModelRequest,
@@ -699,7 +701,17 @@ export class DurableAgentSession {
   preparePublication(commit: DurableSessionCommit) {
     const prepared = this.remote.preparePublication(commit);
     const tools = [...prepared.tools];
+    let afterCommit: (() => void)[] | undefined;
     for (const write of commit.writes) {
+      if (write.type === "entry") {
+        const entry = write.value as { kind: string; conversationId: number };
+        if (entry.kind !== "pi.tool-result") continue;
+        const binding = this.#bindings.get(entry.conversationId);
+        const failure =
+          binding?.onDirectoryFailure && directoryFailure(entry, entry.conversationId);
+        if (failure) (afterCommit ??= []).push(() => binding.onDirectoryFailure?.(failure));
+        continue;
+      }
       if (write.type !== "document.create") continue;
       const record = write.record as { id: number; kind: string; key?: string };
       if (record.kind !== "pi-cloud.tool-recovery" || !record.key) continue;
@@ -713,7 +725,18 @@ export class DurableAgentSession {
         },
       });
     }
-    return { ...prepared, tools };
+    return {
+      ...prepared,
+      tools,
+      ...(afterCommit
+        ? {
+            confirmed: () => {
+              prepared.confirmed();
+              for (const notify of afterCommit) notify();
+            },
+          }
+        : {}),
+    };
   }
   async #publishRecovery(
     taskId: number,

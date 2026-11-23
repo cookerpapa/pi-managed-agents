@@ -436,6 +436,7 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const canQueue =
     selectedDelegatedSession === null &&
     state.session?.workspaceState !== "missing" &&
+    !state.session?.workingDirectoryMissing &&
     (state.session === null ||
       state.sessionState === "cold" ||
       state.sessionState === "idle" ||
@@ -454,7 +455,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const commandAllowed =
     composerCommand !== undefined &&
     state.session !== null &&
-    (composerCommand.kind !== "compact" || (canMutate && selectedDelegatedSession === null));
+    (composerCommand.kind !== "compact" ||
+      (canMutate && selectedDelegatedSession === null && !state.session.workingDirectoryMissing));
   const canSendComposer = composerCommand
     ? commandAllowed
     : canMutate && canQueue && !coldCompactActive;
@@ -869,7 +871,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
           });
           setConversationLoading(null);
           if (
-            snapshot.conversation.session.workspaceState === "missing" &&
+            (snapshot.conversation.session.workspaceState === "missing" ||
+              snapshot.conversation.session.workingDirectoryMissing) &&
             !snapshot.conversation.turns.some(
               (turn) =>
                 turn.operation?.kind === "compact" &&
@@ -2256,6 +2259,18 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
             >
               {t(toolGroupsExpanded ? "chat.collapseToolGroups" : "chat.expandToolGroups")}
             </button>
+            {state.session &&
+              !state.session.workingDirectoryMissing &&
+              state.session.workspaceState === "attached" &&
+              selectedDelegatedSession === null && (
+                <button
+                  type="button"
+                  disabled={!canMutate || currentTurn !== undefined || operation !== null}
+                  onClick={() => setWorkspaceRebindOpen(true)}
+                >
+                  {t("chat.changeWorkspace")}
+                </button>
+              )}
             <button
               className="product-workspace-button"
               disabled={
@@ -2542,13 +2557,12 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
             })()
           : null}
 
-        {workspaceRebindOpen &&
-        selectedDelegatedSession === null &&
-        state.session?.workspaceState === "missing" ? (
+        {workspaceRebindOpen && selectedDelegatedSession === null && state.session ? (
           <WorkspaceRebindDialog
             key={state.session.sessionId}
             api={api}
             sessionId={state.session.sessionId}
+            initialMachineId={state.session.developmentEnvironmentId}
             workspaces={elasticWorkspaces}
             environments={developmentEnvironments}
             canMutate={canMutate}
@@ -2680,9 +2694,16 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
           </div>
         ) : null}
 
-        {state.session?.workspaceState === "missing" ? (
+        {state.session &&
+        (state.session.workspaceState === "missing" || state.session.workingDirectoryMissing) ? (
           <div className="product-workspace-missing-banner">
-            <span>{t("chat.missingWorkspace")}</span>
+            <span>
+              {t(
+                state.session.workingDirectoryMissing
+                  ? "chat.missingDirectory"
+                  : "chat.missingWorkspace",
+              )}
+            </span>
             <button
               disabled={!canMutate || selectedDelegatedSession !== null}
               onClick={() => {

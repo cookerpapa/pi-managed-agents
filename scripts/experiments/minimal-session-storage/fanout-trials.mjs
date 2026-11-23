@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { installFlowHistory, removeFlowOverlay, seedFlowHeads } from "./flow-history.mjs";
 import { studyEntryIndexSql } from "./entry-index.mjs";
 import { createHash } from "node:crypto";
 import { fanoutFixture, targets, offered, partitions } from "./fanout-fixture.mjs";
@@ -45,9 +46,13 @@ export async function runFanout({
     trials: [],
   });
   const owners = fixture.owners;
-  async function seed(arm, displayRounds, mixed, entryIndex) {
+  let hasFlows = false;
+  async function seed(arm, displayRounds, mixed, entryIndex, flowHistory) {
     await call(projector, "fanoutReset", "fanoutResetDone");
+    if (hasFlows) await removeFlowOverlay(db);
+    hasFlows = !!flowHistory;
     await db.query("truncate conversation_worlds,workspace_route_spans,messages,inboxes,runs");
+    if (hasFlows) await installFlowHistory(db, true);
     if (entryIndex !== undefined) {
       await db.query("drop index if exists messages_conversation_entry");
       if (entryIndex) await db.query(studyEntryIndexSql);
@@ -60,6 +65,7 @@ export async function runFanout({
         ...["runId", "sessionId", "writerId"].map((k) => owners.map((o) => o.scope[k])),
       ],
     );
+    if (hasFlows) await seedFlowHeads(db, owners[0].scope.tenantId);
     await db.query(
       `insert into workspace_route_spans(run_id,conversation_id,tenant_id,pi_session_id,session_id,turn_id,topic,partition,first_offset,binding_id,writer_id,allocation_id)
       select id,1,tenant_id,session_id::text,session_id,id,$1,p,0,b,lease_id,case when $5 then gen_random_uuid() end from runs join
@@ -116,12 +122,13 @@ export async function runFanout({
       targetVisibleRate,
       entryIndex,
       omitUsage = false,
+      flowHistory,
     },
   ] of cases(suite).entries()) {
     let rate = rawRate;
     const arm = mixed ? 1 : i + 1,
       count = rounds * targets;
-    if (mode !== "direct") await seed(arm, display ? rounds : 0, mixed, entryIndex);
+    if (mode !== "direct") await seed(arm, display ? rounds : 0, mixed, entryIndex, flowHistory);
     await call(receiver, "fanoutArm", "fanoutArmed", { arm, delay: ms, mixed });
     let source, result, bytes, ends, mix, storage;
     if (mode === "direct") {
@@ -216,7 +223,7 @@ export async function runFanout({
         assert.equal(
           (
             await db.query(
-              "select count(*)::int n from runs where state='completed' and projection_tools='{}'::jsonb",
+              "select count(*)::int n from runs where state='completed' and lease_id is not null and projection_tools='{}'::jsonb",
             )
           ).rows[0].n,
           targets,
@@ -283,6 +290,7 @@ export async function runFanout({
       preload,
       bytes,
       omitUsage,
+      flowHistory,
       source,
       result,
       network,
@@ -377,6 +385,17 @@ function cases(suite) {
         mixed: true,
         ...options,
       });
+    if (short && process.env.PI_CLOUD_COMPARE_FLOW_HISTORY === "1") {
+      return [
+        loopTrial(50, { liveSource: true }),
+        ...[false, true, true, false].map((flowHistory) =>
+          loopTrial(50, { flowHistory, preload: true, rate: 16000 }),
+        ),
+        ...[true, false].map((flowHistory) =>
+          loopTrial(50, { flowHistory, targetVisibleRate: dailyVisibleRate }),
+        ),
+      ];
+    }
     if (short && process.env.PI_CLOUD_COMPARE_ACK_DELAY === "1") {
       return [
         loopTrial(50, { liveSource: true }),

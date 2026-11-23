@@ -16,6 +16,7 @@ import {
   PostgresTenantApiAuthenticator,
   createControlPlaneApplication,
 } from "../../../packages/control-plane/src/index.ts";
+import { DevelopmentEnvironmentService } from "../../../packages/control-plane/src/development-environment-service.ts";
 import { SessionProjector } from "../../../packages/runtime-core/src/session-projector.ts";
 import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import { decodeWorkspaceFact } from "./workspace-operations.mjs";
@@ -29,6 +30,7 @@ const {
   brokers: replyBrokers,
   servingBrokers: brokers,
   cube,
+  directoryRecovery,
   browser,
   inputMode,
   stopInputs,
@@ -89,7 +91,7 @@ async function open() {
     },
   );
   const settle = composed.nativeStore.settle;
-  if (!busy)
+  if (!busy && !directoryRecovery)
     composed.nativeStore.settle = async (tx, fact, position) => {
       if (interruptedFinish === fact.factId && !finishRollbackVerified) {
         // This independent reader sees the last committed version while the
@@ -141,7 +143,19 @@ async function open() {
   );
   await projector.start();
   await until(() => projector.ownsPartition(0), "root projector assignment");
+  const directoryService = directoryRecovery
+    ? new DevelopmentEnvironmentService({
+        database: db,
+        terminalToken: "directory-fixture-no-service-token-00000000",
+        allowInsecureInternalHttp: false,
+        observeMachine: () => ({ state: "running" }),
+      })
+    : undefined;
+  if (directoryService)
+    directoryService.directory = (identity, machine, path) =>
+      endpoint.directory(identity, machine, path);
   app = await createControlPlaneApplication({
+    ...(directoryService ? { developmentEnvironmentService: directoryService } : {}),
     database: db,
     rootMessageHistory: true,
     ...(busy ? await busy.ports(projector) : {}),
@@ -283,189 +297,215 @@ try {
   ).rows[0];
   assert.equal(privileges.n, 0);
   await open();
-  const project = await api.createProject("normal-root"),
-    session = await api.createSession(
-      project.projectId,
-      project.workspaceId,
-      "normal root",
-      "elastic",
-    ),
-    id = session.sessionId;
-  const baseline = await legacyCounts();
-  assert.equal((await api.getConversation(id)).turns.length, 0);
-  evidence = await withFamilyGuest(cube, async (guest) => {
-    endpoint = await guest.directory(binding);
-    const prompt1 = "Check the value in the workspace.",
-      prompt2 = busy
-        ? "Check the saved value " + randomUUID()
-        : "What did the preceding command return?",
-      key = randomUUID(),
-      third = "Additional instructions " + randomUUID(),
-      edited = "Use the revised plan " + randomUUID();
-    async function browserRun(n) {
-      return until(
-        async () => {
-          const {
-            rows: [r],
-          } = await pool.query(
-            "select id,turn_id from runs where session_id=$1 and mailbox_position=$2",
-            [id, n],
-          );
-          return r && { runId: r.id, turnId: r.turn_id };
-        },
-        "browser submitted Run",
-        70000,
-      );
-    }
-    if (browser)
-      await browserNote("/study", "ready", {
+  if (directoryRecovery) {
+    const { directoryAcceptance } = await import("./directory-acceptance.mjs");
+    evidence = await withFamilyGuest(cube, (guest) =>
+      directoryAcceptance({
+        guest,
+        api,
+        pool,
+        database: db,
+        tenant,
+        dsn: url.href,
+        topic,
+        brokers,
+        replyBrokers,
+        replyBoots,
+        browser,
         origin,
-        id,
-        token: tenant.credential.token,
-        inputMode,
-        stopInputs,
-        stopHandoff,
-        third,
-        edited,
-        preferenceKey: "pi-cloud:composer-enter:" + tenant.tenantId + ":" + tenant.ownerUserId,
-        first: prompt1,
-        second: prompt2,
-      });
-    const first = browser ? await browserRun(1) : await api.acceptTurn(id, prompt1, key);
-    if (!browser) assert.equal((await api.acceptTurn(id, prompt1, key)).runId, first.runId);
-    const a = work(first.runId);
-    await Promise.race([
-      until(
-        async () => dispatches === 1 && (await endpoint.marker()) === "once",
-        "physical Bash start",
-        45000,
-      ),
-      a.then(() => {
-        throw Error("Bash completed before release");
+        setEndpoint: (e) => {
+          endpoint = e;
+        },
+        binding,
       }),
-    ]);
-    const active = await api.getConversation(id);
-    const tool = items(active).find((i) => i.kind === "tool");
-    assert(tool?.status === "running" && tool.input.command.includes("cat result"));
-    if (busy) {
-      const measured = await Promise.race([
-        busy.failed,
-        busy.exercise({
+    );
+  } else {
+    const project = await api.createProject("normal-root"),
+      session = await api.createSession(
+        project.projectId,
+        project.workspaceId,
+        "normal root",
+        "elastic",
+      ),
+      id = session.sessionId;
+    const baseline = await legacyCounts();
+    assert.equal((await api.getConversation(id)).turns.length, 0);
+    evidence = await withFamilyGuest(cube, async (guest) => {
+      endpoint = await guest.directory(binding);
+      const prompt1 = "Check the value in the workspace.",
+        prompt2 = busy
+          ? "Check the saved value " + randomUUID()
+          : "What did the preceding command return?",
+        key = randomUUID(),
+        third = "Additional instructions " + randomUUID(),
+        edited = "Use the revised plan " + randomUUID();
+      async function browserRun(n) {
+        return until(
+          async () => {
+            const {
+              rows: [r],
+            } = await pool.query(
+              "select id,turn_id from runs where session_id=$1 and mailbox_position=$2",
+              [id, n],
+            );
+            return r && { runId: r.id, turnId: r.turn_id };
+          },
+          "browser submitted Run",
+          70000,
+        );
+      }
+      if (browser)
+        await browserNote("/study", "ready", {
+          origin,
+          id,
+          token: tenant.credential.token,
+          inputMode,
+          stopInputs,
+          stopHandoff,
+          third,
+          edited,
+          preferenceKey: "pi-cloud:composer-enter:" + tenant.tenantId + ":" + tenant.ownerUserId,
           first: prompt1,
           second: prompt2,
-          id,
-          runId: first.runId,
-          api,
-          endpoint,
-          work,
-          dispatchCount: () => dispatches,
-          ...(stopInputs
-            ? {
-                afterReceipt: (actor, receipt) =>
-                  verifyStoppedRoot({
-                    actor,
-                    receipt,
-                    stopHandoff,
-                    db,
-                    ...(replyBeforeReclaim
-                      ? {
-                          finishOriginal: async () => {
-                            await endpoint.release();
-                            await until(async () => {
-                              const [p] = await replyAdmin.fetchTopicOffsets(originalReply.topic);
-                              return BigInt(p.high ?? p.offset) > BigInt(originalReply.offset);
-                            }, "original Guest reply in its exclusive fixture mailbox");
-                          },
-                        }
-                      : {}),
-                    first,
-                    originalPrompt: prompt1,
-                    second: prompt2,
-                    third,
-                    edited,
-                    id,
-                    api,
-                    pool,
-                    a,
-                    work,
-                    browserRun,
-                    endpoint,
-                    counts: () => ({ dispatches, cancels }),
-                  }),
-              }
-            : {}),
+        });
+      const first = browser ? await browserRun(1) : await api.acceptTurn(id, prompt1, key);
+      if (!browser) assert.equal((await api.acceptTurn(id, prompt1, key)).runId, first.runId);
+      const a = work(first.runId);
+      await Promise.race([
+        until(
+          async () => dispatches === 1 && (await endpoint.marker()) === "once",
+          "physical Bash start",
+          45000,
+        ),
+        a.then(() => {
+          throw Error("Bash completed before release");
         }),
       ]);
+      const active = await api.getConversation(id);
+      const tool = items(active).find((i) => i.kind === "tool");
+      assert(tool?.status === "running" && tool.input.command.includes("cat result"));
+      if (busy) {
+        const measured = await Promise.race([
+          busy.failed,
+          busy.exercise({
+            first: prompt1,
+            second: prompt2,
+            id,
+            runId: first.runId,
+            api,
+            endpoint,
+            work,
+            dispatchCount: () => dispatches,
+            ...(stopInputs
+              ? {
+                  afterReceipt: (actor, receipt) =>
+                    verifyStoppedRoot({
+                      actor,
+                      receipt,
+                      stopHandoff,
+                      db,
+                      ...(replyBeforeReclaim
+                        ? {
+                            finishOriginal: async () => {
+                              await endpoint.release();
+                              await until(async () => {
+                                const [p] = await replyAdmin.fetchTopicOffsets(originalReply.topic);
+                                return BigInt(p.high ?? p.offset) > BigInt(originalReply.offset);
+                              }, "original Guest reply in its exclusive fixture mailbox");
+                            },
+                          }
+                        : {}),
+                      first,
+                      originalPrompt: prompt1,
+                      second: prompt2,
+                      third,
+                      edited,
+                      id,
+                      api,
+                      pool,
+                      a,
+                      work,
+                      browserRun,
+                      endpoint,
+                      counts: () => ({ dispatches, cancels }),
+                    }),
+                }
+              : {}),
+          }),
+        ]);
+        assert.deepEqual(await legacyCounts(), baseline);
+        await projector.checkHealth();
+        return measured;
+      }
+      if (browser) await browserMessage("/study", "active");
+      await endpoint.release();
+      await a;
+      await until(
+        async () => (await api.getRun(first.runId)).state === "completed",
+        "first run settled",
+      );
+      const token = await endpoint.result();
+      const checkFirst = (page) => {
+        const row = page.turns.find((t) => t.turnId === first.turnId);
+        assert.equal(row.prompt, prompt1);
+        const its = row.transcript.items;
+        const tools = its.filter((i) => i.kind === "tool");
+        assert.equal(tools.length, 1);
+        assert.equal(tools[0].toolCallId, tool.toolCallId);
+        assert.deepEqual(tools[0].input, tool.input);
+        assert(tools[0].status === "completed" && JSON.stringify(tools[0].output).includes(token));
+        assert(its.some((i) => i.kind === "text" && i.text === "First answer: " + token));
+      };
+      checkFirst(await api.getConversation(id));
+      const statusChecks = [await checkStatus(id, first.runId)];
+      if (browser) await browserMessage("/study", "detached");
+      await close();
+      await open();
+      checkFirst(await api.getConversation(id));
+      if (browser) await browserNote("/study", "restarted", { marker: token });
+      const second = browser
+        ? await browserRun(2)
+        : await api.acceptTurn(id, prompt2, randomUUID());
+      await work(second.runId);
+      await until(
+        async () => (await api.getRun(second.runId)).state === "completed",
+        "second run settled",
+      );
+      const cold = await api.getConversation(id);
+      checkFirst(cold);
+      assert.deepEqual(
+        cold.turns.map((t) => t.prompt),
+        [prompt1, prompt2],
+      );
+      assert(items(cold).some((i) => i.kind === "text" && i.text === "Second answer: " + token));
+      assert.equal(dispatches, 1);
+      assert.equal(await endpoint.marker(), "once");
+      assert(workers[1].priorEntries > 0);
+      assert.deepEqual(workers[1].restoredUserPrompts, [prompt1, prompt2]);
       assert.deepEqual(await legacyCounts(), baseline);
+      assert(finishRollbackVerified);
+      statusChecks.push(await checkStatus(id, second.runId));
+      assert(
+        statusChecks.every((s) => s.matches),
+        JSON.stringify(statusChecks),
+      );
       await projector.checkHealth();
-      return measured;
-    }
-    if (browser) await browserMessage("/study", "active");
-    await endpoint.release();
-    await a;
-    await until(
-      async () => (await api.getRun(first.runId)).state === "completed",
-      "first run settled",
-    );
-    const token = await endpoint.result();
-    const checkFirst = (page) => {
-      const row = page.turns.find((t) => t.turnId === first.turnId);
-      assert.equal(row.prompt, prompt1);
-      const its = row.transcript.items;
-      const tools = its.filter((i) => i.kind === "tool");
-      assert.equal(tools.length, 1);
-      assert.equal(tools[0].toolCallId, tool.toolCallId);
-      assert.deepEqual(tools[0].input, tool.input);
-      assert(tools[0].status === "completed" && JSON.stringify(tools[0].output).includes(token));
-      assert(its.some((i) => i.kind === "text" && i.text === "First answer: " + token));
-    };
-    checkFirst(await api.getConversation(id));
-    const statusChecks = [await checkStatus(id, first.runId)];
-    if (browser) await browserMessage("/study", "detached");
-    await close();
-    await open();
-    checkFirst(await api.getConversation(id));
-    if (browser) await browserNote("/study", "restarted", { marker: token });
-    const second = browser ? await browserRun(2) : await api.acceptTurn(id, prompt2, randomUUID());
-    await work(second.runId);
-    await until(
-      async () => (await api.getRun(second.runId)).state === "completed",
-      "second run settled",
-    );
-    const cold = await api.getConversation(id);
-    checkFirst(cold);
-    assert.deepEqual(
-      cold.turns.map((t) => t.prompt),
-      [prompt1, prompt2],
-    );
-    assert(items(cold).some((i) => i.kind === "text" && i.text === "Second answer: " + token));
-    assert.equal(dispatches, 1);
-    assert.equal(await endpoint.marker(), "once");
-    assert(workers[1].priorEntries > 0);
-    assert.deepEqual(workers[1].restoredUserPrompts, [prompt1, prompt2]);
-    assert.deepEqual(await legacyCounts(), baseline);
-    assert(finishRollbackVerified);
-    statusChecks.push(await checkStatus(id, second.runId));
-    assert(
-      statusChecks.every((s) => s.matches),
-      JSON.stringify(statusChecks),
-    );
-    await projector.checkHealth();
-    return {
-      ...(browser ? await browserMessage("/study", "done") : {}),
-      statusChecks,
-      runs: cold.turns.length,
-      physicalExecutions: dispatches,
-      runningToolVisible: true,
-      stableToolIdentity: true,
-      coldApiRestart: true,
-      coldWorkerContinuation: true,
-      modelCalls: workers.map((x) => x.modelCalls),
-      coldPriorEntries: workers[1].priorEntries,
-      legacyNativeRowsAdded: 0,
-      finishRollbackVerified,
-    };
-  });
+      return {
+        ...(browser ? await browserMessage("/study", "done") : {}),
+        statusChecks,
+        runs: cold.turns.length,
+        physicalExecutions: dispatches,
+        runningToolVisible: true,
+        stableToolIdentity: true,
+        coldApiRestart: true,
+        coldWorkerContinuation: true,
+        modelCalls: workers.map((x) => x.modelCalls),
+        coldPriorEntries: workers[1].priorEntries,
+        legacyNativeRowsAdded: 0,
+        finishRollbackVerified,
+      };
+    });
+  }
 } catch (error) {
   if (browser) await browserNote("/study", "failure", { message: error.message });
   throw error;

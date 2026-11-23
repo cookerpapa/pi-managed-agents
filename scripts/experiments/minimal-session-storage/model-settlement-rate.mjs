@@ -10,6 +10,7 @@ import { receiptHash } from "../../../packages/accounting/src/receipt-identity.t
 import { up as receipts } from "../../../packages/database/src/migrations/210_model_metering.ts";
 import { up as eligibility } from "../../../packages/database/src/migrations/226_model_charge_evidence.ts";
 import { visibleOutput } from "./visible-output.mjs";
+import { installFlowHistory, seedFlowHeads } from "./flow-history.mjs";
 import { captureNativeUsage } from "./native-usage-fixture.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 
@@ -109,7 +110,16 @@ const groups = lanes.map((runs, partition) => {
 });
 const own = await testPostgres({});
 try {
-  for (const sample of [1, 2]) {
+  const compareFlow = process.argv[3] === "flow",
+    compareSql = process.argv[3] === "flow-sql";
+  const tape = Array.from({ length: partitions }, () => []);
+  const layouts = compareFlow
+    ? [false, true, true, false, true, false, false, true]
+    : compareSql
+      ? [false]
+      : [false, false];
+  for (const [index, flowHistory] of layouts.entries()) {
+    const sample = index + 1;
     const schema = "rate_" + randomUUID().replaceAll("-", "");
     const pool = new pg.Pool({
       connectionString: own.url,
@@ -130,6 +140,7 @@ try {
               : text.includes('"model_metering_events"')
                 ? "evidence"
                 : text.split(/\s+/, 1)[0].toLowerCase();
+          if (compareSql && kind === "prefix") tape[args[1][1]].push({ text, params: args[1] });
           queries[kind] = (queries[kind] ?? 0) + 1;
         }
         return query(...args);
@@ -153,6 +164,7 @@ try {
         { partitions },
       );
       await p.view.install();
+      if (flowHistory) await installFlowHistory(pool, true);
       await p.view.reset(new Map(lanes.map((_, i) => [i, 0n])), 16, "recorded-history");
       const runs = lanes.flat(),
         calls = runs.flatMap((r) => r.calls.filter(Boolean));
@@ -161,6 +173,7 @@ try {
       select "runId","tenantId","sessionId","writerId",'Inspect',"runId",'fixture','running',1 from jsonb_to_recordset($1::jsonb) t("runId" uuid,"tenantId" uuid,"sessionId" uuid,"writerId" uuid)`,
         [JSON.stringify(runs.map((r) => r.scope))],
       );
+      if (flowHistory) await seedFlowHeads(pool, tenantId);
       // A model request normally reaches the gateway before the Worker publishes its settlement.
       await pool.query(
         `insert into model_invocations(id,tenant_id,session_id,run_id,requested_at,provider,model,purpose,context,context_hash)
@@ -191,6 +204,7 @@ try {
       console.log(
         JSON.stringify({
           sample,
+          ...(compareFlow ? { flowHistory } : {}),
           runs: runs.length,
           commits: groups.flat().length,
           ...totals,
@@ -212,6 +226,15 @@ try {
       }
     }
   }
+  if (compareSql)
+    await (
+      await import("./flow-sql-replay.mjs")
+    ).compareFlowSql(
+      own.url,
+      tape,
+      lanes.flat().map((r) => r.scope),
+      visiblePerRun * lanes.flat().length,
+    );
 } finally {
   await own.close();
 }

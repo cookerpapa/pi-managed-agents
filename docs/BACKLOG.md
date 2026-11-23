@@ -2,8 +2,11 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Verify directory loss, native abort, returned drafts, Chrome reselection and cold continuation. [Candidate acceptance](reports/directory-recovery-and-flow-20261123.md).
+- [x] Exercise the two-table Run-boundary Flow layout on the combined delegated schema, plus isolated PG and 50 ms Kafka throughput studies. [Decision](adr/0356-run-flow-head-and-directory-stop.md) and [measurements](reports/directory-recovery-and-flow-20261123.md).
+
 - [x] Validate candidate context estimates for ordinary Sessions, frozen history, fresh and continued children. [Read and admission report](reports/candidate-context-and-prune-20261123.md).
-- [ ] Resolve the Run queue's public Session identity and the physical stream selected after pruning. The combined Fork/delegation admission gate reproduces two conflicting foreign keys. Discuss ownership before changing stored identities or releasing #48.
+- [ ] Connect the verified Flow storage port to the serving Fork, prune and cold Session APIs and the existing cleanup outbox. Match ordered-writer routing and retained attachment/child ownership before the #48 cutover.
 
 - [x] Compare 50 and 100 ms sandbox acceptance on identical 20-tool Kafka replays under paced and preloaded input. [Paired results](reports/provider-only-visible-throughput-20261123.md#sandbox-acceptance-delay-50-vs-100-ms).
 

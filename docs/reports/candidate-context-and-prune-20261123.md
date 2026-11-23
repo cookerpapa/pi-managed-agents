@@ -1,5 +1,7 @@
 # Candidate context status and the prune admission gate
 
+Historical gate at revision `f63ea568`. The Run-linked candidate passes the replacement gate under [ADR-0356](../adr/0356-run-flow-head-and-directory-stop.md). Reproduce the original exit status 2 at that revision.
+
 ## Verified reads
 
 The ordinary root acceptance creates a private tenant, a new Session and two Runs using the HTTP Session API. A real Cube Guest executes one Bash command and a cold Worker continues the second Run after the Session API and Projector restart. The role serving the Session API has zero SELECT privileges on the old Pi history tables. With the former status reader, both authenticated status requests returned HTTP 500. With candidate message reads, the requests returned HTTP 200 and estimated 224 and 249 tokens respectively, matching the estimator applied to the five and seven projected Entries. The model is simulated.

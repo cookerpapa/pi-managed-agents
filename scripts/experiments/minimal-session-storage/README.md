@@ -651,3 +651,17 @@ To kill the old Worker before clicking Stop, use `--root-stop-handoff-web`. Appe
 Run `node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/verify-fork-document-evidence.mjs` to compare the retained candidate rows with native `pi.agent` Fork snapshots. At `872950bb` this diagnostic exited 2. With ADR-0345 it requires equality with each native Fork in a fresh Harness, repeated Fork after source prune/deletion, and final collection. The diagnostic uses two disposable PG schemas and two deterministic Pi histories. The separate `--probe-current-world` option holds agent configuration constant and compares the next environment-reset notice after Fork. Exit 2 identifies the remaining observation-state gap.
 
 For a diagnostic repetition of the million-Run load, add `PI_CLOUD_REPEAT_MILLION_RATE=1` to the existing `grants-million-day` command. After the live capture it replays 1.5×, 3×, 1.5× and 1.5× daily demand, each on a drained projection. Each paced arm in an invocation uses its captured tape. The standard suite retains the original load sequence.
+
+
+### Run-boundary Flow and directory recovery
+
+`run-flow-history.mjs` builds an isolated PostgreSQL schema with Sessions, Run predecessors and ordinary message bodies. Test the joined delegated Run layout through the admission gate. Both scripts require the maintained disposable PG runner.
+
+```sh
+node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/check-matched-session-identity.mjs
+node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/run-flow-history.mjs
+```
+
+Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.
+
+For the directory closure path use the existing operator fixture with `--directory-recovery-web` and an unused report path. It stages the matched fixed Guest executable only in its owned disposable VM. Real Chrome receives the returned drafts, selects a real directory and submits the next Run through the Session API. [Evidence](../../../docs/reports/directory-recovery-and-flow-20261123.md).

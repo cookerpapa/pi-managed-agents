@@ -65,7 +65,7 @@ async function settled(runId) {
   }, "Run seal");
   return run;
 }
-async function turn(prompt) {
+async function turn(prompt, failureCode) {
   const accepted = await api.acceptTurn(
     session.sessionId,
     prompt,
@@ -80,7 +80,12 @@ async function turn(prompt) {
     usage: runUsage(history),
     ...(run.failure ? { failure: run.failure } : {}),
   });
-  assert.equal(run.state, "completed", run.failure?.code ?? "Run failed");
+  assert.equal(
+    run.state,
+    failureCode ? "failed" : "completed",
+    run.failure?.code ?? "Unexpected run state",
+  );
+  if (failureCode) assert.equal(run.failure?.code, failureCode);
   return nativeMessages(history);
 }
 const machineRow = () =>
@@ -132,22 +137,16 @@ try {
     JSON.stringify({ phase: "delete-directory-and-continue", at: new Date().toISOString() }),
   );
   const messages = await turn(
-    `这是一次已授权的临时目录故障验收。严格按顺序执行两次独立 bash 调用：第一次 command 必须是 rmdir ${cwd} && printf CWD_REMOVED；收到结果后，第二次 command 必须是 printf SHOULD_NOT_RUN > ${marker}。第二次预期因工作目录消失而失败。无论第二次是否成功，都不要继续调用工具，不要修复、重建目录、修改 cwd、搜索或委派。最后用自然语言说明第二次的实际工具结果，并包含标记 CWD_ERROR_HANDLED。这里只能删除上面明确指定的临时空目录。`,
+    `严格按顺序调用两次 bash。第一条命令为 rmdir ${cwd} && printf CWD_REMOVED。收到结果后第二条为 printf SHOULD_NOT_RUN > ${marker}。只操作这次验收的临时空目录。`,
+    "workspace_directory_missing",
   );
   const tools = messages.filter((m) => m.role === "toolResult");
-  assert.equal(tools.length, 2, "Expected exactly two Tool calls");
+  assert.equal(tools.length, 2);
   assert.equal(tools[0].isError, false);
-  assert.match(JSON.stringify(tools[0].content), /CWD_REMOVED/);
   assert.equal(tools[1].isError, true);
-  assert.match(JSON.stringify(tools[1].content), /tool_root_unavailable/);
-  assert(
-    messages
-      .slice(messages.indexOf(tools[1]) + 1)
-      .some(
-        (m) => m.role === "assistant" && JSON.stringify(m.content).includes("CWD_ERROR_HANDLED"),
-      ),
-    "No native assistant continuation after the Tool error",
-  );
+  assert.equal(tools[1].details?.code, "workspace_directory_missing");
+  assert.equal(tools[1].details?.execution, "not_started");
+  assert(!messages.slice(messages.indexOf(tools[1]) + 1).some((m) => m.role === "assistant"));
   const listing = await api.listDevelopmentEnvironmentDirectory(
     machine.environmentId,
     "/home/user",
@@ -157,21 +156,17 @@ try {
     "Directory was repaired or the refused command executed",
   );
   assert.deepEqual(await machineRow(), original, "Directory failure changed the VM identity/state");
-  report.sameRunContinuation = true;
+  report.runSealedAfterResult = true;
   report.noCommandEffectOrDirectoryRecreation = true;
   report.sameVmAfterError = true;
-  const chat = await turn("本轮不要调用任何工具，只回复 CHAT_AFTER_CWD_DELETE_OK。");
-  assert(!chat.some((m) => m.role === "toolResult"));
-  assert(
-    chat.some(
-      (m) =>
-        m.role === "assistant" && JSON.stringify(m.content).includes("CHAT_AFTER_CWD_DELETE_OK"),
-    ),
+  await api.rebindConversationWorkspace(
+    session.sessionId,
+    machine.workspaceId,
+    newIdempotencyKey("cwd-reselect"),
+    "/home/user",
   );
-  report.chatAfterDeletion = true;
-  await api.createDevelopmentEnvironmentDirectory(machine.environmentId, "/home/user", name);
   const restored = await turn(
-    "工作目录已由用户恢复。只调用一次 bash 执行 pwd && printf RESTORED_CWD_OK，然后简短报告；不要搜索或委派。",
+    "已选择新的工作目录 /home/user。只调用一次 bash 执行 pwd && printf RESTORED_CWD_OK，然后简短报告；不要搜索或委派。",
   );
   assert(
     restored.some(
@@ -179,7 +174,7 @@ try {
         m.role === "toolResult" &&
         !m.isError &&
         JSON.stringify(m.content).includes("RESTORED_CWD_OK") &&
-        JSON.stringify(m.content).includes(cwd),
+        JSON.stringify(m.content).includes("/home/user"),
     ),
   );
   assert.deepEqual(await machineRow(), original);

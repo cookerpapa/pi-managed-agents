@@ -425,6 +425,48 @@ describe.skipIf(connectionString === undefined)("Workspace deletion / message ad
     });
   });
 
+  it("holds a missing directory's pending Run, restores the original input on withdrawal and rebinds an intact Workspace", async () => {
+    const { session } = await fixture("directory-pending");
+    const q = await store.acceptTurn(session.sessionId, "pending-before-stop", {
+      prompt: "draft from old directory",
+    });
+    await database
+      .updateTable("sessions")
+      .set({ workspace_directory_missing: true })
+      .where("id", "=", session.sessionId)
+      .execute();
+    await database.updateTable("runs").set({ ready_at: null }).where("id", "=", q.runId).execute();
+    const { advanceLaneReadiness } = await import("../../runtime-core/src/run-readiness.ts");
+    await database
+      .transaction()
+      .execute((tx) => advanceLaneReadiness(tx, scope.tenantId, session.sessionId));
+    expect(
+      (
+        await database
+          .selectFrom("runs")
+          .select("ready_at")
+          .where("id", "=", q.runId)
+          .executeTakeFirstOrThrow()
+      ).ready_at,
+    ).toBeNull();
+    const target = await store.createProject({ name: "new dir", source: { kind: "empty" } });
+    await expect(
+      store.rebindConversationWorkspace(session.sessionId, target.workspaceId, "wait-for-draft"),
+    ).rejects.toMatchObject({ code: "conflict" });
+    const queue = new QueuedInputService({ database });
+    const snapshot = await queue.list(scope.tenantId, session.sessionId);
+    expect(snapshot.items.find((i) => i.runId === q.runId)?.text).toBe("draft from old directory");
+    await queue.mutate(scope.tenantId, session.sessionId, q.turnId, "withdraw-old", {
+      action: "cancel",
+      revision: snapshot.revision,
+    });
+    await store.rebindConversationWorkspace(session.sessionId, target.workspaceId, "select-new");
+    const accepted = await store.acceptTurn(session.sessionId, "resubmit", {
+      prompt: "draft from old directory",
+    });
+    expect((await store.getRun(accepted.runId)).workspaceId).toBe(target.workspaceId);
+  });
+
   it("rejects foreign machine owners, invalid directories, unavailable targets and live Workspace changes", async () => {
     const { project, session } = await fixture("machine-rebind-guards");
     const foreignUserId = randomUUID();
@@ -438,7 +480,7 @@ describe.skipIf(connectionString === undefined)("Workspace deletion / message ad
         ownerUserId,
         workingDirectory,
       });
-    await expect(rebind()).rejects.toMatchObject({ code: "conflict" });
+    await expect(rebind()).rejects.toMatchObject({ code: "not_found" });
     await store.deleteWorkspace(project.workspaceId, "delete-rebind-guards");
     await database
       .updateTable("sessions")

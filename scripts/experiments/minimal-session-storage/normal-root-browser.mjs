@@ -20,6 +20,9 @@ export async function verifyRootBrowser(dir) {
       stopHandoff,
       third,
       edited,
+      directoryRecovery,
+      base: guestBase,
+      fresh,
     } = await browserMessage(dir, "ready");
     assert(new URL(origin).hostname === "127.0.0.1");
     let holdAck = stopInputs,
@@ -98,6 +101,7 @@ export async function verifyRootBrowser(dir) {
       async function openBeforeSubmission() {
         const ready =
           "document.querySelector('.product-conversation-heading strong')?.textContent==='normal root'";
+
         await page.navigate(url);
         try {
           await page.waitFor(ready, 10000);
@@ -109,6 +113,48 @@ export async function verifyRootBrowser(dir) {
         }
       }
       try {
+        if (directoryRecovery) {
+          await page.navigate(url);
+          await page.waitFor("document.querySelector('.product-rebind-modal')", 45000);
+          await page.waitFor(
+            "document.querySelector('.product-composer textarea')?.value.includes('return steer') && document.querySelector('.product-composer textarea').value.includes('return follow_up')",
+            30000,
+          );
+          // The machine row contains the selected working directory and its picker.
+          const choose =
+            "document.querySelector('.product-rebind-modal code')?.parentElement?.parentElement?.querySelector('button')";
+          await page.waitFor(choose + " && !(" + choose + ").disabled", 30000);
+          await page.evaluate("(" + choose + ").click()");
+          const option = (name) =>
+            "[...document.querySelectorAll('[role=option]')].find(e=>e.querySelector('strong')?.textContent===" +
+            JSON.stringify(name) +
+            ")";
+          await page.waitFor(option(guestBase.split("/").at(-1)));
+          await page.evaluate(
+            "(" +
+              option(guestBase.split("/").at(-1)) +
+              ").dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))",
+          );
+          await page.waitFor(option("new"));
+          await page.evaluate("(" + option("new") + ").click()");
+          await page.evaluate(
+            "document.querySelector('[role=dialog] footer .product-primary-button').click()",
+          );
+          await page.waitFor(
+            "document.querySelector('.product-rebind-modal code')?.textContent===" +
+              JSON.stringify(fresh),
+          );
+          await page.evaluate(
+            "document.querySelector('.product-rebind-modal button[type=submit]').click()",
+          );
+          await page.waitFor("!document.querySelector('.product-rebind-modal')");
+          await submit(second);
+          await browserNote(dir, "directorySubmitted");
+          await browserMessage(dir, "directoryFinished");
+          await page.waitFor(has("Cancellation hold unexpectedly completed."));
+          assert.deepEqual(failures, []);
+          return;
+        }
         await openBeforeSubmission();
         if (inputMode) {
           await page.evaluate(
@@ -273,6 +319,10 @@ export async function verifyRootBrowser(dir) {
         throw e;
       }
     });
+    if (directoryRecovery) {
+      await browserNote(dir, "done", { ChromeReselection: true });
+      return;
+    }
     await browserNote(dir, "done", {
       browser: "Chrome",
       ...(stopInputs

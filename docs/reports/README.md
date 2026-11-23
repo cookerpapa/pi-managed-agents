@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Directory recovery and Run-linked Flow](directory-recovery-and-flow-20261123.md) covers an isolated real Guest, Chrome, the projection workload and long-history reads and collection.
+
 - [Candidate context status and prune admission](candidate-context-and-prune-20261123.md) covers protected HTTP reads and a reproduced public Session/stream identity conflict.
 
 - [Gateway-only model usage and visible Kafka throughput](provider-only-visible-throughput-20261123.md) measures the candidate projection and the cost of native usage updates.

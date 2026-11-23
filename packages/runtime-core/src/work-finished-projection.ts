@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { recordEnvironmentFailure } from "./environment-failure.ts";
 import { sql, type Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
@@ -50,6 +51,8 @@ export async function finishWorkIn(
   const terminal = fact.terminal;
   if (terminal.type === "turn.failed")
     await recordEnvironmentFailure(tx, { ...fact.scope, code: terminal.payload.code, now });
+  const directoryLost =
+    terminal.type === "turn.failed" && terminal.payload.code === "workspace_directory_missing";
   const state =
     terminal.type === "turn.completed"
       ? "completed"
@@ -128,6 +131,7 @@ export async function finishWorkIn(
     .updateTable("sessions")
     .set({
       state: "idle",
+      ...(directoryLost ? { workspace_directory_missing: true } : {}),
       next_event_seq: event.seq + 1,
       row_version: sql`row_version+1`,
       updated_at: now,
@@ -150,6 +154,49 @@ export async function finishWorkIn(
     cancellations as (${cancellations}), session_state as (${session})
     ${retireWriter ? sql`, retired as (${writer})` : sql``}
     ${projectionOffsetWrite(position)}`.execute(tx);
+  if (directoryLost)
+    await tx
+      .updateTable("runs")
+      .set({ ready_at: null })
+      .where("tenant_id", "=", fact.scope.tenantId)
+      .where("session_id", "=", fact.scope.sessionId)
+      .where("state", "=", "queued")
+      .where("ready_at", "is not", null)
+      .execute();
+  if (
+    directoryLost &&
+    !(await tx
+      .selectFrom("turn_control_requests")
+      .select("id")
+      .where("tenant_id", "=", fact.scope.tenantId)
+      .where("target_run_id", "=", fact.scope.runId)
+      .where("kind", "=", "cancel")
+      .where(sql<string>`payload->>'inputReturnPending'`, "=", "true")
+      .executeTakeFirst())
+  ) {
+    // This is the receipt of the already completed native abort. No Stop command is dispatched.
+    await tx
+      .insertInto("turn_control_requests")
+      .values({
+        id: fact.factId,
+        tenant_id: fact.scope.tenantId,
+        session_id: fact.scope.sessionId,
+        turn_id: fact.scope.turnId,
+        target_run_id: fact.scope.runId,
+        idempotency_key: "directory-stop-" + fact.factId,
+        request_sha256: createHash("sha256").update(fact.factId).digest("hex"),
+        kind: "cancel",
+        state: "completed",
+        payload: { source: "workspace_directory_missing", inputReturnPending: true },
+        attempts: 0,
+        available_at: now,
+        acknowledged_at: now,
+        completed_at: now,
+        dispatched_at: null,
+        failure_code: null,
+      })
+      .execute();
+  }
   await settle(tx, fact, position);
   await advanceLaneReadiness(tx, fact.scope.tenantId, fact.scope.sessionId);
   return event;

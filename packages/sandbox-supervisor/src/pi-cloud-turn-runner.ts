@@ -45,6 +45,7 @@ import {
   measureRunPreparation,
   type PiCloudMetrics,
 } from "@pi-cloud/observability";
+import { recoverDirectoryFailure } from "./durable/workspace-directory-failure.ts";
 import { DurableAgentSession, type DurableRunConfiguration } from "./durable/agent-session.ts";
 import type { CloudModelPermit } from "./durable/scoped-models.ts";
 import { DurableRunEvents } from "./durable/run-events.ts";
@@ -344,7 +345,11 @@ export class PiCloudTurnRunner {
     const activity = new PiRunActivity(options.onActivity);
     activity.phase("preparing");
     // Work follows native settlement and execution ownership, not elapsed time.
-    const combined = signal ?? new AbortController().signal;
+    const directoryStop = new AbortController();
+    const combined = signal
+      ? AbortSignal.any([signal, directoryStop.signal])
+      : directoryStop.signal;
+    let missingDirectory: PiTurnError | undefined;
     let handle: DurableSessionHandle | undefined,
       family: DurableAgentSession | undefined,
       stream: AgentEventStream | undefined,
@@ -355,7 +360,10 @@ export class PiCloudTurnRunner {
     // aborts. Worker retirement, unlike Stop, cancels this owner's startup I/O.
     const readLifetime = new AbortController();
     const retireReads = () => {
-      if (!["user_request", "timeout"].includes(cancellationReason(combined)))
+      if (
+        combined.reason !== missingDirectory &&
+        !["user_request", "timeout"].includes(cancellationReason(combined))
+      )
         readLifetime.abort(
           new PiTurnError("worker_shutdown", "The native owner is stopping", true),
         );
@@ -652,25 +660,27 @@ export class PiCloudTurnRunner {
             .map((tool) => tool.name),
         tools: tools.tools.filter((tool) => !tool.prepareExecution),
         assertCurrent: () => owner.authority.assertCurrent(),
-        ...(p.stopOnResume || options.beforeEffect
-          ? {
-              beforeEffect: async (effectSignal?: AbortSignal) => {
-                await options.beforeEffect?.(effectSignal);
-                if (!p.stopOnResume) return;
-                await awaitWithContext(
-                  new Promise<void>(() => {}),
-                  withAbortSignal(
-                    AbortSignal.any([
-                      combined,
-                      owner.authority.signal,
-                      ...(effectSignal ? [effectSignal] : []),
-                    ]),
-                    BACKGROUND_CONTEXT,
-                  ),
-                );
-              },
-            }
-          : {}),
+        onDirectoryFailure: (failure) => {
+          if (missingDirectory) return;
+          missingDirectory = failure;
+          directoryStop.abort(failure);
+        },
+        beforeEffect: async (effectSignal?: AbortSignal) => {
+          if (missingDirectory) throw missingDirectory;
+          await options.beforeEffect?.(effectSignal);
+          if (!p.stopOnResume) return;
+          await awaitWithContext(
+            new Promise<void>(() => {}),
+            withAbortSignal(
+              AbortSignal.any([
+                combined,
+                owner.authority.signal,
+                ...(effectSignal ? [effectSignal] : []),
+              ]),
+              BACKGROUND_CONTEXT,
+            ),
+          );
+        },
         prepareRemote: async (invocation) => {
           if (!sampling.selected) {
             const task = await owner.storage.task(invocation.taskId as TaskId, BACKGROUND_CONTEXT);
@@ -923,6 +933,20 @@ export class PiCloudTurnRunner {
             }
           : {}),
       };
+      const initialSubmission =
+        p.input.kind === "compact"
+          ? undefined
+          : await owner.storage.submissionByRequest(
+              p.piSession.conversationId as ConversationId,
+              initialRequestId,
+              BACKGROUND_CONTEXT,
+            );
+      if (initialSubmission?.entry !== undefined)
+        missingDirectory = await recoverDirectoryFailure(
+          owner.storage,
+          p.piSession.conversationId as ConversationId,
+          initialSubmission.entry,
+        );
       const conversation = await prepare("conversation_bind", () =>
         freshRootPrompt
           ? world.withInitialObservation((writeWorld) =>
@@ -1010,7 +1034,10 @@ export class PiCloudTurnRunner {
       let aborting: Promise<void> | undefined;
       const abort = () => {
         this.#ended = true;
-        if (!["user_request", "timeout"].includes(cancellationReason(combined))) {
+        if (
+          combined.reason !== missingDirectory &&
+          !["user_request", "timeout"].includes(cancellationReason(combined))
+        ) {
           owner.interrupt(new PiTurnError("worker_shutdown", "The native owner is stopping", true));
           return;
         }
@@ -1047,6 +1074,7 @@ export class PiCloudTurnRunner {
           else if (owner.authority.signal.aborted) revoked();
         });
       }
+      if (missingDirectory && !combined.aborted) directoryStop.abort(missingDirectory);
       if (combined.aborted) abort();
       else if (p.input.kind === "compact") {
         await emit({ type: "turn.started", payload: { inputKind: "compact" } });
@@ -1058,12 +1086,7 @@ export class PiCloudTurnRunner {
           executionReference: p.executionReference,
         });
       } else {
-        const existing = await owner.storage.submissionByRequest(
-          conversation.id,
-          initialRequestId,
-          BACKGROUND_CONTEXT,
-        );
-        if (!existing) {
+        if (!initialSubmission) {
           if (p.input.kind === "resume")
             throw new Error("Native child initial Submission is missing");
           await emit({
@@ -1127,6 +1150,7 @@ export class PiCloudTurnRunner {
       }
       await delivery;
       if (deliveryFailure) throw deliveryFailure;
+      if (missingDirectory && combined.reason === missingDirectory) throw missingDirectory;
       if (combined.aborted) throw new PiTurnCancelledError(cancellationReason(combined), false);
       if (p.input.kind === "compact") {
         const status = await manualCompactionState(

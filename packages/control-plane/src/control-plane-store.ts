@@ -103,6 +103,7 @@ type AcceptedTurnRow = {
 };
 
 const inputSessionColumns = [
+  "workspace_directory_missing",
   "id",
   "pi_session_id",
   "pi_conversation_id",
@@ -1112,30 +1113,21 @@ export class ControlPlaneStore {
       ) {
         throw new ControlPlaneStoreError("conflict", "Conversation cannot change Workspace");
       }
-      const currentWorkspace = await transaction
-        .selectFrom("workspaces")
-        .select("deleted_at")
-        .where("tenant_id", "=", this.#tenantId)
-        .where("id", "=", session.currentWorkspaceId)
-        .executeTakeFirstOrThrow();
-      if (currentWorkspace.deleted_at === null) {
-        throw new ControlPlaneStoreError(
-          "conflict",
-          "Conversation Workspace is still available and does not need rebinding",
-        );
-      }
       const activeTurn = await transaction
         .selectFrom("runs")
-        .select("id")
+        .select(["id", "state"])
         .where("tenant_id", "=", this.#tenantId)
         .where("session_id", "=", sessionId)
-        .where("state", "in", ["queued", "running", "settling", "cancel_requested"])
+        .where("mailbox_position", "is not", null)
+        .where(runRetainsResource())
         .limit(1)
         .executeTakeFirst();
       if (activeTurn !== undefined) {
         throw new ControlPlaneStoreError(
           "conflict",
-          "Wait for the active Run to settle before rebinding the Workspace",
+          activeTurn.state === "queued"
+            ? "Withdraw the queued input before changing the Workspace"
+            : "Wait for the active Run to settle before rebinding the Workspace",
         );
       }
       await transaction
@@ -1245,6 +1237,7 @@ export class ControlPlaneStore {
             ? { sandbox_profile_key: machine.profile_key as DevelopmentEnvironmentProfileKey }
             : {}),
           working_directory: workingDirectory,
+          workspace_directory_missing: false,
           row_version: sql<string>`${sql.ref("row_version")} + 1`,
           updated_at: boundAt,
         })
@@ -1612,6 +1605,11 @@ export class ControlPlaneStore {
           true,
         );
       }
+      if (session.workspace_directory_missing)
+        throw new ControlPlaneStoreError(
+          "conflict",
+          "Choose a working directory or Workspace before continuing",
+        );
       const executionTargets = compact
         ? []
         : await readExecutionTargetGrants(transaction, this.#tenantId, session.id);

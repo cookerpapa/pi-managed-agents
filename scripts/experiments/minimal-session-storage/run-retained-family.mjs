@@ -22,8 +22,12 @@ const output = process.argv[2],
     : process.argv[3] === "--root-input-web"
       ? process.argv[4]
       : undefined,
-  browser = process.argv[3] === "--normal-root-web" || !!inputMode,
-  normalRoot = browser || process.argv[3] === "--normal-root",
+  browser =
+    ["--normal-root-web", "--directory-recovery-web"].includes(process.argv[3]) || !!inputMode,
+  directoryRecovery = ["--directory-recovery", "--directory-recovery-web"].includes(
+    process.argv[3],
+  ),
+  normalRoot = browser || directoryRecovery || process.argv[3] === "--normal-root",
   serving = normalRoot || pgHandoff || process.argv[3] === "--serving";
 if (process.argv[3] === "--root-input-web") assert(["steer", "follow_up"].includes(inputMode));
 if (stopHandoff && process.argv[4] !== undefined)
@@ -35,6 +39,21 @@ const cube = await studyCubeConfig();
 const tmp = await mkdtemp(join(tmpdir(), "pma-family-")),
   pg = await testPostgres({});
 try {
+  if (directoryRecovery) {
+    const { build } = await import("esbuild");
+    await build({
+      entryPoints: [join(repositoryRoot, "packages/tool-sandbox/src/envd-tool-exec.ts")],
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node24",
+      external: ["sharp"],
+      banner: {
+        js: "import {createRequire} from 'node:module';const require=createRequire(import.meta.url);",
+      },
+      outfile: join(tmp, "envd-tool-exec.mjs"),
+    });
+  }
   if (serving) isolatedKafka = await testKafka({});
   const names = ["kafka-1", "kafka-2", "kafka-3"];
   await writeFile(
@@ -44,6 +63,7 @@ try {
       dbUrl: pg.url,
       cube,
       servingBrokers: isolatedKafka?.brokers,
+      directoryRecovery,
       atomicHandoff,
       pgHandoff,
       bashFields,

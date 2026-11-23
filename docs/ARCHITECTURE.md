@@ -187,7 +187,9 @@ means routing admission; neither it nor an absent binding diagnoses VM health or
 checks whether a directory still exists. No provider endpoint or credential is
 exposed. Physical observations remain disposable and separate from this read.
 
-In #52, the context-status reader uses the existing native estimator over the visible projected Entry ranges and the selected model in a repeatable-read snapshot. Shared Fork ranges retain their source commit cutoffs. The combined Fork/delegated Run schema remains gated on admission after pruning. [Read and admission evidence](reports/candidate-context-and-prune-20261123.md).
+In the ADR-0356 candidate, an absent user-selected Guest directory returns a typed, pre-execution failure. The Worker ends the native Run after confirming the result on the Session writer. The ordered terminal marks the Session for reselection, holds queued work and exposes unconsumed input for return. Idle rebinding updates the public window. The isolated Flow experiment gives each window a writable flow and a head Run and keeps predecessor edges on Runs. [Decision and scope](adr/0356-run-flow-head-and-directory-stop.md).
+
+In #52, the context-status reader uses the existing native estimator over the visible projected Entry ranges and the selected model in a repeatable-read snapshot. Shared Fork ranges retain their source commit cutoffs. The former directory layout exposed an admission conflict after pruning. [Read and admission evidence](reports/candidate-context-and-prune-20261123.md).
 
 In the #52 candidate the Session API resolves named children from their founding Runs and sums provider receipts when the user opens `/usage`. [ADR-0355](adr/0355-provider-usage-outside-session-projection.md).
 

@@ -104,6 +104,11 @@ it("returns a native Tool error after cwd deletion without starting the command"
         isError: true,
         result: {
           content: [{ type: "text", text: expect.stringContaining("tool_root_unavailable") }],
+          details: {
+            code: "workspace_directory_missing",
+            execution: "not_started",
+            directory: f.cwd,
+          },
         },
       },
     },

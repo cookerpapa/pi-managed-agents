@@ -1,3 +1,4 @@
+import * as directoryRecovery from "./229_workspace_directory_recovery.ts";
 import * as nativeUsageAndChatHistory from "./228_native_usage_and_chat_history.ts";
 import * as computeServicePeriods from "./224_compute_service_periods.ts";
 import * as httpMcpConnections from "./225_http_mcp_connections.ts";
@@ -423,6 +424,7 @@ export const migrationProvider: MigrationProvider = {
       "225_http_mcp_connections": httpMcpConnections,
       "226_model_charge_evidence": modelChargeEvidence,
       "228_native_usage_and_chat_history": nativeUsageAndChatHistory,
+      "229_workspace_directory_recovery": directoryRecovery,
     };
   },
 };

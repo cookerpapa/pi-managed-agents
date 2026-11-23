@@ -168,6 +168,9 @@ protocol, record the decision under `docs/adr/` before implementation.
   Do not add per-Tool PG Run-lease checks. Chat Stop aborts the Worker Agent and
   sends operation cancellation through the same Session log. Pi Durable owns
   native abort settlement; late physical replies never overwrite it (ADR-0229).
+  ADR-0356 ends the affected Run on a confirmed pre-execution loss of its selected directory,
+  after the native result is committed. A known missing directory holds pending work for
+  explicit withdrawal and reselection. Ordinary file errors never authorize this transition.
   No cancellation ACK or missing reply proves a physical process stopped.
   Normal cancellation follows the guest Tool's process-group boundary, not whole
   cgroup/VM cleanup. Completed background work is never cancelled retroactively.

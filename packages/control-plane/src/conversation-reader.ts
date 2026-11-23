@@ -171,6 +171,7 @@ export class ConversationReader {
         "session_row.execution_mode as executionMode",
         "session_row.sandbox_profile_key as sandboxProfileKey",
         "session_row.working_directory as workingDirectory",
+        "session_row.workspace_directory_missing as workingDirectoryMissing",
         "session_row.created_at as createdAt",
         "session_row.updated_at as updatedAt",
         "session_row.last_active_at as lastActiveAt",
@@ -208,6 +209,7 @@ export class ConversationReader {
         executionMode: row.executionMode,
         sandboxProfileKey: row.sandboxProfileKey,
         workingDirectory: row.workingDirectory,
+        ...(row.workingDirectoryMissing ? { workingDirectoryMissing: true as const } : {}),
         turnCount: nonNegativeSafeInteger(row.turnCount, "Conversation turn count"),
         createdAt: isoTimestamp(row.createdAt),
         updatedAt: isoTimestamp(row.updatedAt),
@@ -324,6 +326,7 @@ export class ConversationReader {
         "session_row.execution_mode as executionMode",
         "session_row.sandbox_profile_key as sandboxProfileKey",
         "session_row.working_directory as workingDirectory",
+        "session_row.workspace_directory_missing as workingDirectoryMissing",
         "session_row.created_at as sessionCreatedAt",
         "session_row.updated_at as sessionUpdatedAt",
         "session_row.last_active_at as lastActiveAt",
@@ -622,6 +625,9 @@ export class ConversationReader {
           executionMode: conversation.executionMode,
           sandboxProfileKey: conversation.sandboxProfileKey,
           workingDirectory: conversation.workingDirectory,
+          ...(conversation.workingDirectoryMissing
+            ? { workingDirectoryMissing: true as const }
+            : {}),
           modelProfileId: conversation.modelProfileId,
           createdAt: isoTimestamp(conversation.sessionCreatedAt),
           updatedAt: isoTimestamp(conversation.sessionUpdatedAt),

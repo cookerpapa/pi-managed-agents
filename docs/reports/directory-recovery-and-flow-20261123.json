@@ -1,0 +1,399 @@
+{
+  "gate": {
+    "claimedAfterPrune": true,
+    "emptyForkRetained": true,
+    "workspaceIndependent": true,
+    "staleWriterRejected": true,
+    "delegatedLayout": true,
+    "cleanupResumed": true
+  },
+  "directory": {
+    "firstModelRequests": 1,
+    "resumedModelRequests": 2,
+    "missingCommandStarts": 0,
+    "restoredCommandStarts": 1,
+    "returnedDrafts": 2,
+    "originalRunSealed": true,
+    "coldPriorEntries": 4,
+    "reboundThroughSessionApi": true,
+    "ChromeReselection": true,
+    "cleanupVerified": true
+  },
+  "database": [
+    {
+      "n": 1000,
+      "admissionMs": {
+        "samples": 100,
+        "p50Ms": 3.049,
+        "p95Ms": 4.384,
+        "p99Ms": 7.342
+      },
+      "scannedPageRows": {
+        "sessions": 1,
+        "runs": 24,
+        "messages": 24
+      },
+      "coldEntries": 120,
+      "latestMs": {
+        "samples": 100,
+        "p50Ms": 1.501,
+        "p95Ms": 1.795,
+        "p99Ms": 1.849
+      },
+      "pageMs": {
+        "samples": 100,
+        "p50Ms": 1.834,
+        "p95Ms": 2.231,
+        "p99Ms": 2.506
+      },
+      "concurrentPageMs": {
+        "samples": 256,
+        "p50Ms": 2.535,
+        "p95Ms": 55.708,
+        "p99Ms": 64.823
+      },
+      "coldMs": {
+        "samples": 30,
+        "p50Ms": 14.916,
+        "p95Ms": 19.399,
+        "p99Ms": 22.105
+      },
+      "forkMs": {
+        "samples": 100,
+        "p50Ms": 3.739,
+        "p95Ms": 4.08,
+        "p99Ms": 4.109
+      },
+      "emptyDeleteMs": {
+        "samples": 100,
+        "p50Ms": 3.355,
+        "p95Ms": 4.162,
+        "p99Ms": 6.055
+      },
+      "emptyGcMs": {
+        "samples": 100,
+        "p50Ms": 3.052,
+        "p95Ms": 4.077,
+        "p99Ms": 5.307
+      },
+      "deleteMs": 2.846,
+      "exclusiveGcMs": 135.989,
+      "first": {
+        "total": 500,
+        "batches": 2,
+        "batchMs": {
+          "samples": 2,
+          "p50Ms": 63.677,
+          "p95Ms": 72.264,
+          "p99Ms": 72.264
+        }
+      },
+      "sharedGcMs": 134.247,
+      "second": {
+        "total": 500,
+        "batches": 2,
+        "batchMs": {
+          "samples": 2,
+          "p50Ms": 66.177,
+          "p95Ms": 67.981,
+          "p99Ms": 67.981
+        }
+      }
+    },
+    {
+      "n": 10000,
+      "admissionMs": {
+        "samples": 100,
+        "p50Ms": 3.052,
+        "p95Ms": 4.086,
+        "p99Ms": 6.591
+      },
+      "scannedPageRows": {
+        "sessions": 1,
+        "runs": 24,
+        "messages": 24
+      },
+      "coldEntries": 32,
+      "latestMs": {
+        "samples": 100,
+        "p50Ms": 1.459,
+        "p95Ms": 1.782,
+        "p99Ms": 1.923
+      },
+      "pageMs": {
+        "samples": 100,
+        "p50Ms": 1.994,
+        "p95Ms": 2.545,
+        "p99Ms": 2.645
+      },
+      "concurrentPageMs": {
+        "samples": 256,
+        "p50Ms": 2.526,
+        "p95Ms": 45.023,
+        "p99Ms": 64.241
+      },
+      "coldMs": {
+        "samples": 30,
+        "p50Ms": 25.939,
+        "p95Ms": 31.232,
+        "p99Ms": 31.833
+      },
+      "forkMs": {
+        "samples": 100,
+        "p50Ms": 3.07,
+        "p95Ms": 4.068,
+        "p99Ms": 4.261
+      },
+      "emptyDeleteMs": {
+        "samples": 100,
+        "p50Ms": 3.322,
+        "p95Ms": 3.841,
+        "p99Ms": 6.248
+      },
+      "emptyGcMs": {
+        "samples": 100,
+        "p50Ms": 3.05,
+        "p95Ms": 4.129,
+        "p99Ms": 5.893
+      },
+      "deleteMs": 3.082,
+      "exclusiveGcMs": 1393.355,
+      "first": {
+        "total": 5000,
+        "batches": 20,
+        "batchMs": {
+          "samples": 20,
+          "p50Ms": 69.08,
+          "p95Ms": 81.877,
+          "p99Ms": 85.123
+        }
+      },
+      "sharedGcMs": 1331.197,
+      "second": {
+        "total": 5000,
+        "batches": 20,
+        "batchMs": {
+          "samples": 20,
+          "p50Ms": 67.076,
+          "p95Ms": 73.058,
+          "p99Ms": 73.984
+        }
+      }
+    },
+    {
+      "n": 100000,
+      "admissionMs": {
+        "samples": 100,
+        "p50Ms": 3.753,
+        "p95Ms": 5.4,
+        "p99Ms": 10.406
+      },
+      "scannedPageRows": {
+        "sessions": 1,
+        "runs": 24,
+        "messages": 24
+      },
+      "coldEntries": 48,
+      "latestMs": {
+        "samples": 100,
+        "p50Ms": 1.373,
+        "p95Ms": 1.673,
+        "p99Ms": 1.796
+      },
+      "pageMs": {
+        "samples": 100,
+        "p50Ms": 1.573,
+        "p95Ms": 1.834,
+        "p99Ms": 1.944
+      },
+      "concurrentPageMs": {
+        "samples": 256,
+        "p50Ms": 2.944,
+        "p95Ms": 60.988,
+        "p99Ms": 65.059
+      },
+      "coldMs": {
+        "samples": 30,
+        "p50Ms": 3.002,
+        "p95Ms": 3.84,
+        "p99Ms": 5.628
+      },
+      "forkMs": {
+        "samples": 100,
+        "p50Ms": 3.066,
+        "p95Ms": 4.899,
+        "p99Ms": 8.92
+      },
+      "emptyDeleteMs": {
+        "samples": 100,
+        "p50Ms": 3.284,
+        "p95Ms": 5.538,
+        "p99Ms": 5.998
+      },
+      "emptyGcMs": {
+        "samples": 100,
+        "p50Ms": 3.067,
+        "p95Ms": 5.153,
+        "p99Ms": 8.659
+      },
+      "deleteMs": 3.333,
+      "exclusiveGcMs": 14323.662,
+      "first": {
+        "total": 50000,
+        "batches": 196,
+        "batchMs": {
+          "samples": 196,
+          "p50Ms": 72,
+          "p95Ms": 86.991,
+          "p99Ms": 92.066
+        }
+      },
+      "sharedGcMs": 13641.601,
+      "second": {
+        "total": 50000,
+        "batches": 196,
+        "batchMs": {
+          "samples": 196,
+          "p50Ms": 67.965,
+          "p95Ms": 75.089,
+          "p99Ms": 185.63
+        }
+      }
+    },
+    {
+      "nestedFlows": 1000,
+      "runs": 10000,
+      "forkAtFirstRunMs": {
+        "samples": 100,
+        "p50Ms": 55.065,
+        "p95Ms": 65.014,
+        "p99Ms": 68.356
+      },
+      "pageMs": {
+        "samples": 100,
+        "p50Ms": 1.262,
+        "p95Ms": 1.545,
+        "p99Ms": 1.909
+      }
+    }
+  ],
+  "kafka": {
+    "partitions": 32,
+    "projectorConnections": 12,
+    "runsPerArm": 1024,
+    "rawRecords": 191488,
+    "visible": {
+      "records": 41984,
+      "texts": 1024,
+      "calls": 20480,
+      "results": 20480
+    },
+    "arms": [
+      {
+        "mode": "live",
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 435.8,
+        "actualInputVisibleKafkaRecordsPerSec": 435.2,
+        "inputWindowLag": [13, 19, 25, 0],
+        "peakLag": 475,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": 0
+      },
+      {
+        "mode": "backlog",
+        "flowHistory": false,
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 888.9,
+        "actualInputVisibleKafkaRecordsPerSec": null,
+        "inputWindowLag": null,
+        "peakLag": 191170,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": null
+      },
+      {
+        "mode": "backlog",
+        "flowHistory": true,
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 690.1,
+        "actualInputVisibleKafkaRecordsPerSec": null,
+        "inputWindowLag": null,
+        "peakLag": 191488,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": null
+      },
+      {
+        "mode": "backlog",
+        "flowHistory": true,
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 876.1,
+        "actualInputVisibleKafkaRecordsPerSec": null,
+        "inputWindowLag": null,
+        "peakLag": 190646,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": null
+      },
+      {
+        "mode": "backlog",
+        "flowHistory": false,
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 939,
+        "actualInputVisibleKafkaRecordsPerSec": null,
+        "inputWindowLag": null,
+        "peakLag": 191396,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": null
+      },
+      {
+        "mode": "paced",
+        "flowHistory": true,
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 410.4,
+        "actualInputVisibleKafkaRecordsPerSec": 473.6,
+        "inputWindowLag": [9066, 16703, 21022, 23139],
+        "peakLag": 23300,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": 13644
+      },
+      {
+        "mode": "paced",
+        "flowHistory": false,
+        "configuredAckDelayMs": 50,
+        "visibleKafkaRecordsPerSec": 436.8,
+        "actualInputVisibleKafkaRecordsPerSec": 473.5,
+        "inputWindowLag": [17, 17, 7054, 15935],
+        "peakLag": 15935,
+        "finalLag": 0,
+        "drainMsAfterLastProducerAck": 7449
+      }
+    ]
+  },
+  "interleavedPg": [
+    {
+      "layout": "baseline",
+      "requests": 11008,
+      "visibleRecordsPerSecond": 684,
+      "ms": 7673,
+      "walBytes": 17307120,
+      "n_tup_upd": "11136",
+      "n_tup_hot_upd": "5243"
+    },
+    {
+      "layout": "flow",
+      "requests": 11008,
+      "visibleRecordsPerSecond": 633,
+      "ms": 8294,
+      "walBytes": 19606576,
+      "n_tup_upd": "11264",
+      "n_tup_hot_upd": "5042"
+    },
+    {
+      "layout": "flow-without-active-index",
+      "requests": 11008,
+      "visibleRecordsPerSecond": 657,
+      "ms": 7989,
+      "walBytes": 19060760,
+      "n_tup_upd": "11264",
+      "n_tup_hot_upd": "5045"
+    }
+  ]
+}
