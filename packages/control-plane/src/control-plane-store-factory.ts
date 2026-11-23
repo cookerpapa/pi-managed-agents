@@ -5,6 +5,7 @@ import type { TenantRequestIdentity } from "./tenant-identity.ts";
 import type { PiCloudMetrics } from "@pi-cloud/observability";
 
 export class ControlPlaneStoreFactory {
+  readonly #delegatedRunHistory: boolean;
   readonly #database: Kysely<Database>;
   readonly #conversationReadDatabase: Kysely<Database>;
   readonly #rootMessageHistory: boolean;
@@ -16,10 +17,12 @@ export class ControlPlaneStoreFactory {
     database: Kysely<Database>;
     conversationReadDatabase?: Kysely<Database>;
     rootMessageHistory?: boolean;
+    delegatedRunHistory?: boolean;
     idGenerator?: () => string;
     environmentImageRevision?: string;
     metrics?: PiCloudMetrics;
   }) {
+    this.#delegatedRunHistory = options.delegatedRunHistory ?? false;
     this.#database = options.database;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
@@ -34,6 +37,7 @@ export class ControlPlaneStoreFactory {
       conversationReadDatabase: this.#conversationReadDatabase,
       tenantId: identity.tenantId,
       rootMessageHistory: this.#rootMessageHistory,
+      delegatedRunHistory: this.#delegatedRunHistory,
       defaultModelProfileId: identity.defaultModelProfileId,
       ...(this.#environmentImageRevision === undefined
         ? {}

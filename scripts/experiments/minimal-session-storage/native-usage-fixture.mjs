@@ -16,7 +16,7 @@ import {
   UsageDoc,
 } from "@earendil-works/pi-durable";
 
-export async function captureNativeUsage(requestId) {
+export async function captureNativeUsage(requestId, sequentialTools = 0) {
   const commits = [];
   class ObservedStorage extends MemoryStorage {
     async commit(writes) {
@@ -48,14 +48,27 @@ export async function captureNativeUsage(requestId) {
       ],
     }),
   );
-  const fake = fauxProvider({ tokensPerSecond: 230, tokenSize: { min: 8, max: 8 } });
-  fake.setResponses([
-    fauxAssistantMessage(
-      [fauxToolCall("inspect", {}, { id: "one" }), fauxToolCall("inspect", {}, { id: "two" })],
-      { stopReason: "toolUse" },
-    ),
-    fauxAssistantMessage("streamed answer ".repeat(80)),
-  ]);
+  const fake = fauxProvider({
+    tokensPerSecond: sequentialTools ? 0 : 230,
+    tokenSize: { min: 8, max: 8 },
+  });
+  if (sequentialTools) {
+    fake.setResponses([
+      ...Array.from({ length: sequentialTools }, (_, i) =>
+        fauxAssistantMessage(fauxToolCall("inspect", {}, { id: "call-" + i }), {
+          stopReason: "toolUse",
+        }),
+      ),
+      fauxAssistantMessage("Complete"),
+    ]);
+  } else
+    fake.setResponses([
+      fauxAssistantMessage(
+        [fauxToolCall("inspect", {}, { id: "one" }), fauxToolCall("inspect", {}, { id: "two" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("streamed answer ".repeat(80)),
+    ]);
   models.setProvider(fake.provider);
   const h = await Harness.open(
     new ObservedStorage(),
@@ -75,8 +88,8 @@ export async function captureNativeUsage(requestId) {
     );
     await root.waitForIdle(ctx);
     assert.equal((await sub.wait(ctx)).status, "done");
-    assert.equal(executed, 2);
-    assert.equal(fake.state.callCount, 2);
+    assert.equal(executed, sequentialTools || 2);
+    assert.equal(fake.state.callCount, sequentialTools ? sequentialTools + 1 : 2);
     return { commits, finalUsage: await h.snapshot(UsageDoc, root.id, ctx) };
   } finally {
     await h.close(ctx);

@@ -187,6 +187,8 @@ means routing admission; neither it nor an absent binding diagnoses VM health or
 checks whether a directory still exists. No provider endpoint or credential is
 exposed. Physical observations remain disposable and separate from this read.
 
+In the #52 candidate the accepted native transition, its Kafka position and model execution evidence share a PG transaction. The Session API resolves a named child's stable identity from its founding Run before summing provider receipts on demand. The candidate's isolated acceptance and throughput measurements are recorded in the [settlement study](reports/candidate-model-settlement-20261123.md).
+
 The root-only Session experiment represents a delegated invocation in the existing Run table and pins each explicit continuation to the previous child transcript. It is isolated from serving storage. [ADR-0349](adr/0349-delegated-runs-prototype.md). A cold Worker first loads the root transcript. An explicit child continuation reads its frozen source and the visible portion of its ancestors. [ADR-0350](adr/0350-lazy-delegated-history.md). The earlier #52 storage prototype retains confirmed child state, commit sequence and the original answer Entry on the child relationship. [ADR-0348](adr/0348-candidate-child-outcomes.md). It separately validates execution-owned original operation routing. Its Worker-facing protocol and experiment boundaries are described in [ADR-0344](adr/0344-execution-owned-operation-routing-study.md). In the candidate continuation path, human Run admission can extend an existing elastic allocation and freeze the outcome for the first model request. [ADR-0346](adr/0346-elastic-retention-at-run-admission.md).
 
 The Worker uses public Pi Tool hooks to prepare a reply waiter and an immutable

@@ -59,6 +59,10 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
                 if not found and (snap?'activity' or snap?'stopped') then raise exception 'Missing child outcome target or changed order' using errcode='PZ002'; end if;
               end loop;
             end if;
+          when 'model-settlement' then
+            perform 1 from runs where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid
+              and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for share;
+            ok:=found; n:=1;
           when 'world' then
             perform 1 from runs where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid
               and id=(a->>2)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested') for share;

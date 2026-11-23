@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Candidate model settlement](candidate-model-settlement-20261123.md) covers projection rollback, named-agent usage and the cost of the accounting transaction.
+
 - [Named subagent executor](named-subagent-executor-20261123.md) verifies durable admission, independent Kafka replies, a process kill, redelivery and ordered projection under a slow handoff.
 
 - [Task-keyed delegation](task-keyed-delegation-20261123.md) covers independent mailbox identities, owner replacement and Projector-only replay in the candidate.

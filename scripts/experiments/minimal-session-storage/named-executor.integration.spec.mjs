@@ -31,6 +31,7 @@ import {
   namedExecutorPath,
 } from "../../../packages/control-plane/src/named-subagent-client.ts";
 import { bootMailbox } from "./direct-delegation-worker.mjs";
+import { namedModelFixture } from "./named-model-fixture.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { sendToActiveConversation } from "./delegated-native.mjs";
 import { openDelegatedTransport } from "./delegated-test-transport.mjs";
@@ -106,34 +107,39 @@ it.skipIf(!url || !brokers)(
     const models = createModels(),
       model = fauxProvider({ provider: "named-executor-test", tokensPerSecond: 0 });
     models.setProvider(model.provider);
-    const config = (lane) => ({
-      runId,
-      conversationId: lane,
-      model: model.getModel(),
-      agent: {},
-      context: {},
-      remoteTools: () => defs.map((d) => d.name),
-      tools: [],
-      assertCurrent: async () => {},
-      openModel: async (r) => ({ model: model.getModel(), options: r.options, release() {} }),
-      prepareRemote: async (v) => {
-        const bindings = await workerTools.create({
-          command: {
-            payload: {
-              ...scope,
-              executionReference: createExecutionReference(writerId, runId, 1),
-              piSession: { conversationId: lane },
-              sessionKind: lane === 1 ? "conversation" : "subagent",
+    const modelReceipts = namedModelFixture(dsn.href, scope);
+    const config = (lane, publicId) => {
+      const call = modelReceipts.bind(lane, publicId);
+      return {
+        runId,
+        conversationId: lane,
+        model: model.getModel(),
+        agent: {},
+        context: {},
+        remoteTools: () => defs.map((d) => d.name),
+        tools: [],
+        assertCurrent: async () => {},
+        openModel: async (r, native) =>
+          call(r, native, await runtime.harness.getTask(native.taskId, ctx), model.getModel()),
+        prepareRemote: async (v) => {
+          const bindings = await workerTools.create({
+            command: {
+              payload: {
+                ...scope,
+                executionReference: createExecutionReference(writerId, runId, 1),
+                piSession: { conversationId: lane },
+                sessionKind: lane === 1 ? "conversation" : "subagent",
+              },
             },
-          },
-          environment: () => assert.fail(),
-        });
-        const tool = bindings.current().find((x) => x.tool.name === v.toolName).tool;
-        return withToolInvocation({ id: "task:" + v.taskId, nativeToolCallId: v.callId }, () =>
-          tool.prepareExecution(v.callId, v.args, v.context.abortSignal),
-        );
-      },
-    });
+            environment: () => assert.fail(),
+          });
+          const tool = bindings.current().find((x) => x.tool.name === v.toolName).tool;
+          return withToolInvocation({ id: "task:" + v.taskId, nativeToolCallId: v.callId }, () =>
+            tool.prepareExecution(v.callId, v.args, v.context.abortSignal),
+          );
+        },
+      };
+    };
     let workerTools;
     async function launch() {
       executor = fork(
@@ -176,6 +182,10 @@ it.skipIf(!url || !brokers)(
         await pool.query(await readFile(new URL(file, import.meta.url), "utf8"));
       await pool.query(`alter table runs add worker_id uuid, add fencing_token bigint,add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint default 0,add output_display_native_seq bigint default 0;
      create table workers(id uuid,supervisor_id uuid);create table supervisor_hosts(supervisor_id uuid,management_base_url text);`);
+      await modelReceipts.install();
+      await pool.query(
+        "alter table sessions add title text not null default 'Root', add pruned_at timestamptz; alter table runs add pruned_at timestamptz",
+      );
       management.post(SUBAGENT_HOST_PATH, async (req, res) => {
         assert.equal(req.headers.authorization, "Bearer " + token);
         const cmd = req.body;
@@ -214,7 +224,7 @@ it.skipIf(!url || !brokers)(
               ...(view.contextAnchor ? { at: view.contextAnchor } : {}),
               view,
             });
-            const child = await runtime.bind(config(lane));
+            const child = await runtime.bind(config(lane, view.id));
             await child.submit({ type: "input", requestId: view.id, content: cmd.prompt }, ctx);
             return lane;
           })();
@@ -269,9 +279,55 @@ it.skipIf(!url || !brokers)(
       );
       await projection.view.install();
       await projection.view.reset(new Map([[0, 0n]]), 16, "recorded-history");
+      let checkedRollback = false;
       transport = await openDelegatedTransport(brokers.split(","), topic, async (r, current) => {
         if (r.fact.tools.length) positions.push(r.offset);
+        const checkAccounting = !checkedRollback && r.fact.modelEvidence?.length;
+        if (checkAccounting) {
+          const before = projection.view.next.get(r.partition);
+          const altered = structuredClone(r.fact);
+          altered.modelEvidence[0].context.model += "-conflict";
+          await assert.rejects(
+            projection.nativeStore.projection.project(altered, r, current),
+            /Model invocation identity changed/,
+          );
+          assert(r.fact.commit.writes.some((w) => w.type === "entry"));
+          const bodies = await pool.query(
+            "select 1 from messages where run_id=$1 and commit_seq=$2",
+            [runId, r.fact.commit.seq],
+          );
+          assert.equal(bodies.rowCount, 0);
+          assert.equal(projection.view.next.get(r.partition), before);
+          assert.equal(
+            BigInt(
+              (
+                await pool.query(
+                  "select next_offset from accepted_fact_projection_offsets where topic=$1 and partition=$2",
+                  [r.topic, r.partition],
+                )
+              ).rows[0].next_offset,
+            ),
+            before,
+          );
+          assert.equal(
+            (await pool.query("select 1 from model_metering_events where kind='execution'"))
+              .rowCount,
+            0,
+          );
+        }
         const p = await projection.nativeStore.projection.project(r.fact, r, current);
+        if (checkAccounting) {
+          assert((await projection.nativeStore.projection.project(r.fact, r, current)).admitted);
+          assert(
+            (
+              await pool.query("select 1 from messages where run_id=$1 and commit_seq=$2", [
+                runId,
+                r.fact.commit.seq,
+              ])
+            ).rowCount > 0,
+          );
+          checkedRollback = true;
+        }
         assert(p.admitted);
         await dispatcher.consume(r, current, async () => true);
       });
@@ -287,7 +343,8 @@ it.skipIf(!url || !brokers)(
         async commit(writes) {
           const p = this.prepareCommit(writes),
             commit = { seq: p.seq, nextId: this.nextId, writes: p.writes },
-            prepared = runtime?.preparePublication(commit);
+            prepared = runtime?.preparePublication(commit),
+            financial = modelReceipts.prepare(commit);
           const tools = (prepared?.tools ?? []).map(({ taskId, command: c }) => ({
             scope,
             target: "control",
@@ -304,13 +361,15 @@ it.skipIf(!url || !brokers)(
             commit,
             tools,
             display: [],
-            origins: [],
+            origins: financial.origins,
+            ...(financial.evidence.length ? { modelEvidence: financial.evidence } : {}),
             cancellations: [],
             factId: randomUUID(),
             occurredAt: new Date().toISOString(),
           });
           const seq = p.apply();
           prepared?.confirmed();
+          financial.confirmed();
           return seq;
         }
       }
@@ -431,7 +490,7 @@ it.skipIf(!url || !brokers)(
         remoteTools: defs,
         settings: { compaction: { enabled: false } },
       });
-      const root = await runtime.bind(config(1));
+      const root = await runtime.bind(config(1, sessionId));
       const turn = await root.submit({ type: "input", requestId: runId, content: "Delegate" }, ctx);
       await within(gotPlacement.promise, "first placement");
       assert.deepEqual(
@@ -525,6 +584,8 @@ it.skipIf(!url || !brokers)(
       finishChild.resolve();
       assert.equal((await within(turn.wait(ctx), "parent result", 35000)).status, "done");
       assert.equal(placed.size, 1);
+      assert(checkedRollback);
+      await modelReceipts.verifyUsage(childID);
       const canonical = (await root.context(ctx)).messages.filter((m) => m.role === "toolResult");
       const toolResults = new Map(
         canonical.map((m) => {
@@ -792,6 +853,7 @@ it.skipIf(!url || !brokers)(
         try {
           await pool.query("drop schema if exists " + schema + " cascade");
         } finally {
+          await modelReceipts.close();
           await pool.end();
         }
       }

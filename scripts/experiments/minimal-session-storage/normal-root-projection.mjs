@@ -5,7 +5,8 @@ import { rootOpeningHead } from "./session-prefix.mjs";
 import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import assert from "node:assert/strict";
 import { changedInputConfirmations } from "@pi-cloud/pi-session-postgres/durable";
-import { sql } from "kysely";
+import { CompiledQuery, Kysely, PostgresDialect, sql } from "kysely";
+import { ModelExecutionAccounting } from "@pi-cloud/accounting";
 import { resolveDurableDisplay } from "@pi-cloud/protocol";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -21,6 +22,7 @@ export function normalRootProjection(
   validateChild,
   {
     delegatedRuns = false,
+    partitions = 1,
     namedExecutor = Boolean(process.env.PI_CLOUD_SUBAGENT_EXECUTOR_URL),
   } = {},
 ) {
@@ -33,17 +35,34 @@ export function normalRootProjection(
       assert.equal(result.rowCount, 1, "Unregistered named child display");
     };
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
+  // Both ports use the same pool and search path. The caller owns this pool.
+  const database = new Kysely({ dialect: new PostgresDialect({ pool }) });
+  const modelAccounting = new ModelExecutionAccounting();
+  view.writeSettlements = (statement, params, records, acquired) =>
+    database.transaction().execute(async (tx) => {
+      if (!acquired()) return;
+      const result = await tx.executeQuery(CompiledQuery.raw(statement, params));
+      if (["applied", "recorded_without_dispatch"].includes(result.rows[0].outcome)) {
+        for (const { fact, topic, partition, offset } of records)
+          await modelAccounting.settle(tx, fact.scope, fact.modelEvidence, {
+            topic,
+            partition,
+            offset,
+          });
+      }
+      return result;
+    });
   view.delegatedRuns = delegatedRuns;
   view.namedExecutor = namedExecutor;
   view.configure(16, "recorded-history");
   const env = {
     pool,
     sessions: view.sessions,
-    partitions: 1,
+    partitions,
     stage: { integrated: true, sink: "single", scene: "plain", rootPresentation: true },
     nextOffsets: new Map(),
     metrics: {
-      byPartition: [0],
+      byPartition: Array(partitions).fill(0),
       queries: 0,
       skipped: 0,
       peakWaiting: 0,
@@ -98,9 +117,8 @@ export function normalRootProjection(
       async project(fact, position, current) {
         assert.equal(fact.scope.sessionId, fact.scope.piSessionId);
         assert(
-          !fact.modelEvidence?.length &&
-            (fact.inputQueueSessions ?? []).every((id) => id === fact.scope.sessionId),
-          "Unsupported root accounting or cross-session input",
+          (fact.inputQueueSessions ?? []).every((id) => id === fact.scope.sessionId),
+          "Unsupported cross-session input",
         );
         for (const { scope: child } of fact.display) {
           if (child.sessionId === fact.scope.sessionId) continue;
@@ -246,6 +264,7 @@ export function normalRootProjection(
   return {
     view,
     nativeStore,
+    modelAccounting,
     async dispatch(r, current, grant) {
       if (r.fact.kind === "work_finished" || r.fact.kind === "execution_seal") {
         nativeStore.controlProjected(r);

@@ -128,6 +128,7 @@ async function open() {
       publicationToken: randomUUID() + randomUUID(),
       advertisedBaseUrl: "http://127.0.0.1:9",
       nativeStore: composed.nativeStore,
+      modelAccounting: composed.modelAccounting,
       ...(busy
         ? { recoveryCheckpoint: busy.guard(composed), nativeChanges: busy.nativeChanges }
         : {}),
@@ -412,6 +413,12 @@ try {
     assert.deepEqual(workers[1].restoredUserPrompts, [prompt1, prompt2]);
     assert.deepEqual(await legacyCounts(), baseline);
     assert(finishRollbackVerified);
+    const closed = await pool.query(
+      `select w.run_id from model_execution_writers w join runs r on r.id=w.run_id
+       where w.run_id=any($1::uuid[]) and w.tenant_id=r.tenant_id and w.close_offset=r.output_seal_offset`,
+      [[first.runId, second.runId]],
+    );
+    assert.equal(closed.rowCount, 2);
     await projector.checkHealth();
     return {
       ...(browser ? await browserMessage("/study", "done") : {}),
@@ -425,6 +432,7 @@ try {
       coldPriorEntries: workers[1].priorEntries,
       legacyNativeRowsAdded: 0,
       finishRollbackVerified,
+      modelWriterClosures: closed.rowCount,
     };
   });
 } catch (error) {
