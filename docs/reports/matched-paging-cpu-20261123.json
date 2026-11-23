@@ -1,0 +1,3828 @@
+{
+  "pgCpus": 2,
+  "memoryMiB": 768,
+  "visibleRuns": 100000,
+  "readSamplesPerLayout": 1728,
+  "main": [
+    {
+      "mode": "matched-content",
+      "direction": "latest",
+      "turns": 32,
+      "bytes": 34372,
+      "sha256": "a17a43cf867246262527561a0eb062e53c3797fa43c942cd00086ce7fd149060"
+    },
+    {
+      "mode": "matched-content",
+      "direction": "older",
+      "turns": 32,
+      "bytes": 34369,
+      "sha256": "3371559a472b161966953ee59d063661e47082ec5ba096a9ee2b89352f110104"
+    },
+    {
+      "mode": "matched-content",
+      "direction": "newer",
+      "turns": 32,
+      "bytes": 34372,
+      "sha256": "a17a43cf867246262527561a0eb062e53c3797fa43c942cd00086ce7fd149060"
+    },
+    {
+      "mode": "page-plan",
+      "layout": "direct",
+      "page": "latest",
+      "httpMs": 16.15,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "other read",
+          "clientMs": 0.71,
+          "planMs": 4.53,
+          "execMs": 0.191,
+          "sharedHits": 8,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.625, 0.625],
+          "label": "select visible runs",
+          "clientMs": 1.33,
+          "planMs": 2.481,
+          "execMs": 0.259,
+          "sharedHits": 19,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.7291666666666666],
+          "label": "locate page entries",
+          "clientMs": 1.41,
+          "planMs": 4.591,
+          "execMs": 1.123,
+          "sharedHits": 310,
+          "maxVisitedRows": 34
+        },
+        {
+          "cpuMs": [1.875, 1.0416666666666667],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.28,
+          "planMs": 1.046,
+          "execMs": 0.546,
+          "sharedHits": 386,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.625, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 0.85,
+          "planMs": 2.018,
+          "execMs": 0.503,
+          "sharedHits": 242,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "load run headers",
+          "clientMs": 0.71,
+          "planMs": 0.208,
+          "execMs": 0.117,
+          "sharedHits": 111,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "other read",
+          "clientMs": 0.63,
+          "planMs": 2.057,
+          "execMs": 0.126,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "direct",
+      "page": "older",
+      "httpMs": 26.95,
+      "sql": [
+        {
+          "cpuMs": [0.4166666666666667, 0.3125],
+          "label": "other read",
+          "clientMs": 0.75,
+          "planMs": 7.202,
+          "execMs": 0.437,
+          "sharedHits": 8,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "resolve cursor run",
+          "clientMs": 0.84,
+          "planMs": 3.107,
+          "execMs": 0.152,
+          "sharedHits": 6,
+          "maxVisitedRows": 1
+        },
+        {
+          "cpuMs": [0.8333333333333334, 1.1458333333333333],
+          "label": "select visible runs",
+          "clientMs": 1.7,
+          "planMs": 0.807,
+          "execMs": 0.465,
+          "sharedHits": 19,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [1.4583333333333333, 1.25],
+          "label": "locate page entries",
+          "clientMs": 7.22,
+          "planMs": 6.838,
+          "execMs": 1.685,
+          "sharedHits": 317,
+          "maxVisitedRows": 35
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.1458333333333333],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.74,
+          "planMs": 1.933,
+          "execMs": 0.71,
+          "sharedHits": 386,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.625],
+          "label": "load terminal metadata",
+          "clientMs": 1.33,
+          "planMs": 1.9,
+          "execMs": 0.519,
+          "sharedHits": 242,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "load run headers",
+          "clientMs": 0.92,
+          "planMs": 0.191,
+          "execMs": 0.142,
+          "sharedHits": 109,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "other read",
+          "clientMs": 0.89,
+          "planMs": 2.092,
+          "execMs": 0.177,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "root",
+      "page": "latest",
+      "httpMs": 25.69,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "session metadata",
+          "clientMs": 0.98,
+          "planMs": 7.987,
+          "execMs": 0.414,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.8125, 2.6041666666666665],
+          "label": "select visible runs",
+          "clientMs": 4.05,
+          "planMs": 6.823,
+          "execMs": 0.947,
+          "sharedHits": 32,
+          "maxVisitedRows": 41
+        },
+        {
+          "cpuMs": [0.9375, 1.25],
+          "label": "locate page entries",
+          "clientMs": 2.39,
+          "planMs": 4.813,
+          "execMs": 2.042,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 1.1458333333333333],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.57,
+          "planMs": 1.184,
+          "execMs": 0.668,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.22,
+          "planMs": 1.699,
+          "execMs": 0.468,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "load run headers",
+          "clientMs": 1.03,
+          "planMs": 0.219,
+          "execMs": 0.141,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "other read",
+          "clientMs": 0.92,
+          "planMs": 2.422,
+          "execMs": 0.14,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "root",
+      "page": "older",
+      "httpMs": 25.43,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "session metadata",
+          "clientMs": 0.99,
+          "planMs": 7.364,
+          "execMs": 0.313,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.5208333333333334],
+          "label": "resolve cursor run",
+          "clientMs": 1.03,
+          "planMs": 6.509,
+          "execMs": 0.799,
+          "sharedHits": 23,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [3.125, 2.9166666666666665],
+          "label": "select visible runs",
+          "clientMs": 3.74,
+          "planMs": 1.635,
+          "execMs": 0.673,
+          "sharedHits": 26,
+          "maxVisitedRows": 41
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.25],
+          "label": "locate page entries",
+          "clientMs": 2.21,
+          "planMs": 4.527,
+          "execMs": 1.589,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [1.0416666666666667, 1.0416666666666667],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.82,
+          "planMs": 1.311,
+          "execMs": 0.636,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 1.33,
+          "planMs": 1.631,
+          "execMs": 0.366,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "load run headers",
+          "clientMs": 1.08,
+          "planMs": 0.228,
+          "execMs": 0.149,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.10416666666666667, 0.3125],
+          "label": "other read",
+          "clientMs": 1,
+          "planMs": 2.053,
+          "execMs": 0.119,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "branch",
+      "page": "latest",
+      "httpMs": 22.13,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "session metadata",
+          "clientMs": 0.94,
+          "planMs": 7.49,
+          "execMs": 0.35,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.9166666666666665, 3.0208333333333335],
+          "label": "select visible runs",
+          "clientMs": 3.45,
+          "planMs": 5.627,
+          "execMs": 0.855,
+          "sharedHits": 59,
+          "maxVisitedRows": 54
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.1458333333333333],
+          "label": "locate page entries",
+          "clientMs": 2.02,
+          "planMs": 4.741,
+          "execMs": 1.891,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.0416666666666667],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.67,
+          "planMs": 1.107,
+          "execMs": 0.518,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.23,
+          "planMs": 1.61,
+          "execMs": 0.326,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "load run headers",
+          "clientMs": 0.95,
+          "planMs": 0.285,
+          "execMs": 0.185,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "other read",
+          "clientMs": 0.79,
+          "planMs": 2.694,
+          "execMs": 0.153,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "branch",
+      "page": "older",
+      "httpMs": 24.15,
+      "sql": [
+        {
+          "cpuMs": [0.4166666666666667, 0.4166666666666667],
+          "label": "session metadata",
+          "clientMs": 0.95,
+          "planMs": 8.163,
+          "execMs": 0.451,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.625, 0.625],
+          "label": "resolve cursor run",
+          "clientMs": 1.08,
+          "planMs": 7.892,
+          "execMs": 0.888,
+          "sharedHits": 39,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.9166666666666665, 2.9166666666666665],
+          "label": "select visible runs",
+          "clientMs": 3.64,
+          "planMs": 1.562,
+          "execMs": 0.64,
+          "sharedHits": 48,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.0416666666666667],
+          "label": "locate page entries",
+          "clientMs": 2.16,
+          "planMs": 4.57,
+          "execMs": 1.387,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 1.0416666666666667],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.42,
+          "planMs": 1.07,
+          "execMs": 0.475,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.625, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 1.23,
+          "planMs": 1.708,
+          "execMs": 0.392,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "load run headers",
+          "clientMs": 0.99,
+          "planMs": 0.229,
+          "execMs": 0.152,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "other read",
+          "clientMs": 0.86,
+          "planMs": 2.012,
+          "execMs": 0.134,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "direct",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 9.792,
+      "authMs": 0.833,
+      "containerMs": 11.423,
+      "wallMs": 895.403
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "direct",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 8.958,
+      "authMs": 0.417,
+      "containerMs": 9.31,
+      "wallMs": 828.435
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "direct",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 8.333,
+      "authMs": 0.625,
+      "containerMs": 8.898,
+      "wallMs": 820.063
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "root",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 13.75,
+      "authMs": 0.833,
+      "containerMs": 14.748,
+      "wallMs": 906.659
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "root",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 14.271,
+      "authMs": 0.729,
+      "containerMs": 15.215,
+      "wallMs": 939.954
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "root",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 10.625,
+      "authMs": 0.521,
+      "containerMs": 11.053,
+      "wallMs": 870.307
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "branch",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 10,
+      "authMs": 0.417,
+      "containerMs": 10.368,
+      "wallMs": 804.55
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "branch",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 11.354,
+      "authMs": 0.521,
+      "containerMs": 11.941,
+      "wallMs": 850.842
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "branch",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.875,
+      "authMs": 0.417,
+      "containerMs": 7.298,
+      "wallMs": 687.29
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "root",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 10.521,
+      "authMs": 0.521,
+      "containerMs": 11.014,
+      "wallMs": 780.93
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "root",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.458,
+      "authMs": 0.417,
+      "containerMs": 7.225,
+      "wallMs": 677.906
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "root",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 10.208,
+      "authMs": 0.625,
+      "containerMs": 10.454,
+      "wallMs": 733.886
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "branch",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 10.938,
+      "authMs": 0.313,
+      "containerMs": 11.505,
+      "wallMs": 795.23
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "branch",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 7.083,
+      "authMs": 0.521,
+      "containerMs": 7.386,
+      "wallMs": 696.88
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "branch",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 9.063,
+      "authMs": 0.625,
+      "containerMs": 9.871,
+      "wallMs": 709.593
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "direct",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 9.583,
+      "authMs": 0.833,
+      "containerMs": 10.431,
+      "wallMs": 782.659
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "direct",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 8.646,
+      "authMs": 0.625,
+      "containerMs": 10.502,
+      "wallMs": 815.28
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "direct",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 7.604,
+      "authMs": 0.521,
+      "containerMs": 8.385,
+      "wallMs": 774.531
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "branch",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.979,
+      "authMs": 0.417,
+      "containerMs": 7.587,
+      "wallMs": 741.414
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "branch",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 9.688,
+      "authMs": 0.521,
+      "containerMs": 10.418,
+      "wallMs": 789.778
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "branch",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 10.833,
+      "authMs": 0.625,
+      "containerMs": 11.252,
+      "wallMs": 783.933
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "direct",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 7.604,
+      "authMs": 0.417,
+      "containerMs": 7.896,
+      "wallMs": 810.048
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "direct",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 6.042,
+      "authMs": 0.417,
+      "containerMs": 6.376,
+      "wallMs": 648.416
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "direct",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 6.875,
+      "authMs": 0.417,
+      "containerMs": 7.387,
+      "wallMs": 707.004
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "root",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 7.5,
+      "authMs": 0.417,
+      "containerMs": 7.734,
+      "wallMs": 726.818
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "root",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 10,
+      "authMs": 0.625,
+      "containerMs": 10.608,
+      "wallMs": 743.957
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "root",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 10,
+      "authMs": 0.625,
+      "containerMs": 10.734,
+      "wallMs": 702.009
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 468,
+      "seconds": 11.21,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 21.628,
+      "pgThrottlePeriods": 103,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "direct"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 468,
+      "seconds": 11.22,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 22.01,
+      "pgThrottlePeriods": 104,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 90,
+        "rate": 8.022,
+        "p95Ms": 85.542,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 846,
+      "seconds": 6.2,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 12.21,
+      "pgThrottlePeriods": 58,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 50,
+        "rate": 8.063,
+        "p95Ms": 57.347,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 769,
+      "seconds": 6.83,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 12.011,
+      "pgThrottlePeriods": 54,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 55,
+        "rate": 8.055,
+        "p95Ms": 62.592,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 868,
+      "seconds": 6.05,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.605,
+      "pgThrottlePeriods": 54,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "root"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 431,
+      "seconds": 12.17,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 25.398,
+      "pgThrottlePeriods": 122,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1069,
+        "rate": 87.841,
+        "p95Ms": 183.129,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 278,
+      "seconds": 18.88,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 37.752,
+      "pgThrottlePeriods": 186,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1076,
+        "rate": 56.993,
+        "p95Ms": 199.928,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 303,
+      "seconds": 17.34,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 34.623,
+      "pgThrottlePeriods": 171,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1093,
+        "rate": 63.022,
+        "p95Ms": 187.479,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 294,
+      "seconds": 17.87,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 35.711,
+      "pgThrottlePeriods": 175,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1162,
+        "rate": 65.032,
+        "p95Ms": 188.807,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 302,
+      "seconds": 17.4,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 34.803,
+      "pgThrottlePeriods": 173,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1065,
+        "rate": 61.198,
+        "p95Ms": 190.05,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 542,
+      "seconds": 9.68,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 19.391,
+      "pgThrottlePeriods": 94,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1253,
+        "rate": 129.501,
+        "p95Ms": 92.477,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 907,
+      "seconds": 5.79,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.159,
+      "pgThrottlePeriods": 53,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "root"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 889,
+      "seconds": 5.9,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.57,
+      "pgThrottlePeriods": 51,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 48,
+        "rate": 8.133,
+        "p95Ms": 49.442,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 858,
+      "seconds": 6.11,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.117,
+      "pgThrottlePeriods": 50,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 49,
+        "rate": 8.014,
+        "p95Ms": 51.74,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 456,
+      "seconds": 11.52,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 22.992,
+      "pgThrottlePeriods": 111,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 92,
+        "rate": 7.987,
+        "p95Ms": 86.782,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 533,
+      "seconds": 9.84,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 19.526,
+      "pgThrottlePeriods": 95,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "direct"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 455,
+      "seconds": 11.54,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 22.648,
+      "pgThrottlePeriods": 108,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 93,
+        "rate": 8.062,
+        "p95Ms": 85.584,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 513,
+      "seconds": 10.23,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 20.452,
+      "pgThrottlePeriods": 96,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "root"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 294,
+      "seconds": 17.88,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 35.754,
+      "pgThrottlePeriods": 176,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1063,
+        "rate": 59.451,
+        "p95Ms": 195.78,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 307,
+      "seconds": 17.07,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 34.008,
+      "pgThrottlePeriods": 167,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1100,
+        "rate": 64.441,
+        "p95Ms": 191.508,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": "saturated",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 515,
+      "seconds": 10.2,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 20.33,
+      "pgThrottlePeriods": 98,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 1303,
+        "rate": 127.766,
+        "p95Ms": 100.377,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 917,
+      "seconds": 5.72,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 10.542,
+      "pgThrottlePeriods": 47,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "direct"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 920,
+      "seconds": 5.7,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 10.873,
+      "pgThrottlePeriods": 48,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 46,
+        "rate": 8.068,
+        "p95Ms": 53.861,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": 8,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 883,
+      "seconds": 5.94,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.588,
+      "pgThrottlePeriods": 53,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 48,
+        "rate": 8.08,
+        "p95Ms": 53.411,
+        "skipped": 0
+      },
+      "layout": "root"
+    }
+  ],
+  "fixed32": [
+    {
+      "mode": "matched-content",
+      "direction": "latest",
+      "turns": 32,
+      "bytes": 34372,
+      "sha256": "a17a43cf867246262527561a0eb062e53c3797fa43c942cd00086ce7fd149060"
+    },
+    {
+      "mode": "matched-content",
+      "direction": "older",
+      "turns": 32,
+      "bytes": 34369,
+      "sha256": "3371559a472b161966953ee59d063661e47082ec5ba096a9ee2b89352f110104"
+    },
+    {
+      "mode": "matched-content",
+      "direction": "newer",
+      "turns": 32,
+      "bytes": 34372,
+      "sha256": "a17a43cf867246262527561a0eb062e53c3797fa43c942cd00086ce7fd149060"
+    },
+    {
+      "mode": "page-plan",
+      "layout": "direct",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.275
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 0.874
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.133
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.966
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.537
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.323
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.232
+        }
+      ],
+      "page": "latest",
+      "httpMs": 22.96,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "session metadata",
+          "clientMs": 0.91,
+          "planMs": 6.155,
+          "execMs": 0.336,
+          "sharedHits": 8,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.8333333333333334],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.3125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 1.71,
+          "planMs": 3.132,
+          "execMs": 0.336,
+          "sharedHits": 19,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [1.0416666666666667, 0.9375],
+          "label": "locate page entries",
+          "clientMs": 2.05,
+          "planMs": 6.905,
+          "execMs": 1.593,
+          "sharedHits": 310,
+          "maxVisitedRows": 34
+        },
+        {
+          "cpuMs": [0.9375, 0.9375],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.68,
+          "planMs": 1.152,
+          "execMs": 0.736,
+          "sharedHits": 386,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.21,
+          "planMs": 1.799,
+          "execMs": 0.403,
+          "sharedHits": 242,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "load run headers",
+          "clientMs": 0.93,
+          "planMs": 0.196,
+          "execMs": 0.112,
+          "sharedHits": 116,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.84,
+          "planMs": 1.703,
+          "execMs": 0.108,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "direct",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.289
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.274
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 0.874
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.207
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.968
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.589
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.346
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.236
+        }
+      ],
+      "page": "older",
+      "httpMs": 17.02,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "session metadata",
+          "clientMs": 0.77,
+          "planMs": 5.163,
+          "execMs": 0.281,
+          "sharedHits": 8,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.10416666666666667, 0.20833333333333334],
+          "planChoice": {
+            "automatic": {
+              "generic": 196,
+              "custom": 5
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.15625
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.625
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0
+              }
+            ]
+          },
+          "label": "resolve cursor run",
+          "clientMs": 0.67,
+          "planMs": 2.419,
+          "execMs": 0.117,
+          "sharedHits": 6,
+          "maxVisitedRows": 1
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.7291666666666666],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.3125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 1.46,
+          "planMs": 0.671,
+          "execMs": 0.349,
+          "sharedHits": 19,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.1458333333333333],
+          "label": "locate page entries",
+          "clientMs": 1.59,
+          "planMs": 5.299,
+          "execMs": 1.394,
+          "sharedHits": 317,
+          "maxVisitedRows": 35
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.25],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.28,
+          "planMs": 1.527,
+          "execMs": 0.794,
+          "sharedHits": 386,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 1.06,
+          "planMs": 1.73,
+          "execMs": 0.436,
+          "sharedHits": 242,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "load run headers",
+          "clientMs": 0.75,
+          "planMs": 0.19,
+          "execMs": 0.108,
+          "sharedHits": 110,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.62,
+          "planMs": 2.007,
+          "execMs": 0.116,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "root",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.292
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.616
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.19
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.962
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.521
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.356
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.235
+        }
+      ],
+      "page": "latest",
+      "httpMs": 23.49,
+      "sql": [
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "session metadata",
+          "clientMs": 0.94,
+          "planMs": 6.58,
+          "execMs": 0.285,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.3958333333333335, 2.2916666666666665],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.5
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.34375
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.78125
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 3.6,
+          "planMs": 5.012,
+          "execMs": 0.671,
+          "sharedHits": 32,
+          "maxVisitedRows": 41
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.8333333333333334],
+          "label": "locate page entries",
+          "clientMs": 2.11,
+          "planMs": 4.216,
+          "execMs": 1.847,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 1.0416666666666667],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.49,
+          "planMs": 0.941,
+          "execMs": 0.491,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 1.24,
+          "planMs": 1.582,
+          "execMs": 0.401,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "load run headers",
+          "clientMs": 0.98,
+          "planMs": 0.211,
+          "execMs": 0.138,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.10416666666666667, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.95,
+          "planMs": 1.696,
+          "execMs": 0.103,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "root",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.305
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.469
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.56
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.23
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.936
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.529
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.334
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.224
+        }
+      ],
+      "page": "older",
+      "httpMs": 23.55,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "session metadata",
+          "clientMs": 0.87,
+          "planMs": 6.312,
+          "execMs": 0.293,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.3125],
+          "planChoice": {
+            "automatic": {
+              "generic": 196,
+              "custom": 5
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.03125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.03125
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625
+              }
+            ]
+          },
+          "label": "resolve cursor run",
+          "clientMs": 1.07,
+          "planMs": 5.463,
+          "execMs": 0.566,
+          "sharedHits": 23,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.3958333333333335, 2.2916666666666665],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.78125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.03125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.5
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.78125
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 3.16,
+          "planMs": 1.315,
+          "execMs": 0.558,
+          "sharedHits": 26,
+          "maxVisitedRows": 41
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.9375],
+          "label": "locate page entries",
+          "clientMs": 1.83,
+          "planMs": 4.25,
+          "execMs": 1.285,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 0.9375],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.44,
+          "planMs": 0.901,
+          "execMs": 0.46,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 1.22,
+          "planMs": 1.493,
+          "execMs": 0.34,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "load run headers",
+          "clientMs": 0.86,
+          "planMs": 0.227,
+          "execMs": 0.151,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.71,
+          "planMs": 2.051,
+          "execMs": 0.125,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "branch",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.282
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.425
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.107
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.877
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.475
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.311
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.211
+        }
+      ],
+      "page": "latest",
+      "httpMs": 22.71,
+      "sql": [
+        {
+          "cpuMs": [0.4166666666666667, 0.20833333333333334],
+          "label": "session metadata",
+          "clientMs": 0.91,
+          "planMs": 6.706,
+          "execMs": 0.312,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.7083333333333335, 2.1875],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.34375
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.1875
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 3.24,
+          "planMs": 4.685,
+          "execMs": 0.763,
+          "sharedHits": 59,
+          "maxVisitedRows": 54
+        },
+        {
+          "cpuMs": [1.0416666666666667, 0.9375],
+          "label": "locate page entries",
+          "clientMs": 1.91,
+          "planMs": 3.678,
+          "execMs": 1.879,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [1.0416666666666667, 1.1458333333333333],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.56,
+          "planMs": 1.037,
+          "execMs": 0.615,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.27,
+          "planMs": 1.721,
+          "execMs": 0.493,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "load run headers",
+          "clientMs": 0.98,
+          "planMs": 0.219,
+          "execMs": 0.14,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.10416666666666667],
+          "label": "project environment",
+          "clientMs": 0.79,
+          "planMs": 2.33,
+          "execMs": 0.134,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "branch",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.289
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.476
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.555
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.218
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.92
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.522
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.351
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.221
+        }
+      ],
+      "page": "older",
+      "httpMs": 21.4,
+      "sql": [
+        {
+          "cpuMs": [0.20833333333333334, 0.4166666666666667],
+          "label": "session metadata",
+          "clientMs": 0.85,
+          "planMs": 7.172,
+          "execMs": 0.315,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.4166666666666667],
+          "planChoice": {
+            "automatic": {
+              "generic": 196,
+              "custom": 5
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.03125
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 1.875
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875
+              }
+            ]
+          },
+          "label": "resolve cursor run",
+          "clientMs": 0.98,
+          "planMs": 5.792,
+          "execMs": 0.678,
+          "sharedHits": 39,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.3958333333333335, 2.2916666666666665],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.34375
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.5
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 3.29,
+          "planMs": 1.606,
+          "execMs": 0.645,
+          "sharedHits": 48,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [0.9375, 0.9375],
+          "label": "locate page entries",
+          "clientMs": 1.88,
+          "planMs": 4.126,
+          "execMs": 1.271,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 0.9375],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.59,
+          "planMs": 0.91,
+          "execMs": 0.421,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.3125],
+          "label": "load terminal metadata",
+          "clientMs": 1.15,
+          "planMs": 1.675,
+          "execMs": 0.43,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "load run headers",
+          "clientMs": 0.9,
+          "planMs": 0.196,
+          "execMs": 0.118,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.10416666666666667, 0.3125],
+          "label": "project environment",
+          "clientMs": 0.77,
+          "planMs": 2.143,
+          "execMs": 0.101,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "direct",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 9.375,
+      "authMs": 0.625,
+      "containerMs": 10.494,
+      "wallMs": 753.974
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "direct",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 7.5,
+      "authMs": 0.521,
+      "containerMs": 8.235,
+      "wallMs": 709.818
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "direct",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.979,
+      "authMs": 0.417,
+      "containerMs": 7.4,
+      "wallMs": 657.096
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "root",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 12.083,
+      "authMs": 0.938,
+      "containerMs": 13.349,
+      "wallMs": 774.519
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "root",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 11.563,
+      "authMs": 0.417,
+      "containerMs": 12.109,
+      "wallMs": 733.458
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "root",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 7.917,
+      "authMs": 0.521,
+      "containerMs": 9.714,
+      "wallMs": 727.341
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "branch",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 8.021,
+      "authMs": 0.521,
+      "containerMs": 8.479,
+      "wallMs": 629.544
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "branch",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 10.417,
+      "authMs": 0.521,
+      "containerMs": 11.235,
+      "wallMs": 792.667
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 0,
+      "name": "branch",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.563,
+      "authMs": 0.208,
+      "containerMs": 6.988,
+      "wallMs": 675.195
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "root",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 11.25,
+      "authMs": 0.417,
+      "containerMs": 12.119,
+      "wallMs": 808.303
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "root",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.563,
+      "authMs": 0.417,
+      "containerMs": 7.103,
+      "wallMs": 658.117
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "root",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 8.125,
+      "authMs": 0.313,
+      "containerMs": 8.637,
+      "wallMs": 641.646
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "branch",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 9.271,
+      "authMs": 0.521,
+      "containerMs": 9.958,
+      "wallMs": 633.783
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "branch",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.25,
+      "authMs": 0.417,
+      "containerMs": 6.811,
+      "wallMs": 600.392
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "branch",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 8.438,
+      "authMs": 0.521,
+      "containerMs": 8.915,
+      "wallMs": 643.984
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "direct",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 5.625,
+      "authMs": 0.625,
+      "containerMs": 6.543,
+      "wallMs": 620.288
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "direct",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 5.833,
+      "authMs": 0.417,
+      "containerMs": 6.442,
+      "wallMs": 645.819
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 1,
+      "name": "direct",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 5.729,
+      "authMs": 0.521,
+      "containerMs": 6.07,
+      "wallMs": 609.459
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "branch",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.042,
+      "authMs": 0.313,
+      "containerMs": 6.64,
+      "wallMs": 607.99
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "branch",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 8.333,
+      "authMs": 0.521,
+      "containerMs": 8.974,
+      "wallMs": 638.218
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "branch",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 8.75,
+      "authMs": 0.625,
+      "containerMs": 9.628,
+      "wallMs": 652.24
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "direct",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.146,
+      "authMs": 0.521,
+      "containerMs": 6.594,
+      "wallMs": 634.897
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "direct",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 6.25,
+      "authMs": 0.313,
+      "containerMs": 6.38,
+      "wallMs": 650.411
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "direct",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 6.25,
+      "authMs": 0.417,
+      "containerMs": 6.576,
+      "wallMs": 632.991
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "root",
+      "direction": "newer",
+      "pages": 96,
+      "historyMs": 6.667,
+      "authMs": 0.313,
+      "containerMs": 7.183,
+      "wallMs": 685.662
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "root",
+      "direction": "latest",
+      "pages": 96,
+      "historyMs": 8.333,
+      "authMs": 0.313,
+      "containerMs": 8.784,
+      "wallMs": 655.94
+    },
+    {
+      "mode": "page-cpu",
+      "pass": 2,
+      "name": "root",
+      "direction": "older",
+      "pages": 96,
+      "historyMs": 9.063,
+      "authMs": 0.521,
+      "containerMs": 9.307,
+      "wallMs": 642.647
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 530,
+      "seconds": 9.89,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 19.431,
+      "pgThrottlePeriods": 91,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "direct"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 839,
+      "seconds": 6.25,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.972,
+      "pgThrottlePeriods": 53,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 200,
+        "rate": 31.986,
+        "p95Ms": 57.968,
+        "skipped": 0
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 876,
+      "seconds": 5.99,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.544,
+      "pgThrottlePeriods": 51,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "root"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 815,
+      "seconds": 6.44,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 12.713,
+      "pgThrottlePeriods": 59,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 206,
+        "rate": 32,
+        "p95Ms": 59.044,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 892,
+      "seconds": 5.88,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.222,
+      "pgThrottlePeriods": 54,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "branch"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 435,
+      "seconds": 12.06,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 23.502,
+      "pgThrottlePeriods": 112,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 377,
+        "rate": 31.268,
+        "p95Ms": 111.947,
+        "skipped": 8
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 425,
+      "seconds": 12.35,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 24.425,
+      "pgThrottlePeriods": 118,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 395,
+        "rate": 31.992,
+        "p95Ms": 92.14,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 562,
+      "seconds": 9.34,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 18.461,
+      "pgThrottlePeriods": 89,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "branch"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 433,
+      "seconds": 12.13,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 23.936,
+      "pgThrottlePeriods": 117,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 388,
+        "rate": 31.994,
+        "p95Ms": 96.818,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 539,
+      "seconds": 9.73,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 18.984,
+      "pgThrottlePeriods": 93,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "root"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 464,
+      "seconds": 11.32,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 22.598,
+      "pgThrottlePeriods": 112,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 355,
+        "rate": 31.364,
+        "p95Ms": 116.313,
+        "skipped": 7
+      },
+      "layout": "direct"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 685,
+      "seconds": 7.66,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 14.661,
+      "pgThrottlePeriods": 71,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "direct"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 933,
+      "seconds": 5.63,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 10.847,
+      "pgThrottlePeriods": 49,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "root"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 839,
+      "seconds": 6.26,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 12.285,
+      "pgThrottlePeriods": 59,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 200,
+        "rate": 31.968,
+        "p95Ms": 60.545,
+        "skipped": 0
+      },
+      "layout": "root"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 886,
+      "seconds": 5.92,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 11.37,
+      "pgThrottlePeriods": 52,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "branch"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 836,
+      "seconds": 6.27,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 13.028,
+      "pgThrottlePeriods": 60,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 201,
+        "rate": 32.033,
+        "p95Ms": 61.991,
+        "skipped": 0
+      },
+      "layout": "branch"
+    },
+    {
+      "mode": "writer",
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 532,
+      "seconds": 9.86,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 18.728,
+      "pgThrottlePeriods": 88,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": null,
+      "layout": "direct"
+    },
+    {
+      "mode": 32,
+      "runs": 128,
+      "total": 23808,
+      "visible": 5248,
+      "visiblePerSecond": 453,
+      "seconds": 11.59,
+      "pgCommits": 11008,
+      "pgCpuSeconds": 22.94,
+      "pgThrottlePeriods": 112,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 2560,
+      "pages": {
+        "completed": 371,
+        "rate": 32.008,
+        "p95Ms": 93.836,
+        "skipped": 0
+      },
+      "layout": "direct"
+    }
+  ],
+  "cachedPlanChecks": [
+    {
+      "mode": "page-plan",
+      "layout": "direct",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.269
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 0.844
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.109
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 1.008
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.555
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.324
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.218
+        }
+      ],
+      "page": "latest",
+      "httpMs": 23.48,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "session metadata",
+          "clientMs": 1.02,
+          "planMs": 6.613,
+          "execMs": 0.352,
+          "sharedHits": 8,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.7291666666666666, 0.9375],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875,
+                "planningMs": 0.008,
+                "executionMs": 0.186,
+                "sharedHits": 10
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125,
+                "planningMs": 0.396,
+                "executionMs": 0.189,
+                "sharedHits": 10
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125,
+                "planningMs": 0.366,
+                "executionMs": 0.196,
+                "sharedHits": 10
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.3125,
+                "planningMs": 0.009,
+                "executionMs": 0.183,
+                "sharedHits": 10
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 1.78,
+          "planMs": 2.076,
+          "execMs": 0.373,
+          "sharedHits": 19,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [0.9375, 1.25],
+          "label": "locate page entries",
+          "clientMs": 2.19,
+          "planMs": 5.998,
+          "execMs": 1.586,
+          "sharedHits": 310,
+          "maxVisitedRows": 34
+        },
+        {
+          "cpuMs": [0.7291666666666666, 0.8333333333333334],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.81,
+          "planMs": 1.345,
+          "execMs": 0.792,
+          "sharedHits": 386,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.42,
+          "planMs": 1.381,
+          "execMs": 0.388,
+          "sharedHits": 242,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.10416666666666667],
+          "label": "load run headers",
+          "clientMs": 1.05,
+          "planMs": 0.164,
+          "execMs": 0.088,
+          "sharedHits": 113,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.88,
+          "planMs": 1.67,
+          "execMs": 0.15,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "direct",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.265
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.245
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 0.822
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.165
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 1.005
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.576
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.334
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.23
+        }
+      ],
+      "page": "older",
+      "httpMs": 20.15,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.20833333333333334],
+          "label": "session metadata",
+          "clientMs": 0.87,
+          "planMs": 6.164,
+          "execMs": 0.291,
+          "sharedHits": 8,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.10416666666666667, 0.20833333333333334],
+          "planChoice": {
+            "automatic": {
+              "generic": 196,
+              "custom": 5
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.15625,
+                "planningMs": 0.007,
+                "executionMs": 0.086,
+                "sharedHits": 6
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.46875,
+                "planningMs": 0.347,
+                "executionMs": 0.095,
+                "sharedHits": 6
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.404,
+                "executionMs": 0.099,
+                "sharedHits": 6
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.15625,
+                "planningMs": 0.008,
+                "executionMs": 0.092,
+                "sharedHits": 6
+              }
+            ]
+          },
+          "label": "resolve cursor run",
+          "clientMs": 0.79,
+          "planMs": 1.851,
+          "execMs": 0.102,
+          "sharedHits": 6,
+          "maxVisitedRows": 1
+        },
+        {
+          "cpuMs": [0.9375, 0.7291666666666666],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875,
+                "planningMs": 0.01,
+                "executionMs": 0.216,
+                "sharedHits": 10
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.78125,
+                "planningMs": 0.323,
+                "executionMs": 0.193,
+                "sharedHits": 10
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.305,
+                "executionMs": 0.177,
+                "sharedHits": 10
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.15625,
+                "planningMs": 0.01,
+                "executionMs": 0.182,
+                "sharedHits": 10
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 1.55,
+          "planMs": 0.597,
+          "execMs": 0.313,
+          "sharedHits": 19,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [1.1458333333333333, 1.1458333333333333],
+          "label": "locate page entries",
+          "clientMs": 1.77,
+          "planMs": 5.216,
+          "execMs": 2.109,
+          "sharedHits": 317,
+          "maxVisitedRows": 35
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.9375],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.66,
+          "planMs": 1.371,
+          "execMs": 0.676,
+          "sharedHits": 386,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.5208333333333334],
+          "label": "load terminal metadata",
+          "clientMs": 1.18,
+          "planMs": 1.747,
+          "execMs": 0.353,
+          "sharedHits": 242,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "load run headers",
+          "clientMs": 0.91,
+          "planMs": 0.173,
+          "execMs": 0.123,
+          "sharedHits": 112,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.3125, 0.10416666666666667],
+          "label": "project environment",
+          "clientMs": 0.79,
+          "planMs": 1.973,
+          "execMs": 0.12,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "root",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.291
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.535
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.175
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.945
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.522
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.351
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.233
+        }
+      ],
+      "page": "latest",
+      "httpMs": 21.25,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "session metadata",
+          "clientMs": 0.88,
+          "planMs": 6.418,
+          "execMs": 0.311,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.3958333333333335, 2.1875],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.78125,
+                "planningMs": 0.038,
+                "executionMs": 0.524,
+                "sharedHits": 20
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.34375,
+                "planningMs": 1.165,
+                "executionMs": 0.412,
+                "sharedHits": 20
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.1875,
+                "planningMs": 1.251,
+                "executionMs": 0.418,
+                "sharedHits": 20
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.032,
+                "executionMs": 0.541,
+                "sharedHits": 20
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 3.15,
+          "planMs": 4.768,
+          "execMs": 0.701,
+          "sharedHits": 32,
+          "maxVisitedRows": 41
+        },
+        {
+          "cpuMs": [1.0416666666666667, 0.9375],
+          "label": "locate page entries",
+          "clientMs": 1.91,
+          "planMs": 4.611,
+          "execMs": 1.847,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 0.9375],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.52,
+          "planMs": 0.988,
+          "execMs": 0.544,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.1,
+          "planMs": 1.718,
+          "execMs": 0.429,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "load run headers",
+          "clientMs": 0.91,
+          "planMs": 0.254,
+          "execMs": 0.165,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.74,
+          "planMs": 1.968,
+          "execMs": 0.1,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "root",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.299
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.463
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.518
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.188
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.903
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.487
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.322
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.213
+        }
+      ],
+      "page": "older",
+      "httpMs": 20.27,
+      "sql": [
+        {
+          "cpuMs": [0.20833333333333334, 0.4166666666666667],
+          "label": "session metadata",
+          "clientMs": 0.73,
+          "planMs": 6.419,
+          "execMs": 0.376,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.4166666666666667],
+          "planChoice": {
+            "automatic": {
+              "generic": 196,
+              "custom": 5
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875,
+                "planningMs": 0.014,
+                "executionMs": 0.418,
+                "sharedHits": 17
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.03125,
+                "planningMs": 1.28,
+                "executionMs": 0.383,
+                "sharedHits": 17
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.1875,
+                "planningMs": 1.083,
+                "executionMs": 0.345,
+                "sharedHits": 17
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.3125,
+                "planningMs": 0.009,
+                "executionMs": 0.337,
+                "sharedHits": 17
+              }
+            ]
+          },
+          "label": "resolve cursor run",
+          "clientMs": 0.98,
+          "planMs": 6.783,
+          "execMs": 0.94,
+          "sharedHits": 23,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.2916666666666665, 2.3958333333333335],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.014,
+                "executionMs": 0.49,
+                "sharedHits": 20
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.5,
+                "planningMs": 1.299,
+                "executionMs": 0.428,
+                "sharedHits": 20
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.1875,
+                "planningMs": 1.28,
+                "executionMs": 0.423,
+                "sharedHits": 20
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.019,
+                "executionMs": 0.53,
+                "sharedHits": 20
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 2.81,
+          "planMs": 1.183,
+          "execMs": 0.486,
+          "sharedHits": 26,
+          "maxVisitedRows": 41
+        },
+        {
+          "cpuMs": [1.0416666666666667, 0.9375],
+          "label": "locate page entries",
+          "clientMs": 1.65,
+          "planMs": 4.238,
+          "execMs": 1.576,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.8333333333333334, 0.8333333333333334],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.26,
+          "planMs": 0.967,
+          "execMs": 0.468,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.01,
+          "planMs": 1.465,
+          "execMs": 0.333,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "load run headers",
+          "clientMs": 2.1,
+          "planMs": 0.198,
+          "execMs": 0.123,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "project environment",
+          "clientMs": 0.74,
+          "planMs": 2.092,
+          "execMs": 0.154,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "branch",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.291
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.405
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.101
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.85
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.461
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.302
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.214
+        }
+      ],
+      "page": "latest",
+      "httpMs": 19.99,
+      "sql": [
+        {
+          "cpuMs": [0.3125, 0.3125],
+          "label": "session metadata",
+          "clientMs": 0.75,
+          "planMs": 6.018,
+          "execMs": 0.339,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.1875, 2.2916666666666665],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.026,
+                "executionMs": 0.466,
+                "sharedHits": 47
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.5,
+                "planningMs": 1.46,
+                "executionMs": 0.597,
+                "sharedHits": 47
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.34375,
+                "planningMs": 1.24,
+                "executionMs": 0.473,
+                "sharedHits": 47
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.78125,
+                "planningMs": 0.026,
+                "executionMs": 0.454,
+                "sharedHits": 47
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 2.93,
+          "planMs": 6.203,
+          "execMs": 1.242,
+          "sharedHits": 59,
+          "maxVisitedRows": 54
+        },
+        {
+          "cpuMs": [1.0416666666666667, 0.7291666666666666],
+          "label": "locate page entries",
+          "clientMs": 1.8,
+          "planMs": 3.709,
+          "execMs": 1.545,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.8333333333333334, 1.0416666666666667],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.28,
+          "planMs": 0.956,
+          "execMs": 0.491,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.5208333333333334, 0.3125],
+          "label": "load terminal metadata",
+          "clientMs": 0.92,
+          "planMs": 1.396,
+          "execMs": 0.402,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "load run headers",
+          "clientMs": 0.82,
+          "planMs": 0.202,
+          "execMs": 0.194,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.71,
+          "planMs": 1.678,
+          "execMs": 0.096,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "layout": "branch",
+      "apiStatementCpu": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.29
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.469
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 2.482
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 1.2
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.922
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.502
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.324
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.214
+        }
+      ],
+      "page": "older",
+      "httpMs": 24.22,
+      "sql": [
+        {
+          "cpuMs": [0.4166666666666667, 0.3125],
+          "label": "session metadata",
+          "clientMs": 1.05,
+          "planMs": 7.866,
+          "execMs": 0.335,
+          "sharedHits": 9,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [0.3125, 0.5208333333333334],
+          "planChoice": {
+            "automatic": {
+              "generic": 196,
+              "custom": 5
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875,
+                "planningMs": 0.01,
+                "executionMs": 0.376,
+                "sharedHits": 33
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 1.875,
+                "planningMs": 1.128,
+                "executionMs": 0.344,
+                "sharedHits": 33
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 1.71875,
+                "planningMs": 1.102,
+                "executionMs": 0.352,
+                "sharedHits": 33
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.013,
+                "executionMs": 0.384,
+                "sharedHits": 33
+              }
+            ]
+          },
+          "label": "resolve cursor run",
+          "clientMs": 1.3,
+          "planMs": 5.806,
+          "execMs": 0.658,
+          "sharedHits": 39,
+          "maxVisitedRows": 3
+        },
+        {
+          "cpuMs": [2.5, 2.3958333333333335],
+          "planChoice": {
+            "automatic": {
+              "generic": 0,
+              "custom": 201
+            },
+            "trials": [
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.625,
+                "planningMs": 0.014,
+                "executionMs": 0.486,
+                "sharedHits": 42
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.5,
+                "planningMs": 1.351,
+                "executionMs": 0.486,
+                "sharedHits": 42
+              },
+              {
+                "setting": "force_custom_plan",
+                "cpuMs": 2.34375,
+                "planningMs": 1.337,
+                "executionMs": 0.507,
+                "sharedHits": 42
+              },
+              {
+                "setting": "force_generic_plan",
+                "cpuMs": 0.46875,
+                "planningMs": 0.017,
+                "executionMs": 0.496,
+                "sharedHits": 42
+              }
+            ]
+          },
+          "label": "select visible runs",
+          "clientMs": 3.85,
+          "planMs": 1.391,
+          "execMs": 0.516,
+          "sharedHits": 48,
+          "maxVisitedRows": 42
+        },
+        {
+          "cpuMs": [0.9375, 1.1458333333333333],
+          "label": "locate page entries",
+          "clientMs": 2.24,
+          "planMs": 3.898,
+          "execMs": 1.363,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "cpuMs": [0.9375, 0.8333333333333334],
+          "label": "load bodies and tool dependencies",
+          "clientMs": 1.52,
+          "planMs": 1.324,
+          "execMs": 0.701,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.4166666666666667, 0.4166666666666667],
+          "label": "load terminal metadata",
+          "clientMs": 1.27,
+          "planMs": 1.62,
+          "execMs": 0.429,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.3125],
+          "label": "load run headers",
+          "clientMs": 1.08,
+          "planMs": 0.256,
+          "execMs": 0.136,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "cpuMs": [0.20833333333333334, 0.20833333333333334],
+          "label": "project environment",
+          "clientMs": 0.9,
+          "planMs": 1.992,
+          "execMs": 0.107,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Database CPU per page with and without Fork](matched-paging-cpu-20261123.md) compares three matched public read arms, per-statement planning and 42 Kafka projection trials.
+
 - [Branch correctness and concurrent history paging](flow-tree-and-paging-20261123.md) checks nested Fork/prune and compares a fixed Kafka tape under three browser read loads.
 
 - [Frozen fork base versus moving Session head](flow-base-admission-20261123.md) compares registration, history reads and cleanup on PostgreSQL.

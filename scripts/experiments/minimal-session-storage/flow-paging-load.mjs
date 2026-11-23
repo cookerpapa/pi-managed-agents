@@ -7,6 +7,12 @@ import { KafkaLogConsumer } from "@pi-cloud/event-log";
 import { FamilyPresentation } from "./family-presentation.mjs";
 import { testKafka } from "../../lib/test-kafka.mjs";
 import { observePagingWaits, provePagingVisibility } from "./flow-paging-waits.mjs";
+import {
+  withMatchedPageFixture,
+  measurePageCpu,
+  pageCostTrials,
+  loadMatchedPages,
+} from "./matched-page-cost.mjs";
 import { withPagingFixture } from "./flow-paging-fixture.mjs";
 
 function latency(ms) {
@@ -54,7 +60,15 @@ async function readers(api, level, deadline) {
     },
   };
 }
-export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun, setCpuLimit) {
+export async function studyFlowPaging(
+  url,
+  tenant,
+  groups,
+  scopes,
+  visiblePerRun,
+  setCpuLimit,
+  pageCost = false,
+) {
   const presenters = new Map();
   for (const group of groups)
     for (const { fact } of group) {
@@ -70,9 +84,11 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
     }
   const live = scopes[0],
     total = groups.reduce((n, g) => n + g.length, 0);
-  await withPagingFixture(url, tenant, async (api) => {
+  const fixture = pageCost ? withMatchedPageFixture : withPagingFixture;
+  await fixture(url, tenant, async (api) => {
+    if (pageCost) await measurePageCpu(api.arms);
     const kafka = await testKafka({});
-    const { db, projector, topic } = api;
+    const { topic } = api;
     const k = new native.KafkaJS.Kafka({
       kafkaJS: { brokers: kafka.brokers, logLevel: native.KafkaJS.logLevel.NOTHING },
     });
@@ -111,13 +127,14 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
         ends.reduce((n, r) => n + r[1], 0),
         total,
       );
-      await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$3)", [
-        api.live,
-        tenant,
-        live.piSessionId,
-      ]);
+      if (!pageCost)
+        await api.db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$3)", [
+          api.live,
+          tenant,
+          live.piSessionId,
+        ]);
       if (setCpuLimit) await provePagingVisibility(api, tenant, live.piSessionId);
-      for (const level of ["paced", "saturated"]) {
+      for (const level of pageCost ? [] : ["paced", "saturated"]) {
         const t = performance.now(),
           load = await readers(api, level, t + 3500);
         await delay(3500);
@@ -128,20 +145,27 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
           }),
         );
       }
-      const trials = setCpuLimit
-        ? [
-            [2, "writer"],
-            [2, "saturated"],
-            [4, "saturated"],
-            [4, "writer"],
-            [4, "writer"],
-            [4, "saturated"],
-            [2, "saturated"],
-            [2, "writer"],
-          ]
-        : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [2, mode]);
-      for (const [cpus, mode] of trials) {
-        if (setCpuLimit) await setCpuLimit(cpus);
+      const trials = pageCost
+        ? pageCostTrials(pageCost === "fixed32")
+        : setCpuLimit
+          ? [
+              [2, "writer"],
+              [2, "saturated"],
+              [4, "saturated"],
+              [4, "writer"],
+              [4, "writer"],
+              [4, "saturated"],
+              [2, "saturated"],
+              [2, "writer"],
+            ]
+          : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [
+              2,
+              mode,
+            ]);
+      for (const [layout, mode] of trials) {
+        const arm = pageCost ? api.arms[layout] : api;
+        const { db, projector } = arm;
+        if (setCpuLimit) await setCpuLimit(layout);
         const ids = scopes.map((s) => s.runId);
         await db.query("delete from messages where run_id=any($1::uuid[])", [ids]);
         await db.query("delete from inboxes where pi_session_id=any($1::uuid[])", [
@@ -194,7 +218,7 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
                 assert(
                   (await projector.nativeStore.projection.project(r.fact, r, current)).admitted,
                 );
-              if (mode !== "writer" && count === Math.floor(total * 0.6)) {
+              if (!pageCost && mode !== "writer" && count === Math.floor(total * 0.6)) {
                 livePage = api.page(api.live).then((p) => {
                   assert.equal(p.turns.length, 1);
                   const n = p.turns[0].transcript?.items.length ?? 0;
@@ -226,18 +250,18 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
               .map((v) => v.split(" ")),
           );
         };
-        const chromeBefore = api.browserReads();
+        const chromeBefore = api.browserReads?.();
         let cpuBefore, cpuAfter, observer;
         try {
-          if (setCpuLimit) observer = await observePagingWaits(url, cpus);
+          if (setCpuLimit) observer = await observePagingWaits(url, layout);
           cpuBefore = await counters();
           await reader.start();
           const limit = performance.now() + 90000;
           while (!t0 && !firstError && performance.now() < limit) await delay(10);
           assert(t0, "No partition delivery");
           if (mode !== "writer") {
-            loads = await readers(api, mode, limit);
-            scrollJob = api.scroll();
+            loads = pageCost ? loadMatchedPages(arm, mode) : await readers(api, mode, limit);
+            if (!pageCost) scrollJob = api.scroll();
           }
           await Promise.race([
             finished.promise,
@@ -281,7 +305,7 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
               livePageItems: livePage ? await livePage : null,
               toolResults: t.n,
               pages,
-              browserOlderPages: api.browserReads() - chromeBefore,
+              ...(pageCost ? { layout } : { browserOlderPages: api.browserReads() - chromeBefore }),
             }),
           );
         } finally {

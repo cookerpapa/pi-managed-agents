@@ -15,6 +15,29 @@ import { withChromePage } from "../../lib/chrome-cdp.mjs";
 import { installFlowHistory } from "./flow-history.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 
+export async function installPagingProjection(db) {
+  await db.query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
+  await db.query(`alter table runs add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint default 0,add output_display_native_seq bigint default 0,
+   add turn_id uuid generated always as(id) stored,add input_text text generated always as(initial_input) stored,add input_uploads jsonb default '[]',
+   add pruned_at timestamptz,add operation_kind text default 'chat',add stop_reason text,add scheduled_origin jsonb,add output_seal_id uuid,add output_sealed_at timestamptz;
+   create function fixture_run(f uuid,n integer) returns uuid language sql immutable as $$
+      select overlay(overlay(md5(f::text||n) placing '4' from 13 for 1) placing '8' from 17 for 1)::uuid
+   $$;
+`);
+  const topic = "flow-pages",
+    partitions = 32;
+  const projector = normalRootProjection(
+    db,
+    topic,
+    () => assert.fail(),
+    () => assert.fail(),
+    undefined,
+    { partitions },
+  );
+  await projector.view.install();
+  return projector;
+}
+
 export async function withPagingFixture(url, tenantId, work) {
   const meta = createDatabase({ connectionString: url, maxConnections: 5 });
   const db = new pg.Pool({
@@ -52,25 +75,9 @@ export async function withPagingFixture(url, tenantId, work) {
     }
     const [root, left, right, empty, live] = windows;
     await db.query("create schema flow_study; create schema flow_web");
-    await db.query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
-    await db.query(`alter table runs add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint default 0,add output_display_native_seq bigint default 0,
-   add turn_id uuid generated always as(id) stored,add input_text text generated always as(initial_input) stored,add input_uploads jsonb default '[]',
-   add pruned_at timestamptz,add operation_kind text default 'chat',add stop_reason text,add scheduled_origin jsonb,add output_seal_id uuid,add output_sealed_at timestamptz;
-   create function fixture_run(f uuid,n integer) returns uuid language sql immutable as $$
-      select overlay(overlay(md5(f::text||n) placing '4' from 13 for 1) placing '8' from 17 for 1)::uuid
-   $$;
-   create view flow_web.sessions as select * from public.sessions;`);
-    const topic = "flow-pages",
-      partitions = 32;
-    const projector = normalRootProjection(
-      db,
-      topic,
-      () => assert.fail(),
-      () => assert.fail(),
-      undefined,
-      { partitions },
-    );
-    await projector.view.install();
+    const projector = await installPagingProjection(db);
+    const topic = "flow-pages";
+    await db.query("create view flow_web.sessions as select * from public.sessions");
     await installFlowHistory(db, true, false, "base");
     const f = randomUUID(),
       lf = randomUUID(),

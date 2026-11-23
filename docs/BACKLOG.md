@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Measure database CPU per complete page and replay the same Kafka workload with direct, ordinary Flow and nested Flow reads. [Matched benchmark](reports/matched-paging-cpu-20261123.md).
+
 - [x] Distinguish row locking from CPU and WAL contention during public paging using same-Run open transactions and paired CPU quotas. [Evidence](reports/flow-tree-and-paging-20261123.md#do-history-reads-block-projection-writes).
 
 - [x] Check generated branching histories and shared-prefix collection against an independent reference. Exercise public Flow history requests from Chrome while the candidate projects Kafka records. [Measurements](reports/flow-tree-and-paging-20261123.md).

@@ -681,6 +681,16 @@ TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts
 
 Replace `flow-pages` with `flow-page-locks` to test same-Run snapshot visibility, observe a deliberately blocked second writer and sample PG wait events during two- and four-CPU replays. The quota changes apply only to the PG container created by this benchmark.
 
+For the cost per page, run the two profiles serially on the same machine. Each creates disposable PG and Kafka and checks the visible content of the latest, older and newer pages across a genuine no-Fork layout and two Flow views. The fixed-rate suite pairs each load with nearby writer-only controls. The last command profiles the read side alone.
+
+```sh
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 4 flow-page-cost
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 4 flow-page-cost fixed32
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/matched-page-cost.mjs
+```
+
+[CPU and throughput comparison](../../../docs/reports/matched-paging-cpu-20261123.md).
+
 [Mixed-load results and study boundaries](../../../docs/reports/flow-tree-and-paging-20261123.md).
 
 Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.

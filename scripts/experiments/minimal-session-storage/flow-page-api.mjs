@@ -13,7 +13,7 @@ import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import { emptyEventRuntime } from "../../../packages/control-plane/test/fixtures/event-runtime.ts";
 import { profilePage } from "./flow-page-profile.mjs";
 
-export async function openPageApi(url, readUrl) {
+export async function openPageApi(url, readUrl, flowRootHistory = true) {
   const proc = fork(fileURLToPath(import.meta.url), [], {
     execArgv: ["--import", "tsx"],
     stdio: ["ignore", "inherit", "inherit", "ipc"],
@@ -36,15 +36,19 @@ export async function openPageApi(url, readUrl) {
     await exited;
   }
   try {
-    const { origin } = await ask({ url, readUrl });
-    return { origin, profile: (token, id, before) => ask({ token, id, before }), close };
+    const { origin } = await ask({ url, readUrl, flowRootHistory });
+    return {
+      origin,
+      profile: (token, id, before, cpuLabel) => ask({ token, id, before, cpuLabel }),
+      close,
+    };
   } catch (e) {
     await close();
     throw e;
   }
 }
 if (import.meta.main) {
-  const [{ url, readUrl }] = await once(process, "message");
+  const [{ url, readUrl, flowRootHistory }] = await once(process, "message");
   assert(new URL(url).hostname === "127.0.0.1" && new URL(readUrl).hostname === "127.0.0.1");
   const controlDsn = new URL(url);
   controlDsn.searchParams.set("application_name", "flow-control");
@@ -60,7 +64,7 @@ if (import.meta.main) {
       database,
       conversationReadDatabase: reads,
       rootMessageHistory: true,
-      flowRootHistory: true,
+      flowRootHistory,
       eventRuntime: emptyEventRuntime(),
       productionHttpGateway: new ProductionHttpGateway({
         authenticator: new PostgresTenantApiAuthenticator({ database }),
@@ -69,11 +73,11 @@ if (import.meta.main) {
     });
     await app.listen(0, "127.0.0.1");
     const origin = await app.getUrl();
-    process.on("message", async ({ id, token, before }) => {
+    process.on("message", async ({ id, token, before, cpuLabel }) => {
       try {
         const api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), token);
         for (const query of [{}, { before }])
-          await profilePage(readUrl, (q) => api.getConversation(id, q), query);
+          await profilePage(readUrl, (q) => api.getConversation(id, q), query, cpuLabel);
         process.send({ ok: true });
       } catch (e) {
         process.send({ error: e.message });
