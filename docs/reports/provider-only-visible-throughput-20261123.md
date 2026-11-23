@@ -31,12 +31,30 @@ The separate 256-Run comparison uses the same 20-tool per-record PG entry point 
 
 The RF3 transport suite passed 40 checks, including the delegated browser. The targeted accounting, Session, Worker and executor run passed 26 checks. Twelve native-trace and recovery-policy checks passed. An existing native commit with historical financial metadata replayed with its original fingerprint and produced no additional financial event. The provider-usage assertion read 240 tokens before projection and 240 again after writer closure, stale output and duplicate gateway delivery.
 
+## Sandbox acceptance delay, 50 vs 100 ms
+
+A follow-up captured one unmodified trace and replayed identical Kafka value bytes against 1,024 warm simulated sandboxes. Each arm verified all 191,488 raw records, 41,984 visible records, 20,480 ordered tool call/result pairs and the final partition positions. Only the simulated receiver acknowledgement delay changed within each pair. Preloaded arms ran at 100/50/50/100 ms and paced arms at 50/100/100/50 ms. The single live capture at 50 ms processed 371.8 visible records/s and is excluded from the comparisons.
+
+| Load | Configured ACK | Observed mean ACK, ms by trial | Visible Kafka records/s by trial | Combined visible records/s | Drain after paced input, s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Preloaded | 100 ms | 103.4 / 103.0 | 537.9 / 565.8 | 551.5 | — |
+| Preloaded | 50 ms | 51.7 / 52.2 | 776.0 / 666.0 | 716.8 | — |
+| Paced | 100 ms | 105.2 / 106.3 | 443.4 / 364.6 | 400.2 | 6.1 / 26.4 |
+| Paced | 50 ms | 54.9 / 55.4 | 411.0 / 387.2 | 398.7 | 13.3 / 19.7 |
+
+Combined throughput divides both trials' visible records by their combined processing time. On this host, shorter acknowledgement delays coincided with 30.0% higher backlog throughput. With actual incoming traffic of 472.6–474.0 visible records/s, the combined change was −0.4%. All arms drained. These paced samples do not show a sustained capacity increase. PG and Kafka grant times also varied between trials.
+
+A target can hold one outstanding dispatch at a time. Across both preloaded arms at each delay, target reservation waits fell from 1,540 to 269. Across the paced arms they fell from 1,437 to 158. Peak reservations stayed at or below 128 out of 3,072, using at most 512 KiB of the 12 MiB reservation budget. These waits were for reuse of a particular target. The standard 20-tool workload now uses 50 ms. The paired diagnostic and the original 100 ms reference profiles remain reproducible. The study verified disposal of its Kafka topic and group, scratch database and Kubernetes resources.
+
 ## Reproduce
 
 ```sh
 PI_CLOUD_RUNTIME_LOAD_CHECK=1 PI_CLOUD_FANOUT_SUITE=grants-million-day PI_CLOUD_COMPARE_USAGE_WIRE=1 \
   node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /tmp/new-usage-wire-study workspace-fanout
 node scripts/experiments/minimal-session-storage/summarize-tool-loop.mjs /tmp/new-usage-wire-study
+PI_CLOUD_RUNTIME_LOAD_CHECK=1 PI_CLOUD_FANOUT_SUITE=grants-million-day PI_CLOUD_COMPARE_ACK_DELAY=1 \
+  node --import tsx scripts/experiments/minimal-session-storage/run-cpu-placement.mjs /tmp/new-ack-delay-study workspace-fanout
+node scripts/experiments/minimal-session-storage/summarize-tool-loop.mjs /tmp/new-ack-delay-study
 node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 8
 node --import tsx --test scripts/experiments/minimal-session-storage/native-tool-loop.test.mjs
 ```

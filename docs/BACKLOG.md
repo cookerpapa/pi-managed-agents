@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare 50 and 100 ms sandbox acceptance on identical 20-tool Kafka replays under paced and preloaded input. [Paired results](reports/provider-only-visible-throughput-20261123.md#sandbox-acceptance-delay-50-vs-100-ms).
+
 - [x] Keep provider usage outside Session log projection and count completed user-visible Kafka records in the 20-tool load. [Decision](adr/0355-provider-usage-outside-session-projection.md) and [measurements](reports/provider-only-visible-throughput-20261123.md).
 - [ ] If customer charging is introduced, design independent correlation in metering for retries, handoff and interrupted output.
 

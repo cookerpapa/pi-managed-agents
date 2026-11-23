@@ -369,6 +369,23 @@ function cases(suite) {
     const short = suite === "grants-million-day";
     // 20 tool calls, 20 results and one answer per Run in this fixed trace.
     const dailyVisibleRate = (41 * 1_000_000) / 86_400;
+    const loopTrial = (delay, options) =>
+      trial("concurrent", delay, short ? 20 : 200, {
+        grantWidth: 8,
+        batchProjection: true,
+        display: true,
+        mixed: true,
+        ...options,
+      });
+    if (short && process.env.PI_CLOUD_COMPARE_ACK_DELAY === "1") {
+      return [
+        loopTrial(50, { liveSource: true }),
+        ...[100, 50, 50, 100].map((delay) => loopTrial(delay, { preload: true, rate: 16000 })),
+        ...[50, 100, 100, 50].map((delay) =>
+          loopTrial(delay, { targetVisibleRate: dailyVisibleRate }),
+        ),
+      ];
+    }
     if (short && process.env.PI_CLOUD_COMPARE_USAGE_WIRE === "1") {
       return [
         { liveSource: true },
@@ -378,15 +395,7 @@ function cases(suite) {
           rate: 16000,
         })),
         { targetVisibleRate: dailyVisibleRate },
-      ].map((options) =>
-        trial("concurrent", 100, 20, {
-          grantWidth: 8,
-          batchProjection: true,
-          display: true,
-          mixed: true,
-          ...options,
-        }),
-      );
+      ].map((options) => loopTrial(100, options));
     }
     if (short && process.env.PI_CLOUD_COMPARE_ENTRY_INDEX === "1") {
       const ordered = [false, true, true, false, true, false, false, true];
@@ -395,20 +404,12 @@ function cases(suite) {
         { liveSource: true },
         ...ordered.map((entryIndex) => ({ entryIndex, preload: true, rate: 16000 })),
         ...ordered.slice(0, 4).map((entryIndex) => ({ entryIndex, targetVisibleRate: fixedRate })),
-      ].map((options) =>
-        trial("concurrent", 100, 20, {
-          grantWidth: 8,
-          batchProjection: true,
-          display: true,
-          mixed: true,
-          ...options,
-        }),
-      );
+      ].map((options) => loopTrial(100, options));
     }
     // Diagnostic only: replay the very same tape at 1.5x both before and after
     // a saturated arm. The published daily-load profile keeps its original order.
-    const multipliers =
-      process.env.PI_CLOUD_REPEAT_MILLION_RATE === "1" ? [1.5, 3, 1.5, 1.5] : [1, 2, 3, 1.5, 1];
+    const repeatMillionRate = process.env.PI_CLOUD_REPEAT_MILLION_RATE === "1";
+    const multipliers = repeatMillionRate ? [1.5, 3, 1.5, 1.5] : [1, 2, 3, 1.5, 1];
     const rates = short
       ? multipliers.map((multiplier) => ({ targetVisibleRate: multiplier * dailyVisibleRate }))
       : [
@@ -419,15 +420,8 @@ function cases(suite) {
           { preload: true },
           { rate: 3500 },
         ];
-    return [{ liveSource: true }, ...rates].map((options) =>
-      trial("concurrent", 100, short ? 20 : 200, {
-        grantWidth: 8,
-        batchProjection: true,
-        display: true,
-        mixed: true,
-        ...options,
-      }),
-    );
+    const delay = short && !repeatMillionRate ? 50 : 100;
+    return [{ liveSource: true }, ...rates].map((options) => loopTrial(delay, options));
   }
   if (suite === "grants-display-wide")
     return [32, 64, 128, 128, 64, 32].map((grantWidth) =>

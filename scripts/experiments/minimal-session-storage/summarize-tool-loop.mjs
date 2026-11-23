@@ -54,6 +54,10 @@ const rates = trials.map((t) => {
   }
   const lagAtInputFraction = (f) => inputSample(f).lag;
   return {
+    configuredAckDelayMs: t.delay,
+    observedMeanAckMs: rounded(r.phases.ack.mean),
+    peakReservedDispatches: r.peakActive,
+    peakPendingReceiverAcks: t.network.peak,
     mode: t.preload ? "backlog" : t.liveSource ? "live" : "paced",
     visibleKafkaRecordsPerSec: v ? rounded(v.records / duration) : null,
     visibleItemsPerSec: v ? rounded((v.texts + v.calls + v.results) / duration) : null,

@@ -542,6 +542,8 @@ and committed partition positions.
 
 The summary leads with completed user-visible Kafka records per second. A record with assistant text, any number of completed tool calls or one or more results counts once. Public output item rates count text-bearing assistant messages, individual calls and results separately. Streaming deltas, tool dispatch and control receipts do not add another completed output. Set `PI_CLOUD_COMPARE_USAGE_WIRE=1` with `grants-million-day` to compare intact traces against disposable replays that omit only `pi.usage` updates, in alternating order. The serving writer always sends the original Pi commit.
 
+The standard 20-tool profile uses a 50 ms simulated sandbox acceptance delay. Set `PI_CLOUD_COMPARE_ACK_DELAY=1` on that profile to capture one trace and replay it at both 50 and 100 ms. The backlog trials run in 100/50/50/100 ms order. Paced trials run in reverse order at the same visible-record input target. The usage, index and host-speed comparisons retain their original 100 ms setting. The configured delay applies only to the simulated receiver's acknowledgement. The model and Bash timings used to create the trace stay fixed across replays.
+
 ### Conversation Entry index cost
 
 With the same 32-partition, 12-connection `workspace-fanout` setup, set
