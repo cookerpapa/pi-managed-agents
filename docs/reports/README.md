@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Frozen fork base versus moving Session head](flow-base-admission-20261123.md) compares registration, history reads and cleanup on PostgreSQL.
+
 - [Directory recovery and Run-linked Flow](directory-recovery-and-flow-20261123.md) covers an isolated real Guest, Chrome, the projection workload and long-history reads and collection.
 
 - [Candidate context status and prune admission](candidate-context-and-prune-20261123.md) covers protected HTTP reads and a reproduced public Session/stream identity conflict.

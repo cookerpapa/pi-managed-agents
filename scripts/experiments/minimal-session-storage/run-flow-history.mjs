@@ -30,7 +30,8 @@ const spread = (xs) => {
   const at = (n) => round(sorted[Math.ceil(sorted.length * n) - 1]);
   return { samples: xs.length, p50Ms: at(0.5), p95Ms: at(0.95), p99Ms: at(0.99) };
 };
-const session = (s) => one("select * from sessions where tenant_id=$1 and id=$2", [tenant, s]);
+const session = (s) =>
+  one("select s.* from flow_session_tips s where tenant_id=$1 and id=$2", [tenant, s]);
 const create = (s, f) =>
   query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$3)", [s, tenant, f]);
 const admit = (s, f, r, body) =>
@@ -118,7 +119,7 @@ async function correctness(withDelegates) {
   assert.equal(selected.workspace_id, (await session(root)).workspace_id);
   await query("update sessions set working_directory='/home/user/other' where id=$1", [other]);
   assert.equal((await session(root)).working_directory, "/workspace");
-  assert.equal((await session(other)).head_run_id, ids[1]);
+  assert.equal((await session(other)).tip_run_id, ids[1]);
   assert.deepEqual(
     (await query(flowPage, [tenant, other, 10])).rows.map((r) => r.id),
     ids.slice(0, 2).reverse(),
@@ -180,7 +181,7 @@ async function correctness(withDelegates) {
   await admit(qs, qf, q1, "one");
   await admit(qs, qf, q2, "two");
   await query("select flow_swap_pending($1,$2,$3,$4)", [tenant, qs, q1, q2]);
-  assert.equal((await session(qs)).head_run_id, q1);
+  assert.equal((await session(qs)).tip_run_id, q1);
   assert.deepEqual(
     (await query(flowPage, [tenant, qs, 5])).rows.map((r) => r.id),
     [q1, q2, q0],
@@ -229,10 +230,73 @@ async function correctness(withDelegates) {
     c.release();
   }
   const bState = await session(b);
-  assert.equal(bState.head_run_id, a);
+  assert.equal(bState.tip_run_id, a);
   assert.equal((await collect(await detach(b, bState.flow_id))).total, 1);
 }
-async function seed(n) {
+// A window can own a tip even after the last successor and base references go away.
+async function branchDeletionOrders(anchor) {
+  for (const rootFirst of [false, true])
+    for (const populated of [false, true]) {
+      const s = randomUUID(),
+        flow = randomUUID(),
+        a = randomUUID(),
+        b = randomUUID();
+      await create(s, flow);
+      await complete(s, flow, a, 1);
+      await complete(s, flow, b, 2);
+      const branch = await fork(s, b),
+        writable = (await session(branch)).flow_id;
+      const g = randomUUID();
+      if (populated) await complete(branch, writable, g, 3);
+      if (anchor === "base") assert.equal((await session(branch)).base_run_id, b);
+      const firstJob = rootFirst ? await detach(s, flow) : await detach(branch, writable);
+      assert.equal((await collect(firstJob)).total, !rootFirst && populated ? 1 : 0);
+      const survivor = rootFirst ? branch : s;
+      const page = (await query(flowPage, [tenant, survivor, 8])).rows.map((r) => r.id);
+      assert.deepEqual(page, rootFirst && populated ? [g, b, a] : [b, a]);
+      const lastJob = await detach(survivor, (await session(survivor)).flow_id);
+      assert.equal((await collect(lastJob)).total, page.length);
+      assert.equal(await scalar("select count(*)::int from messages"), 0);
+    }
+}
+
+async function concurrentAdmission(anchor) {
+  const s = randomUUID(),
+    f = randomUUID(),
+    first = randomUUID(),
+    second = randomUUID();
+  await create(s, f);
+  const c = await pool.connect();
+  try {
+    await c.query("begin");
+    await c.query("select flow_admit($1,$2,$3,$4,'first')", [tenant, s, f, first]);
+    const waiter = admit(s, f, second, "second");
+    let blocked = false;
+    for (let i = 0; i < 200 && !blocked; i++) {
+      blocked = await scalar(
+        "select exists(select from pg_stat_activity where $1::int=any(pg_blocking_pids(pid)))",
+        [c.processID],
+      );
+      if (!blocked) await delay(5);
+    }
+    await c.query("commit");
+    await waiter;
+    assert(blocked);
+  } finally {
+    await c.query("rollback");
+    c.release();
+  }
+  assert.equal(await admit(s, f, second, "second"), second);
+  await assert.rejects(admit(s, f, second, "different"), /identity changed/);
+  assert.deepEqual(
+    (await query(flowPage, [tenant, s, 8])).rows.map((r) => r.id),
+    [second, first],
+  );
+  if (anchor === "base") assert.equal((await session(s)).base_run_id, null);
+  await query("update runs set state='cancelled' where flow_id=$1", [f]);
+  assert.equal((await collect(await detach(s, f))).total, 2);
+}
+async function seed(n, anchor) {
   const f = randomUUID();
   await create(root, f);
   await query(
@@ -249,7 +313,8 @@ async function seed(n) {
   );
   const mid = await scalar("select md5($1::text||$2::text)::uuid", [f, Math.floor(n / 2)]),
     head = await scalar("select md5($1::text||$2::text)::uuid", [f, n]);
-  await query("update sessions set head_run_id=$2 where id=$1", [root, head]);
+  if (anchor === "head")
+    await query("update sessions set head_run_id=$2 where id=$1", [root, head]);
   await query("analyze runs");
   await query("analyze messages");
   await query("analyze sessions");
@@ -265,8 +330,8 @@ async function series(f, iterations = 100, concurrency = 1) {
   );
   return spread(xs);
 }
-async function measure(n) {
-  const { mid, head, flow } = await seed(n);
+async function measure(n, anchor) {
+  const { mid, head, flow } = await seed(n, anchor);
   const latest = async () =>
     assert.equal((await query(flowPage, [tenant, root, 1])).rows[0].id, head);
   const page = async () => assert.equal((await query(flowPage, [tenant, root, 24])).rowCount, 24);
@@ -343,7 +408,7 @@ async function measure(n) {
     first = await collect(job);
   });
   assert.equal(first.total, n - Math.floor(n / 2));
-  assert.equal((await session(empty)).head_run_id, mid);
+  assert.equal((await session(empty)).tip_run_id, mid);
   const restJob = await detach(empty, (await session(empty)).flow_id);
   const sharedGcMs = await elapsed(async () => {
     second = await collect(restJob);
@@ -369,9 +434,9 @@ async function measure(n) {
     second,
   };
 }
-async function nested() {
+async function nested(anchor) {
   const n = 10000,
-    { head, flow } = await seed(n);
+    { head, flow } = await seed(n, anchor);
   // Each local segment contains ten Runs; reaching the original anchor crosses 1,000 flows.
   await query(
     "update runs set flow_id=md5($1::text||'part'||((mailbox_position-1)/10)::text)::uuid,mailbox_position=1+(mailbox_position-1)%10 where tenant_id=$2",
@@ -393,14 +458,19 @@ async function nested() {
   assert.equal(deleted.total, n);
   return { nestedFlows: n / 10, runs: n, forkAtFirstRunMs: forkMs, pageMs };
 }
-export async function runFlowStudy(acceptanceOnly = false) {
+export async function runFlowStudy(acceptanceOnly = false, anchor = "head") {
   try {
     await query("create schema " + schema);
     await query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
-    await installFlowHistory(pool, false, acceptanceOnly);
+    await installFlowHistory(pool, false, acceptanceOnly, anchor);
     await correctness(acceptanceOnly);
+    await branchDeletionOrders(anchor);
+    await concurrentAdmission(anchor);
     console.log(
       JSON.stringify({
+        anchor,
+        branchDeletionOrdersVerified: true,
+        concurrentAdmissionVerified: true,
         claimedAfterPrune: true,
         emptyForkRetained: true,
         workspaceIndependent: true,
@@ -410,8 +480,8 @@ export async function runFlowStudy(acceptanceOnly = false) {
       }),
     );
     if (acceptanceOnly) return;
-    for (const n of [1000, 10000, 100000]) console.log(JSON.stringify(await measure(n)));
-    console.log(JSON.stringify(await nested()));
+    for (const n of [1000, 10000, 100000]) console.log(JSON.stringify(await measure(n, anchor)));
+    console.log(JSON.stringify(await nested(anchor)));
   } finally {
     try {
       await query("drop schema if exists " + schema + " cascade");
@@ -420,4 +490,4 @@ export async function runFlowStudy(acceptanceOnly = false) {
     }
   }
 }
-if (import.meta.main) await runFlowStudy();
+if (import.meta.main) await runFlowStudy(false, process.argv[2] ?? "head");

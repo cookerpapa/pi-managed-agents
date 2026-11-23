@@ -1,0 +1,1721 @@
+{
+  "fixture": {
+    "cpus": 2,
+    "memoryMiB": 768,
+    "postgres": "17.6",
+    "durableCommit": true
+  },
+  "paired": [
+    [
+      {
+        "config": {
+          "pg": "17.6",
+          "fsync": "on",
+          "sync": "on"
+        },
+        "historyRuns": 100000,
+        "blockSize": 32,
+        "cycles": 8,
+        "schedule": [0, 1, 1, 0, 1, 0, 0, 1]
+      },
+      {
+        "tipPlan": "empty",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 0
+      },
+      {
+        "tipPlan": "long",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 1
+      },
+      {
+        "name": "read_empty_branch",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.693,
+          "p95": 0.853,
+          "p99": 0.967
+        },
+        "operationsPerSecond": 1415.944,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_empty_branch",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.909,
+          "p95": 1.158,
+          "p99": 1.274
+        },
+        "operationsPerSecond": 1065.595,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_populated_flow",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.675,
+          "p95": 0.97,
+          "p99": 1.119
+        },
+        "operationsPerSecond": 1407.132,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_populated_flow",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.931,
+          "p95": 1.457,
+          "p99": 1.689
+        },
+        "operationsPerSecond": 1007.045,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "page_24_previews",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.723,
+          "p95": 2.214,
+          "p99": 2.473
+        },
+        "operationsPerSecond": 564.55,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "page_24_previews",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.971,
+          "p95": 2.47,
+          "p99": 2.774
+        },
+        "operationsPerSecond": 498.117,
+        "walBytes": 56,
+        "walBytesPerOperation": 0.055,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_24_previews",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 2.749,
+          "p95": 3.697,
+          "p99": 57.892
+        },
+        "operationsPerSecond": 1524.596,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_24_previews",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.174,
+          "p95": 56.641,
+          "p99": 60.451
+        },
+        "operationsPerSecond": 903.297,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "first_run_on_empty_branch",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.082,
+          "p95": 4.888,
+          "p99": 6.95
+        },
+        "operationsPerSecond": 289.897,
+        "walBytes": 7861160,
+        "walBytesPerOperation": 7676.914,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "first_run_on_empty_branch",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.047,
+          "p95": 4.074,
+          "p99": 5.608
+        },
+        "operationsPerSecond": 310.895,
+        "walBytes": 7136632,
+        "walBytesPerOperation": 6969.367,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "append_to_long_flow",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.064,
+          "p95": 4.303,
+          "p99": 6.479
+        },
+        "operationsPerSecond": 301.056,
+        "walBytes": 10460728,
+        "walBytesPerOperation": 10215.555,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "append_to_long_flow",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.044,
+          "p95": 4.176,
+          "p99": 6.047
+        },
+        "operationsPerSecond": 307.899,
+        "walBytes": 10038984,
+        "walBytesPerOperation": 9803.695,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_one_window",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 9.262,
+          "p95": 91.74,
+          "p99": 106.597
+        },
+        "operationsPerSecond": 311.34,
+        "walBytes": 3011040,
+        "walBytesPerOperation": 2940.469,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_one_window",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 23.977,
+          "p95": 28.854,
+          "p99": 32.101
+        },
+        "operationsPerSecond": 325.209,
+        "walBytes": 2464408,
+        "walBytesPerOperation": 2406.648,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_eight_windows",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 5.946,
+          "p95": 8.013,
+          "p99": 8.622
+        },
+        "operationsPerSecond": 1294.557,
+        "walBytes": 2092048,
+        "walBytesPerOperation": 2043.016,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_eight_windows",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 5.921,
+          "p95": 8.663,
+          "p99": 13.229
+        },
+        "operationsPerSecond": 1299.309,
+        "walBytes": 1532368,
+        "walBytesPerOperation": 1496.453,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      }
+    ],
+    [
+      {
+        "config": {
+          "pg": "17.6",
+          "fsync": "on",
+          "sync": "on"
+        },
+        "historyRuns": 100000,
+        "blockSize": 32,
+        "cycles": 8,
+        "schedule": [0, 1, 1, 0, 1, 0, 0, 1]
+      },
+      {
+        "tipPlan": "empty",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 0
+      },
+      {
+        "tipPlan": "long",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 1
+      },
+      {
+        "name": "read_empty_branch",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.502,
+          "p95": 0.635,
+          "p99": 0.767
+        },
+        "operationsPerSecond": 1928.666,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_empty_branch",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.633,
+          "p95": 0.775,
+          "p99": 0.883
+        },
+        "operationsPerSecond": 1537.207,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_populated_flow",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.475,
+          "p95": 0.579,
+          "p99": 0.753
+        },
+        "operationsPerSecond": 2051.082,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_populated_flow",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.635,
+          "p95": 0.772,
+          "p99": 0.886
+        },
+        "operationsPerSecond": 1544.081,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "page_24_previews",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.205,
+          "p95": 1.486,
+          "p99": 1.658
+        },
+        "operationsPerSecond": 808.191,
+        "walBytes": 56,
+        "walBytesPerOperation": 0.055,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "page_24_previews",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.369,
+          "p95": 1.648,
+          "p99": 1.895
+        },
+        "operationsPerSecond": 713.191,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_24_previews",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.734,
+          "p95": 2.663,
+          "p99": 57.577
+        },
+        "operationsPerSecond": 1771.074,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_24_previews",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.882,
+          "p95": 2.598,
+          "p99": 56.137
+        },
+        "operationsPerSecond": 1814.003,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "first_run_on_empty_branch",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.035,
+          "p95": 4.601,
+          "p99": 6.31
+        },
+        "operationsPerSecond": 317.128,
+        "walBytes": 7967880,
+        "walBytesPerOperation": 7781.133,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "first_run_on_empty_branch",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.029,
+          "p95": 3.918,
+          "p99": 6.053
+        },
+        "operationsPerSecond": 325.042,
+        "walBytes": 7247832,
+        "walBytesPerOperation": 7077.961,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "append_to_long_flow",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.031,
+          "p95": 4.098,
+          "p99": 6.074
+        },
+        "operationsPerSecond": 316.822,
+        "walBytes": 10073048,
+        "walBytesPerOperation": 9836.961,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "append_to_long_flow",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.038,
+          "p95": 4.98,
+          "p99": 7.049
+        },
+        "operationsPerSecond": 308.657,
+        "walBytes": 9509752,
+        "walBytesPerOperation": 9286.867,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_one_window",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 9.101,
+          "p95": 92.785,
+          "p99": 108.695
+        },
+        "operationsPerSecond": 315.739,
+        "walBytes": 3057192,
+        "walBytesPerOperation": 2985.539,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_one_window",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 23.828,
+          "p95": 29.231,
+          "p99": 35.891
+        },
+        "operationsPerSecond": 330.057,
+        "walBytes": 2692240,
+        "walBytesPerOperation": 2629.141,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_eight_windows",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 4.919,
+          "p95": 7.129,
+          "p99": 9.158
+        },
+        "operationsPerSecond": 1611.984,
+        "walBytes": 2230776,
+        "walBytesPerOperation": 2178.492,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_eight_windows",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 4.882,
+          "p95": 6.83,
+          "p99": 9.172
+        },
+        "operationsPerSecond": 1627.832,
+        "walBytes": 1673648,
+        "walBytesPerOperation": 1634.422,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      }
+    ],
+    [
+      {
+        "config": {
+          "pg": "17.6",
+          "fsync": "on",
+          "sync": "on"
+        },
+        "historyRuns": 100000,
+        "blockSize": 32,
+        "cycles": 8,
+        "schedule": [0, 1, 1, 0, 1, 0, 0, 1]
+      },
+      {
+        "tipPlan": "empty",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 0
+      },
+      {
+        "tipPlan": "long",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 1
+      },
+      {
+        "name": "read_empty_branch",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.711,
+          "p95": 0.921,
+          "p99": 1.055
+        },
+        "operationsPerSecond": 1353.594,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_empty_branch",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.963,
+          "p95": 1.217,
+          "p99": 1.358
+        },
+        "operationsPerSecond": 1001.596,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_populated_flow",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.706,
+          "p95": 0.944,
+          "p99": 1.076
+        },
+        "operationsPerSecond": 1358.678,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "read_populated_flow",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 0.989,
+          "p95": 1.317,
+          "p99": 1.525
+        },
+        "operationsPerSecond": 963.78,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "page_24_previews",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 2.062,
+          "p95": 2.667,
+          "p99": 2.981
+        },
+        "operationsPerSecond": 474.977,
+        "walBytes": 56,
+        "walBytesPerOperation": 0.055,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "page_24_previews",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 2.354,
+          "p95": 2.981,
+          "p99": 3.284
+        },
+        "operationsPerSecond": 419.822,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_24_previews",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 2.746,
+          "p95": 3.848,
+          "p99": 59.645
+        },
+        "operationsPerSecond": 1579.925,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_24_previews",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.1,
+          "p95": 57.981,
+          "p99": 61.627
+        },
+        "operationsPerSecond": 792.22,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "first_run_on_empty_branch",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.085,
+          "p95": 4.267,
+          "p99": 7.425
+        },
+        "operationsPerSecond": 274.181,
+        "walBytes": 8082328,
+        "walBytesPerOperation": 7892.898,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "first_run_on_empty_branch",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.053,
+          "p95": 4.109,
+          "p99": 5.95
+        },
+        "operationsPerSecond": 306.695,
+        "walBytes": 7365544,
+        "walBytesPerOperation": 7192.914,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "append_to_long_flow",
+        "anchor": "head",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.096,
+          "p95": 4.449,
+          "p99": 6.171
+        },
+        "operationsPerSecond": 290.75,
+        "walBytes": 9949832,
+        "walBytesPerOperation": 9716.633,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "append_to_long_flow",
+        "anchor": "base",
+        "parallel": 1,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 3.055,
+          "p95": 4.908,
+          "p99": 6.122
+        },
+        "operationsPerSecond": 302.778,
+        "walBytes": 9555592,
+        "walBytesPerOperation": 9331.633,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_one_window",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 9.181,
+          "p95": 90.785,
+          "p99": 101.992
+        },
+        "operationsPerSecond": 314.565,
+        "walBytes": 2903928,
+        "walBytesPerOperation": 2835.867,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_one_window",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 23.991,
+          "p95": 30.1,
+          "p99": 34.997
+        },
+        "operationsPerSecond": 318.733,
+        "walBytes": 2345512,
+        "walBytesPerOperation": 2290.539,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_eight_windows",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 5.917,
+          "p95": 8.012,
+          "p99": 11.444
+        },
+        "operationsPerSecond": 1312.139,
+        "walBytes": 2183112,
+        "walBytesPerOperation": 2131.945,
+        "sessionUpdates": 1024,
+        "runInserts": 1024
+      },
+      {
+        "name": "concurrent_eight_windows",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 5.886,
+          "p95": 7.829,
+          "p99": 9.249
+        },
+        "operationsPerSecond": 1327.436,
+        "walBytes": 1631264,
+        "walBytesPerOperation": 1593.031,
+        "sessionUpdates": 0,
+        "runInserts": 1024
+      }
+    ]
+  ],
+  "scale": {
+    "head": [
+      {
+        "anchor": "head",
+        "branchDeletionOrdersVerified": true,
+        "concurrentAdmissionVerified": true,
+        "claimedAfterPrune": true,
+        "emptyForkRetained": true,
+        "workspaceIndependent": true,
+        "staleWriterRejected": true,
+        "delegatedLayout": false,
+        "cleanupResumed": true
+      },
+      {
+        "n": 1000,
+        "admissionMs": {
+          "samples": 100,
+          "p50Ms": 3.028,
+          "p95Ms": 4.87,
+          "p99Ms": 6.413
+        },
+        "scannedPageRows": {
+          "runs": 24,
+          "sessions": 1,
+          "messages": 24
+        },
+        "coldEntries": 120,
+        "latestMs": {
+          "samples": 100,
+          "p50Ms": 1.026,
+          "p95Ms": 1.289,
+          "p99Ms": 1.401
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.206,
+          "p95Ms": 1.458,
+          "p99Ms": 2.263
+        },
+        "concurrentPageMs": {
+          "samples": 256,
+          "p50Ms": 1.668,
+          "p95Ms": 2.231,
+          "p99Ms": 14.737
+        },
+        "coldMs": {
+          "samples": 30,
+          "p50Ms": 11.257,
+          "p95Ms": 12.348,
+          "p99Ms": 12.543
+        },
+        "forkMs": {
+          "samples": 100,
+          "p50Ms": 3.049,
+          "p95Ms": 4.923,
+          "p99Ms": 6.676
+        },
+        "emptyDeleteMs": {
+          "samples": 100,
+          "p50Ms": 2.559,
+          "p95Ms": 3.568,
+          "p99Ms": 5.865
+        },
+        "emptyGcMs": {
+          "samples": 100,
+          "p50Ms": 2.947,
+          "p95Ms": 3.347,
+          "p99Ms": 4.888
+        },
+        "deleteMs": 2.868,
+        "exclusiveGcMs": 111.29,
+        "first": {
+          "total": 500,
+          "batches": 2,
+          "batchMs": {
+            "samples": 2,
+            "p50Ms": 52.963,
+            "p95Ms": 58.282,
+            "p99Ms": 58.282
+          }
+        },
+        "sharedGcMs": 101.247,
+        "second": {
+          "total": 500,
+          "batches": 2,
+          "batchMs": {
+            "samples": 2,
+            "p50Ms": 48.151,
+            "p95Ms": 53.015,
+            "p99Ms": 53.015
+          }
+        }
+      },
+      {
+        "n": 10000,
+        "admissionMs": {
+          "samples": 100,
+          "p50Ms": 3.051,
+          "p95Ms": 5.199,
+          "p99Ms": 6.005
+        },
+        "scannedPageRows": {
+          "runs": 24,
+          "sessions": 1,
+          "messages": 24
+        },
+        "coldEntries": 32,
+        "latestMs": {
+          "samples": 100,
+          "p50Ms": 1.012,
+          "p95Ms": 1.217,
+          "p99Ms": 1.368
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.183,
+          "p95Ms": 1.326,
+          "p99Ms": 1.367
+        },
+        "concurrentPageMs": {
+          "samples": 256,
+          "p50Ms": 1.635,
+          "p95Ms": 3.688,
+          "p99Ms": 11.204
+        },
+        "coldMs": {
+          "samples": 30,
+          "p50Ms": 20.202,
+          "p95Ms": 22.172,
+          "p99Ms": 22.608
+        },
+        "forkMs": {
+          "samples": 100,
+          "p50Ms": 3.028,
+          "p95Ms": 4.825,
+          "p99Ms": 6.755
+        },
+        "emptyDeleteMs": {
+          "samples": 100,
+          "p50Ms": 2.558,
+          "p95Ms": 3.54,
+          "p99Ms": 6.042
+        },
+        "emptyGcMs": {
+          "samples": 100,
+          "p50Ms": 2.986,
+          "p95Ms": 3.956,
+          "p99Ms": 5.745
+        },
+        "deleteMs": 3.021,
+        "exclusiveGcMs": 1114.501,
+        "first": {
+          "total": 5000,
+          "batches": 20,
+          "batchMs": {
+            "samples": 20,
+            "p50Ms": 56.974,
+            "p95Ms": 60.776,
+            "p99Ms": 60.956
+          }
+        },
+        "sharedGcMs": 1108.227,
+        "second": {
+          "total": 5000,
+          "batches": 20,
+          "batchMs": {
+            "samples": 20,
+            "p50Ms": 56.037,
+            "p95Ms": 60.006,
+            "p99Ms": 63.72
+          }
+        }
+      },
+      {
+        "n": 100000,
+        "admissionMs": {
+          "samples": 100,
+          "p50Ms": 3.046,
+          "p95Ms": 4.111,
+          "p99Ms": 4.979
+        },
+        "scannedPageRows": {
+          "runs": 24,
+          "sessions": 1,
+          "messages": 24
+        },
+        "coldEntries": 48,
+        "latestMs": {
+          "samples": 100,
+          "p50Ms": 1.429,
+          "p95Ms": 1.622,
+          "p99Ms": 1.887
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.677,
+          "p95Ms": 2.035,
+          "p99Ms": 2.436
+        },
+        "concurrentPageMs": {
+          "samples": 256,
+          "p50Ms": 2.555,
+          "p95Ms": 20.957,
+          "p99Ms": 62.041
+        },
+        "coldMs": {
+          "samples": 30,
+          "p50Ms": 2.554,
+          "p95Ms": 3.242,
+          "p99Ms": 3.792
+        },
+        "forkMs": {
+          "samples": 100,
+          "p50Ms": 3.272,
+          "p95Ms": 4.144,
+          "p99Ms": 5.883
+        },
+        "emptyDeleteMs": {
+          "samples": 100,
+          "p50Ms": 3.308,
+          "p95Ms": 4.274,
+          "p99Ms": 5.99
+        },
+        "emptyGcMs": {
+          "samples": 100,
+          "p50Ms": 3.065,
+          "p95Ms": 4.092,
+          "p99Ms": 6.287
+        },
+        "deleteMs": 3.916,
+        "exclusiveGcMs": 15505.8,
+        "first": {
+          "total": 50000,
+          "batches": 196,
+          "batchMs": {
+            "samples": 196,
+            "p50Ms": 77.912,
+            "p95Ms": 92.962,
+            "p99Ms": 100.801
+          }
+        },
+        "sharedGcMs": 14923.682,
+        "second": {
+          "total": 50000,
+          "batches": 196,
+          "batchMs": {
+            "samples": 196,
+            "p50Ms": 74.367,
+            "p95Ms": 91.527,
+            "p99Ms": 100.857
+          }
+        }
+      },
+      {
+        "nestedFlows": 1000,
+        "runs": 10000,
+        "forkAtFirstRunMs": {
+          "samples": 100,
+          "p50Ms": 55.009,
+          "p95Ms": 64.003,
+          "p99Ms": 67.934
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.455,
+          "p95Ms": 1.776,
+          "p99Ms": 2.202
+        }
+      }
+    ],
+    "base": [
+      {
+        "anchor": "base",
+        "branchDeletionOrdersVerified": true,
+        "concurrentAdmissionVerified": true,
+        "claimedAfterPrune": true,
+        "emptyForkRetained": true,
+        "workspaceIndependent": true,
+        "staleWriterRejected": true,
+        "delegatedLayout": false,
+        "cleanupResumed": true
+      },
+      {
+        "n": 1000,
+        "admissionMs": {
+          "samples": 100,
+          "p50Ms": 3.023,
+          "p95Ms": 3.991,
+          "p99Ms": 4.09
+        },
+        "scannedPageRows": {
+          "runs": 25,
+          "sessions": 1,
+          "messages": 24
+        },
+        "coldEntries": 120,
+        "latestMs": {
+          "samples": 100,
+          "p50Ms": 1.59,
+          "p95Ms": 2.018,
+          "p99Ms": 2.218
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.812,
+          "p95Ms": 2.168,
+          "p99Ms": 2.423
+        },
+        "concurrentPageMs": {
+          "samples": 256,
+          "p50Ms": 2.729,
+          "p95Ms": 35.931,
+          "p99Ms": 67.333
+        },
+        "coldMs": {
+          "samples": 30,
+          "p50Ms": 15.607,
+          "p95Ms": 17.901,
+          "p99Ms": 18.538
+        },
+        "forkMs": {
+          "samples": 100,
+          "p50Ms": 3.049,
+          "p95Ms": 4.188,
+          "p99Ms": 5.661
+        },
+        "emptyDeleteMs": {
+          "samples": 100,
+          "p50Ms": 3.146,
+          "p95Ms": 4.624,
+          "p99Ms": 6.689
+        },
+        "emptyGcMs": {
+          "samples": 100,
+          "p50Ms": 3.031,
+          "p95Ms": 4.129,
+          "p99Ms": 5.89
+        },
+        "deleteMs": 3.042,
+        "exclusiveGcMs": 122.222,
+        "first": {
+          "total": 500,
+          "batches": 2,
+          "batchMs": {
+            "samples": 2,
+            "p50Ms": 59.99,
+            "p95Ms": 62.183,
+            "p99Ms": 62.183
+          }
+        },
+        "sharedGcMs": 126.248,
+        "second": {
+          "total": 500,
+          "batches": 2,
+          "batchMs": {
+            "samples": 2,
+            "p50Ms": 63.007,
+            "p95Ms": 63.157,
+            "p99Ms": 63.157
+          }
+        }
+      },
+      {
+        "n": 10000,
+        "admissionMs": {
+          "samples": 100,
+          "p50Ms": 3.025,
+          "p95Ms": 3.342,
+          "p99Ms": 4.102
+        },
+        "scannedPageRows": {
+          "runs": 25,
+          "sessions": 1,
+          "messages": 24
+        },
+        "coldEntries": 32,
+        "latestMs": {
+          "samples": 100,
+          "p50Ms": 1.495,
+          "p95Ms": 1.813,
+          "p99Ms": 1.908
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.861,
+          "p95Ms": 2.17,
+          "p99Ms": 2.35
+        },
+        "concurrentPageMs": {
+          "samples": 256,
+          "p50Ms": 2.635,
+          "p95Ms": 10.859,
+          "p99Ms": 67.102
+        },
+        "coldMs": {
+          "samples": 30,
+          "p50Ms": 24.617,
+          "p95Ms": 26.821,
+          "p99Ms": 28.007
+        },
+        "forkMs": {
+          "samples": 100,
+          "p50Ms": 3.048,
+          "p95Ms": 4.107,
+          "p99Ms": 5.446
+        },
+        "emptyDeleteMs": {
+          "samples": 100,
+          "p50Ms": 3.169,
+          "p95Ms": 4.998,
+          "p99Ms": 6.077
+        },
+        "emptyGcMs": {
+          "samples": 100,
+          "p50Ms": 3.047,
+          "p95Ms": 4.92,
+          "p99Ms": 6.095
+        },
+        "deleteMs": 3.027,
+        "exclusiveGcMs": 1238.118,
+        "first": {
+          "total": 5000,
+          "batches": 20,
+          "batchMs": {
+            "samples": 20,
+            "p50Ms": 61.897,
+            "p95Ms": 69.921,
+            "p99Ms": 71.955
+          }
+        },
+        "sharedGcMs": 1238.045,
+        "second": {
+          "total": 5000,
+          "batches": 20,
+          "batchMs": {
+            "samples": 20,
+            "p50Ms": 63.837,
+            "p95Ms": 68.151,
+            "p99Ms": 69.557
+          }
+        }
+      },
+      {
+        "n": 100000,
+        "admissionMs": {
+          "samples": 100,
+          "p50Ms": 3.05,
+          "p95Ms": 4.12,
+          "p99Ms": 6.061
+        },
+        "scannedPageRows": {
+          "runs": 25,
+          "sessions": 1,
+          "messages": 24
+        },
+        "coldEntries": 48,
+        "latestMs": {
+          "samples": 100,
+          "p50Ms": 1.391,
+          "p95Ms": 1.666,
+          "p99Ms": 1.824
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.608,
+          "p95Ms": 2.049,
+          "p99Ms": 2.168
+        },
+        "concurrentPageMs": {
+          "samples": 256,
+          "p50Ms": 2.4,
+          "p95Ms": 58.378,
+          "p99Ms": 67.015
+        },
+        "coldMs": {
+          "samples": 30,
+          "p50Ms": 3.489,
+          "p95Ms": 3.97,
+          "p99Ms": 5.188
+        },
+        "forkMs": {
+          "samples": 100,
+          "p50Ms": 3.04,
+          "p95Ms": 4.04,
+          "p99Ms": 4.985
+        },
+        "emptyDeleteMs": {
+          "samples": 100,
+          "p50Ms": 3.224,
+          "p95Ms": 4.279,
+          "p99Ms": 7.062
+        },
+        "emptyGcMs": {
+          "samples": 100,
+          "p50Ms": 3.053,
+          "p95Ms": 4.316,
+          "p99Ms": 5.068
+        },
+        "deleteMs": 2.877,
+        "exclusiveGcMs": 13460.741,
+        "first": {
+          "total": 50000,
+          "batches": 196,
+          "batchMs": {
+            "samples": 196,
+            "p50Ms": 66.986,
+            "p95Ms": 85.139,
+            "p99Ms": 91.051
+          }
+        },
+        "sharedGcMs": 10281.609,
+        "second": {
+          "total": 50000,
+          "batches": 196,
+          "batchMs": {
+            "samples": 196,
+            "p50Ms": 50.909,
+            "p95Ms": 66.969,
+            "p99Ms": 81.898
+          }
+        }
+      },
+      {
+        "nestedFlows": 1000,
+        "runs": 10000,
+        "forkAtFirstRunMs": {
+          "samples": 100,
+          "p50Ms": 39.972,
+          "p95Ms": 43.087,
+          "p99Ms": 44.527
+        },
+        "pageMs": {
+          "samples": 100,
+          "p50Ms": 1.29,
+          "p95Ms": 1.599,
+          "p99Ms": 1.755
+        }
+      }
+    ]
+  },
+  "combinedSchema": {
+    "head": {
+      "anchor": "head",
+      "branchDeletionOrdersVerified": true,
+      "concurrentAdmissionVerified": true,
+      "claimedAfterPrune": true,
+      "emptyForkRetained": true,
+      "workspaceIndependent": true,
+      "staleWriterRejected": true,
+      "delegatedLayout": true,
+      "cleanupResumed": true
+    },
+    "base": {
+      "anchor": "base",
+      "branchDeletionOrdersVerified": true,
+      "concurrentAdmissionVerified": true,
+      "claimedAfterPrune": true,
+      "emptyForkRetained": true,
+      "workspaceIndependent": true,
+      "staleWriterRejected": true,
+      "delegatedLayout": true,
+      "cleanupResumed": true
+    }
+  },
+  "pageDiagnostics": [
+    [
+      {
+        "config": {
+          "pg": "17.6",
+          "fsync": "on",
+          "sync": "on"
+        },
+        "historyRuns": 100000,
+        "blockSize": 32,
+        "cycles": 8,
+        "schedule": [0, 1, 1, 0, 1, 0, 0, 1]
+      },
+      {
+        "tipPlan": "empty",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 0
+      },
+      {
+        "tipPlan": "long",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 1
+      },
+      {
+        "anchor": "head",
+        "planningMs": {
+          "p50": 0.17,
+          "p95": 0.204,
+          "p99": 0.25
+        },
+        "executionMs": {
+          "p50": 0.267,
+          "p95": 0.436,
+          "p99": 0.491
+        }
+      },
+      {
+        "anchor": "base",
+        "planningMs": {
+          "p50": 0.163,
+          "p95": 0.238,
+          "p99": 0.445
+        },
+        "executionMs": {
+          "p50": 0.269,
+          "p95": 0.493,
+          "p99": 0.521
+        }
+      },
+      {
+        "name": "concurrent_page_unnamed",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.82,
+          "p95": 2.647,
+          "p99": 51.427
+        },
+        "operationsPerSecond": 2017.784,
+        "cpuUsPerRead": 1217.525,
+        "throttledPeriods": 5,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_unnamed",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.905,
+          "p95": 9.922,
+          "p99": 51.324
+        },
+        "operationsPerSecond": 1748.837,
+        "cpuUsPerRead": 1362.123,
+        "throttledPeriods": 8,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_prepared",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.217,
+          "p95": 1.843,
+          "p99": 2.262
+        },
+        "operationsPerSecond": 5127.677,
+        "cpuUsPerRead": 618.156,
+        "throttledPeriods": 2,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_prepared",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.245,
+          "p95": 1.822,
+          "p99": 19.776
+        },
+        "operationsPerSecond": 4009.886,
+        "cpuUsPerRead": 643.581,
+        "throttledPeriods": 4,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      }
+    ],
+    [
+      {
+        "config": {
+          "pg": "17.6",
+          "fsync": "on",
+          "sync": "on"
+        },
+        "historyRuns": 100000,
+        "blockSize": 32,
+        "cycles": 8,
+        "schedule": [0, 1, 1, 0, 1, 0, 0, 1]
+      },
+      {
+        "tipPlan": "empty",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 0
+      },
+      {
+        "tipPlan": "long",
+        "index": "runs_tenant_id_session_id_mailbox_position_key",
+        "direction": "Backward",
+        "rows": 1
+      },
+      {
+        "anchor": "head",
+        "planningMs": {
+          "p50": 0.167,
+          "p95": 0.254,
+          "p99": 0.255
+        },
+        "executionMs": {
+          "p50": 0.269,
+          "p95": 0.44,
+          "p99": 0.493
+        }
+      },
+      {
+        "anchor": "base",
+        "planningMs": {
+          "p50": 0.161,
+          "p95": 0.197,
+          "p99": 0.201
+        },
+        "executionMs": {
+          "p50": 0.292,
+          "p95": 0.486,
+          "p99": 0.512
+        }
+      },
+      {
+        "name": "concurrent_page_unnamed",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.741,
+          "p95": 10.522,
+          "p99": 50.102
+        },
+        "operationsPerSecond": 1770.34,
+        "cpuUsPerRead": 1182.539,
+        "throttledPeriods": 9,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_unnamed",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.89,
+          "p95": 2.565,
+          "p99": 50.292
+        },
+        "operationsPerSecond": 2357.763,
+        "cpuUsPerRead": 1332.149,
+        "throttledPeriods": 4,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_prepared",
+        "anchor": "head",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.201,
+          "p95": 1.728,
+          "p99": 2.222
+        },
+        "operationsPerSecond": 4297.587,
+        "cpuUsPerRead": 603.628,
+        "throttledPeriods": 3,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      },
+      {
+        "name": "concurrent_page_prepared",
+        "anchor": "base",
+        "parallel": 8,
+        "count": 1024,
+        "blocks": 32,
+        "latencyMs": {
+          "p50": 1.258,
+          "p95": 1.794,
+          "p99": 2.625
+        },
+        "operationsPerSecond": 4596.862,
+        "cpuUsPerRead": 642.947,
+        "throttledPeriods": 3,
+        "walBytes": 0,
+        "walBytesPerOperation": 0,
+        "sessionUpdates": 0,
+        "runInserts": 0
+      }
+    ]
+  ]
+}

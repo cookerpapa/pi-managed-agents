@@ -662,6 +662,15 @@ node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments
 node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/run-flow-history.mjs
 ```
 
+For the frozen-base comparison, pass `base` to either command above. The paired benchmark uses the same 100,000 predecessors and admission IDs in two isolated schemas. It reports client latency, PG row updates, WAL and the base lookup plan. Run the page-plan diagnostic separately to compare concurrent reads with and without a named prepared query on the disposable Linux PG fixture.
+
+```sh
+node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/compare-flow-admission.mjs
+node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/compare-flow-admission.mjs --page-plans
+```
+
+[Measurements and recovery behavior](../../../docs/reports/flow-base-admission-20261123.md).
+
 Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.
 
 For the directory closure path use the existing operator fixture with `--directory-recovery-web` and an unused report path. It stages the matched fixed Guest executable only in its owned disposable VM. Real Chrome receives the returned drafts, selects a real directory and submits the next Run through the Session API. [Evidence](../../../docs/reports/directory-recovery-and-flow-20261123.md).

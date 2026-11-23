@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0357](0357-flow-base-admission-study.md) compares frozen-base and moving-head Run admission in the isolated Flow layouts.
+
 [ADR-0356](0356-run-flow-head-and-directory-stop.md) scopes the Run-linked Flow experiment and directory recovery.
 
 [ADR-0355](0355-provider-usage-outside-session-projection.md) moves model usage entirely outside the Session projection path.

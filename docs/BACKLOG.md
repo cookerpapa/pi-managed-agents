@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare a frozen branch base with a moving Session head on identical admission workloads. Check deletion in both orders, WAL, recent pages and bounded collection. [Results](reports/flow-base-admission-20261123.md).
+
 - [x] Verify directory loss, native abort, returned drafts, Chrome reselection and cold continuation. [Candidate acceptance](reports/directory-recovery-and-flow-20261123.md).
 - [x] Exercise the two-table Run-boundary Flow layout on the combined delegated schema, plus isolated PG and 50 ms Kafka throughput studies. [Decision](adr/0356-run-flow-head-and-directory-stop.md) and [measurements](reports/directory-recovery-and-flow-20261123.md).
 
