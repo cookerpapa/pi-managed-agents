@@ -1,5 +1,5 @@
 // Match the serving catalogue/preparation, ordered dispatcher, controller and
-// boot-scoped return mailbox. This arm exercises the three pure control reads.
+// boot-scoped return mailbox. Exercise direct delegation and the three pure control reads.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import native from "@confluentinc/kafka-javascript";
@@ -12,9 +12,15 @@ import { restoreToolReply } from "../../../packages/supervisor-host/src/tool-rep
 import { SubagentController } from "../../../packages/control-plane/src/subagent-controller.ts";
 import { ControlToolDispatcher } from "../../../packages/control-plane/src/control-tool-dispatcher.ts";
 import { ControlToolRegistry } from "../../../packages/control-plane/src/control-tool-registry.ts";
+import { delegationPorts } from "./delegation-ports.mjs";
 import { DelegatedHistoryReader } from "../../../packages/control-plane/src/delegated-history-reader.ts";
 
-export async function servingDelegatedQueries(brokers, url, schema) {
+export async function servingDelegatedQueries(
+  brokers,
+  url,
+  schema,
+  { pool, topic, place, childAnchor, initialReplayComplete },
+) {
   const dsn = new URL(url);
   dsn.searchParams.set("options", "-c search_path=" + schema);
   const database = createDatabase({ connectionString: dsn.href, maxConnections: 3 }),
@@ -23,17 +29,26 @@ export async function servingDelegatedQueries(brokers, url, schema) {
     }).admin();
   const mailbox = new KafkaToolReplyMailbox({ brokers, bootId: randomUUID(), replicas: 3 });
   const publisher = new KafkaToolReplyPublisher(brokers, "query-" + randomUUID());
+  const { directDelegation, directDelegations } = delegationPorts({
+    pool,
+    database,
+    topic,
+    place,
+    initialReplayComplete,
+  });
   const controller = new SubagentController({
     database,
     managementToken: "unused",
     allowInsecureHttp: true,
     delegatedReads: new DelegatedHistoryReader(database),
+    directDelegation,
   });
   const pending = new Map(),
     seen = [];
   const dispatcher = new ControlToolDispatcher({
     database,
     admittedDelegatedReads: true,
+    directDelegations,
     partitions: 1,
     ownsPartition: () => true,
     execute: (c, current) => controller.executeTool(c, current),
@@ -47,7 +62,7 @@ export async function servingDelegatedQueries(brokers, url, schema) {
     implementation: () => undefined,
     maximumDepth: null,
     nativeConversations: {
-      childAnchor: async () => null,
+      childAnchor,
       conversationDepth: async () => 0,
       originalControlIntent: async () => assert.fail(),
     },
@@ -85,7 +100,13 @@ export async function servingDelegatedQueries(brokers, url, schema) {
       const refs = [];
       for (const write of writes) {
         const task = write.type === "task" && durableToolState(write.value);
-        if (!task?.intent || !["list", "status", "wait"].includes(task.intent.arguments.action))
+        if (
+          !task?.intent ||
+          !(
+            ["ALPHA_JOB", "BETA_JOB"].includes(task.intent.arguments.task) ||
+            ["list", "status", "wait"].includes(task.intent.arguments.action)
+          )
+        )
           continue;
         const { id, conversationId, intent } = task;
         const bindings = await runtime.create({
@@ -103,7 +124,8 @@ export async function servingDelegatedQueries(brokers, url, schema) {
           },
           environment: () => assert.fail(),
         });
-        const tool = bindings.current().find((t) => t.tool.name === "subagent_control").tool;
+        const name = intent.arguments.task ? "subagent" : "subagent_control";
+        const tool = bindings.current().find((t) => t.tool.name === name).tool;
         const prepared = await withToolInvocation(
           { id: "task:" + id, nativeToolCallId: intent.callId },
           () => tool.prepareExecution(intent.callId, intent.arguments),
@@ -131,7 +153,7 @@ export async function servingDelegatedQueries(brokers, url, schema) {
       try {
         const result = await handle.result();
         const data = JSON.parse(result.content[0].text);
-        seen.push([args.action, data]);
+        if (args.action) seen.push([args.action, data]);
         return result;
       } finally {
         pending.delete(taskId);

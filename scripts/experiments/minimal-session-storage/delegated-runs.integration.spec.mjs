@@ -13,12 +13,14 @@ import {
 } from "@earendil-works/pi-ai/providers/faux";
 import { Harness, createRegistry, defineTool, defineExtension } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
+import { movingStarts } from "./moving-checkpoint.mjs";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { projectRecord } from "./project-record.mjs";
 import { claimBatchSql } from "./fixture.mjs";
 import { delegatedControl, admitDelegatedRun } from "./delegated-runs.mjs";
 import {
+  openDelegatedInvocation,
   runDelegation,
   sendDelegatedMessage,
   sendToActiveConversation,
@@ -211,37 +213,52 @@ it.skipIf(!url).each([true, false])(
             ...["read", "write"].map((name) =>
               register(name, Type.Object({}), () => assert.fail("file tool was not requested")),
             ),
-            register("fixture_delegate_pair", Type.Object({}), async (_args, api, context) => {
-              const anchor = await api.commit(
-                async (tx) =>
-                  (await tx.scanEntries({ conversationId: 1 }, 8)).items.find(
-                    (e) => e.model?.[0]?.role === "user",
-                  ).id,
-                context,
-              );
-              const result = await Promise.all([
-                runDelegation(
+            register(
+              "subagent",
+              Type.Object({ task: Type.String(), context: Type.String(), workspace: Type.Any() }),
+              async (args, api, context) => {
+                const { task } = args;
+                if (queryChannel) {
+                  const result = await queryChannel.result(api.taskId, args);
+                  const child = JSON.parse(result.content[0].text);
+                  assert.equal(child.state, "completed");
+                  if (task === "ALPHA_JOB") {
+                    aId = child.executionId;
+                    assert.equal(child.output, "ALPHA_PRIVATE");
+                  } else bId = child.executionId;
+                  // The fixture parent consumes a summary to keep its model transcript deterministic.
+                  return text("Check finished");
+                }
+                const alpha = task === "ALPHA_JOB";
+                const anchor = alpha
+                  ? await api.commit(
+                      async (tx) =>
+                        (await tx.scanEntries({ conversationId: 1 }, 8)).items.find(
+                          (e) => e.model?.[0]?.role === "user",
+                        ).id,
+                      context,
+                    )
+                  : null;
+                const result = await runDelegation(
                   api,
                   store,
                   control,
-                  { task: "ALPHA_JOB", mode: "branch", at: anchor, workspace: { tools: ["read"] } },
+                  {
+                    task,
+                    mode: alpha ? "branch" : "fresh",
+                    at: anchor,
+                    workspace: alpha ? { tools: ["read"] } : null,
+                  },
                   context,
-                  "alpha",
-                ),
-                runDelegation(
-                  api,
-                  store,
-                  control,
-                  { task: "BETA_JOB", mode: "fresh", workspace: null },
-                  context,
-                  "beta",
-                ),
-              ]);
-              [aId, bId] = result.map((r) => r.agentId);
-              assert(result.every((r) => r.status === "done"));
-              assert.equal(result[0].output, "ALPHA_PRIVATE");
-              return text("Both checks finished");
-            }),
+                );
+                assert.equal(result.status, "done");
+                if (alpha) {
+                  aId = result.agentId;
+                  assert.equal(result.output, "ALPHA_PRIVATE");
+                } else bId = result.agentId;
+                return text("Check finished");
+              },
+            ),
             register(
               "subagent_control",
               Type.Object({
@@ -294,6 +311,7 @@ it.skipIf(!url).each([true, false])(
       let sent = 0;
       async function response(transcript) {
         const messages = JSON.stringify(transcript.messages);
+        const inputs = JSON.stringify(transcript.messages.filter((m) => m.role === "user"));
         requests.push(messages);
         const last = transcript.messages.at(-1);
         const visible = new Set();
@@ -302,7 +320,7 @@ it.skipIf(!url).each([true, false])(
           for (const tool of m.toolsAdded ?? []) visible.add(tool.name);
         }
         const fileTools = [...visible].filter((n) => n === "read" || n === "write").sort();
-        if (messages.includes("RESUME_ALPHA") && messages.includes("ALPHA_JOB")) {
+        if (messages.includes("RESUME_ALPHA") && inputs.includes("ALPHA_JOB")) {
           assert.deepEqual(fileTools, retainRead ? ["read"] : []);
           assert(
             messages.includes("ALPHA_PRIVATE") &&
@@ -336,7 +354,7 @@ it.skipIf(!url).each([true, false])(
             "again",
           );
         }
-        if (messages.includes("ALPHA_JOB")) {
+        if (inputs.includes("ALPHA_JOB")) {
           assert.deepEqual(fileTools, ["read"]);
           assert(messages.includes("ROOT_TWO"));
           await checked(ready.promise);
@@ -350,7 +368,7 @@ it.skipIf(!url).each([true, false])(
           }
           return say("ALPHA_PRIVATE");
         }
-        if (messages.includes("BETA_JOB")) {
+        if (inputs.includes("BETA_JOB")) {
           assert.deepEqual(fileTools, []);
           assert(!messages.includes("ROOT_TWO"));
           const b = (await control.list()).agents.find((r) => r.task === "BETA_JOB");
@@ -361,7 +379,20 @@ it.skipIf(!url).each([true, false])(
           return say("BETA_PRIVATE");
         }
         if (messages.includes("ROOT_TWO") && last.role !== "toolResult")
-          return tool("fixture_delegate_pair", {}, "family");
+          return fauxAssistantMessage(
+            ["ALPHA_JOB", "BETA_JOB"].map((task) =>
+              fauxToolCall(
+                "subagent",
+                {
+                  task,
+                  context: task === "ALPHA_JOB" ? "branch" : "fresh",
+                  workspace: task === "ALPHA_JOB" ? { tools: ["read"] } : null,
+                },
+                { id: "delegate-" + task },
+              ),
+            ),
+            { stopReason: "toolUse" },
+          );
         return say("root done");
       }
       fake.setResponses(
@@ -397,7 +428,37 @@ it.skipIf(!url).each([true, false])(
       if (process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS) {
         const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS.split(",");
         const { servingDelegatedQueries } = await import("./serving-delegated-queries.mjs");
-        queryChannel = await servingDelegatedQueries(brokers, url, schema);
+        queryChannel = await servingDelegatedQueries(brokers, url, schema, {
+          pool,
+          topic,
+          initialReplayComplete: (p) => transport?.initialReplayComplete(p) === true,
+          childAnchor: async (_ref, inherit) =>
+            inherit
+              ? String(
+                  (await store.scanEntries({ conversationId: 1 }, 8, undefined, ctx)).items.find(
+                    (e) => e.model?.[0]?.role === "user",
+                  ).id,
+                )
+              : null,
+          place: async (row, cmd, active) => {
+            if (!active()) return;
+            if (row.source) await store.ensureSource(row.source);
+            const lane = await openDelegatedInvocation(
+              {
+                taskId: cmd.taskId,
+                conversationId: cmd.conversationId,
+                commit: h.commit.bind(h),
+              },
+              store,
+              row,
+              row.source,
+              ctx,
+            );
+            const child = await h.conversation(lane, ctx);
+            if (active())
+              await child.submit({ type: "input", requestId: row.id, content: row.task }, ctx);
+          },
+        });
         const { WorkspaceOperationRouter } = await import("./workspace-operation-router.mjs");
         const router = new WorkspaceOperationRouter({
           pool,
@@ -421,11 +482,29 @@ it.skipIf(!url).each([true, false])(
         ctx,
       );
       await checked(ready.promise);
+      if (queryChannel) {
+        // The child has already placed its input. Test a lost *active prefix*
+        // independently of an unprojected partition backlog or a zombie Worker.
+        const cut = await one(
+          `select r.projection_pin,h.next_offset from runs r
+          join accepted_fact_projection_offsets h on h.topic=$2 and h.partition=r.projection_partition
+          where r.id=$1`,
+          [r2.runId, topic],
+        );
+        assert(cut.projection_pin !== null);
+        const pin = BigInt(cut.projection_pin),
+          head = BigInt(cut.next_offset);
+        assert(head > pin + 1n);
+        const [[, durable, expired]] = await movingStarts(pool, topic, [
+          { partition: 0, low: pin + 1n, high: head },
+        ]);
+        assert.equal(durable, head);
+        assert.match(expired.message, /Required projection suffix is unavailable/);
+      }
       const before = (await control.list()).agents;
       const beta = before.find((r) => r.task === "BETA_JOB");
       const source = await one("select source_task_id from runs where id=$1", [beta.id]);
       const duplicate = {
-        id: beta.id,
         callerRunId: r2.runId,
         taskId: Number(source.source_task_id),
         task: "BETA_JOB",
@@ -440,7 +519,7 @@ it.skipIf(!url).each([true, false])(
       await assert.rejects(
         admitDelegatedRun(pool, r2, {
           ...duplicate,
-          id: randomUUID(),
+          taskId: duplicate.taskId + 1000000,
           agentId: beta.id,
           mode: "continue",
         }),
@@ -498,7 +577,6 @@ it.skipIf(!url).each([true, false])(
       assert.notEqual(scope.writerId, r2.writerId);
       await assert.rejects(
         admitDelegatedRun(pool, r2, {
-          id: randomUUID(),
           callerRunId: r2.runId,
           taskId: 1,
           task: "stale",

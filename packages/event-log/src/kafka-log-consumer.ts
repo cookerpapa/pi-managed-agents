@@ -698,17 +698,20 @@ export class KafkaLogConsumer<T> {
     throw new Error("Kafka replay did not reach its startup boundary");
   }
 
+  initialReplayComplete(partition: number): boolean {
+    const target = this.#initialTargets.get(partition);
+    return (
+      this.ownsPartition(partition) &&
+      !this.#blocked.has(partition) &&
+      target !== undefined &&
+      (this.#processedOffsets.get(partition) ?? 0n) >= target
+    );
+  }
   async waitForPartition(partition: number, timeoutMs = 120_000): Promise<void> {
     const end = Date.now() + timeoutMs;
     while (!this.#closing && Date.now() < end) {
-      const target = this.#initialTargets.get(partition);
       if (this.#blocked.has(partition)) throw this.#blocked.get(partition)!;
-      if (
-        this.#ready &&
-        target !== undefined &&
-        (this.#processedOffsets.get(partition) ?? 0n) >= target
-      )
-        return;
+      if (this.initialReplayComplete(partition)) return;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error("Session partition replay is unavailable");

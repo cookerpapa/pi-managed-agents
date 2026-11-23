@@ -44,6 +44,11 @@ export class SubagentController {
       allowInsecureHttp: boolean;
       treePolicy?: CloudSubagentTreePolicy;
       candidateMessages?: boolean;
+      /** Matched root-only Session store. The native task names a single child Run. */
+      directDelegation?(
+        command: AcceptedControlToolCommand,
+        current: () => boolean,
+      ): Promise<ControlToolOutcome>;
       delegatedReads?: Pick<
         import("./delegated-history-reader.ts").DelegatedHistoryReader,
         "readTool"
@@ -199,6 +204,8 @@ export class SubagentController {
         if (!result) return { waiting: true };
         value = result;
       } else if (args.action === "run") {
+        if (this.options.directDelegation)
+          return await this.options.directDelegation(call, current);
         const child = await this.#jobs.start({
           id: call.recovery?.operationId ?? call.operationId,
           tenantId: scope.tenantId,

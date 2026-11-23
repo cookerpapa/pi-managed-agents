@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./delegation-identity": "./src/delegation-identity.ts",
     "./guest": "./src/guest.ts",
     "./workspace": "./src/workspace-seed.ts",
     "./uploads": "./src/user-upload.ts",

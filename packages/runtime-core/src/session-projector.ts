@@ -497,6 +497,9 @@ export class SessionProjector {
       throw new Error("Session Projector assignment is settling");
     return owner;
   }
+  initialReplayComplete(partition: number): boolean {
+    return this.#consumer.initialReplayComplete(partition);
+  }
   ownsPartition(partition: number): boolean {
     return this.#consumer.ownsPartition(partition);
   }

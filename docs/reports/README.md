@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Task-keyed delegation](task-keyed-delegation-20261123.md) covers independent mailbox identities, owner replacement and Projector-only replay in the candidate.
+
 - [Direct delegation before and after admission](direct-delegation-handoff-20261123.md) checks the Worker handoff, original Kafka reference and candidate browser reads.
 
 - [Conversation Entry index cost](conversation-entry-index-cost-20261122.md) compares mixed projection throughput, PG append time, WAL, index size and long-history reads.

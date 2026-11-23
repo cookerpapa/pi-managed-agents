@@ -1,3 +1,4 @@
+import { delegatedRunId } from "../../../packages/protocol/src/delegation-identity.ts";
 import assert from "node:assert/strict";
 import { durableControlIntent } from "@pi-cloud/protocol";
 
@@ -47,15 +48,22 @@ export function projectChildOutcomes(
   for (const t of dispatches ?? [])
     if (
       t.target === "control" &&
+      (!delegatedRuns || t.sourceDocumentId === undefined) &&
       (t.toolName === "subagent" ||
         (t.toolName === "subagent_control" &&
           durableControlIntent(fact.commit, t).arguments.action === "run"))
     )
-      trackCaller(t.taskId, t.recovery?.operationId ?? t.operationId);
+      trackCaller(
+        t.taskId,
+        delegatedRuns
+          ? delegatedRunId(fact.scope, t.taskId)
+          : (t.recovery?.operationId ?? t.operationId),
+      );
   for (const w of writes) {
     if (w.type !== "document.create") continue;
     const { record, content } = w;
     if (
+      !delegatedRuns &&
       record.kind === "pi-cloud.tool-hostcall" &&
       record.scope.kind === "task" &&
       content.kind === "base" &&

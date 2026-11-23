@@ -24,13 +24,14 @@ alter table runs
     or (root_run_id is not null and caller_run_id is not null and agent_id is not null and root_run_id<>id
      and mailbox_position is null and lease_id is null and source_task_id is not null and source_task_id>0
      and context_mode is not null and context_mode in ('fresh','branch','continue')
-     and (context_mode='fresh')=(context_at is null) and (context_at is null or context_at>0)
+     and (context_mode<>'fresh' or context_at is null) and (context_mode<>'continue' or context_at is not null) and (context_at is null or context_at>0)
      and (context_mode='continue')=(previous_run_id is not null) and (previous_run_id is null)=(agent_id=id)
      and (native_lane is null or native_lane>1)
      and state in ('preparing','running','completed','failed','cancelled','unknown')));
 drop index runs_one_active;
 create unique index runs_one_active on runs(tenant_id,session_id)
   where mailbox_position is not null and state in ('running','cancel_requested');
+create unique index delegated_root_task on runs(root_run_id,source_task_id) where root_run_id is not null;
 create unique index delegated_live_agent on runs(agent_id) where agent_id is not null and state in ('preparing','running');
 create unique index delegated_successor on runs(previous_run_id) where previous_run_id is not null;
 create unique index delegated_lane on runs(tenant_id,session_id,native_lane) where native_lane is not null;

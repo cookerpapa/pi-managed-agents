@@ -66,6 +66,7 @@ export async function openDelegatedTransport(brokers, topic, apply) {
     await reader.waitUntilAssigned(20000);
     return {
       close,
+      initialReplayComplete: (partition) => reader.initialReplayComplete(partition),
       async publish(fact) {
         let producer = producers.get(fact.scope.writerId);
         if (!producer) {

@@ -1,3 +1,4 @@
+import { restoredDelegationIntent } from "./task-delegation.ts";
 import { readSealedFamily, type SealedFamilyRead } from "./sealed-family.ts";
 import { NativeProjectionProgress } from "../native-projection-progress.ts";
 import { nativeRead } from "./read-lifetime.ts";
@@ -167,6 +168,7 @@ export class PostgresDurableSessionHost {
        * native store owns subsequent publications; the host owns lease and mailbox lifetime. */
       sealedRecovery?: {
         topic: string;
+        delegatedRuns?: boolean;
         hydrate(
           family: SealedFamilyRead,
           authority: ActiveExecutionAuthority,
@@ -253,6 +255,16 @@ export class PostgresDurableSessionHost {
     await owner.authority.assertCurrent();
     return nativeRead(
       async () => {
+        if (this.options.sealedRecovery?.delegatedRuns) {
+          const source = await restoredDelegationIntent(
+            await owner.storage,
+            binding,
+            conversationId,
+            taskId,
+          );
+          await owner.authority.assertCurrent();
+          return source;
+        }
         let after = 0;
         for (;;) {
           // History is indexed by this one Task identity, never a Session journal scan.
@@ -805,6 +817,7 @@ export class PostgresDurableSessionHost {
                 this.options.database,
                 { ...binding, fencingToken: identity.fencingToken },
                 source.topic,
+                { delegatedRuns: source.delegatedRuns === true },
               ),
             readSignal,
             readFailed,

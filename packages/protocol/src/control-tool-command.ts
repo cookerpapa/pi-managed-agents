@@ -12,6 +12,8 @@ export type ToolImplementation = Readonly<{
   catalogScope?: string;
 }>;
 
+/** The candidate uses the execution checkpoint and logical child Run ID here.
+ * The enclosing dispatch operationId correlates the current mailbox delivery. */
 export type ControlToolRecoverySource = Readonly<{
   sequence: number;
   operationId: string;

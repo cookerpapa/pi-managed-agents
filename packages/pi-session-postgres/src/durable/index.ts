@@ -1,3 +1,4 @@
+export { restoredDelegationIntent } from "./task-delegation.ts";
 export {
   PublishedDurableStorage,
   type DurableStorageOptions,
@@ -62,6 +63,7 @@ export {
 export { collectInputConfirmations, changedInputConfirmations } from "./input-confirmations.ts";
 export {
   readSealedFamily,
+  readSealedDelegationIntent,
   resumeFamilyCheckpoint,
   saveSealedFamily,
   hydrateSealedFamily,

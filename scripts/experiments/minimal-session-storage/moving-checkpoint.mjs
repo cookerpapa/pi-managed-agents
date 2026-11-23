@@ -74,6 +74,8 @@ export function foldLive(documents = {}, writes) {
 export function checkpoint(view, record) {
   const inboxRoutes = emptyInboxRoutes(view.inboxes);
   if (
+    // The caller still needs the Kafka delivery reference on Projector-only restart.
+    view.childCallers !== undefined ||
     view.rootInputDoc ||
     !inboxRoutes ||
     Object.keys(view.pendingTools ?? {}).length ||

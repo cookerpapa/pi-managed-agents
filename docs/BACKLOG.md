@@ -3,7 +3,7 @@
 ## Minimal Session storage feasibility
 
 - [x] Adopt the measured Conversation Entry index on the candidate. Verify the child directory, two invocations of one child after root compaction, projected control reads, and intersected Workspace grants through a cold owner.
-- [ ] Resolve PG-only handoff of an admitted native `subagent` intent when the child Run has yet to be registered. Keep independent recovery for an already registered child and late obsolete writers. [Direct delegation release gate](reports/direct-delegation-handoff-20261123.md).
+- [x] Reattach a direct delegation by native task before and after child Run admission, across two owner replacements and on Projector-only replay. Verify the original branch cutoff after parent compaction and suppress a stopped caller. [Decision](adr/0353-native-task-delegation-identity.md) and [acceptance](reports/task-keyed-delegation-20261123.md).
 
 - [x] Retire the built-in workflow tool and guest control callbacks in the candidate. Keep native child delegation and its recovery path. [ADR-0352](adr/0352-retire-workflow-tool.md).
 

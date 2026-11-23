@@ -4,7 +4,7 @@ import { KafkaLogConsumer } from "../../../packages/event-log/src/kafka-log-cons
 import { KafkaWorkerProducer } from "../../../packages/event-log/src/kafka-worker-producer.ts";
 import { encodeWorkspaceFact, decodeWorkspaceFact } from "./workspace-operations.mjs";
 
-export async function readRetainedPrefix(brokers, topic, native, plan) {
+export async function readRetainedPrefix(brokers, topic, native, plan, consumer) {
   const admin = new kafkaNative.KafkaJS.Kafka({
     kafkaJS: { brokers, logLevel: kafkaNative.KafkaJS.logLevel.NOTHING },
   }).admin();
@@ -24,7 +24,8 @@ export async function readRetainedPrefix(brokers, topic, native, plan) {
       return starts;
     },
     decode: (v) => decodeWorkspaceFact(v).fact,
-    handler: async (r) => {
+    handler: async (r, current) => {
+      await consumer?.observe(r, current, reader);
       for (const ref of r.fact.tools)
         found.push({
           offset: Number(r.offset),
@@ -61,6 +62,8 @@ export async function readRetainedPrefix(brokers, topic, native, plan) {
     signal.addEventListener("abort", timeout, { once: true });
     try {
       await end.promise;
+      await reader.waitForPartition(0, 15000);
+      await consumer?.drained();
     } finally {
       signal.removeEventListener("abort", timeout);
     }

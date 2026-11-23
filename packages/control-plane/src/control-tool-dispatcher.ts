@@ -7,6 +7,7 @@ import {
   parseControlToolDispatch,
   parseToolResultPayload,
   parsePackedToolResultPayload,
+  type OriginalControlToolIntent,
   type ToolResultData,
   type ToolResultPayload,
   type ImagePacked,
@@ -21,7 +22,7 @@ import type { KafkaAcceptedFactRecord } from "@pi-cloud/runtime-core/kafka-accep
 
 type Pending = {
   dispatch: DurableControlToolDispatch;
-  query?: AcceptedControlToolCommand;
+  admittedCommand?: AcceptedControlToolCommand;
   sequence: number;
   partition: number;
   dirty: boolean;
@@ -71,8 +72,27 @@ function admittedDelegatedQuery(
       nativeSequence: fact.commit.seq,
     };
 }
-/** Reconciles repeatable control effects from native history. Pending memory
- * contains references; it is neither a task scheduler nor a durable command queue. */
+function admittedDelegation(
+  fact: Extract<KafkaAcceptedFactRecord["fact"], { kind: "durable_commit" }>,
+  ref: DurableControlToolDispatch,
+): AcceptedControlToolCommand | undefined {
+  if (ref.recovery) {
+    // Validate the native document in this commit. Load the sealed source only
+    // if the task still waits after the partition finishes its startup replay.
+    durableControlRecovery(fact.commit, ref);
+    return;
+  }
+  const intent = durableControlIntent(fact.commit, ref);
+  return {
+    ...ref,
+    kind: "control_tool",
+    arguments: intent.arguments,
+    nativeCallId: intent.callId,
+    nativeSequence: fact.commit.seq,
+  };
+}
+/** Reconciles control effects from admitted native history. The candidate also
+ * retains validated direct requests in memory until task settlement or fencing. */
 export class ControlToolDispatcher {
   readonly #pending = new Map<string, Pending>();
   readonly #active = new Map<string, Promise<void>>();
@@ -86,6 +106,11 @@ export class ControlToolDispatcher {
       images?: ImageAttachmentCodec;
       partitions: number;
       admittedDelegatedReads?: boolean;
+      /** Only the matched delegated-Run composition supplies a sealed task reader. */
+      directDelegations?: {
+        initialReplayComplete(partition: number): boolean;
+        source(ref: DurableControlToolDispatch): Promise<OriginalControlToolIntent>;
+      };
       ownsPartition(partition: number): boolean;
       execute(
         command: AcceptedControlToolCommand,
@@ -143,9 +168,8 @@ export class ControlToolDispatcher {
     }
     if (fact.kind !== "durable_commit") return;
     // The publication decoder validated the same-commit intent. Retain only
-    // the transport reference, not another expanded argument copy.
-    // Recovery reads this exact descriptor from cloud_metadata; storing its
-    // expanded arguments here would turn an ordinary replay into a conflict.
+    // the transport identity separately from any candidate in-memory command.
+    // Cold recovery compares the descriptor without expanded arguments.
     let admitted: boolean | undefined;
     for (const reference of fact.tools) {
       if (reference.target !== "control" || reference.sourceDocumentId !== undefined) continue;
@@ -154,15 +178,21 @@ export class ControlToolDispatcher {
         : this.options.replayable?.(reference.toolName) !== false;
       if (!repeatable && admitted === undefined) admitted = (await commitBeforeEffect?.()) ?? false;
       if (!current()) return;
-      const query = this.options.admittedDelegatedReads
-        ? admittedDelegatedQuery(fact, reference)
-        : undefined;
+      const admittedCommand =
+        reference.toolName === "subagent" &&
+        this.options.directDelegations &&
+        !reference.implementation
+          ? admittedDelegation(fact, reference)
+          : this.options.admittedDelegatedReads
+            ? admittedDelegatedQuery(fact, reference)
+            : undefined;
+      if (!current()) return;
       this.#remember(
         reference,
         fact.commit.seq,
         record.partition,
         repeatable ? "repeatable" : admitted ? "once" : "unknown",
-        query,
+        admittedCommand,
       );
     }
     let changed = false;
@@ -218,17 +248,17 @@ export class ControlToolDispatcher {
     sequence: number,
     partition: number,
     execution: Pending["execution"] = "repeatable",
-    query?: AcceptedControlToolCommand,
+    admittedCommand?: AcceptedControlToolCommand,
   ): void {
     const key = this.#key(dispatch.scope, dispatch.operationId);
     const prior = this.#pending.get(key);
     if (prior) {
       if (!isDeepStrictEqual(prior.dispatch, dispatch) || prior.sequence !== sequence)
         throw new Error("Control dispatch identity changed");
-      if (query) {
-        if (prior.query && !isDeepStrictEqual(prior.query, query))
-          throw new Error("Admitted delegation query changed");
-        prior.query = query;
+      if (admittedCommand) {
+        if (prior.admittedCommand && !isDeepStrictEqual(prior.admittedCommand, admittedCommand))
+          throw new Error("Admitted delegation command changed");
+        prior.admittedCommand = admittedCommand;
       }
       return;
     }
@@ -240,7 +270,7 @@ export class ControlToolDispatcher {
       due: Infinity,
       replyBytes: 0,
       execution,
-      ...(query ? { query } : {}),
+      ...(admittedCommand ? { admittedCommand } : {}),
       controller: new AbortController(),
     });
   }
@@ -325,6 +355,30 @@ export class ControlToolDispatcher {
   }
   async #load(pending: Pending): Promise<AcceptedControlToolCommand | undefined> {
     const d = pending.dispatch;
+    if (
+      this.options.directDelegations &&
+      d.toolName === "subagent" &&
+      d.recovery &&
+      !d.implementation
+    ) {
+      const source = await this.options.directDelegations.source(d);
+      if (
+        source.taskId !== d.taskId ||
+        source.conversationId !== d.conversationId ||
+        source.toolName !== d.toolName ||
+        source.contextAnchor !== d.contextAnchor ||
+        source.sequence !== d.recovery.sequence ||
+        source.operationId !== d.recovery.operationId
+      )
+        throw Error("Recovered delegation differs from the sealed native task");
+      return {
+        ...d,
+        kind: "control_tool",
+        arguments: source.arguments,
+        nativeCallId: source.nativeCallId,
+        nativeSequence: source.sequence,
+      };
+    }
     // The ordered Session consumer owns dispatch eligibility. Read only the
     // original native intent and current task here, never the Worker's lease.
     // Cold recovery separately excludes closed/superseded Run identities.
@@ -417,6 +471,8 @@ export class ControlToolDispatcher {
     for (const [key, pending] of this.#pending) {
       if (this.#active.size >= 128) break;
       if (
+        (pending.dispatch.toolName === "subagent" &&
+          this.options.directDelegations?.initialReplayComplete(pending.partition) === false) ||
         pending.done ||
         !pending.dirty ||
         this.#active.has(key) ||
@@ -447,12 +503,14 @@ export class ControlToolDispatcher {
     }
   }
   async #work(key: string, pending: Pending, current: () => boolean): Promise<void> {
-    const command = pending.query ?? (await this.#load(pending));
+    const command = pending.admittedCommand ?? (await this.#load(pending));
     if (!current()) return;
     if (!command) {
       this.#remove(key);
       return;
     }
+    if (this.options.directDelegations && command.toolName === "subagent" && command.recovery)
+      pending.admittedCommand = command;
     if (!pending.reply) {
       let outcome: ControlToolOutcome;
       if (pending.outcome) outcome = pending.outcome;

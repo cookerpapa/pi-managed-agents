@@ -2,6 +2,7 @@
 // native current values cross the ownership boundary. Guest addresses do not.
 import type {
   ConversationRecord,
+  EntryRecord,
   MemoryStorage,
   Seq,
   StorageWrite,
@@ -14,6 +15,7 @@ import {
   type ToolReplyRecovery,
 } from "@pi-cloud/protocol";
 import { sql, type Kysely, type Transaction } from "kysely";
+import { nativeDelegationIntent } from "./task-delegation.ts";
 import { AcceptedFamilyCheckpoint, type SealedNativeState } from "./accepted-family-checkpoint.ts";
 
 type FamilyScope = {
@@ -95,6 +97,69 @@ function decodePredecessor(stored: StoredHandoff, scope: FamilyScope, topic: str
   return { ...source, state: JSON.parse(nativeText) };
 }
 
+/** Validate one recovered control task using the immutable predecessor and its
+ * indexed assistant entry. A control retry does not reload every child transcript. */
+export function readSealedDelegationIntent(
+  db: Kysely<Database>,
+  scope: FamilyScope,
+  topic: string,
+  conversationId: number,
+  taskId: number,
+) {
+  return db
+    .transaction()
+    .setIsolationLevel("repeatable read")
+    .setAccessMode("read only")
+    .execute(async (tx) => {
+      const {
+        rows: [row],
+      } = await sql<{
+        handoff: StoredHandoff;
+        session: string;
+        turn: string;
+      }>`select native_work_handoff as handoff,session_id as session,turn_id as turn from runs
+        where tenant_id=${scope.tenantId}::uuid and session_id=${scope.piSessionId}::uuid
+          and id=${scope.runId}::uuid and native_work_handoff is not null`.execute(tx);
+      if (!row) throw Error("Sealed native delegation source is unavailable");
+      // Only validate the immutable root-seal evidence. Ordered dispatch and the
+      // child registration transaction own admission, including writer retirement.
+      const { state } = decodePredecessor(
+        row.handoff,
+        { ...scope, sessionId: row.session, turnId: row.turn },
+        topic,
+      );
+      const task = state.records.find(
+        ({ write }) => write.type === "task" && write.value.id === taskId,
+      );
+      if (task?.write.type !== "task") throw Error("Delegation task absent from predecessor seal");
+      return nativeDelegationIntent(scope, conversationId, taskId, task.write.value, {
+        sequence: async () => task.seq,
+        assistant: async (id) => {
+          const {
+            rows: [entry],
+          } = await sql<{
+            content: string;
+          }>`select content from messages where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}
+          and entry_id=${id} and conversation_id=${conversationId} and run_id=${scope.runId}::uuid and commit_seq<=${task.seq}`.execute(
+            tx,
+          );
+          return entry ? (JSON.parse(entry.content) as EntryRecord) : undefined;
+        },
+        frozenRun: async () => {
+          for (const { write } of state.records)
+            if (
+              write.type === "document.create" &&
+              write.record.kind === "pi-cloud.run" &&
+              write.record.scope.kind === "conversation" &&
+              write.record.scope.conversationId === conversationId &&
+              write.content.kind === "base"
+            )
+              return write.content.value;
+        },
+      });
+    });
+}
+
 export async function resumeFamilyCheckpoint(
   db: Kysely<Database>,
   scope: FamilyScope,
@@ -172,6 +237,7 @@ function sealedHistorySelection(
 ) {
   const conversations = new Map<number, ConversationRecord>(),
     activeTasks = new Set<number>(),
+    pendingBranches = new Set<number>(),
     points = new Map<number, Set<number>>(),
     pinned = new Set<number>();
   function goal(lane: number, through: number = state.nextId - 1) {
@@ -194,12 +260,37 @@ function sealedHistorySelection(
     if (t.kind === "pi.tool" && typeof input?.assistant === "number") pinned.add(input.assistant);
     const cp = ("checkpoint" in t.state ? t.state.checkpoint : undefined) as
       { cutoff?: number; tail?: number; assistant?: number } | undefined;
+    if (
+      delegatedRuns &&
+      t.kind === "pi.tool" &&
+      durableToolState(t)?.intent?.arguments.context === "branch" &&
+      (cp as { replay?: string } | undefined)?.replay === "safe"
+    )
+      pendingBranches.add(t.conversationId);
     if (t.kind === "pi.generation") {
       if (typeof cp?.assistant === "number") pinned.add(cp.assistant);
       if (typeof cp?.cutoff === "number") goal(t.conversationId, cp.cutoff);
     }
     if (t.kind === "pi.compaction" && typeof cp?.tail === "number") goal(t.conversationId, cp.tail);
   }
+  // A pending branch may still need to fork from the start of this Run,
+  // even when a later compaction changed the parent's visible context.
+  if (pendingBranches.size)
+    for (const { write } of state.records) {
+      if (
+        write.type !== "document.create" ||
+        write.record.kind !== "pi-cloud.run" ||
+        write.record.scope.kind !== "conversation" ||
+        !pendingBranches.has(write.record.scope.conversationId) ||
+        write.content.kind !== "base"
+      )
+        continue;
+      const anchor = write.content.value.baseEntry;
+      if (typeof anchor === "number" && Number.isSafeInteger(anchor) && anchor > 0) {
+        pinned.add(anchor);
+        goal(write.record.scope.conversationId, anchor);
+      }
+    }
   // Several children can share one generation owner. Only a still-live
   // delegation Tool needs its child's original submission to return a result.
   const callers = new Map<number, { task: number; request: string }>();

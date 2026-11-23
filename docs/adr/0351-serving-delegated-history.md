@@ -31,5 +31,4 @@ model request. An earlier prompt, tool list or forked context cannot enlarge it.
 
 [ADR-0352](0352-retire-workflow-tool.md) retires live script hostcalls.
 The release gate now exercises one native `subagent` request before and after
-child admission. Its PG-only handoff still needs an original source when
-admission has not happened. [Experiment](../reports/direct-delegation-handoff-20261123.md).
+child admission. The [initial experiment](../reports/direct-delegation-handoff-20261123.md) isolated missing delivery identity in a PG-only handoff. [ADR-0353](0353-native-task-delegation-identity.md) resolves direct delegation by native task.

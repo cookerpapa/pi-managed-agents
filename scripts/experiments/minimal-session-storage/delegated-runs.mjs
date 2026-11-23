@@ -1,15 +1,21 @@
 // Control-side adapter for the root-only Session prototype. Native callers pass
 // stable operation IDs; the root claim remains the single execution authority.
+import { delegatedRunId } from "@pi-cloud/protocol/delegation-identity";
 import assert from "node:assert/strict";
 import { isDeepStrictEqual } from "node:util";
 import {
   childWorkspaceGrant,
   continuedWorkspaceGrant,
 } from "@pi-cloud/subagent-control/delegated-workspace-grant";
-import { assertSubagentTaskInputBudget } from "@pi-cloud/protocol";
+import {
+  assertSubagentTaskInputBudget,
+  prepareSubagentArguments,
+  serializeSubagentResult,
+} from "@pi-cloud/protocol";
 
-export async function admitDelegatedRun(pool, scope, request) {
-  const { id, callerRunId, taskId, task, mode, agentId = id, at = null } = request;
+export async function admitDelegatedRun(pool, scope, request, current = () => true) {
+  const id = delegatedRunId(scope, request.taskId);
+  const { callerRunId, taskId, task, mode, agentId = id, at = null } = request;
   assertSubagentTaskInputBudget(task);
   assert(
     ["fresh", "branch", "continue"].includes(mode) &&
@@ -17,10 +23,7 @@ export async function admitDelegatedRun(pool, scope, request) {
       Number.isSafeInteger(taskId) &&
       taskId > 0,
   );
-  assert(
-    (mode === "branch") === (Number.isSafeInteger(at) && at > 0) &&
-      (mode === "branch" || at === null),
-  );
+  assert(at === null || (mode === "branch" && Number.isSafeInteger(at) && at > 0));
   assert((mode === "continue") === (agentId !== id));
   const db = await pool.connect();
   try {
@@ -32,7 +35,7 @@ export async function admitDelegatedRun(pool, scope, request) {
         [scope.tenantId, scope.piSessionId, scope.runId, scope.writerId],
       )
     ).rows[0];
-    assert(owner, "Root writer is no longer active");
+    assert(owner && current(), "Root writer is no longer active");
     const caller = (
       await db.query(
         `select id,native_lane,state,workspace_grant from runs
@@ -65,14 +68,15 @@ export async function admitDelegatedRun(pool, scope, request) {
           existing.context_mode === mode &&
           existing.initial_input === task &&
           Number(existing.source_task_id) === taskId &&
-          (mode !== "branch" || Number(existing.context_at) === at) &&
+          (mode !== "branch" ||
+            (existing.context_at == null ? null : Number(existing.context_at)) === at) &&
           isDeepStrictEqual(existing.workspace_grant, expected),
         "Delegation identity changed",
       );
       await db.query("commit");
       return existing;
     }
-    assert(caller.state === "running", "Caller is not active in this root");
+    assert(current() && caller.state === "running", "Caller is not active in this root");
     let previous,
       anchor = at;
     if (mode === "continue") {
@@ -124,6 +128,7 @@ export async function admitDelegatedRun(pool, scope, request) {
         ],
       )
     ).rows[0];
+    assert(current(), "Delegating task closed during admission");
     await db.query("commit");
     return row;
   } catch (error) {
@@ -132,6 +137,57 @@ export async function admitDelegatedRun(pool, scope, request) {
   } finally {
     db.release();
   }
+}
+
+// Called by the candidate SubagentController after ordered dispatcher admission.
+// The Worker creates the native conversation and accepts its input under row.id.
+export async function dispatchDirectDelegation(pool, command, place, current) {
+  const args = prepareSubagentArguments(command.arguments);
+  if (!current()) return { waiting: true };
+  const row = await delegatedControl(pool, command.scope, current).start({
+    callerLane: command.conversationId,
+    taskId: command.taskId,
+    task: args.task,
+    mode: args.context ?? "fresh",
+    workspace: args.workspace,
+    at: command.contextAnchor,
+  });
+  if (!current()) return { waiting: true };
+  const {
+    rows: [child],
+  } = await pool.query(
+    `select r.state,r.native_answer_id,m.content from runs r
+     left join message_entries m on m.tenant_id=r.tenant_id and m.pi_session_id=r.session_id
+       and m.run_id=r.root_run_id and m.conversation_id=r.native_lane and m.entry_id=r.native_answer_id
+     where r.id=$1 and r.root_run_id=$2 and r.session_id=$3 and r.tenant_id=$4`,
+    [row.id, command.scope.runId, command.scope.piSessionId, command.scope.tenantId],
+  );
+  if (!current()) return { waiting: true };
+  if (child.state === "preparing") await place(row, command, current);
+  if (child.state === "preparing" || child.state === "running") return { waiting: true };
+  if (child.state === "completed" && child.native_answer_id == null)
+    throw Error("Completed child has no original answer");
+  let output;
+  if (child.native_answer_id != null) {
+    const entry = JSON.parse(child.content);
+    assert.equal(entry.id, Number(child.native_answer_id));
+    const msg = entry.model.find((m) => m.role === "assistant");
+    assert(msg);
+    output = msg.content
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+  }
+  const value = {
+    executionId: row.agentId,
+    runId: row.id,
+    state: child.state,
+    ...(output === undefined ? {} : { output }),
+  };
+  return {
+    result: { content: [{ type: "text", text: serializeSubagentResult(value) }] },
+    isError: child.state !== "completed",
+  };
 }
 
 export async function delegatedAddress(pool, scope, agentId) {
@@ -145,7 +201,7 @@ export async function delegatedAddress(pool, scope, agentId) {
 }
 
 export async function delegatedSource(pool, row) {
-  if (row.context_mode === "fresh") return;
+  if (row.context_at === null) return;
   const {
     rows: [source],
   } = await pool.query(
@@ -159,9 +215,9 @@ export async function delegatedSource(pool, row) {
 
 // These methods belong to the execution/control side. A Worker only needs the
 // logical operation and the native source returned by the adapter.
-export function delegatedControl(pool, scope) {
+export function delegatedControl(pool, scope, current = () => true) {
   return {
-    async start({ operationId, callerLane, taskId, task, mode, agentId, at, workspace }) {
+    async start({ callerLane, taskId, task, mode, agentId, at, workspace }) {
       const caller =
         callerLane === 1
           ? scope.runId
@@ -172,16 +228,20 @@ export function delegatedControl(pool, scope) {
               )
             ).rows[0]?.id;
       assert(caller, "Unregistered calling conversation");
-      const row = await admitDelegatedRun(pool, scope, {
-        id: operationId,
-        callerRunId: caller,
-        taskId,
-        task,
-        mode,
-        workspace,
-        agentId,
-        at,
-      });
+      const row = await admitDelegatedRun(
+        pool,
+        scope,
+        {
+          callerRunId: caller,
+          taskId,
+          task,
+          mode,
+          workspace,
+          agentId,
+          at,
+        },
+        current,
+      );
       return {
         id: row.id,
         agentId: row.agent_id,

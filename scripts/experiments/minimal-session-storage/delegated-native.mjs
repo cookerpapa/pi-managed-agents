@@ -89,10 +89,8 @@ export async function sendToActiveConversation(api, target, message, delivery, r
   }, ctx);
 }
 
-export async function runDelegation(api, storage, control, options, context, memoKey = "delegate") {
-  const operationId = await api.memo(memoKey, crypto.randomUUID(), context);
+export async function runDelegation(api, storage, control, options, context) {
   const row = await control.start({
-    operationId,
     taskId: api.taskId,
     callerLane: api.conversationId,
     ...options,
