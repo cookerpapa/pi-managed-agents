@@ -2,6 +2,9 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Validate candidate context estimates for ordinary Sessions, frozen history, fresh and continued children. [Read and admission report](reports/candidate-context-and-prune-20261123.md).
+- [ ] Resolve the Run queue's public Session identity and the physical stream selected after pruning. The combined Fork/delegation admission gate reproduces two conflicting foreign keys. Discuss ownership before changing stored identities or releasing #48.
+
 - [x] Compare 50 and 100 ms sandbox acceptance on identical 20-tool Kafka replays under paced and preloaded input. [Paired results](reports/provider-only-visible-throughput-20261123.md#sandbox-acceptance-delay-50-vs-100-ms).
 
 - [x] Keep provider usage outside Session log projection and count completed user-visible Kafka records in the 20-tool load. [Decision](adr/0355-provider-usage-outside-session-projection.md) and [measurements](reports/provider-only-visible-throughput-20261123.md).

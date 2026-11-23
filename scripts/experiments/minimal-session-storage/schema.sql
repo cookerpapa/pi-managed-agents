@@ -41,3 +41,9 @@ create table conversation_worlds (
     and state#>>'{sandbox,status}'='active' and octet_length(state::text)<=4096),
   primary key(tenant_id,pi_session_id,conversation_id)
 );
+
+-- Read boundary shared by ordinary and Fork-enabled candidate layouts.
+create function message_root_ranges(t uuid, public_id uuid, physical uuid, needs_base boolean)
+returns table(stream uuid,lane bigint,lo bigint,hi bigint,seq bigint) language sql stable as $$
+  select physical,1::bigint,1::bigint,9007199254740991::bigint,9007199254740991::bigint where not needs_base
+$$;

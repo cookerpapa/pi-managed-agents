@@ -185,6 +185,18 @@ it.skipIf(!url || !brokers)(
       await pool.query(
         "alter table sessions add title text not null default 'Root', add pruned_at timestamptz; alter table runs add pruned_at timestamptz",
       );
+      await pool.query(`create table model_profiles(id uuid,tenant_id uuid,provider text,model_id text);
+        alter table sessions add desired_model_profile_id uuid generated always as (tenant_id) stored,
+          add pi_session_id text generated always as (id::text) stored,add pi_conversation_id bigint default 1,
+          add session_kind text default 'conversation',add conversation_fork_entry_id bigint;
+        alter table runs add provider text,add model_id text,add model_runtime_snapshot jsonb,
+          add recovery_requested_at timestamptz,add output_seal_id uuid,add output_sealed_at timestamptz`);
+      const runtimeModel = model.getModel();
+      await pool.query("insert into model_profiles values($1,$1,$2,$3)", [
+        tenantId,
+        runtimeModel.provider,
+        runtimeModel.id,
+      ]);
       management.post(SUBAGENT_HOST_PATH, async (req, res) => {
         assert.equal(req.headers.authorization, "Bearer " + token);
         const cmd = req.body;

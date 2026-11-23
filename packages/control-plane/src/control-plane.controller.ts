@@ -875,9 +875,11 @@ export class ControlPlaneController {
     @Param("sessionId") value: unknown,
   ): Promise<ConversationStatusResource> {
     const identity = this.tenantRequestContext.resolve(request);
-    return this.controlPlaneStores
-      .forIdentity(identity)
-      .getConversationStatus(parseUuidPathParameter(value, "sessionId"));
+    const store = this.controlPlaneStores.forIdentity(identity),
+      id = parseUuidPathParameter(value, "sessionId");
+    return abortableHistoryRead(request, (signal) =>
+      withDatabaseReadSignal(signal, () => store.getConversationStatus(id)),
+    );
   }
 
   @Get("conversations/:sessionId/usage")

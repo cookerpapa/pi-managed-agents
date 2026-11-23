@@ -55,3 +55,11 @@ create function fork_agent_at(t uuid,s uuid,lane bigint,through_seq bigint) retu
     and (m.pi_session_id,m.commit_seq,m.ordinal)=(b.agent_base_stream,b.agent_base_seq,b.agent_base_ordinal)
     where b.tenant_id=t and b.stream_uuid=s and lane=1 and not exists(select from local)
 $$;
+
+create or replace function message_root_ranges(t uuid, public_id uuid, physical uuid, needs_base boolean)
+returns table(stream uuid,lane bigint,lo bigint,hi bigint,seq bigint) language sql stable as $$
+  with own as (select stream_id,root_id from fork_sessions where tenant_id=t and id=public_id)
+  select stream_id,1::bigint,1::bigint,9007199254740991::bigint,9007199254740991::bigint from own
+  union all select n.source_id::uuid,n.conversation_id,n.min_id,n.max_id,n.through_seq
+    from own cross join lateral fork_leaves(t,own.root_id) n
+$$;

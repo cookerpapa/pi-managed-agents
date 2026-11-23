@@ -102,6 +102,11 @@ export function namedModelFixture(url, scope) {
         }
         for (const id of [scope.sessionId, childId]) {
           const u = await usage(id);
+          const status = await fetch(origin + "/v1/conversations/" + id + "/status");
+          assert.equal(status.status, 200);
+          const resource = await status.json();
+          assert.equal(resource.sessionId, id);
+          assert(resource.context.estimatedTokens > 0);
           assert(measured.get(id) > 0);
           assert.equal(u.tokens.total, measured.get(id));
           assert.equal(u.unconfirmedRequests, 0);

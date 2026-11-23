@@ -40,10 +40,10 @@ export function receivingConversationRunId(
   sessionId: string,
 ): RawBuilder<string | null> {
   return sql<string | null>`coalesce(
-    (select id from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and pruned_at is null
+    (select id from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and mailbox_position is not null and pruned_at is null
       and (state not in ('queued','completed','failed','cancelled','timed_out') or recovery_requested_at is not null or (output_seal_id is not null and output_sealed_at is null))
       order by mailbox_position limit 1),
-    (select id from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and pruned_at is null and state='queued' order by mailbox_position limit 1),
-    (select id from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and pruned_at is null order by mailbox_position desc limit 1)
+    (select id from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and mailbox_position is not null and pruned_at is null and state='queued' order by mailbox_position limit 1),
+    (select id from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and mailbox_position is not null and pruned_at is null order by mailbox_position desc limit 1)
   )`;
 }

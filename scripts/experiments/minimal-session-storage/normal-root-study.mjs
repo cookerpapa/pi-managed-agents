@@ -1,6 +1,7 @@
 import { verifyStoppedRoot } from "./stopped-root-study.mjs";
 import { rootInputStudy } from "./root-input-handoff-study.mjs";
 import assert from "node:assert/strict";
+import { estimateStoredContext } from "../../../packages/pi-session-postgres/src/durable/conversation-usage.ts";
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { browserNote, browserMessage } from "./browser-signals.mjs";
@@ -198,6 +199,37 @@ function work(runId, resumeInput = false) {
   return done;
 }
 const items = (page) => page.turns.flatMap((t) => t.transcript?.items ?? []);
+// The disposable ordinary-root fixture knows both identities and every projected Entry.
+async function checkStatus(sessionId, runId) {
+  const owner = await pool.query(
+    "select r.provider,r.model_id,s.pi_session_id from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id where r.id=$1 and s.id=$2 and s.tenant_id=$3",
+    [runId, sessionId, tenant.tenantId],
+  );
+  assert.equal(owner.rowCount, 1);
+  const { provider, model_id, pi_session_id } = owner.rows[0];
+  const { rows } = await pool.query(
+    "select content from message_entries where tenant_id=$1 and pi_session_id=$2 and conversation_id=1 order by entry_id",
+    [tenant.tenantId, pi_session_id],
+  );
+  const expected = estimateStoredContext(
+    rows.map((row) => JSON.parse(row.content)),
+    { provider, modelId: model_id },
+  );
+  assert(expected.estimatedTokens > 0);
+  const res = await fetch(new URL("/v1/conversations/" + sessionId + "/status", origin), {
+    headers: { authorization: "Bearer " + tenant.credential.token },
+  });
+  const actual = res.ok ? (await res.json()).context : null;
+  if (!res.ok) await res.body?.cancel();
+  return {
+    entries: rows.length,
+    expected,
+    actual,
+    httpStatus: res.status,
+    matches:
+      actual?.method === expected.method && actual?.estimatedTokens === expected.estimatedTokens,
+  };
+}
 async function legacyCounts() {
   return Object.fromEntries(
     await Promise.all(
@@ -388,6 +420,7 @@ try {
       assert(its.some((i) => i.kind === "text" && i.text === "First answer: " + token));
     };
     checkFirst(await api.getConversation(id));
+    const statusChecks = [await checkStatus(id, first.runId)];
     if (browser) await browserMessage("/study", "detached");
     await close();
     await open();
@@ -412,9 +445,15 @@ try {
     assert.deepEqual(workers[1].restoredUserPrompts, [prompt1, prompt2]);
     assert.deepEqual(await legacyCounts(), baseline);
     assert(finishRollbackVerified);
+    statusChecks.push(await checkStatus(id, second.runId));
+    assert(
+      statusChecks.every((s) => s.matches),
+      JSON.stringify(statusChecks),
+    );
     await projector.checkHealth();
     return {
       ...(browser ? await browserMessage("/study", "done") : {}),
+      statusChecks,
       runs: cold.turns.length,
       physicalExecutions: dispatches,
       runningToolVisible: true,

@@ -37,6 +37,7 @@ export {
 export {
   readNativeUsageBatch,
   readNativeContextEstimate,
+  estimateStoredContext,
   nativeUsageTotals,
 } from "./conversation-usage.ts";
 export {
