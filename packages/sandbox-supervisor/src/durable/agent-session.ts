@@ -109,6 +109,7 @@ type RemoteToolDefinitionsSource = {
   subscribe(listener: () => void): () => void;
 };
 export type DurableRunConfiguration = {
+  initialRequestId?: string;
   metrics?: PiCloudMetrics;
   runId: string;
   conversationId: number;
@@ -462,7 +463,7 @@ export class DurableAgentSession {
       const agent = await this.#harness.snapshot(AgentDoc, conversation.id, BACKGROUND_CONTEXT);
       const receipt = await this.storage.submissionByRequest(
         conversation.id,
-        run.runId,
+        run.initialRequestId ?? run.runId,
         BACKGROUND_CONTEXT,
       );
       if (

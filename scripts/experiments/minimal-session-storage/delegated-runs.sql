@@ -73,3 +73,42 @@ begin
       and (not(change?'answer') or r.native_answer_id is null or r.native_answer_id=(change->>'answer')::bigint);
   return found;
 end $$;
+
+-- Named executor admission. The founding row owns the name across later root Runs.
+alter table runs add agent_name text, add parent_agent_id uuid, add creation_hash text,
+  add placement_sequence bigint, add placement_lane bigint, add placement_due timestamptz,
+  add placement_claim uuid,
+  add check(agent_name is null or
+    (id=agent_id and previous_run_id is null and parent_agent_id is not null and
+     creation_hash is not null and placement_sequence is not null and placement_sequence>0 and placement_lane is not null and placement_lane>0));
+create unique index named_child on runs(tenant_id,session_id,parent_agent_id,agent_name)
+  where agent_name is not null;
+create index named_placement_due on runs(placement_due,id)
+  where placement_due is not null and state='preparing';
+
+create table subagent_deliveries (
+ operation_id uuid primary key, root_id uuid not null references runs(id) on delete cascade,
+ writer uuid not null, caller_task bigint not null, caller_lane bigint not null,
+ operation_hash text not null, destination text not null, call_id text not null, tool text not null,
+ child_id uuid references runs(id) on delete cascade, kind text not null check(kind in ('watch','state','fixed','send','cancel','question','answered','finished')),
+ value jsonb not null, due_at timestamptz, claim uuid, sent boolean not null default false,
+ created_at timestamptz not null default now()
+);
+create index subagent_delivery_due on subagent_deliveries(due_at,operation_id) where not sent;
+create index subagent_waiting_child on subagent_deliveries(child_id) where not sent;
+create index subagent_delivery_root on subagent_deliveries(root_id);
+create function wake_named_children() returns trigger language plpgsql as $$
+begin
+ if new.root_run_id is null then
+   if new.state in ('completed','failed','cancelled') then
+     delete from subagent_deliveries where root_id=new.id;
+   end if;
+ elsif new.state in ('completed','failed','cancelled','unknown') then
+   update subagent_deliveries set due_at=now(),claim=null where child_id=new.id and not sent and kind in ('watch','state','question');
+   if found then perform pg_notify('pma_named_children',''); end if;
+ end if;
+ return null;
+end $$;
+create trigger named_child_change after update of state,native_answer_id on runs for each row
+ when (old.state is distinct from new.state or old.native_answer_id is distinct from new.native_answer_id)
+ execute function wake_named_children();

@@ -7,17 +7,32 @@ export function delegatedRunId(
 ): string {
   if (!Number.isSafeInteger(taskId) || taskId < 1)
     throw new TypeError("Invalid delegation task ID");
-  const bytes = createHash("sha256")
-    .update(
-      JSON.stringify([
-        "pi-cloud.delegated-run.v1",
-        scope.tenantId.toLowerCase(),
-        scope.piSessionId.toLowerCase(),
-        scope.runId.toLowerCase(),
-        taskId,
-      ]),
-    )
-    .digest();
+  return uuid([
+    "pi-cloud.delegated-run.v1",
+    scope.tenantId.toLowerCase(),
+    scope.piSessionId.toLowerCase(),
+    scope.runId.toLowerCase(),
+    taskId,
+  ]);
+}
+
+export function namedAgentId(
+  tenant: string,
+  session: string,
+  parent: string,
+  name: string,
+): string {
+  return uuid([
+    "pi-cloud.named-agent.v1",
+    tenant.toLowerCase(),
+    session.toLowerCase(),
+    parent.toLowerCase(),
+    name.normalize("NFC"),
+  ]);
+}
+
+function uuid(parts: readonly (string | number)[]): string {
+  const bytes = createHash("sha256").update(JSON.stringify(parts)).digest();
   bytes[6] = (bytes[6]! & 15) | 0x80;
   bytes[8] = (bytes[8]! & 63) | 0x80;
   const hex = bytes.subarray(0, 16).toString("hex");

@@ -1,0 +1,87 @@
+{{- if and .Values.globalPlaneEnabled .Values.global.namedSubagents }}
+{{- $name := include "pi-cloud-platform.name" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-subagent-executor
+  labels:
+    {{- include "pi-cloud-platform.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: subagent-executor }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: subagent-executor }
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, seccompProfile: { type: RuntimeDefault } }
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.trustedNodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.trustedTolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: subagent-executor
+          image: {{ include "pi-cloud-platform.image" .Values.images.sessionRuntime | quote }}
+          imagePullPolicy: {{ .Values.images.sessionRuntime.pullPolicy }}
+          args: [/app/packages/control-plane/src/subagent-executor-main.ts]
+          ports: [{ name: api, containerPort: 4313 }]
+          env:
+            - { name: HOST, value: "0.0.0.0" }
+            - { name: PORT, value: "4313" }
+            - { name: DATABASE_URL_FILE, value: /run/secrets/database-url }
+            - { name: DATABASE_NOTIFICATION_URL_FILE, value: /run/secrets/database-notification-url }
+            - { name: PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN_FILE, value: /run/secrets/management-token }
+            - { name: PI_CLOUD_KAFKA_BROKERS, value: {{ join "," .Values.global.kafka.brokers | quote }} }
+          readinessProbe: { httpGet: { path: /health/ready, port: api } }
+          securityContext: { readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: credentials, mountPath: /run/secrets, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: credentials
+          secret:
+            secretName: {{ .Values.global.existingSecret }}
+            items:
+              - { key: {{ .Values.external.database.secretKey }}, path: database-url }
+              - { key: {{ .Values.external.database.notificationSecretKey }}, path: database-notification-url }
+              - { key: {{ index .Values "pi-workers" "credentials" "supervisorManagementTokenKey" }}, path: management-token }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata: { name: subagent-executor }
+spec:
+  selector: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: subagent-executor }
+  ports: [{ name: api, port: 4313, targetPort: api }]
+{{- if .Values.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: {{ $name }}-subagent-executor }
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: subagent-executor }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: session-runtime } } }]
+      ports: [{ protocol: TCP, port: 4313 }]
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+          podSelector: { matchLabels: { k8s-app: kube-dns } }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to:
+        - namespaceSelector: { matchLabels: { {{ .Values.networkPolicy.trustedNamespaceLabel.key }}: {{ .Values.networkPolicy.trustedNamespaceLabel.value | quote }} } }
+        {{- range .Values.networkPolicy.externalEgressCidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [{ protocol: TCP, port: 4100 }, { protocol: TCP, port: 5432 }, { protocol: TCP, port: 9092 }]
+{{- end }}
+{{- end }}

@@ -40,6 +40,35 @@ const resources = parseAllDocuments(rendered)
     return document.toJSON();
   })
   .filter(Boolean);
+const namedResources = parseAllDocuments(
+  run([
+    "template",
+    "pi-cloud",
+    chart,
+    "--namespace",
+    "pi-cloud-system",
+    "--set",
+    "global.namedSubagents=true",
+  ]),
+)
+  .map((doc) => doc.toJSON())
+  .filter(Boolean);
+const namedProcess = namedResources.find(
+  (r) => r.kind === "Deployment" && r.metadata.name === "pi-cloud-subagent-executor",
+);
+assert(
+  namedProcess.spec.template.spec.containers[0].args.includes(
+    "/app/packages/control-plane/src/subagent-executor-main.ts",
+  ),
+);
+assert(!resources.some((r) => r.metadata?.name === "pi-cloud-subagent-executor"));
+for (const envName of ["PI_CLOUD_SUBAGENT_EXECUTOR_URL", "PI_CLOUD_NAMED_SUBAGENTS"]) {
+  assert(
+    namedResources.some((r) =>
+      r.spec?.template?.spec?.containers?.some((c) => c.env?.some((e) => e.name === envName)),
+    ),
+  );
+}
 for (const resource of resources.filter((r) => r.spec?.template)) {
   const containers = resource.spec.template.spec.containers;
   const mcpMounts = containers.flatMap((c) =>

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Named subagent executor](named-subagent-executor-20261123.md) verifies durable admission, independent Kafka replies, a process kill, redelivery and ordered projection under a slow handoff.
+
 - [Task-keyed delegation](task-keyed-delegation-20261123.md) covers independent mailbox identities, owner replacement and Projector-only replay in the candidate.
 
 - [Direct delegation before and after admission](direct-delegation-handoff-20261123.md) checks the Worker handoff, original Kafka reference and candidate browser reads.

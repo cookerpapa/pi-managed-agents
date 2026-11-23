@@ -21,6 +21,7 @@ try {
     "scripts/experiments/minimal-session-storage/delegated-runs.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/delegated-history.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/direct-delegation-source.integration.spec.mjs",
+    "scripts/experiments/minimal-session-storage/named-executor.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/delegated-handoff.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/family-inboxes.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/sealed-family.integration.spec.mjs",

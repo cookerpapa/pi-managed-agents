@@ -111,7 +111,7 @@ export function DelegatedAgentHistoryPage({
         <ul>
           {agents.map((a) => (
             <li key={a.agentId}>
-              <a href={delegatedHistoryUrl(session, a.agentId)}>{a.task}</a>
+              <a href={delegatedHistoryUrl(session, a.agentId)}>{a.name ?? a.task}</a>
             </li>
           ))}
         </ul>

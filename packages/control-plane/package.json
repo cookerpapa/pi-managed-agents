@@ -13,6 +13,7 @@
     "bootstrap": "tsx src/bootstrap-main.ts",
     "tenant-admin": "tsx src/tenant-admin.ts",
     "start": "tsx src/main.ts",
+    "start:subagent-executor": "tsx src/subagent-executor-main.ts",
     "start:session-runtime": "tsx src/session-runtime-main.ts",
     "start:session-api": "tsx src/session-api-main.ts",
     "typecheck": "tsc --noEmit",

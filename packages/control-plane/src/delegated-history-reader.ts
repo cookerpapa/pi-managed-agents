@@ -19,16 +19,19 @@ export class DelegatedHistoryReader {
   async directory(tenant: string, root: string, after?: string) {
     const { rows } = await sql<{
       agentId: string;
+      name: string | null;
       task: string;
       state: string;
-    }>`select c.agent_id as "agentId",left(btrim(a.initial_input),160) as task,c.state from runs c
+    }>`select c.agent_id as "agentId",a.agent_name as name,left(btrim(a.initial_input),160) as task,c.state from runs c
       join runs a on a.id=c.agent_id and a.tenant_id=c.tenant_id and a.session_id=c.session_id
       where c.tenant_id=${tenant}::uuid and c.session_id=${root}::uuid and c.agent_id is not null
         and not exists(select 1 from runs n where n.previous_run_id=c.id)
       ${after ? sql`and c.agent_id>${after}::uuid` : sql``} order by c.agent_id limit 25`.execute(
       this.db,
     );
-    const agents = rows.slice(0, 24);
+    const agents = rows
+      .slice(0, 24)
+      .map(({ name, ...agent }) => ({ ...agent, ...(name ? { name } : {}) }));
     return parseDelegatedAgentDirectory({
       agents,
       ...(rows.length > 24 ? { nextCursor: agents.at(-1)!.agentId } : {}),

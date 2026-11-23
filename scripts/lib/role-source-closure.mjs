@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const entries = {
   worker: "packages/supervisor-host/src/main.ts",
   sessionApi: "packages/control-plane/src/session-api-main.ts",
+  subagentExecutor: "packages/control-plane/src/subagent-executor-main.ts",
   sessionRuntime: "packages/control-plane/src/session-runtime-main.ts",
   management: "packages/control-plane/src/main.ts",
   toolHost: "packages/control-plane/src/tool-host-main.ts",

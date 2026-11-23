@@ -1,7 +1,12 @@
 // Candidate Worker wire. Native writes and the logical operation share one
 // record. Neither the intent nor the Worker-side replay reader needs a route.
 import assert from "node:assert/strict";
-import { durableToolIntent, durableToolState, parseToolReplyRecovery } from "@pi-cloud/protocol";
+import {
+  isControlToolName,
+  durableToolIntent,
+  durableToolState,
+  parseToolReplyRecovery,
+} from "@pi-cloud/protocol";
 import {
   decodeSessionLogEnvelope,
   encodeSessionLogFact,
@@ -29,7 +34,7 @@ function checkShape(op) {
 function delegationReference(t) {
   return (
     t?.target === "control" &&
-    ["subagent", "subagent_control"].includes(t.toolName) &&
+    isControlToolName(t.toolName) &&
     t.bindingId === undefined &&
     t.environment === undefined &&
     t.implementation === undefined

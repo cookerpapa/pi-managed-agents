@@ -13,6 +13,7 @@ sandboxDomains:
     maximumActiveSandboxes: null
 
 global:
+  namedSubagents: false
   clusterDomain: cluster.local
   existingSecret: pi-cloud-platform-secrets
   imagePullSecrets: []

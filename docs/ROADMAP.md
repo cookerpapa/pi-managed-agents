@@ -12,6 +12,8 @@ The first implementation milestone for [#48](https://github.com/cookerpapa/pi-ma
 
 ## Ordered Session projection under load
 
+The [named subagent executor](adr/0354-named-subagent-executor.md) registers stable child names and per-invocation return routes on the candidate. [Failure acceptance](reports/named-subagent-executor-20261123.md).
+
 The [direct delegation gate](reports/direct-delegation-handoff-20261123.md) separates recovery before child Run admission from recovery after the child has an ID. Child history and read-only controls are integrated in the matched candidate. The [task-keyed handoff](reports/task-keyed-delegation-20261123.md) closes the gap before child admission in the candidate.
 
 The [delegated-Run prototype](reports/delegated-runs-20261122.md) exercises one root Session, both kinds of child context, sibling messaging and explicit continuation across owners. Its schema is isolated from the serving composition. [Selective cold reads](reports/lazy-delegated-history-20261122.md) cover a later parent compaction and a replacement Worker with an unfinished child.

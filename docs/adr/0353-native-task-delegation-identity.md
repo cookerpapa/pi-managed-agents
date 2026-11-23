@@ -1,5 +1,7 @@
 # ADR-0353. One child invocation per native delegation task
 
+[ADR-0354](0354-named-subagent-executor.md) supersedes child naming in the matched named-executor configuration. The native task still identifies the recovery checkpoint for each separate invocation.
+
 In the delegated-Run candidate, the tenant, physical Session, root Run and native
 tool task identify one child Run. Derive its public UUID from that tuple. Enforce
 uniqueness of the source task within its root in PG. A new native tool task can

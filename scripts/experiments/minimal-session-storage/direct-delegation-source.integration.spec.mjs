@@ -15,7 +15,9 @@ import {
   saveSealedFamily,
 } from "@pi-cloud/pi-session-postgres/durable";
 import { durableControlIntent, durableToolState } from "@pi-cloud/protocol";
-import { delegatedRunId } from "@pi-cloud/protocol/delegation-identity";
+import { registerSubagent } from "../../../packages/control-plane/src/named-subagent-store.ts";
+import { toolReplyTopic } from "@pi-cloud/event-log";
+import { delegatedRunId, namedAgentId } from "@pi-cloud/protocol/delegation-identity";
 import { ControlToolDispatcher } from "../../../packages/control-plane/src/control-tool-dispatcher.ts";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { delegatedControl } from "./delegated-runs.mjs";
@@ -126,9 +128,13 @@ async function replaceWaitingSuccessor(
   return next;
 }
 
-it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch"])(
-  "reattaches one %s native delegation either side of child Run admission",
-  async (mode) => {
+it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each([
+  ["fresh", false],
+  ["branch", false],
+  ["branch", true],
+])(
+  "reattaches one %s native delegation either side of child Run admission (named executor: %s)",
+  async (mode, named) => {
     const tenantId = randomUUID(),
       sessionId = randomUUID(),
       runId = randomUUID(),
@@ -145,7 +151,8 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
     const successor = { ...scope, writerId: randomUUID(), fencingToken: 2 };
     const topic = "direct-delegation-" + randomUUID(),
       sealId = randomUUID();
-    const old = await waitingDelegation(scope, mode);
+    const name = named ? "cold-check" : undefined;
+    const old = await waitingDelegation(scope, mode, name);
     const { prefix, ids } = old;
     try {
       const seal = { topic, partition: 0, offset: BigInt(prefix.length) };
@@ -153,9 +160,9 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
       let replayEvidence;
       for (const [id, alreadyAdmitted, projectorOnly] of [
         [ids[0], false],
-        [ids[1], false],
+        ...(!named ? [[ids[1], false]] : []),
         [ids[0], true],
-        ...(process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS ? [[ids[0], true, true]] : []),
+        ...(!named && process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS ? [[ids[0], true, true]] : []),
       ]) {
         const schema = "delegate_" + randomUUID().replaceAll("-", "");
         const url = new URL(process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL);
@@ -175,7 +182,7 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
             () => assert.fail(),
             () => assert.fail(),
             undefined,
-            { delegatedRuns: true },
+            { delegatedRuns: true, namedExecutor: named },
           );
           await projection.view.install();
           await projection.view.reset(new Map([[0, 0n]]), 16, "recorded-history");
@@ -204,7 +211,24 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
           const source = records.find((f) => f.tools.length),
             [ref] = source.tools;
           const intent = durableControlIntent(source.commit, ref);
-          const childId = delegatedRunId(scope, ref.taskId);
+          const childId = named
+            ? namedAgentId(tenantId, sessionId, sessionId, name)
+            : delegatedRunId(scope, ref.taskId);
+          const offer = {
+            tenant: tenantId,
+            session: sessionId,
+            root: runId,
+            writer: writerId,
+            epoch: 1,
+            lane: ref.conversationId,
+            task: ref.taskId,
+            operation: id,
+            destination: ref.replyTopic,
+            tool: "subagent",
+            anchor: ref.contextAnchor,
+            input: { call: intent.callId, args: intent.arguments, seq: source.commit.seq },
+          };
+
           const request = {
             callerLane: 1,
             taskId: ref.taskId,
@@ -213,7 +237,8 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
             at: ref.contextAnchor,
             workspace: intent.arguments.workspace,
           };
-          if (alreadyAdmitted) {
+          if (named && alreadyAdmitted) await registerSubagent(db, topic, offer);
+          else if (alreadyAdmitted) {
             const child = await delegatedControl(pool, scope).start(request);
             assert.equal(child.id, childId);
           }
@@ -311,6 +336,36 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
             /different Run/,
           );
           assert.notEqual(delegatedRunId(scope, ref.taskId + 1), childId);
+          if (named) {
+            assert.equal(cold.arguments.name, name);
+            assert.equal(cold.contextAnchor, ref.contextAnchor);
+            const newTopic = toolReplyTopic(randomUUID());
+            await assert.rejects(registerSubagent(db, topic, offer), /Root writer closed/);
+            await registerSubagent(db, topic, {
+              ...offer,
+              writer: successor.writerId,
+              epoch: 2,
+              destination: newTopic,
+              operation: randomUUID(),
+              input: { seq: cold.sequence, recover: cold.operationId },
+            });
+            const children = (
+              await pool.query("select id,context_at from runs where root_run_id=$1", [runId])
+            ).rows;
+            assert.equal(children.length, 1);
+            assert.equal(children[0].id, childId);
+            assert.equal(Number(children[0].context_at), ref.contextAnchor);
+            const waiters = (
+              await pool.query("select destination from subagent_deliveries where child_id=$1", [
+                childId,
+              ])
+            ).rows.map((r) => r.destination);
+            assert.deepEqual(
+              waiters.sort(),
+              (alreadyAdmitted ? [ref.replyTopic, newTopic] : [newTopic]).sort(),
+            );
+            continue;
+          }
           assert.equal(cold.operationId, childId);
           assert.equal(cold.sequence, source.commit.seq);
           assert.equal(cold.contextAnchor, ref.contextAnchor);
@@ -372,6 +427,7 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each(["fresh", "branch
           }
         }
       }
+      if (named) return;
       assert.deepEqual(snapshots[0], snapshots[1]);
       process.stdout.write(
         "direct-delegation-source " +

@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0354](0354-named-subagent-executor.md) moves named child admission and callback recovery to an independent candidate executor.
+
 [ADR-0353](0353-native-task-delegation-identity.md) keys a candidate child Run by its native delegation task and routes replies to the current waiter.
 
 [ADR-0352](0352-retire-workflow-tool.md) retires sandbox-scripted delegation in the candidate and retains native subagent tools.

@@ -32,6 +32,7 @@ import { command } from "./fixtures/durable-command.ts";
 
 it.each([
   "complete",
+  "named_child",
   "request_too_large",
   "lease_expired_after_prepare",
   "stop_on_resume",
@@ -97,6 +98,25 @@ it.each([
     const failedBinding = crypto.randomUUID(),
       recoveryBindings: string[] = [];
     let initialConversationId = 1;
+    const childId = crypto.randomUUID();
+    if (mode === "named_child") {
+      const seed = await Harness.open(
+        storage,
+        { models: createModels(), registry: createRegistry() },
+        BACKGROUND_CONTEXT,
+      );
+      try {
+        await seed.root(BACKGROUND_CONTEXT);
+        initialConversationId = (
+          await seed.commit(
+            (tx) => tx.createConversation({ ownership: { kind: "ownerless" } }),
+            BACKGROUND_CONTEXT,
+          )
+        ).id;
+      } finally {
+        await seed.close(BACKGROUND_CONTEXT);
+      }
+    }
     if (mode === "environment_recovery") {
       const seed = await Harness.open(
         storage,
@@ -390,6 +410,27 @@ it.each([
         ...selectedCommand,
         payload: {
           ...selectedCommand.payload,
+          ...(mode === "named_child"
+            ? {
+                sessionKind: "subagent",
+                sessionId: childId,
+                turnId: childId,
+                conversationWork: {
+                  id: childId,
+                  agentName: "payment-tests",
+                  sessionId: childId,
+                  turnId: childId,
+                  parentConversationId: 1,
+                  ownerTaskId: 17,
+                  contextAnchor: null,
+                  workingDirectory: "/workspace",
+                  computeSessionId: null,
+                  toolCapabilities: [],
+                  agentSystemPrompt: "Check the tests",
+                  source: { taskId: 17, sequence: 1 },
+                },
+              }
+            : {}),
           piSession: {
             ...selectedCommand.payload.piSession,
             conversationId: initialConversationId,
@@ -555,7 +596,9 @@ it.each([
       );
       const submissions = await storage.scanSubmissions({}, 100, undefined, BACKGROUND_CONTEXT);
       expect(submissions.items).toHaveLength(1);
-      expect(submissions.items[0]?.requestId).toBe(command.payload.runId);
+      expect(submissions.items[0]?.requestId).toBe(
+        mode === "named_child" ? childId : command.payload.runId,
+      );
       expect(submissions.items[0]?.status).toBe("done");
     } finally {
       vi.useRealTimers();

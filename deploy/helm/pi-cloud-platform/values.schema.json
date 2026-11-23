@@ -53,6 +53,7 @@
         "kafka"
       ],
       "properties": {
+        "namedSubagents": { "type": "boolean" },
         "clusterDomain": {
           "$ref": "#/$defs/dnsName"
         },

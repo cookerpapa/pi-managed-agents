@@ -50,6 +50,37 @@ export const SubagentToolSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const NamedSubagentToolSchema = Type.Object(
+  {
+    ...SubagentToolSchema.properties,
+    name: Type.String({
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "Stable sibling name, for example payment-tests. Use the same name to find or retry this child.",
+    }),
+  },
+  { additionalProperties: false },
+);
+export function subagentName(raw: unknown): string {
+  if (typeof raw !== "string") throw new Error("A subagent name is required");
+  const name = raw.normalize("NFC");
+  if (
+    !/^[\p{L}\p{N}][\p{L}\p{N}_.-]{0,63}$/u.test(name) ||
+    ["main", "parent"].includes(name) ||
+    /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(name)
+  )
+    throw new Error("Invalid or reserved subagent name");
+  return name;
+}
+export function prepareNamedSubagentArguments(
+  value: unknown,
+): Static<typeof NamedSubagentToolSchema> {
+  if (!Value.Check(NamedSubagentToolSchema, value))
+    throw Error("Invalid named delegation arguments");
+  assertSubagentTaskInputBudget(value.task);
+  return { ...value, name: subagentName(value.name) };
+}
 /** Root coding Conversations own a Workspace; a child with no file/shell grant
  * has workspace:null. Its ordinary workspace tools must follow the same rule. */
 export function hasConversationWorkspace(scope: {
@@ -186,10 +217,29 @@ const supervisorSchema = Type.Object(
 );
 
 /** Frozen code-owned catalogue; handlers never import the Pi Runner. */
-export function infrastructureToolDefinitions(): readonly InfrastructureToolDefinition[] {
+export function infrastructureToolDefinitions(
+  named = false,
+): readonly InfrastructureToolDefinition[] {
   return [
-    subagent,
-    subagentControl,
+    named
+      ? {
+          ...subagent,
+          parameters: NamedSubagentToolSchema,
+          prepareArguments: prepareNamedSubagentArguments,
+          description: subagent.description.replace(
+            "Recovery continues this same delegation; a new Tool call creates distinct work.",
+            "Choose a stable name unique among your children. Same name, task and options return the existing child or its original result. Conflicting options return a name conflict.",
+          ),
+        }
+      : subagent,
+    named
+      ? {
+          ...subagentControl,
+          description:
+            subagentControl.description +
+            " A direct child can also be addressed by its name across Runs in this Session.",
+        }
+      : subagentControl,
     {
       name: "contact_supervisor",
       availability: "child",

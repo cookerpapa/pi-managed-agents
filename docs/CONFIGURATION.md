@@ -18,6 +18,14 @@ not an API readiness dependency. Helm has independent `images.sessionRuntime`,
 `images.controlPlane` and `images.metering` values even when they reference the
 same built host artifact; `sessionRuntime` owns its own replica/HPA/resources.
 
+## Named subagent executor (matched storage candidate)
+
+`global.namedSubagents` defaults to false. For a deployment using the #52 named
+child schema, enabling it starts `subagent-executor`, configures the Session
+runtime's authenticated admission URL and enables named tool definitions in
+the Workers. Each Worker create wait defaults to five minutes. The child keeps
+its own execution lifetime. [Process settings and acceptance](reports/named-subagent-executor-20261123.md).
+
 ## Image generation and display
 
 ADR-0275 adds `show_image({path, caption?})` whenever Session image storage is

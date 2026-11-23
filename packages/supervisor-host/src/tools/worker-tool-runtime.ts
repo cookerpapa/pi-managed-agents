@@ -60,6 +60,8 @@ export class WorkerToolRuntime {
         ): Promise<OriginalControlToolIntent>;
       };
       maximumDepth: number | null;
+      namedSubagents?: boolean;
+      subagentWaitMs?: number;
       prepareTarget?(
         command: ExecuteTurnCommandMessage,
         target: ExecutionTargetGrant,
@@ -305,12 +307,18 @@ export class WorkerToolRuntime {
                 scope.piSession.conversationId,
               );
         const waiting = new AbortController();
+        const namedWait = this.options.namedSubagents && isControlToolName(definition.name);
         const deadline =
           environment.kind === "target"
             ? AbortSignal.timeout(executorToolBudget(definition.name, args).replyMs)
             : mcp
               ? AbortSignal.timeout(MCP_TOOL_TIMEOUT_MS + TOOL_REPLY_DELIVERY_MARGIN_MS)
-              : undefined;
+              : namedWait
+                ? AbortSignal.timeout(
+                    this.options.subagentWaitMs ??
+                      (definition.name === "contact_supervisor" ? 10 : 5) * 60_000,
+                  )
+                : undefined;
         const activeSignal = AbortSignal.any([
           waiting.signal,
           ...(signal ? [signal] : []),
@@ -367,6 +375,22 @@ export class WorkerToolRuntime {
             } catch (error) {
               if (signal?.aborted) throw signal.reason;
               if (deadline?.aborted && error === deadline.reason) {
+                if (namedWait) {
+                  const name = String(args.name ?? args.target ?? "");
+                  return {
+                    isError: true,
+                    content: [
+                      {
+                        type: "text" as const,
+                        text:
+                          definition.name === "subagent"
+                            ? `还没收到 ${name} 的回复。先查一下它的状态：subagent_control(${JSON.stringify({ action: "status", target: name })})。`
+                            : `这次操作还没收到回复。请稍后再查看${name ? " " + name : ""}。`,
+                      },
+                    ],
+                    details: { code: "subagent_reply_timeout", name },
+                  };
+                }
                 const failure = new ToolExecutionFailure({
                   code: "tool_reply_timeout",
                   effect: "unknown",
@@ -419,7 +443,7 @@ export class WorkerToolRuntime {
         } as PreparedAgentTool,
       };
     };
-    const native = infrastructureToolDefinitions().map((definition) =>
+    const native = infrastructureToolDefinitions(this.options.namedSubagents).map((definition) =>
       createBinding(definition, false),
     );
     let revision: string | undefined;

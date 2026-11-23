@@ -103,6 +103,9 @@ spec:
               containerPort: 9465
               protocol: TCP
           env:
+            {{- if .Values.global.namedSubagents }}
+            - { name: PI_CLOUD_NAMED_SUBAGENTS, value: "1" }
+            {{- end }}
             {{- if .Values.imageAttachments.endpoint }}
             - { name: PI_CLOUD_IMAGE_S3_ENDPOINT, value: {{ .Values.imageAttachments.endpoint | quote }} }
             - { name: PI_CLOUD_IMAGE_S3_REGION, value: {{ .Values.imageAttachments.region | quote }} }

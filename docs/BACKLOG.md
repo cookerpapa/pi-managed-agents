@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Register named children and independent waiters atomically; return results from a separate executor. Verify process loss on both sides of Kafka delivery, delayed admission, supervisor questions and reply-independent replay floors. [Acceptance](reports/named-subagent-executor-20261123.md).
+
 - [x] Adopt the measured Conversation Entry index on the candidate. Verify the child directory, two invocations of one child after root compaction, projected control reads, and intersected Workspace grants through a cold owner.
 - [x] Reattach a direct delegation by native task before and after child Run admission, across two owner replacements and on Projector-only replay. Verify the original branch cutoff after parent compaction and suppress a stopped caller. [Decision](adr/0353-native-task-delegation-identity.md) and [acceptance](reports/task-keyed-delegation-20261123.md).
 

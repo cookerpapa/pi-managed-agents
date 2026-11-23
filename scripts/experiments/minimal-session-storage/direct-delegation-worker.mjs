@@ -30,8 +30,9 @@ import { ControlToolRegistry } from "../../../packages/control-plane/src/control
 import { delegatedControl } from "./delegated-runs.mjs";
 import { encodeWorkspaceFact, decodeWorkspaceFact } from "./workspace-operations.mjs";
 
-async function workerDelegationTool(scope, mailbox, nativeConversations) {
+async function workerDelegationTool(scope, mailbox, nativeConversations, namedSubagents = false) {
   const bindings = await new WorkerToolRuntime({
+    namedSubagents,
     catalog: new ControlToolRegistry(),
     maximumDepth: null,
     implementation: () => undefined,
@@ -55,7 +56,7 @@ async function workerDelegationTool(scope, mailbox, nativeConversations) {
   return bindings.current().find((b) => b.tool.name === "subagent").tool;
 }
 
-async function bootMailbox() {
+export async function bootMailbox() {
   const bootId = randomUUID(),
     brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS?.split(",");
   const replyTopic = toolReplyTopic(bootId);
@@ -99,7 +100,7 @@ async function bootMailbox() {
   return { replyTopic, mailbox, publish: (topic, r) => publisher.publish(topic, r), close };
 }
 
-export async function waitingDelegation(scope, mode) {
+export async function waitingDelegation(scope, mode, name) {
   const facts = [],
     handles = [];
   const boot = await bootMailbox(),
@@ -116,7 +117,7 @@ export async function waitingDelegation(scope, mode) {
     fauxAssistantMessage(
       fauxToolCall(
         "subagent",
-        { task: "Check the tests", context: mode, workspace: null },
+        { ...(name ? { name } : {}), task: "Check the tests", context: mode, workspace: null },
         { id: "delegate-once" },
       ),
       { stopReason: "toolUse" },
@@ -124,10 +125,17 @@ export async function waitingDelegation(scope, mode) {
     fauxAssistantMessage("Child checked the tests"),
     fauxAssistantMessage("Parent finished"),
   ]);
-  const definition = infrastructureToolDefinitions().find((t) => t.name === "subagent");
-  const tool = await workerDelegationTool(scope, mailbox, {
-    childAnchor: async (_ref, inherit) => (inherit ? String(await runtime.childAnchor(1)) : null),
-  });
+  const definition = infrastructureToolDefinitions(Boolean(name)).find(
+    (t) => t.name === "subagent",
+  );
+  const tool = await workerDelegationTool(
+    scope,
+    mailbox,
+    {
+      childAnchor: async (_ref, inherit) => (inherit ? String(await runtime.childAnchor(1)) : null),
+    },
+    Boolean(name),
+  );
   let runtime;
   class Store extends MemoryStorage {
     async commit(writes) {

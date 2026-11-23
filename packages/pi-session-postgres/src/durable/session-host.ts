@@ -555,6 +555,36 @@ export class PostgresDurableSessionHost {
         }> = [];
         for (let first = 0; first < views.length; first += 128) {
           const batch = views.slice(first, first + 128);
+          const named = batch.filter((e) => e.view.agentName !== undefined);
+          if (named.length) {
+            const { rows } = await sql<{
+              id: string;
+              agent_id: string;
+              agent_name: string;
+              source_task_id: string;
+              placement_sequence: string;
+              native_lane: string | null;
+              next: string;
+            }>`select id,agent_id,agent_name,source_task_id,placement_sequence,native_lane,output_display_seq+1 as next from runs
+              where tenant_id=${binding.tenantId}::uuid and session_id=${binding.piSessionId}::uuid and root_run_id=${binding.runId}::uuid
+              and id=any(${named.map((e) => e.view.id)}::uuid[])`.execute(this.options.database);
+            for (const e of named) {
+              const r = rows.find((v) => v.id === e.view.id);
+              if (
+                !r ||
+                e.view.turnId !== r.id ||
+                e.view.sessionId !== r.agent_id ||
+                e.view.agentName !== r.agent_name ||
+                Number(r.source_task_id) !== e.view.ownerTaskId ||
+                Number(r.placement_sequence) !== e.view.source.sequence ||
+                (r.native_lane !== null && Number(r.native_lane) !== e.conversationId)
+              )
+                throw Error("Named child view is missing or changed");
+              result.push({ ...e, nextEventSeq: Number(r.next) });
+            }
+          }
+          const legacy = batch.filter((e) => e.view.agentName === undefined);
+          if (!legacy.length) continue;
           const rows = await this.options.database
             .selectFrom("subagent_conversations as v")
             .innerJoin("sessions as s", (join) =>
@@ -579,11 +609,11 @@ export class PostgresDurableSessionHost {
             .where(
               "v.id",
               "in",
-              batch.map((entry) => entry.view.id),
+              legacy.map((entry) => entry.view.id),
             )
             .execute();
           const byId = new Map(rows.map((row) => [row.id, row]));
-          for (const entry of batch) {
+          for (const entry of legacy) {
             const row = byId.get(entry.view.id),
               source = entry.view.source;
             if (

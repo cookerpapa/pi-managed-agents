@@ -310,7 +310,14 @@ export class ReadyProjection {
             foldRootPresentation(view, f, draft.frame);
           }
           if (r.rootPresentation || this.delegatedRuns)
-            projectChildOutcomes(view, f, draft.frame, r.nativeDispatches, this.delegatedRuns);
+            projectChildOutcomes(
+              view,
+              f,
+              draft.frame,
+              r.nativeDispatches,
+              this.delegatedRuns,
+              this.namedExecutor,
+            );
           view.liveDocs = foldLive(previous?.liveDocs, f.commit.writes);
           if (covered && owner?.projection_pin != null)
             view.pinOffset = BigInt(owner.projection_pin);
@@ -332,8 +339,13 @@ export class ReadyProjection {
               useSynchronousPolicy(f, true) ||
               draft.barrier ||
               draft.frame.ops.some((op) => op.kind !== "tool");
-          if (draft.frame.ops.length && !hasEffect && !covered) {
-            const state = checkpoint(view, r);
+          const namedOffer =
+            this.namedExecutor &&
+            r.nativeDispatches?.some(
+              (t) => t.target === "control" && !t.implementation && !t.sourceDocumentId,
+            );
+          if ((draft.frame.ops.length || namedOffer) && !hasEffect && !covered) {
+            const state = checkpoint(view, r, this.namedExecutor);
             if (state) {
               draft.frame.snapshot = { run: f.scope.runId, writer: f.scope.writerId, state };
               delete view.pinOffset;
@@ -384,7 +396,10 @@ export class ReadyProjection {
           if (d.scope.sessionId === f.scope.sessionId)
             rootThrough = Math.max(rootThrough ?? 0, through);
           else if (through > 0)
-            (draft.frame.childDisplays ??= []).push({
+            (this.namedExecutor
+              ? (draft.frame.namedDisplays ??= [])
+              : (draft.frame.childDisplays ??= [])
+            ).push({
               tenant: f.scope.tenantId,
               run: f.scope.runId,
               session: d.scope.sessionId,
@@ -437,7 +452,7 @@ export class ReadyProjection {
       )
         break;
     }
-    const operations = draft.frames.filter((f) => f.ops.length);
+    const operations = draft.frames.filter((f) => f.ops.length || f.snapshot);
     let outcome = covered ? "covered" : "memory";
     if (!covered && operations.length) {
       const next = BigInt(operations.at(-1).offset) + 1n;

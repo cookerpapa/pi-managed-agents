@@ -23,13 +23,13 @@ export function assertFamilySettled(view) {
 
 // Pi's checkpoint predicate excludes in-flight text and running tools. The
 // stricter bounded subset here also excludes retry details and tool outputs.
-function compactLive(value) {
+function compactLive(value, namedExecutor = false) {
   return (
     value &&
     typeof value === "object" &&
     !Array.isArray(value) &&
     (!value.tools || Array.isArray(value.tools)) &&
-    LiveDoc.definition.checkpointWhen(value) &&
+    (namedExecutor || LiveDoc.definition.checkpointWhen(value)) &&
     knownKeys(value, ["run", "tools"]) &&
     (!value.run ||
       (knownKeys(value.run, ["taskId", "inputs"]) &&
@@ -40,7 +40,15 @@ function compactLive(value) {
       value.tools.every(
         (slot) =>
           knownKeys(slot, ["callId", "name", "status", "entry", "taskId"]) &&
-          ["pending", "done"].includes(slot.status),
+          (["pending", "done"].includes(slot.status) ||
+            (namedExecutor &&
+              slot.status === "running" &&
+              [
+                "subagent",
+                "subagent_control",
+                "contact_supervisor",
+                "subagent_supervisor",
+              ].includes(slot.name))),
       ))
   );
 }
@@ -71,16 +79,16 @@ export function foldLive(documents = {}, writes) {
   return next;
 }
 
-export function checkpoint(view, record) {
+export function checkpoint(view, record, namedExecutor = false) {
   const inboxRoutes = emptyInboxRoutes(view.inboxes);
   if (
     // The caller still needs the Kafka delivery reference on Projector-only restart.
-    view.childCallers !== undefined ||
+    (!namedExecutor && view.childCallers !== undefined) ||
     view.rootInputDoc ||
     !inboxRoutes ||
     Object.keys(view.pendingTools ?? {}).length ||
     !Object.keys(view.liveDocs).length ||
-    !Object.values(view.liveDocs).every((doc) => compactLive(doc.value))
+    !Object.values(view.liveDocs).every((doc) => compactLive(doc.value, namedExecutor))
   )
     return;
   const fields = {};
@@ -104,6 +112,7 @@ export function checkpoint(view, record) {
     if (view[key] !== undefined) fields[key] = view[key];
   const state = {
     version: 1,
+    ...(namedExecutor ? { namedExecutor: true } : {}),
     writer: record.fact.scope.writerId,
     ...fields,
     inboxRoutes,
@@ -123,10 +132,12 @@ export function hydrate(state, writer, first) {
       Number.isSafeInteger(state.seq) &&
       typeof state.lastFact === "string" &&
       /^[0-9a-f]{64}$/.test(state.hash) &&
-      Object.values(state.liveDocs).every((doc) => compactLive(doc.value)),
+      Object.values(state.liveDocs).every((doc) =>
+        compactLive(doc.value, state.namedExecutor === true),
+      ),
     "Invalid active projection checkpoint",
   );
-  const { version, offset, hash, answered, inboxRoutes, ...fields } = state;
+  const { version, offset, hash, answered, inboxRoutes, namedExecutor, ...fields } = state;
   return {
     ...fields,
     writer,

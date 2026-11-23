@@ -3,6 +3,27 @@
 Pi Managed Agents provides `subagent` to delegate a task and `subagent_control`
 to find and manage children. Users can request delegation in ordinary language.
 
+## Named children in the matched candidate
+
+```js
+subagent({ name: "payment-tests", task: "Check the payment tests", workspace: null })
+subagent_control({ action: "status", target: "payment-tests" })
+```
+
+A direct child's name stays reserved under the same parent across Runs. Names
+are case-sensitive Unicode NFC identifiers of up to 64 letters, digits, dots,
+underscores or hyphens, starting with a letter or digit. The addresses `main`,
+`parent` and UUIDs are reserved. A Fork starts its own namespace.
+
+The first call waits for a child result or question. Repeating the same name,
+task and requested options returns the existing status or original result.
+Different creation arguments return a name conflict with the existing UUID.
+The first registration freezes actual permissions and the branch cutoff.
+Use `send` for messages to an active agent. A five-minute create wait can
+expire while the child continues. The parent gets a short instruction to look
+up its name. The Worker does not automatically query or recreate it.
+[Architecture and failure checks](reports/named-subagent-executor-20261123.md).
+
 ## Direct task
 
 ```js
@@ -92,8 +113,7 @@ It includes completed children of the current root work, source Task identity,
 parent relationship, state and a short task summary. Follow `nextCursor` for the
 next page. Use the returned execution ID with `status`, `wait`, `send` or `cancel`.
 These management operations are unsafe on native crash recovery.
-Inspect existing effects before deciding to repeat them. Similar prompts in new
-Tool calls intentionally create distinct children.
+Inspect existing effects before deciding to repeat them. In the task-keyed configuration a fresh Tool call creates a distinct child. The named configuration instead reuses a matching sibling name.
 
 Children retain generation ownership so a direct delegation can return a
 supervisor question while the child remains available for the parent's answer.

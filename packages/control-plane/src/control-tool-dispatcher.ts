@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { Database } from "@pi-cloud/database";
 import {
   durableControlIntent,
+  isControlToolName,
   durableControlRecovery,
   parseControlToolDispatch,
   parseToolResultPayload,
@@ -106,6 +107,10 @@ export class ControlToolDispatcher {
       images?: ImageAttachmentCodec;
       partitions: number;
       admittedDelegatedReads?: boolean;
+      namedExecutor?: Pick<
+        import("./named-subagent-client.ts").NamedSubagentClient,
+        "offer" | "reset" | "close" | "activeCount"
+      >;
       /** Only the matched delegated-Run composition supplies a sealed task reader. */
       directDelegations?: {
         initialReplayComplete(partition: number): boolean;
@@ -134,6 +139,7 @@ export class ControlToolDispatcher {
     return `${scope.tenantId}:${scope.piSessionId}:${operationId}`;
   }
   reset(): void {
+    this.options.namedExecutor?.reset();
     this.#generation++;
     for (const pending of this.#pending.values())
       pending.controller.abort(new Error("Control Tool owner changed"));
@@ -173,6 +179,16 @@ export class ControlToolDispatcher {
     let admitted: boolean | undefined;
     for (const reference of fact.tools) {
       if (reference.target !== "control" || reference.sourceDocumentId !== undefined) continue;
+      if (
+        this.options.namedExecutor &&
+        !reference.implementation &&
+        isControlToolName(reference.toolName)
+      ) {
+        admitted ??= (await commitBeforeEffect?.()) ?? false;
+        if (admitted && current() && this.options.canStart?.() !== false)
+          this.options.namedExecutor.offer(fact, reference);
+        continue;
+      }
       const repeatable = reference.implementation
         ? reference.implementation.replay === "safe"
         : this.options.replayable?.(reference.toolName) !== false;
@@ -307,6 +323,7 @@ export class ControlToolDispatcher {
         join pi_durable_records r on r.tenant_id=c.tenant_id and r.session_id=c.session_id
           and r.id=(effect->>'taskId')::bigint and r.kind='task'
         where c.cloud_metadata is not null
+          ${this.options.namedExecutor ? sql`and (effect?'implementation' or effect->>'toolName' not in ('subagent','subagent_control','subagent_supervisor','contact_supervisor'))` : sql``}
           and ((effect ? 'replyRecovery' and owner.state in ('running','queued')
             and r.fields->>'replyOperation'=effect->>'operationId'
             and r.fields->>'replyIntentSeq'=c.seq::text)
@@ -611,11 +628,12 @@ export class ControlToolDispatcher {
     clearInterval(this.#timer);
     this.reset();
     await Promise.allSettled(this.#active.values());
+    await this.options.namedExecutor?.close();
   }
 
   quiescence(): { active: number; unsettled: number } {
     return {
-      active: this.#active.size,
+      active: this.#active.size + (this.options.namedExecutor?.activeCount ?? 0),
       // Keep successful replies until native settlement, including `done`.
       // Repeatable waits can be reconstructed by the next partition owner.
       unsettled: [...this.#pending.values()].filter((p) => p.execution !== "repeatable").length,

@@ -4,6 +4,7 @@ import { SessionPublicationService } from "./session-publication-service.ts";
 import { SubagentController } from "./subagent-controller.ts";
 import { PlatformRuntimeSettingsService } from "./platform-runtime-settings.ts";
 import { ControlToolDispatcher } from "./control-tool-dispatcher.ts";
+import { NamedSubagentClient } from "./named-subagent-client.ts";
 import { ToolHostClient } from "./tool-host-client.ts";
 import { ToolCatalogAuthority } from "./tool-catalog-authority.ts";
 import { KafkaToolCatalogConsumer } from "@pi-cloud/event-log";
@@ -181,41 +182,45 @@ export async function startSessionRuntime(): Promise<void> {
       },
       ...(images ? { images } : {}),
     });
-    const subagents = new SubagentController({
-      database,
-      managementToken: config.supervisorManagementToken,
-      allowInsecureHttp: config.allowInsecureInternalHttp,
-      treePolicy: config.subagentTreePolicy,
-      validateDirectory: async (target) => {
-        const machine =
-          target.executionMode === "development_environment" && target.computeSessionId === null;
-        const root =
-          target.executionMode === "development_environment" ? "/home/user" : "/workspace";
-        if (!machine && target.cwd !== root && !target.cwd.startsWith(root + "/"))
-          throw new Error("Subagent directory is outside the shared Volume");
-        if (machine && (!target.developmentEnvironmentId || !target.userId))
-          throw new Error("Subagent machine ownership is unavailable");
-        await sandboxControl!.resources.listWorkspaceDirectory({
-          toolBrokerProtocolVersion: 1,
-          type: "workspace.list_directory",
-          requestId: randomUUID(),
-          tenantId: target.tenantId,
-          workspaceId: target.workspaceId,
-          sessionId: target.sessionId,
-          rootPath: "",
-          path: machine ? "" : target.cwd.slice(root.length).replace(/^\//, ""),
-          ...(machine
-            ? {
-                machine: {
-                  environmentId: target.developmentEnvironmentId!,
-                  userId: target.userId!,
-                  directory: target.cwd,
-                },
-              }
-            : {}),
+    const namedExecutorUrl = process.env.PI_CLOUD_SUBAGENT_EXECUTOR_URL;
+    const subagents = namedExecutorUrl
+      ? undefined
+      : new SubagentController({
+          database,
+          managementToken: config.supervisorManagementToken,
+          allowInsecureHttp: config.allowInsecureInternalHttp,
+          treePolicy: config.subagentTreePolicy,
+          validateDirectory: async (target) => {
+            const machine =
+              target.executionMode === "development_environment" &&
+              target.computeSessionId === null;
+            const root =
+              target.executionMode === "development_environment" ? "/home/user" : "/workspace";
+            if (!machine && target.cwd !== root && !target.cwd.startsWith(root + "/"))
+              throw new Error("Subagent directory is outside the shared Volume");
+            if (machine && (!target.developmentEnvironmentId || !target.userId))
+              throw new Error("Subagent machine ownership is unavailable");
+            await sandboxControl!.resources.listWorkspaceDirectory({
+              toolBrokerProtocolVersion: 1,
+              type: "workspace.list_directory",
+              requestId: randomUUID(),
+              tenantId: target.tenantId,
+              workspaceId: target.workspaceId,
+              sessionId: target.sessionId,
+              rootPath: "",
+              path: machine ? "" : target.cwd.slice(root.length).replace(/^\//, ""),
+              ...(machine
+                ? {
+                    machine: {
+                      environmentId: target.developmentEnvironmentId!,
+                      userId: target.userId!,
+                      directory: target.cwd,
+                    },
+                  }
+                : {}),
+            });
+          },
         });
-      },
-    });
     unattachedSubagents = subagents;
     const catalogAuthority = new ToolCatalogAuthority(database);
     catalogConsumer = new KafkaToolCatalogConsumer({
@@ -232,6 +237,14 @@ export async function startSessionRuntime(): Promise<void> {
       catalog: (name) => toolCatalog.publicationFor(name),
     });
     const controlTools = new ControlToolDispatcher({
+      ...(namedExecutorUrl
+        ? {
+            namedExecutor: new NamedSubagentClient(
+              namedExecutorUrl,
+              config.supervisorManagementToken,
+            ),
+          }
+        : {}),
       database,
       partitions: config.kafkaPartitions,
       ...(images ? { images: images.codec } : {}),
@@ -274,8 +287,10 @@ export async function startSessionRuntime(): Promise<void> {
             ...(binding.snapshot.continuity ? { continuity: binding.snapshot.continuity } : {}),
           };
         }
+        if (isControlToolName(call.toolName) && !subagents)
+          throw Error("Named delegation was returned to the local control dispatcher");
         const outcome = await (isControlToolName(call.toolName)
-          ? subagents.executeTool(call, current)
+          ? subagents!.executeTool(call, current)
           : toolHost!.execute(call, current, signal));
         return { ...outcome, ...(execution ? { execution } : {}) };
       },
@@ -364,7 +379,9 @@ export async function startSessionRuntime(): Promise<void> {
             for (const sessionId of fact.inputQueueSessions ?? [])
               inputQueues.notify(fact.scope.tenantId, sessionId, () => current?.() !== false);
         },
-        close: () => subagents.close(),
+        close: async () => {
+          await subagents?.close();
+        },
       },
       toolCommands: executorDispatcher,
       controlTools,
@@ -382,7 +399,7 @@ export async function startSessionRuntime(): Promise<void> {
           bindingView.reset();
           executionBindings.reset();
           inputQueues.reset();
-          subagents.reset();
+          subagents?.reset();
           controlTools.reset();
           sandboxControl!.environments.reset();
           sandboxControl!.dispatcher.reset();

@@ -807,7 +807,12 @@ export const DelegatedAgentDirectorySchema = Type.Object(
   {
     agents: Type.Array(
       Type.Object(
-        { agentId: UuidSchema, task: Type.String(), state: DelegatedSessionStateSchema },
+        {
+          agentId: UuidSchema,
+          name: Type.Optional(Type.String()),
+          task: Type.String(),
+          state: DelegatedSessionStateSchema,
+        },
         { additionalProperties: false },
       ),
       { maxItems: 24 },

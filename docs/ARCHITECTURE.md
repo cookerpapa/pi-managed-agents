@@ -617,6 +617,12 @@ Availability is independent of the prompt policy controlling proactive delegatio
 
 The #52 candidate reads addressed child history across invocations under one root Session and narrows Workspace capabilities on continuation. Its API and browser composition are opt-in. [Candidate contract](adr/0351-serving-delegated-history.md). In this composition one native delegation task names one child Run across Worker and Projector replacement. [Task identity](adr/0353-native-task-delegation-identity.md).
 
+The root-only storage candidate can run a dedicated subagent executor. Its PG
+transaction owns a named child and its per-request reply addresses. Projector
+offers are bounded and asynchronous after dispatch authorization. The executor
+places work through Worker management and publishes the result to Kafka. The
+parent's native Harness settles its tool. [Named delegation contract](adr/0354-named-subagent-executor.md).
+
 Subagents are native child Conversations in the same Session family. Their identity
 and creation receipt survive parent interruption. Direct delegation recovers that
 receipt; management operations are unsafe for automatic replay.

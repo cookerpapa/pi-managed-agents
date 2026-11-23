@@ -61,6 +61,9 @@ spec:
             - { name: metrics, containerPort: 9464 }
             - { name: sandbox, containerPort: 4300 }
           env:
+            {{- if .Values.global.namedSubagents }}
+            - { name: PI_CLOUD_SUBAGENT_EXECUTOR_URL, value: "http://subagent-executor:4313" }
+            {{- end }}
             {{- if .Values.imageAttachments.endpoint }}
             - { name: PI_CLOUD_IMAGE_S3_ENDPOINT, value: {{ .Values.imageAttachments.endpoint | quote }} }
             - { name: PI_CLOUD_IMAGE_S3_REGION, value: {{ .Values.imageAttachments.region | quote }} }

@@ -18,9 +18,11 @@ const command = {
   },
 } as ExecuteTurnCommandMessage;
 
-function fixture(codec?: ImageAttachmentCodec) {
+function fixture(codec?: ImageAttachmentCodec, namedSubagents = false) {
   const mailbox = new ToolReplyMailbox();
   const runtime = new WorkerToolRuntime({
+    namedSubagents,
+    ...(namedSubagents ? { subagentWaitMs: 25 } : {}),
     implementation: () => ({ releaseId: "test-v1", generation: 1, replay: "never" }),
     catalog: (() => {
       const catalog = new ControlToolRegistry();
@@ -647,5 +649,39 @@ it("resolves Skill activation from the frozen manifest and only prepares a Works
     ).rejects.toThrow("not selected");
   } finally {
     f.mailbox.close();
+  }
+});
+
+it("returns the named child and a concrete status lookup on timeout, without retrying", async () => {
+  const { runtime, mailbox } = fixture(undefined, true);
+  const bindings = await runtime.create({
+    command,
+    environment: () => {
+      throw Error("Unexpected environment");
+    },
+  });
+  const tool = bindings.current().find((b) => b.tool.name === "subagent")!
+    .tool as PreparedAgentTool;
+  const wait = vi.spyOn(mailbox, "wait");
+  expect(() => tool.prepareArguments?.({ task: "check" })).toThrow();
+  const prepared = await withToolInvocation({ id: "task:17", nativeToolCallId: "create" }, () =>
+    tool.prepareExecution!("create", { name: "payment-tests", task: "check" }),
+  );
+  try {
+    expect(await prepared.result()).toMatchObject({
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: expect.stringContaining(
+            'subagent_control({"action":"status","target":"payment-tests"})',
+          ),
+        },
+      ],
+      details: { code: "subagent_reply_timeout" },
+    });
+    expect(wait).toHaveBeenCalledOnce();
+  } finally {
+    prepared.dispose();
   }
 });

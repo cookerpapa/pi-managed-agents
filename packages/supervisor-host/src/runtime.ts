@@ -517,6 +517,7 @@ export class PiWorkerRuntime {
     );
     this.#executionTargets = executionTargets;
     const trustedTools = new WorkerToolRuntime({
+      namedSubagents: process.env.PI_CLOUD_NAMED_SUBAGENTS === "1",
       implementation: (name) => this.#catalogConsumer?.view.implementation(name),
       catalog: this.#catalogConsumer.view,
       scopedCatalog: (scope) =>

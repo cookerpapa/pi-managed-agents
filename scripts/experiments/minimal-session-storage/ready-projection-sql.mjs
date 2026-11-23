@@ -160,6 +160,15 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
             end if;
           end loop;
         end if;
+        if frame?'namedDisplays' then
+          if applied=0 then raise exception 'Child display lacks admitted source'; end if;
+          for a in select value from jsonb_array_elements(frame->'namedDisplays') loop
+            update runs set output_display_seq=greatest(output_display_seq,(a->>'through')::bigint),
+              output_display_native_seq=greatest(output_display_native_seq,(a->>'seq')::bigint)
+              where tenant_id=(a->>'tenant')::uuid and root_run_id=(a->>'run')::uuid and agent_id=(a->>'session')::uuid and id=(a->>'turn')::uuid;
+            if not found then raise exception 'Named child display scope changed' using errcode='40001'; end if;
+          end loop;
+        end if;
         if frame?'childDisplays' then
           if applied=0 then raise exception 'Child display lacks admitted source'; end if;
           for a in select value from jsonb_array_elements(frame->'childDisplays') loop

@@ -6,6 +6,7 @@ import { CloudToolCapabilitySnapshotSchema } from "./tool-capabilities.ts";
 export const ConversationWorkViewSchema = Type.Object(
   {
     id: Type.String({ format: "uuid" }),
+    agentName: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
     sessionId: Type.String({ format: "uuid" }),
     turnId: Type.String({ format: "uuid" }),
     parentConversationId: Type.Integer({ minimum: 1 }),

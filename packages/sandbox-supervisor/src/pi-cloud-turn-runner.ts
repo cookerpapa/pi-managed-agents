@@ -331,6 +331,7 @@ export class PiCloudTurnRunner {
   ): Promise<PiTurnResult> {
     const options = this.#options,
       p = command.payload;
+    const initialRequestId = p.conversationWork?.agentName ? p.conversationWork.id : p.runId;
     this.#identity = { tenantId: p.tenantId, sessionId: p.sessionId, runId: p.runId };
     if (p.input.kind === "resume" && (!p.conversationWork || p.piSession.conversationId === 1))
       throw new PiTurnError(
@@ -622,6 +623,7 @@ export class PiCloudTurnRunner {
       const binding: DurableRunConfiguration = {
         ...(options.metrics ? { metrics: options.metrics } : {}),
         runId: p.runId,
+        initialRequestId,
         conversationId: p.piSession.conversationId,
         model,
         ...(config.autoCompactTokenLimit === undefined
@@ -1062,7 +1064,7 @@ export class PiCloudTurnRunner {
       } else {
         const existing = await owner.storage.submissionByRequest(
           conversation.id,
-          p.runId,
+          initialRequestId,
           BACKGROUND_CONTEXT,
         );
         if (!existing) {
@@ -1083,7 +1085,7 @@ export class PiCloudTurnRunner {
           );
           await prepare("input_submit", () =>
             conversation.submit(
-              { type: "input", content, requestId: p.runId, whenBusy: "followUp" },
+              { type: "input", content, requestId: initialRequestId, whenBusy: "followUp" },
               BACKGROUND_CONTEXT,
             ),
           );
@@ -1161,7 +1163,7 @@ export class PiCloudTurnRunner {
         );
       const rootInput = await owner.storage.submissionByRequest(
         conversation.id,
-        p.runId,
+        initialRequestId,
         BACKGROUND_CONTEXT,
       );
       const humanInputs = await runtime.harness.snapshot(

@@ -18,6 +18,7 @@ export function projectChildOutcomes(
   frame,
   dispatches = fact.tools,
   delegatedRuns = false,
+  namedExecutor = false,
 ) {
   const writes = fact.commit.writes;
   let lanes = view.childOutcomes,
@@ -47,6 +48,7 @@ export function projectChildOutcomes(
   // An operation ID is known at dispatch, including before native child creation.
   for (const t of dispatches ?? [])
     if (
+      !namedExecutor &&
       t.target === "control" &&
       (!delegatedRuns || t.sourceDocumentId === undefined) &&
       (t.toolName === "subagent" ||

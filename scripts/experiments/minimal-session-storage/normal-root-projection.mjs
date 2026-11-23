@@ -19,10 +19,22 @@ export function normalRootProjection(
   select,
   resolve,
   validateChild,
-  { delegatedRuns = false } = {},
+  {
+    delegatedRuns = false,
+    namedExecutor = Boolean(process.env.PI_CLOUD_SUBAGENT_EXECUTOR_URL),
+  } = {},
 ) {
+  if (namedExecutor && !validateChild)
+    validateChild = async (scope, child) => {
+      const result = await pool.query(
+        "select 1 from runs where tenant_id=$1 and session_id=$2 and root_run_id=$3 and agent_id=$4 and id=$5",
+        [scope.tenantId, scope.piSessionId, scope.runId, child.sessionId, child.turnId],
+      );
+      assert.equal(result.rowCount, 1, "Unregistered named child display");
+    };
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
   view.delegatedRuns = delegatedRuns;
+  view.namedExecutor = namedExecutor;
   view.configure(16, "recorded-history");
   const env = {
     pool,
