@@ -39,3 +39,22 @@ PG used approximately two CPU seconds per elapsed second throughout projection, 
 Before cutover, compare the same public requests against a separate read-capacity configuration or reduce the work of assembling a full page, keeping cursor isolation and repeatable snapshots. Browser history reads are covered here; public Fork/prune mutations, full cold handoff and retained attachments still have their own integration gates.
 
 [Reproduction commands](../../scripts/experiments/minimal-session-storage/README.md#run-boundary-flow-and-directory-recovery) and [structured measurements](flow-tree-and-paging-20261123.json).
+
+## Do history reads block projection writes?
+
+On PostgreSQL 17.6, the paginated HTTP read used its existing repeatable-read snapshot. A controlled invocation of the candidate's actual projection SQL inserted a second assistant message, updated the same Run's display coverage and advanced the partition offset in one open transaction. The writer could see both messages. An authenticated HTTP request for that Run returned in 49.49 ms with the first message. We kept the transaction open for 865.72 ms after the write. After commit another HTTP request saw both messages. A separate read-only repeatable-read transaction held across that commit continued to see one message, then saw two in its next transaction.
+
+As a positive control, a second connection requested `SELECT … FOR UPDATE` on that Run while projection held the write open. PostgreSQL reported `Lock:transactionid` with the projection connection as the blocker. The writer held granted `RowExclusiveLock` table locks on the messages, Runs and offset tables. Ordinary page reads take a compatible `AccessShareLock`. The Projector's partition-offset row lock orders writers to that offset; the page has no reason to acquire it. [PostgreSQL explicit locking](https://www.postgresql.org/docs/17/explicit-locking.html) and [MVCC](https://www.postgresql.org/docs/17/mvcc-intro.html).
+
+We replayed one RF3 tape eight times on the same disposable database, changing only the PG CPU quota and reader load between arms. Each trial drained 32 partitions, projected 2,624 visible records, and verified 1,280 tool results. Eight concurrent clients continuously requested pages in the mixed trials. A separate observer sampled labelled API, control and Projector connections, including heavyweight lock holders when any such wait was reported.
+
+| PG CPU quota | Reader load | Visible records/s (two trials) | Pages/s | Page P95 | PG CPU cores used |
+|---:|---|---:|---:|---:|---:|
+| 2 | No induced paging | 460 / 470 | — | — | 1.99 / 1.96 |
+| 2 | Continuous paging | 259 / 255 | 54.61 / 54.86 | 207 / 224 ms | 2.00 / 2.00 |
+| 4 | No induced paging | 1,379 / 967 | — | — | 2.99 / 2.12 |
+| 4 | Continuous paging | 435 / 288 | 140.83 / 64.64 | 117 / 201 ms | 3.18 / 3.39 |
+
+There were 1,216 snapshots, including 741 during mixed load. None of the sampled active API, control or projection backends reported wait type `Lock`. Of 885 active page-backend observations, 792 had no reported wait. One observed a buffer-content lightweight lock and one a data-file read. Across all trials the Projector frequently reported `LWLock:WALWrite` and `IO:WalSync`, including when it ran alone. These events concern PG's WAL write path. Event counts are samples of backends, not elapsed milliseconds. An active backend with no reported wait can be running or runnable. Samples were separated by up to 149 ms, so very short waits could be missed. [PostgreSQL wait events](https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW).
+
+In the two-core mixed trials the container was throttled in 99 of 101 and 102 of 103 quota periods. With four cores the simultaneous workloads completed more history pages and projected more visible records per second. This establishes a shared CPU-capacity effect on this host. The four-core runs varied substantially and the closed-loop clients offered more work when service became faster. Those numbers are benchmarks of this fixture, not a linear scaling factor. No production settings changed. [Per-trial measurements](flow-paging-waits-20261123.json).

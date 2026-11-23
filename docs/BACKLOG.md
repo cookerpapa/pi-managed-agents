@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Distinguish row locking from CPU and WAL contention during public paging using same-Run open transactions and paired CPU quotas. [Evidence](reports/flow-tree-and-paging-20261123.md#do-history-reads-block-projection-writes).
+
 - [x] Check generated branching histories and shared-prefix collection against an independent reference. Exercise public Flow history requests from Chrome while the candidate projects Kafka records. [Measurements](reports/flow-tree-and-paging-20261123.md).
 
 - [x] Compare a frozen branch base with a moving Session head on identical admission workloads. Check deletion in both orders, WAL, recent pages and bounded collection. [Results](reports/flow-base-admission-20261123.md).

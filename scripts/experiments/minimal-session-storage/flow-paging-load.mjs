@@ -6,6 +6,7 @@ import native from "@confluentinc/kafka-javascript";
 import { KafkaLogConsumer } from "@pi-cloud/event-log";
 import { FamilyPresentation } from "./family-presentation.mjs";
 import { testKafka } from "../../lib/test-kafka.mjs";
+import { observePagingWaits, provePagingVisibility } from "./flow-paging-waits.mjs";
 import { withPagingFixture } from "./flow-paging-fixture.mjs";
 
 function latency(ms) {
@@ -53,7 +54,7 @@ async function readers(api, level, deadline) {
     },
   };
 }
-export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun) {
+export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun, setCpuLimit) {
   const presenters = new Map();
   for (const group of groups)
     for (const { fact } of group) {
@@ -115,6 +116,7 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
         tenant,
         live.piSessionId,
       ]);
+      if (setCpuLimit) await provePagingVisibility(api, tenant, live.piSessionId);
       for (const level of ["paced", "saturated"]) {
         const t = performance.now(),
           load = await readers(api, level, t + 3500);
@@ -126,7 +128,20 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
           }),
         );
       }
-      for (const mode of ["writer", "paced", "saturated", "saturated", "paced", "writer"]) {
+      const trials = setCpuLimit
+        ? [
+            [2, "writer"],
+            [2, "saturated"],
+            [4, "saturated"],
+            [4, "writer"],
+            [4, "writer"],
+            [4, "saturated"],
+            [2, "saturated"],
+            [2, "writer"],
+          ]
+        : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [2, mode]);
+      for (const [cpus, mode] of trials) {
+        if (setCpuLimit) await setCpuLimit(cpus);
         const ids = scopes.map((s) => s.runId);
         await db.query("delete from messages where run_id=any($1::uuid[])", [ids]);
         await db.query("delete from inboxes where pi_session_id=any($1::uuid[])", [
@@ -212,8 +227,9 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
           );
         };
         const chromeBefore = api.browserReads();
-        let cpuBefore, cpuAfter;
+        let cpuBefore, cpuAfter, observer;
         try {
+          if (setCpuLimit) observer = await observePagingWaits(url, cpus);
           cpuBefore = await counters();
           await reader.start();
           const limit = performance.now() + 90000;
@@ -258,6 +274,7 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
               visiblePerSecond: Math.round((visible * 1000) / (end - t0)),
               seconds: +((end - t0) / 1000).toFixed(2),
               pgCommits: projector.view.stats.commits,
+              ...(observer ? { waitStudy: observer.summary(t0, end) } : {}),
               pgCpuSeconds: +((cpuAfter.usage_usec - cpuBefore.usage_usec) / 1e6).toFixed(3),
               pgThrottlePeriods: cpuAfter.nr_throttled - cpuBefore.nr_throttled,
               allPartitionsDrained: true,
@@ -270,7 +287,11 @@ export async function studyFlowPaging(url, tenant, groups, scopes, visiblePerRun
         } finally {
           clearTimeout(timeout);
           if (loads) await loads.stop(t0 ?? 0, performance.now());
-          await reader.close();
+          try {
+            await reader.close();
+          } finally {
+            await observer?.stop();
+          }
         }
       }
     } finally {

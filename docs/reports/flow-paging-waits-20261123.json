@@ -1,0 +1,432 @@
+[
+  {
+    "mode": "same-run-visibility",
+    "before": {
+      "ms": 49.49,
+      "second": false
+    },
+    "after": {
+      "ms": 17.81,
+      "second": true
+    },
+    "heldMs": 865.72,
+    "oldSnapshotCount": 1,
+    "freshCount": 2,
+    "positiveControl": {
+      "wait_event_type": "Lock",
+      "wait_event": "transactionid",
+      "blocked": true
+    },
+    "writerRelationLocks": [
+      {
+        "rel": "accepted_fact_projection_offsets",
+        "mode": "RowExclusiveLock"
+      },
+      {
+        "rel": "accepted_fact_projection_offsets",
+        "mode": "RowShareLock"
+      },
+      {
+        "rel": "messages",
+        "mode": "AccessShareLock"
+      },
+      {
+        "rel": "messages",
+        "mode": "RowExclusiveLock"
+      },
+      {
+        "rel": "runs",
+        "mode": "RowExclusiveLock"
+      },
+      {
+        "rel": "runs",
+        "mode": "RowShareLock"
+      }
+    ]
+  },
+  {
+    "mode": "writer",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 460,
+    "seconds": 5.71,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 2,
+      "samples": 135,
+      "maxGapMs": 99,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "no reported wait": 463,
+          "IO:WalSync": 116,
+          "LWLock:WALWrite": 470,
+          "Client:ClientRead": 10,
+          "LWLock:BufferContent": 16,
+          "IO:WalWrite": 4,
+          "IO:DataFileRead": 1,
+          "IO:DataFileExtend": 1
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 1.99,
+      "quotaPeriods": 57,
+      "throttledPeriods": 53
+    },
+    "pgCpuSeconds": 11.886,
+    "pgThrottlePeriods": 53,
+    "allPartitionsDrained": true,
+    "livePageItems": null,
+    "toolResults": 1280,
+    "pages": null,
+    "browserOlderPages": 0
+  },
+  {
+    "mode": "saturated",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 259,
+    "seconds": 10.14,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 2,
+      "samples": 199,
+      "maxGapMs": 100.2,
+      "activeBackendObservations": {
+        "flow-control": {
+          "no reported wait": 15,
+          "Client:ClientRead": 6
+        },
+        "flow-projector": {
+          "no reported wait": 685,
+          "IO:WalSync": 147,
+          "LWLock:WALWrite": 527,
+          "LWLock:BufferContent": 24,
+          "Client:ClientRead": 32,
+          "LWLock:WALInsert": 1,
+          "IO:DataFileExtend": 3,
+          "IO:WalInitWrite": 1,
+          "IO:WalInitSync": 1,
+          "IO:WalWrite": 6
+        },
+        "flow-page": {
+          "no reported wait": 273,
+          "Client:ClientRead": 18
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 2,
+      "quotaPeriods": 101,
+      "throttledPeriods": 99
+    },
+    "pgCpuSeconds": 20.625,
+    "pgThrottlePeriods": 99,
+    "allPartitionsDrained": true,
+    "livePageItems": 21,
+    "toolResults": 1280,
+    "pages": {
+      "latencyMs": {
+        "n": 554,
+        "p50": 132.65,
+        "p95": 206.92,
+        "p99": 315.04
+      },
+      "pagesPerSecond": 54.61,
+      "counts": {
+        "latest": 189,
+        "older": 188,
+        "newer": 185
+      }
+    },
+    "browserOlderPages": 1
+  },
+  {
+    "mode": "saturated",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 435,
+    "seconds": 6.04,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 4,
+      "samples": 160,
+      "maxGapMs": 97.5,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "no reported wait": 363,
+          "IO:WalSync": 102,
+          "LWLock:WALWrite": 245,
+          "Client:ClientRead": 11,
+          "IO:DataFileExtend": 1,
+          "IO:WalWrite": 3,
+          "LWLock:BufferContent": 1,
+          "IO:WalInitWrite": 1
+        },
+        "flow-page": {
+          "no reported wait": 142,
+          "Client:ClientRead": 11
+        },
+        "flow-control": {
+          "Client:ClientRead": 5,
+          "no reported wait": 6
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 3.18,
+      "quotaPeriods": 60,
+      "throttledPeriods": 3
+    },
+    "pgCpuSeconds": 19.492,
+    "pgThrottlePeriods": 3,
+    "allPartitionsDrained": true,
+    "livePageItems": 18,
+    "toolResults": 1280,
+    "pages": {
+      "latencyMs": {
+        "n": 850,
+        "p50": 38.7,
+        "p95": 117.3,
+        "p99": 138.95
+      },
+      "pagesPerSecond": 140.83,
+      "counts": {
+        "latest": 288,
+        "older": 286,
+        "newer": 285
+      }
+    },
+    "browserOlderPages": 1
+  },
+  {
+    "mode": "writer",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 1379,
+    "seconds": 1.9,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 4,
+      "samples": 84,
+      "maxGapMs": 24.6,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "no reported wait": 213,
+          "LWLock:WALWrite": 445,
+          "IO:WalSync": 79,
+          "Client:ClientRead": 3,
+          "IO:WalWrite": 1,
+          "IO:DataFileExtend": 1
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 2.99,
+      "quotaPeriods": 19,
+      "throttledPeriods": 0
+    },
+    "pgCpuSeconds": 5.955,
+    "pgThrottlePeriods": 0,
+    "allPartitionsDrained": true,
+    "livePageItems": null,
+    "toolResults": 1280,
+    "pages": null,
+    "browserOlderPages": 0
+  },
+  {
+    "mode": "writer",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 967,
+    "seconds": 2.71,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 4,
+      "samples": 119,
+      "maxGapMs": 31.2,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "no reported wait": 224,
+          "LWLock:WALWrite": 368,
+          "IO:WalSync": 95,
+          "Client:ClientRead": 4,
+          "LWLock:WALInsert": 3,
+          "LWLock:BufferContent": 2,
+          "Timeout:SpinDelay": 1,
+          "IO:DataFileExtend": 1
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 2.12,
+      "quotaPeriods": 27,
+      "throttledPeriods": 0
+    },
+    "pgCpuSeconds": 6.027,
+    "pgThrottlePeriods": 0,
+    "allPartitionsDrained": true,
+    "livePageItems": null,
+    "toolResults": 1280,
+    "pages": null,
+    "browserOlderPages": 0
+  },
+  {
+    "mode": "saturated",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 288,
+    "seconds": 9.1,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 4,
+      "samples": 185,
+      "maxGapMs": 148.7,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "LWLock:WALWrite": 292,
+          "IO:WalSync": 115,
+          "no reported wait": 472,
+          "Client:ClientRead": 14,
+          "IO:DataFileExtend": 2,
+          "IO:WalInitWrite": 2,
+          "IO:WalWrite": 1
+        },
+        "flow-page": {
+          "no reported wait": 178,
+          "Client:ClientRead": 22
+        },
+        "flow-control": {
+          "Client:ClientRead": 3,
+          "no reported wait": 13
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 3.39,
+      "quotaPeriods": 91,
+      "throttledPeriods": 24
+    },
+    "pgCpuSeconds": 31.145,
+    "pgThrottlePeriods": 24,
+    "allPartitionsDrained": true,
+    "livePageItems": 14,
+    "toolResults": 1280,
+    "pages": {
+      "latencyMs": {
+        "n": 588,
+        "p50": 126.82,
+        "p95": 200.57,
+        "p99": 304.17
+      },
+      "pagesPerSecond": 64.64,
+      "counts": {
+        "latest": 202,
+        "older": 199,
+        "newer": 195
+      }
+    },
+    "browserOlderPages": 1
+  },
+  {
+    "mode": "saturated",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 255,
+    "seconds": 10.3,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 2,
+      "samples": 197,
+      "maxGapMs": 106.2,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "no reported wait": 660,
+          "IO:WalSync": 154,
+          "Client:ClientRead": 24,
+          "LWLock:WALWrite": 472,
+          "IO:WalWrite": 6,
+          "LWLock:WALInsert": 3,
+          "IO:DataFileExtend": 3,
+          "LWLock:LockManager": 7,
+          "LWLock:BufferContent": 6,
+          "LWLock:ProcArray": 1,
+          "IPC:ProcarrayGroupUpdate": 4,
+          "IO:WalInitWrite": 2,
+          "IO:WalInitSync": 1,
+          "Timeout:SpinDelay": 2
+        },
+        "flow-page": {
+          "IO:DataFileRead": 1,
+          "Client:ClientRead": 40,
+          "no reported wait": 199,
+          "LWLock:BufferContent": 1
+        },
+        "flow-control": {
+          "Client:ClientRead": 6,
+          "no reported wait": 11
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 2,
+      "quotaPeriods": 103,
+      "throttledPeriods": 102
+    },
+    "pgCpuSeconds": 21.013,
+    "pgThrottlePeriods": 102,
+    "allPartitionsDrained": true,
+    "livePageItems": 19,
+    "toolResults": 1280,
+    "pages": {
+      "latencyMs": {
+        "n": 565,
+        "p50": 133.5,
+        "p95": 223.58,
+        "p99": 325.11
+      },
+      "pagesPerSecond": 54.86,
+      "counts": {
+        "latest": 193,
+        "older": 192,
+        "newer": 188
+      }
+    },
+    "browserOlderPages": 1
+  },
+  {
+    "mode": "writer",
+    "runs": 64,
+    "total": 11904,
+    "visible": 2624,
+    "visiblePerSecond": 470,
+    "seconds": 5.59,
+    "pgCommits": 5504,
+    "waitStudy": {
+      "cpus": 2,
+      "samples": 137,
+      "maxGapMs": 55.5,
+      "activeBackendObservations": {
+        "flow-projector": {
+          "no reported wait": 482,
+          "IO:WalSync": 126,
+          "LWLock:WALWrite": 461,
+          "Client:ClientRead": 7,
+          "IO:DataFileExtend": 2,
+          "IO:WalWrite": 1
+        }
+      },
+      "blockingPairs": {},
+      "pgCoresUsed": 1.96,
+      "quotaPeriods": 56,
+      "throttledPeriods": 52
+    },
+    "pgCpuSeconds": 11.264,
+    "pgThrottlePeriods": 52,
+    "allPartitionsDrained": true,
+    "livePageItems": null,
+    "toolResults": 1280,
+    "pages": null,
+    "browserOlderPages": 0
+  }
+]

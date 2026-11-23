@@ -110,7 +110,8 @@ const groups = lanes.map((runs, partition) => {
 });
 const own = await testPostgres({});
 try {
-  const comparePages = process.argv[3] === "flow-pages";
+  const waitStudy = process.argv[3] === "flow-page-locks";
+  const comparePages = waitStudy || process.argv[3] === "flow-pages";
   if (comparePages) {
     const { studyFlowPaging } = await import("./flow-paging-load.mjs");
     await studyFlowPaging(
@@ -119,6 +120,7 @@ try {
       groups,
       lanes.flat().map((r) => r.scope),
       visiblePerRun,
+      waitStudy ? own.setCpuLimit : undefined,
     );
   }
   const compareFlow = process.argv[3] === "flow",

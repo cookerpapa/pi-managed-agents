@@ -46,7 +46,9 @@ export async function openPageApi(url, readUrl) {
 if (import.meta.main) {
   const [{ url, readUrl }] = await once(process, "message");
   assert(new URL(url).hostname === "127.0.0.1" && new URL(readUrl).hostname === "127.0.0.1");
-  const database = createDatabase({ connectionString: url, maxConnections: 5 });
+  const controlDsn = new URL(url);
+  controlDsn.searchParams.set("application_name", "flow-control");
+  const database = createDatabase({ connectionString: controlDsn.href, maxConnections: 5 });
   const reads = createDatabase({
     connectionString: readUrl,
     maxConnections: 8,

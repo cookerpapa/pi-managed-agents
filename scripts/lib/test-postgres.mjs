@@ -106,6 +106,11 @@ exec sleep infinity`;
     return {
       url,
       close,
+      async setCpuLimit(cpus) {
+        if (!started || closed || !Number.isInteger(cpus) || cpus < 1 || cpus > 4)
+          throw new Error("Invalid disposable PG CPU limit");
+        await execute("docker", ["update", "--cpus", String(cpus), name]);
+      },
       ...(crashable ? { crash: () => control("stop"), restart: () => control("start") } : {}),
     };
   } catch (error) {

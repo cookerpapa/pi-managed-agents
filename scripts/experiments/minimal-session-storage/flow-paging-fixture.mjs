@@ -17,8 +17,14 @@ import { normalRootProjection } from "./normal-root-projection.mjs";
 
 export async function withPagingFixture(url, tenantId, work) {
   const meta = createDatabase({ connectionString: url, maxConnections: 5 });
-  const db = new pg.Pool({ connectionString: url, options: "-c search_path=flow_study", max: 12 });
+  const db = new pg.Pool({
+    application_name: "flow-projector",
+    connectionString: url,
+    options: "-c search_path=flow_study",
+    max: 12,
+  });
   const readDsn = new URL(url);
+  readDsn.searchParams.set("application_name", "flow-page");
   readDsn.searchParams.set("options", "-c search_path=flow_web,flow_study,public");
   let app, web;
   try {
