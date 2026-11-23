@@ -157,7 +157,6 @@ export function useSynchronousPolicy(fact, recoverableTools = false) {
       (fact.tools?.length && !recoverableTools) ||
       fact.cancellations?.length ||
       fact.inputQueueSessions?.length ||
-      fact.modelEvidence?.length ||
       fact.display?.length
     ) ||
     fact.commit.writes.some(

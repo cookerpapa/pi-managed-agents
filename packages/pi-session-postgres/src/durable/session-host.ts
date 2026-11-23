@@ -118,7 +118,6 @@ type Owner = {
   runtime?: Promise<ManagedNativeRuntime>;
   prepare?: (commit: DurableSessionCommit) => NativePublicationPreparation;
   display: Map<number, PrepareDisplay>;
-  modelEvidence: Map<number, PrepareModelEvidence>;
   publicationTail: Promise<unknown>;
   releaseTail: Promise<unknown>;
   closing?: Promise<void>;
@@ -140,15 +139,9 @@ export type DurableSessionHandle = {
   runtime<T extends ManagedNativeRuntime>(factory: () => Promise<T>): Promise<T>;
   preparePublication(prepare: (commit: DurableSessionCommit) => NativePublicationPreparation): void;
   prepareDisplay(prepare: PrepareDisplay): void;
-  prepareModelEvidence(prepare: PrepareModelEvidence): void;
   serializePublication<T>(work: () => Promise<T>): Promise<T>;
   close(): Promise<void>;
   interrupt(reason: Error): void;
-};
-
-type PrepareModelEvidence = (commit: DurableSessionCommit) => {
-  evidence: import("@pi-cloud/protocol").ModelExecutionEvidence[];
-  confirmed(): void;
 };
 
 /** One storage and one Harness per physical lease incarnation. The SDK does
@@ -720,9 +713,6 @@ export class PostgresDurableSessionHost {
               );
             const commit = batch as unknown as DurableSessionCommit;
             const preparation = this.#owners.get(key)?.prepare?.(commit);
-            const modelEvidence = [...this.#owners.get(key)!.modelEvidence.values()].map(
-              (prepare) => prepare(commit),
-            );
             const recoveryCancellations: import("@pi-cloud/protocol").CandidateToolCancellation[] =
               [];
             const completedRecoveries: number[] = [];
@@ -770,9 +760,6 @@ export class PostgresDurableSessionHost {
               await active.publish({
                 commit,
                 origins,
-                ...(modelEvidence.some((prepared) => prepared.evidence.length)
-                  ? { modelEvidence: modelEvidence.flatMap((prepared) => prepared.evidence) }
-                  : {}),
                 ...(inputConversations.length
                   ? {
                       inputQueueSessions: [
@@ -810,7 +797,6 @@ export class PostgresDurableSessionHost {
               });
               acknowledged = true;
               preparation?.confirmed();
-              for (const prepared of modelEvidence) prepared.confirmed();
               for (const id of completedRecoveries) {
                 recoveredOperations.delete(id);
                 recoveredControlTools.delete(id);
@@ -908,7 +894,6 @@ export class PostgresDurableSessionHost {
         recoveredOperations,
         recoveredControlTools,
         display: new Map(),
-        modelEvidence: new Map(),
         publicationTail: Promise.resolve(),
         releaseTail: Promise.resolve(),
       };
@@ -931,7 +916,6 @@ export class PostgresDurableSessionHost {
           await currentOwner.publicationTail;
         } finally {
           currentOwner.display.delete(binding.conversationId);
-          currentOwner.modelEvidence.delete(binding.conversationId);
           currentOwner.runs.delete(binding.conversationId);
           if (
             ![...currentOwner.runs.values()].some(
@@ -964,9 +948,6 @@ export class PostgresDurableSessionHost {
         },
         prepareDisplay: (prepare) => {
           currentOwner.display.set(binding.conversationId, prepare);
-        },
-        prepareModelEvidence: (prepare) => {
-          currentOwner.modelEvidence.set(binding.conversationId, prepare);
         },
         serializePublication: (work) => this.#serialize(currentOwner, work),
         close: release,

@@ -15,16 +15,20 @@ import type { AcceptedDurableCommitFact } from "./accepted-fact.ts";
 import { projectionOffsetWrite, type FactPosition } from "./accepted-fact-recovery.ts";
 import { projectionTransaction, type ProjectionBudget } from "./projection-transaction.ts";
 import { captureNativePresentation, mayCaptureNativePresentation } from "./frozen-history.ts";
-import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
 function cloudMetadata(fact: AcceptedDurableCommitFact) {
   const controlTools = fact.tools.filter((tool) => tool.target === "control");
   const remoteTools = fact.tools.filter((tool) => tool.target !== "control" && tool.replyRecovery);
-  return controlTools.length || remoteTools.length || fact.modelEvidence?.length
+  // Retained records must reproduce the byte identity of an already projected commit.
+  const historicalProof =
+    "modelEvidence" in fact && Array.isArray(fact.modelEvidence) && fact.modelEvidence.length
+      ? fact.modelEvidence
+      : undefined;
+  return controlTools.length || remoteTools.length || historicalProof
     ? {
         ...(controlTools.length ? { controlTools } : {}),
         ...(remoteTools.length ? { remoteTools } : {}),
-        ...(fact.modelEvidence?.length ? { modelEvidence: fact.modelEvidence } : {}),
+        ...(historicalProof ? { modelEvidence: historicalProof } : {}),
       }
     : undefined;
 }
@@ -141,7 +145,6 @@ export class PostgresDurableCommitProjector {
   constructor(
     readonly database: Kysely<Database>,
     readonly budget?: ProjectionBudget,
-    readonly modelAccounting?: ModelAccountingPort,
   ) {}
   #key(scope: AcceptedDurableCommitFact["scope"]): string {
     // All Conversations/anchors of one physical writer share this view. Old
@@ -278,7 +281,6 @@ export class PostgresDurableCommitProjector {
       !fact.tools.length &&
       !fact.cancellations.length &&
       !fact.inputQueueSessions?.length &&
-      !fact.modelEvidence?.length &&
       fact.display.every(
         (d) =>
           d.coveredThrough === undefined &&
@@ -358,7 +360,6 @@ export class PostgresDurableCommitProjector {
           run.output_first_offset !== null &&
           !covered.length &&
           !capture &&
-          !fact.modelEvidence?.length &&
           !fact.inputQueueSessions?.length;
         const { appended, sharedEntries, finished } = await view.applyLockedIn(
           tx,
@@ -373,11 +374,6 @@ export class PostgresDurableCommitProjector {
           finalNativeWrite ? (ready) => projectionOffsetWrite(position, ready) : undefined,
         );
         admitted = true;
-        if (appended && fact.modelEvidence?.length) {
-          if (!this.modelAccounting)
-            throw new Error("Model accounting projection is not installed");
-          await this.modelAccounting.settle(tx, fact.scope, fact.modelEvidence, position);
-        }
         if (nativeConfirmations.length) {
           const conversations = await tx
             .selectFrom("sessions")

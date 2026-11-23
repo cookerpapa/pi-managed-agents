@@ -49,27 +49,6 @@ export function parseModelMeteringContext(value: unknown): ModelMeteringContext 
     throw new TypeError("Invalid model metering context");
   return value;
 }
-export const ModelExecutionEvidenceSchema = Type.Object(
-  {
-    context: ModelMeteringContextSchema,
-    outcome: Type.Union([
-      Type.Literal("completed"),
-      Type.Literal("cancelled"),
-      Type.Literal("failed"),
-      Type.Literal("superseded"),
-    ]),
-  },
-  closed,
-);
-export type ModelExecutionEvidence = Static<typeof ModelExecutionEvidenceSchema>;
-export function parseModelExecutionEvidence(value: unknown): ModelExecutionEvidence {
-  if (!Value.Check(ModelExecutionEvidenceSchema, value))
-    throw new TypeError("Invalid model execution evidence");
-  parseModelMeteringContext(value.context);
-  if (!value.context.execution?.taskId || value.context.purpose === "image")
-    throw new TypeError("Model settlement requires native execution identity");
-  return value;
-}
 export const MeteredTokensSchema = Type.Object(
   {
     input: Count,

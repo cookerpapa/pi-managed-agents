@@ -1,7 +1,7 @@
 import { modelTransportKey, MODEL_PURPOSE_HEADER } from "@pi-cloud/protocol";
 import { MODEL_EVENT_IDLE_MS, MODEL_RETRY_COUNT } from "./durable/model-wait-policy.ts";
 import { DurableTextPresentation } from "./durable/text-presentation.ts";
-import { DurableModelAccounting } from "./durable/model-accounting.ts";
+import { attributedModelFetch } from "./durable/model-accounting.ts";
 import {
   prepareNativeSettlementFollowUp,
   type PiSettlementGatePolicy,
@@ -438,8 +438,6 @@ export class PiCloudTurnRunner {
         p.input.kind === "prompt" &&
         p.piSession.conversationId === 1 &&
         owner.committedSequence() === 0;
-      const accounting = new DurableModelAccounting(command);
-      owner.prepareModelEvidence((commit) => accounting.prepare(commit));
       text = new DurableTextPresentation({
         conversationId: p.piSession.conversationId,
       });
@@ -768,9 +766,8 @@ export class PiCloudTurnRunner {
                 if (sequence === undefined || !checkpoint)
                   throw new Error("Model task has no committed checkpoint");
                 details.samplingAttempt = checkpoint.attempt ?? 1;
-                const modelAccounting = accounting.request({
+                const meteredFetch = attributedModelFetch(command, {
                   taskId: native.taskId,
-                  phase: checkpoint.phase ?? "request",
                   provider: model.provider,
                   model: model.id,
                   purpose: native.purpose,
@@ -827,7 +824,7 @@ export class PiCloudTurnRunner {
                       : {}),
                     options: {
                       ...request.options,
-                      fetch: modelAccounting.fetch,
+                      fetch: meteredFetch,
                       ...(config.transport ? { transport: config.transport } : {}),
                       apiKey: config.apiKey,
                       ...(model.api === "openai-codex-responses" ? { sessionId: cacheKey } : {}),
@@ -864,7 +861,6 @@ export class PiCloudTurnRunner {
                       });
                     },
                     onOutcome: (sample) => {
-                      modelAccounting.finish(sample.outcome);
                       options.metrics?.modelDuration.observe(
                         { provider: model.provider, model: model.id, outcome: sample.outcome },
                         sample.durationMs / 1000,

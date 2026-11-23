@@ -3,13 +3,15 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import {
   parseModelBillingPage,
-  type ModelExecutionEvidence,
   type ModelMeteringContext,
   type ModelMeteringEvent,
   type ModelUsageFact,
 } from "@pi-cloud/protocol";
 import { ModelMeteringService } from "../src/model-metering-service.ts";
-import { ModelExecutionAccounting } from "../src/model-execution-accounting.ts";
+import {
+  ModelExecutionAccounting,
+  type ModelExecutionEvidence,
+} from "./fixtures/historical-model-execution.ts";
 
 const db = createDatabase({
   connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL!,

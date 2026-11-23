@@ -119,8 +119,7 @@ it.skipIf(!url || !brokers)(
         remoteTools: () => defs.map((d) => d.name),
         tools: [],
         assertCurrent: async () => {},
-        openModel: async (r, native) =>
-          call(r, native, await runtime.harness.getTask(native.taskId, ctx), model.getModel()),
+        openModel: async (r, native) => call(r, native, model.getModel()),
         prepareRemote: async (v) => {
           const bindings = await workerTools.create({
             command: {
@@ -279,55 +278,10 @@ it.skipIf(!url || !brokers)(
       );
       await projection.view.install();
       await projection.view.reset(new Map([[0, 0n]]), 16, "recorded-history");
-      let checkedRollback = false;
       transport = await openDelegatedTransport(brokers.split(","), topic, async (r, current) => {
         if (r.fact.tools.length) positions.push(r.offset);
-        const checkAccounting = !checkedRollback && r.fact.modelEvidence?.length;
-        if (checkAccounting) {
-          const before = projection.view.next.get(r.partition);
-          const altered = structuredClone(r.fact);
-          altered.modelEvidence[0].context.model += "-conflict";
-          await assert.rejects(
-            projection.nativeStore.projection.project(altered, r, current),
-            /Model invocation identity changed/,
-          );
-          assert(r.fact.commit.writes.some((w) => w.type === "entry"));
-          const bodies = await pool.query(
-            "select 1 from messages where run_id=$1 and commit_seq=$2",
-            [runId, r.fact.commit.seq],
-          );
-          assert.equal(bodies.rowCount, 0);
-          assert.equal(projection.view.next.get(r.partition), before);
-          assert.equal(
-            BigInt(
-              (
-                await pool.query(
-                  "select next_offset from accepted_fact_projection_offsets where topic=$1 and partition=$2",
-                  [r.topic, r.partition],
-                )
-              ).rows[0].next_offset,
-            ),
-            before,
-          );
-          assert.equal(
-            (await pool.query("select 1 from model_metering_events where kind='execution'"))
-              .rowCount,
-            0,
-          );
-        }
+        assert(!Object.hasOwn(r.fact, "modelEvidence"));
         const p = await projection.nativeStore.projection.project(r.fact, r, current);
-        if (checkAccounting) {
-          assert((await projection.nativeStore.projection.project(r.fact, r, current)).admitted);
-          assert(
-            (
-              await pool.query("select 1 from messages where run_id=$1 and commit_seq=$2", [
-                runId,
-                r.fact.commit.seq,
-              ])
-            ).rowCount > 0,
-          );
-          checkedRollback = true;
-        }
         assert(p.admitted);
         await dispatcher.consume(r, current, async () => true);
       });
@@ -343,8 +297,7 @@ it.skipIf(!url || !brokers)(
         async commit(writes) {
           const p = this.prepareCommit(writes),
             commit = { seq: p.seq, nextId: this.nextId, writes: p.writes },
-            prepared = runtime?.preparePublication(commit),
-            financial = modelReceipts.prepare(commit);
+            prepared = runtime?.preparePublication(commit);
           const tools = (prepared?.tools ?? []).map(({ taskId, command: c }) => ({
             scope,
             target: "control",
@@ -361,15 +314,13 @@ it.skipIf(!url || !brokers)(
             commit,
             tools,
             display: [],
-            origins: financial.origins,
-            ...(financial.evidence.length ? { modelEvidence: financial.evidence } : {}),
+            origins: [],
             cancellations: [],
             factId: randomUUID(),
             occurredAt: new Date().toISOString(),
           });
           const seq = p.apply();
           prepared?.confirmed();
-          financial.confirmed();
           return seq;
         }
       }
@@ -584,7 +535,6 @@ it.skipIf(!url || !brokers)(
       finishChild.resolve();
       assert.equal((await within(turn.wait(ctx), "parent result", 35000)).status, "done");
       assert.equal(placed.size, 1);
-      assert(checkedRollback);
       await modelReceipts.verifyUsage(childID);
       const canonical = (await root.context(ctx)).messages.filter((m) => m.role === "toolResult");
       const toolResults = new Map(

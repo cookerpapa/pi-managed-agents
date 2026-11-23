@@ -2,8 +2,8 @@
 
 ## Minimal Session storage feasibility
 
-- [x] Co-commit accepted model execution evidence with the candidate native prefix and read named-agent usage through the Session API. [Correctness and cost](reports/candidate-model-settlement-20261123.md).
-- [ ] Meet the candidate projection performance gate with execution receipts enabled. Compare the same 20-tool workload before enabling the matched storage release.
+- [x] Keep provider usage outside Session log projection and count completed user-visible Kafka records in the 20-tool load. [Decision](adr/0355-provider-usage-outside-session-projection.md) and [measurements](reports/provider-only-visible-throughput-20261123.md).
+- [ ] If customer charging is introduced, design independent correlation in metering for retries, handoff and interrupted output.
 
 - [x] Register named children and independent waiters atomically; return results from a separate executor. Verify process loss on both sides of Kafka delivery, delayed admission, supervisor questions and reply-independent replay floors. [Acceptance](reports/named-subagent-executor-20261123.md).
 

@@ -217,7 +217,6 @@ async function fixture(
     cancellations,
     started,
     server,
-    modelEvidence: textDisplay.modelEvidence,
     counts: () => ({ acquired, returned }),
     release: () => {
       released = true;
@@ -247,26 +246,6 @@ async function fixture(
     },
   };
 }
-
-it("records accepted HTTP requests with native settlement and does not bill partial document writes", async () => {
-  const f = await fixture("tool_call");
-  try {
-    await f.run();
-    expect(f.modelEvidence.length).toBe(f.server.observations.length);
-    expect(f.modelEvidence.length).toBeGreaterThan(1);
-    expect(new Set(f.modelEvidence.map((e) => e.context.invocationId)).size).toBe(
-      f.modelEvidence.length,
-    );
-    expect(
-      f.modelEvidence.every(
-        (e) =>
-          e.outcome === "completed" && e.context.execution?.taskId && e.context.purpose === "agent",
-      ),
-    ).toBe(true);
-  } finally {
-    await f.close();
-  }
-});
 
 it("executes one native post-validation handoff and releases the model permit during the tool wait", async () => {
   const f = await fixture("tool_hold", true);
@@ -339,8 +318,6 @@ it("finishes cancelled text through the real Runner without another display mess
     );
     f.stop();
     expect(await running).toMatchObject({ code: "turn_cancelled" });
-    expect(f.modelEvidence).toHaveLength(1);
-    expect(f.modelEvidence[0]!.outcome).toBe("cancelled");
     const entries = (
       await f.storage.scanEntries(
         { conversationId: 1 as import("@earendil-works/pi-durable").ConversationId },

@@ -540,6 +540,8 @@ the rates describe the Session Projector and warm tool dispatch. Each arm
 verifies completion, original ordered call/result pairs, displays, receipts
 and committed partition positions.
 
+The summary leads with completed user-visible Kafka records per second. A record with assistant text, any number of completed tool calls or one or more results counts once. Public output item rates count text-bearing assistant messages, individual calls and results separately. Streaming deltas, tool dispatch and control receipts do not add another completed output. Set `PI_CLOUD_COMPARE_USAGE_WIRE=1` with `grants-million-day` to compare intact traces against disposable replays that omit only `pi.usage` updates, in alternating order. The serving writer always sends the original Pi commit.
+
 ### Conversation Entry index cost
 
 With the same 32-partition, 12-connection `workspace-fanout` setup, set

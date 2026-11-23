@@ -51,7 +51,6 @@ export type AcceptedDurableCommitFact = Readonly<{
   commit: DurableSessionCommit;
   origins: readonly DurableRecordOrigin[];
   inputQueueSessions?: readonly string[];
-  modelEvidence?: readonly import("@pi-cloud/protocol").ModelExecutionEvidence[];
   tools: readonly DurableToolDispatch[];
   cancellations: readonly import("@pi-cloud/protocol").AcceptedToolCancellation[];
   display: readonly Readonly<{
@@ -137,7 +136,6 @@ export function isHistoryOnlyCommit(fact: SessionLogFact): fact is AcceptedDurab
     !fact.cancellations.length &&
     !fact.display.length &&
     !fact.inputQueueSessions?.length &&
-    !fact.modelEvidence?.length &&
     fact.commit.writes.length > 0 &&
     fact.commit.writes.every((write) => write.type === "entry")
   );

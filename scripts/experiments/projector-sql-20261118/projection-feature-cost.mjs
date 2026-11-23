@@ -12,7 +12,7 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { DurablePostgresProjection } from "@pi-cloud/pi-session-postgres/durable";
 import { readNativeUsageBatch } from "../../../packages/pi-session-postgres/src/durable/conversation-usage.ts";
-import { ModelExecutionAccounting } from "@pi-cloud/accounting";
+import { ModelExecutionAccounting } from "../../../packages/accounting/test/fixtures/historical-model-execution.ts";
 import { createPrivateTenant } from "../../../packages/control-plane/src/tenant-administration.ts";
 import { ControlPlaneStore } from "../../../packages/control-plane/src/control-plane-store.ts";
 import {
@@ -381,7 +381,7 @@ async function compare(name, stage, round, cases) {
       accepted = stage === "accepted" || stage === "finished";
     const chat = ["chat", "accounting"].includes(stage);
     const accounting = new ModelExecutionAccounting(),
-      projector = new ExecutionStreamProjector(db, accounting);
+      projector = new ExecutionStreamProjector(db);
     const oldQuery = pg.Client.prototype.query;
     let calls = 0;
     const latency = [];
@@ -476,7 +476,7 @@ async function compare(name, stage, round, cases) {
       raw: raw ? count : 0,
       commits: raw ? 0 : count,
       frames: chat || accepted ? count : 0,
-      accounting: stage === "accounting" || accepted ? count : 0,
+      accounting: stage === "accounting" ? count : 0,
       finished: stage === "finished" ? count : 0,
     });
     if (raw) {

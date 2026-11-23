@@ -79,7 +79,15 @@ export function encodeSessionLogFact(fact: SessionLogFact): string {
     )
       throw new Error("One native commit must use its original Worker reply Topic");
     return JSON.stringify({
-      ...fact,
+      kind: fact.kind,
+      factId: fact.factId,
+      occurredAt: fact.occurredAt,
+      scope: fact.scope,
+      commit: fact.commit,
+      origins: fact.origins,
+      ...(fact.inputQueueSessions === undefined
+        ? {}
+        : { inputQueueSessions: fact.inputQueueSessions }),
       ...(replyTopic ? { replyTopic } : {}),
       tools: fact.tools.map((tool) => {
         const { scope: identity, replyTopic: _reply, ...descriptor } = tool;
@@ -142,6 +150,7 @@ export function expandSessionLogEnvelope(input: unknown): SessionLogFact {
       "replyTopic",
     ]);
     const root = rootScope(value.scope);
+    // The native fingerprint of a pre-cutover record includes its original cloud metadata.
     const { replyTopic, ...fact } = value;
     const tools = list(value.tools);
     if (

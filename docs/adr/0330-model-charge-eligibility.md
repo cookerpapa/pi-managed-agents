@@ -3,6 +3,8 @@
 Status: deployed on 2026-11-17 as `projector-admission-20261117-r1` (#45).
 Extends ADR-0297/0298 accounting without enabling payment collection.
 
+The matched candidate retires the online proof and writer-closure path under [ADR-0355](0355-provider-usage-outside-session-projection.md). The following describes the prior deployed policy.
+
 ## Policy
 
 Keep actual provider usage and its immutable price-version quote. Customer

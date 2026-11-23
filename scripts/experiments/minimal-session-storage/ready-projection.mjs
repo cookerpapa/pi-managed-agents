@@ -237,7 +237,6 @@ export class ReadyProjection {
     // owner's in-memory state or publish its external intent.
     const owners = covered ? await this.activeRuns(partition, candidates) : undefined;
     const kept = [];
-    const settlements = [];
     for (const r of candidates) {
       if (r.offset < expected !== covered) break;
       assert.equal(r.partition, partition);
@@ -358,15 +357,6 @@ export class ReadyProjection {
             view.pinOffset = r.offset;
             if (!draft.frame.ops.length) draft.frame.ops.push({ kind: "pin", args, count: 1 });
           }
-          if (!covered && f.modelEvidence?.length) {
-            // A task transition can carry evidence without a message, pin or snapshot.
-            // In that case the same transaction still needs the PG owner check.
-            if (!draft.frame.ops.length) {
-              const args = [f.scope.tenantId, f.scope.piSessionId, f.scope.runId, f.scope.writerId];
-              draft.frame.ops.push({ kind: "model-settlement", args, count: 1 });
-            }
-            settlements.push(r);
-          }
           draft.views.set(f.scope.runId, view);
           draft.frame.history =
             plainAnswer(draft.frame, f) ||
@@ -466,13 +456,11 @@ export class ReadyProjection {
     let outcome = covered ? "covered" : "memory";
     if (!covered && operations.length) {
       const next = BigInt(operations.at(-1).offset) + 1n;
-      const started = performance.now();
-      let taken = started;
-      const acquired = () => {
+      const started = performance.now(),
+        c = await connect(),
         taken = performance.now();
-        return owned();
-      };
       try {
+        if (!owned()) return kept.length;
         const relaxed =
           (this.policy === "selective" ||
             this.policy === "replay-finish" ||
@@ -483,7 +471,9 @@ export class ReadyProjection {
         const usageCount = draft.frames.reduce((n, f) => n + (f.usage?.length ?? 0), 0);
         const grouped = this.bulkUsage && moving && canGroupUsage(draft.frames, usageCount);
         const statement = grouped ? applyBulkUsageSql : moving ? applyMovingSql : applyPrefixSql;
-        const params = [
+        const {
+          rows: [row],
+        } = await c.query(statement, [
           this.topic,
           partition,
           String(expected),
@@ -492,22 +482,7 @@ export class ReadyProjection {
           ...(moving
             ? [relaxed, this.policy === "replay-finish" || this.policy === "recorded-history"]
             : []),
-        ];
-        let result;
-        if (settlements.length) {
-          assert(this.writeSettlements, "Missing model settlement adapter");
-          result = await this.writeSettlements(statement, params, settlements, acquired);
-        } else {
-          const client = await connect();
-          try {
-            if (!acquired()) return kept.length;
-            result = await client.query(statement, params);
-          } finally {
-            client.release();
-          }
-        }
-        if (!result) return kept.length;
-        const [row] = result.rows;
+        ]);
         outcome = row.outcome;
         if (outcome === "recorded_without_dispatch") {
           // Tool intent terminates the ready prefix. Preserve the ordered writes,
@@ -525,6 +500,7 @@ export class ReadyProjection {
           this.stats.firstPins += draft.frames.filter((f) => f.pin).length;
         }
       } finally {
+        c.release();
         this.stats.poolMs += taken - started;
         this.stats.holdMs += performance.now() - taken;
       }

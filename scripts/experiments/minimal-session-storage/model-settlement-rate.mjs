@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import pg from "pg";
-import { CompiledQuery, Kysely, PostgresDialect } from "kysely";
+import { Kysely, PostgresDialect } from "kysely";
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { testPostgres } from "../../lib/test-postgres.mjs";
 import { receiptHash } from "../../../packages/accounting/src/receipt-identity.ts";
 import { up as receipts } from "../../../packages/database/src/migrations/210_model_metering.ts";
 import { up as eligibility } from "../../../packages/database/src/migrations/226_model_charge_evidence.ts";
+import { visibleOutput } from "./visible-output.mjs";
 import { captureNativeUsage } from "./native-usage-fixture.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 
@@ -19,6 +20,10 @@ const seed = randomUUID(),
   tenantId = randomUUID(),
   when = new Date().toISOString();
 const { commits } = await captureNativeUsage(seed, 20);
+const visiblePerRun = commits.filter((c) =>
+  Object.values(visibleOutput(c.writes)).some(Boolean),
+).length;
+assert.equal(visiblePerRun, 41);
 const shape = commits.map((c) => {
   const task =
     c.writes.some((w) => w.type === "entry" && w.value.kind === "pi.assistant") &&
@@ -98,18 +103,13 @@ const groups = lanes.map((runs, partition) => {
       records.push({
         position: { partition, topic: "comparison", offset: BigInt(records.length) },
         fact,
-        accounted: context ? { ...fact, modelEvidence: [{ context, outcome: "completed" }] } : fact,
       });
     }
   return records;
 });
 const own = await testPostgres({});
 try {
-  const variants =
-    process.argv[3] === "isolate"
-      ? ["policy", "transaction", "transaction", "policy"]
-      : ["baseline", "accounted", "accounted", "baseline"];
-  for (const variant of variants) {
+  for (const sample of [1, 2]) {
     const schema = "rate_" + randomUUID().replaceAll("-", "");
     const pool = new pg.Pool({
       connectionString: own.url,
@@ -152,17 +152,6 @@ try {
         undefined,
         { partitions },
       );
-      // Diagnostic controls retain the strict policy and same accepted task frame.
-      // Neither control is a usable accounting implementation.
-      if (variant === "policy" || variant === "transaction") {
-        p.view.writeSettlements = (statement, params, _records, acquired) => {
-          const query = async (executor) => {
-            assert(acquired());
-            return executor.executeQuery(CompiledQuery.raw(statement, params));
-          };
-          return variant === "policy" ? query(db) : db.transaction().execute(query);
-        };
-      }
       await p.view.install();
       await p.view.reset(new Map(lanes.map((_, i) => [i, 0n])), 16, "recorded-history");
       const runs = lanes.flat(),
@@ -185,13 +174,7 @@ try {
         groups.map(async (group) => {
           for (const r of group)
             assert(
-              (
-                await p.nativeStore.projection.project(
-                  variant === "baseline" ? r.fact : r.accounted,
-                  r.position,
-                  () => true,
-                )
-              ).admitted,
+              (await p.nativeStore.projection.project(r.fact, r.position, () => true)).admitted,
             );
         }),
       );
@@ -202,15 +185,17 @@ try {
       } = await pool.query(
         "select (select count(*)::int from model_metering_events where kind='execution') receipts,(select count(*)::int from messages) messages,(select count(*)::int from message_entries where role='toolResult') tools",
       );
-      assert.equal(totals.receipts, variant === "accounted" ? calls.length : 0);
+      assert.equal(totals.receipts, 0);
+      assert.deepEqual(queries, { prefix: p.view.stats.commits });
       assert.equal(totals.tools, 20 * runs.length);
       console.log(
         JSON.stringify({
-          variant,
+          sample,
           runs: runs.length,
           commits: groups.flat().length,
           ...totals,
           ms: Math.round(ms),
+          visibleRecordsPerSecond: Math.round((visiblePerRun * runs.length * 1000) / ms),
           recordsPerSecond: Math.round((groups.flat().length * 1000) / ms),
           pgTransactions: p.view.stats.commits,
           sync: p.view.stats.syncTransactions,

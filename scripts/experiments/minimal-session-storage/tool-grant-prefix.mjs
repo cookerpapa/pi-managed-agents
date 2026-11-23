@@ -43,7 +43,6 @@ export function plainExecution(fact, liveDocs, allowDisplay = false) {
     fact.tools.length ||
     fact.cancellations.length ||
     (fact.display.length && !allowDisplay) ||
-    fact.modelEvidence?.length ||
     fact.inputQueueSessions?.length
   )
     return;

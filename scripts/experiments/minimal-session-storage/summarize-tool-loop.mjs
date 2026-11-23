@@ -14,6 +14,14 @@ const { trials, partitions, targets } = report.fanout;
 const first = trials[0].mix,
   complete = Object.values(first.entries).reduce((a, n) => a + n, 0);
 const calls = first.intents;
+const v = first.visible;
+if (v)
+  assert(
+    v.calls === calls &&
+      v.results === calls &&
+      v.records > 0 &&
+      v.records <= v.calls + v.texts + v.results,
+  );
 const callsPerRun = calls / targets;
 assert(
   [20, 200].includes(callsPerRun) &&
@@ -23,7 +31,7 @@ assert(
 assert(trials.some((t) => t.liveSource) && trials.some((t) => !t.liveSource && !t.preload));
 if (callsPerRun === 200)
   assert(first.entries["pi.compaction"] === targets && trials.some((t) => t.preload));
-else assert(first.records === 187 * targets && !first.entries["pi.compaction"]);
+else assert(!first.entries["pi.compaction"]);
 const rounded = (v) => Math.round(v * 10) / 10;
 const rates = trials.map((t) => {
   const { result: r, source: s } = t;
@@ -47,6 +55,19 @@ const rates = trials.map((t) => {
   const lagAtInputFraction = (f) => inputSample(f).lag;
   return {
     mode: t.preload ? "backlog" : t.liveSource ? "live" : "paced",
+    visibleKafkaRecordsPerSec: v ? rounded(v.records / duration) : null,
+    visibleItemsPerSec: v ? rounded((v.texts + v.calls + v.results) / duration) : null,
+    textItemsPerSec: v ? rounded(v.texts / duration) : null,
+    toolCallsPerSec: v ? rounded(v.calls / duration) : null,
+    toolResultsPerSec: v ? rounded(v.results / duration) : null,
+    usageUpdatesOmitted: t.omitUsage ?? false,
+    wireBytes: t.bytes,
+    actualInputVisibleKafkaRecordsPerSec:
+      !v || t.preload ? null : rounded((v.records * 1000) / period),
+    targetVisibleKafkaRecordsPerSec:
+      v && !t.preload && !t.liveSource
+        ? rounded(t.targetVisibleRate ?? (t.rate * v.records) / first.records)
+        : null,
     targetRecordsPerSec: t.preload || t.liveSource ? null : t.rate,
     actualInputRecordsPerSec: t.preload ? null : rounded(s.rate),
     projectorSeconds: rounded(duration),
@@ -71,6 +92,8 @@ console.log(
       targets,
       projectorConnections: report.projectorConnections,
       runs: first.runs,
+      visible: v,
+      usage: first.usage,
       toolCalls: calls,
       entries: first.entries,
       records: first.records,

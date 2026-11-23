@@ -187,7 +187,7 @@ means routing admission; neither it nor an absent binding diagnoses VM health or
 checks whether a directory still exists. No provider endpoint or credential is
 exposed. Physical observations remain disposable and separate from this read.
 
-In the #52 candidate the accepted native transition, its Kafka position and model execution evidence share a PG transaction. The Session API resolves a named child's stable identity from its founding Run before summing provider receipts on demand. The candidate's isolated acceptance and throughput measurements are recorded in the [settlement study](reports/candidate-model-settlement-20261123.md).
+In the #52 candidate the Session API resolves named children from their founding Runs and sums provider receipts when the user opens `/usage`. [ADR-0355](adr/0355-provider-usage-outside-session-projection.md).
 
 The root-only Session experiment represents a delegated invocation in the existing Run table and pins each explicit continuation to the previous child transcript. It is isolated from serving storage. [ADR-0349](adr/0349-delegated-runs-prototype.md). A cold Worker first loads the root transcript. An explicit child continuation reads its frozen source and the visible portion of its ancestors. [ADR-0350](adr/0350-lazy-delegated-history.md). The earlier #52 storage prototype retains confirmed child state, commit sequence and the original answer Entry on the child relationship. [ADR-0348](adr/0348-candidate-child-outcomes.md). It separately validates execution-owned original operation routing. Its Worker-facing protocol and experiment boundaries are described in [ADR-0344](adr/0344-execution-owned-operation-routing-study.md). In the candidate continuation path, human Run admission can extend an existing elastic allocation and freeze the outcome for the first model request. [ADR-0346](adr/0346-elastic-retention-at-run-admission.md).
 
@@ -561,11 +561,7 @@ Projector and chat history. PG owns deduplicated usage, immutable rate versions 
 simulated amounts. Model/Tool retry authority stays with the existing runtime.
 Missing receipts remain unconfirmed; unsupported tariffs remain unpriced. Neither
 real payments nor balance deductions are enabled; sandbox service/storage have
-their own informational accounting. Under [ADR-0330](adr/0330-model-charge-eligibility.md),
-accepted native model-task changes co-commit exact financial settlement evidence.
-The accounting view combines that evidence, provider receipts and persistent writer
-cutoffs to separate customer usage from platform waste. Valid user Stop with
-complete usage remains chargeable; unknown quantities are not estimated charges.
+their own informational accounting. Under [ADR-0355](adr/0355-provider-usage-outside-session-projection.md), provider-reported tokens remain visible across writer handoff. The Projector performs no model settlement or financial closure writes. New customer charge eligibility stays unconfirmed.
 The provider has no live fencing view. See [Model billing](MODEL_BILLING.md).
 
 Under [ADR-0289](adr/0289-provider-owned-model-continuation.md), HTTP/SSE carries the

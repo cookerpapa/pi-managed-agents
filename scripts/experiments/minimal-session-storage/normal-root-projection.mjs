@@ -5,8 +5,7 @@ import { rootOpeningHead } from "./session-prefix.mjs";
 import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import assert from "node:assert/strict";
 import { changedInputConfirmations } from "@pi-cloud/pi-session-postgres/durable";
-import { CompiledQuery, Kysely, PostgresDialect, sql } from "kysely";
-import { ModelExecutionAccounting } from "@pi-cloud/accounting";
+import { sql } from "kysely";
 import { resolveDurableDisplay } from "@pi-cloud/protocol";
 import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -35,23 +34,6 @@ export function normalRootProjection(
       assert.equal(result.rowCount, 1, "Unregistered named child display");
     };
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
-  // Both ports use the same pool and search path. The caller owns this pool.
-  const database = new Kysely({ dialect: new PostgresDialect({ pool }) });
-  const modelAccounting = new ModelExecutionAccounting();
-  view.writeSettlements = (statement, params, records, acquired) =>
-    database.transaction().execute(async (tx) => {
-      if (!acquired()) return;
-      const result = await tx.executeQuery(CompiledQuery.raw(statement, params));
-      if (["applied", "recorded_without_dispatch"].includes(result.rows[0].outcome)) {
-        for (const { fact, topic, partition, offset } of records)
-          await modelAccounting.settle(tx, fact.scope, fact.modelEvidence, {
-            topic,
-            partition,
-            offset,
-          });
-      }
-      return result;
-    });
   view.delegatedRuns = delegatedRuns;
   view.namedExecutor = namedExecutor;
   view.configure(16, "recorded-history");
@@ -264,7 +246,6 @@ export function normalRootProjection(
   return {
     view,
     nativeStore,
-    modelAccounting,
     async dispatch(r, current, grant) {
       if (r.fact.kind === "work_finished" || r.fact.kind === "execution_seal") {
         nativeStore.controlProjected(r);

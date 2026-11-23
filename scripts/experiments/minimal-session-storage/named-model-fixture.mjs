@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createDatabase } from "@pi-cloud/database";
 import { ModelMeteringService } from "@pi-cloud/accounting";
 import { createExecutionReference, MODEL_METERING_HEADER } from "@pi-cloud/protocol";
-import { DurableModelAccounting } from "../../../packages/sandbox-supervisor/src/durable/model-accounting.ts";
+import { attributedModelFetch } from "../../../packages/sandbox-supervisor/src/durable/model-accounting.ts";
 import { up as installReceipts } from "../../../packages/database/src/migrations/210_model_metering.ts";
 import { up as installEligibility } from "../../../packages/database/src/migrations/226_model_charge_evidence.ts";
 import { readConversationUsage } from "../../../packages/control-plane/src/conversation-usage.ts";
@@ -14,8 +14,7 @@ import { emptyEventRuntime } from "../../../packages/control-plane/test/fixtures
 export function namedModelFixture(url, scope) {
   const database = createDatabase({ connectionString: url, maxConnections: 2 });
   const metering = new ModelMeteringService(database);
-  const lanes = new Map(),
-    measured = new Map();
+  const measured = new Map();
   async function provider(_url, init) {
     const c = JSON.parse(
       Buffer.from(init.headers.get(MODEL_METERING_HEADER), "base64url").toString(),
@@ -56,7 +55,7 @@ export function namedModelFixture(url, scope) {
       await installEligibility(database);
     },
     bind(conversationId, sessionId) {
-      const accounting = new DurableModelAccounting({
+      const command = {
         payload: {
           ...scope,
           sessionId,
@@ -67,49 +66,22 @@ export function namedModelFixture(url, scope) {
           ),
           piSession: { id: scope.piSessionId, conversationId },
         },
-      });
-      lanes.set(conversationId, accounting);
-      return async (request, native, task, model) => {
-        const meter = accounting.request({
+      };
+      return async (request, native, model) => {
+        const fetch = attributedModelFetch(command, {
           taskId: native.taskId,
-          phase: task.state.checkpoint.phase,
           model: model.id,
           provider: model.provider,
           purpose: native.purpose,
           fetch: provider,
         });
         // The faux model has no HTTP transport. Exercise the Worker fetch wrapper once per model invocation.
-        await meter.fetch("https://provider.invalid/test");
+        await fetch("https://provider.invalid/test");
         return {
           model,
           options: request.options,
           release() {},
-          onOutcome: (sample) => meter.finish(sample.outcome),
         };
-      };
-    },
-    prepare(commit) {
-      const prepared = Array.from(lanes.values(), (a) => a.prepare(commit));
-      const evidence = prepared.flatMap((p) => p.evidence);
-      const origins = Array.from(
-        new Map(
-          evidence.map(({ context: c }) => [
-            c.execution.taskId,
-            {
-              recordId: c.execution.taskId,
-              sessionId: c.sessionId,
-              turnId: c.conversationId === 1 ? scope.turnId : c.sessionId,
-              runId: scope.runId,
-            },
-          ]),
-        ).values(),
-      );
-      return {
-        evidence,
-        origins,
-        confirmed() {
-          for (const p of prepared) p.confirmed();
-        },
       };
     },
     async verifyUsage(childId) {
@@ -155,7 +127,7 @@ export function namedModelFixture(url, scope) {
           result.length * 10,
           [...measured.values()].reduce((a, b) => a + b, 0),
         );
-        assert(result.every((r) => r.customer_eligibility === "billable"));
+        assert(result.every((r) => r.customer_eligibility === "pending"));
       } finally {
         await app.close();
       }

@@ -26,7 +26,6 @@ import type { KafkaAcceptedFactRecord } from "./kafka-accepted-fact-consumer.ts"
 import { recordFactProjection, type FactPosition } from "./accepted-fact-recovery.ts";
 import { ExecutionPrefix } from "./execution-prefix.ts";
 import { projectionTransaction } from "./projection-transaction.ts";
-import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
 /** Install a replacement-readable checkpoint before its Run becomes claimable.
  * Only database work participates here; the seal transaction owns the writer. */
@@ -78,16 +77,13 @@ export class ExecutionStreamProjector {
 
   constructor(
     database: Kysely<Database>,
-    readonly modelAccounting?: ModelAccountingPort,
     boundaryLimits?: BoundaryCacheLimits,
     private readonly recoveryCheckpoint?: RecoverySealCheckpoint,
     private readonly nativeStore?: SessionNativeStore,
   ) {
     this.#database = database;
     this.#boundary = new ExecutionStreamBoundary(database, boundaryLimits);
-    this.#durable =
-      nativeStore?.projection ??
-      new PostgresDurableCommitProjector(database, undefined, modelAccounting);
+    this.#durable = nativeStore?.projection ?? new PostgresDurableCommitProjector(database);
   }
 
   restoreProjectedPositions(topic: string, next: ReadonlyMap<number, bigint>): void {
@@ -413,10 +409,7 @@ export class ExecutionStreamProjector {
       );
       if (result) {
         rootClosed = position.offset;
-        if (retire) {
-          writerClosed = position.offset;
-          await this.modelAccounting?.closeWriter(tx, fact.scope, position);
-        }
+        if (retire) writerClosed = position.offset;
       }
       if (!current()) throw new Error("Work completion Projector owner changed");
       return result;
@@ -489,7 +482,6 @@ export class ExecutionStreamProjector {
             .where("tenant_id", "=", fact.scope.tenantId)
             .where("lease_id", "=", fact.scope.writerId)
             .execute();
-          await this.modelAccounting?.closeWriter(transaction, fact.scope, position);
           await releaseIdleSessionLease(transaction, fact.scope.writerId, now);
         }
         await recordFactProjection(transaction, position);
@@ -514,7 +506,6 @@ export class ExecutionStreamProjector {
           })
           .where("lease_id", "=", fact.scope.writerId)
           .execute();
-        await this.modelAccounting?.closeWriter(transaction, fact.scope, position);
       }
       {
         // The ordered Kafka fence is the ownership proof. An unreachable old

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Gateway-only model usage and visible Kafka throughput](provider-only-visible-throughput-20261123.md) measures the candidate projection and the cost of native usage updates.
+
 - [Candidate model settlement](candidate-model-settlement-20261123.md) covers projection rollback, named-agent usage and the cost of the accounting transaction.
 
 - [Named subagent executor](named-subagent-executor-20261123.md) verifies durable admission, independent Kafka replies, a process kill, redelivery and ordered projection under a slow handoff.

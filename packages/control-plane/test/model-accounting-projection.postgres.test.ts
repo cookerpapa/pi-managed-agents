@@ -1,6 +1,7 @@
+import { sql } from "kysely";
 import { expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { ModelExecutionAccounting, ModelMeteringService } from "@pi-cloud/accounting";
+import { readSessionModelUsage, ModelMeteringService } from "@pi-cloud/accounting";
 import type { ModelMeteringContext, ModelMeteringEvent, ModelUsageFact } from "@pi-cloud/protocol";
 import { nativeSubagentFixture } from "./native-subagent-fixture.ts";
 import { ExecutionStreamProjector } from "../../runtime-core/src/execution-stream-projection.ts";
@@ -13,10 +14,9 @@ import type {
   AcceptedFact,
 } from "../../runtime-core/src/accepted-fact.ts";
 
-it("co-commits financial evidence, retains valid late usage and ignores post-seal model settlement", async () => {
+it("keeps provider usage stable across projection, writer closure, stale output and duplicate delivery", async () => {
   const f = await nativeSubagentFixture();
-  const accounting = new ModelExecutionAccounting();
-  const projector = new ExecutionStreamProjector(f.database, accounting);
+  const projector = new ExecutionStreamProjector(f.database);
   const metering = new ModelMeteringService(f.database);
   const head = await f.projection.head();
   const context = (taskId: number): ModelMeteringContext => ({
@@ -67,7 +67,6 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
         runId: c.runId,
       },
     ],
-    modelEvidence: [{ context: c, outcome: "completed" }],
     tools: [],
     cancellations: [],
     display: [],
@@ -107,7 +106,34 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
     ];
   };
   try {
-    await project(fact(valid, head.seq + 1), 10n);
+    const events = [...receipts(late), ...receipts(valid)];
+    await metering.ingest({ events });
+    const usage = async () =>
+      (await readSessionModelUsage(f.database, f.scope.tenantId, [f.scope.sessionId])).get(
+        f.scope.sessionId,
+      )!.tokens.total;
+    expect(await usage()).toBe(240);
+    const accepted = fact(valid, head.seq + 1);
+    const retained = {
+      ...JSON.parse(encodeSessionLogFact(accepted)),
+      modelEvidence: [{ context: valid, outcome: "completed" }],
+    };
+    const decoded = decodeSessionLogFact(JSON.stringify(retained)).fact;
+    expect(JSON.parse(encodeSessionLogFact(decoded))).not.toHaveProperty("modelEvidence");
+    if (decoded.kind !== "durable_commit") throw new Error("Expected retained model commit");
+    const position = { topic: "financial-projection", partition: 0, offset: 10n };
+    await projector.project({ fact: decoded, ...position });
+    // Old native commit fingerprints include the opaque proof. Rewind can verify it
+    // without creating a financial event, even after a fresh Projector starts.
+    const {
+      rows: [stored],
+    } = await sql<{
+      metadata: unknown;
+    }>`select cloud_metadata::jsonb metadata from pi_durable_commits where tenant_id=${f.scope.tenantId}::uuid and session_id=${f.scope.piSessionId} and seq=${decoded.commit.seq}`.execute(
+      f.database,
+    );
+    expect(stored?.metadata).toEqual({ modelEvidence: retained.modelEvidence });
+    await new ExecutionStreamProjector(f.database).project({ fact: decoded, ...position });
     expect((await f.projection.head()).seq).toBe(head.seq + 1);
     expect(
       await f.database
@@ -115,7 +141,7 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
         .select("id")
         .where("id", "=", `${valid.invocationId}:execution`)
         .executeTakeFirst(),
-    ).toBeDefined();
+    ).toBeUndefined();
     await project(
       {
         kind: "work_finished",
@@ -145,7 +171,15 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
         .where("id", "=", `${late.invocationId}:execution`)
         .executeTakeFirst(),
     ).toBeUndefined();
-    await metering.ingest({ events: [...receipts(late), ...receipts(valid)] });
+    await metering.ingest({ events });
+    expect(await usage()).toBe(240);
+    expect(
+      await f.database
+        .selectFrom("model_execution_writers")
+        .select("writer_id")
+        .where("writer_id", "=", f.scope.writerId)
+        .execute(),
+    ).toHaveLength(0);
     const page = await metering.list(f.scope.tenantId, {
       from: "2020-01-01T00:00:00.000Z",
       to: "2099-01-01T00:00:00.000Z",
@@ -154,11 +188,11 @@ it("co-commits financial evidence, retains valid late usage and ignores post-sea
     expect(
       page.items.find((i) => i.context.invocationId === valid.invocationId)!.usage[0]!.eligibility
         .state,
-    ).toBe("billable");
+    ).toBe("pending");
     expect(
       page.items.find((i) => i.context.invocationId === late.invocationId)!.usage[0]!.eligibility
         .state,
-    ).toBe("platform");
+    ).toBe("pending");
   } finally {
     await f.close();
   }

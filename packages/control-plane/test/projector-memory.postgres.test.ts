@@ -5,7 +5,7 @@ import type { AcceptedDurableCommitFact } from "../../runtime-core/src/accepted-
 
 it("reloads an evicted active identity while preserving the real native replay prefix", async () => {
   const f = await nativeSubagentFixture();
-  const projector = new ExecutionStreamProjector(f.database, undefined, {
+  const projector = new ExecutionStreamProjector(f.database, {
     maximumEntries: 1,
     maximumBytes: 4096,
   });

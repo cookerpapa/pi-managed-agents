@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { nativeBashTrace, nativeBashFact } from "./native-bash-trace.mjs";
+import { visibleOutput } from "./visible-output.mjs";
 import { FamilyPresentation } from "./family-presentation.mjs";
 import { plainExecution } from "./tool-grant-prefix.mjs";
 import { decodeWorkspaceFact, encodeWorkspaceFact } from "./workspace-operations.mjs";
@@ -12,11 +13,13 @@ export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
     hash = createHash("sha256");
   let index = 0,
     intents = 0;
+  const visible = { records: 0, texts: 0, calls: 0, results: 0 },
+    usage = { updates: 0, standalone: 0 };
   const entries = {},
     kinds = {},
     previous = new Map(),
     adjacentSizes = [];
-  function append(owner, f, intent = false, before) {
+  function append(owner, f, intent = false, before, usageOrdinals) {
     const { partition, scope } = owner;
     const value = encodeWorkspaceFact(f);
     if (intent)
@@ -30,6 +33,7 @@ export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
       id: f.factId,
       session: scope.piSessionId,
       value,
+      ...(usageOrdinals?.length ? { usageOrdinals } : {}),
     });
     const streak = previous.get(partition) ?? 0;
     if (!intent && streak) adjacentSizes.push(streak);
@@ -43,11 +47,25 @@ export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
         { scope } = owner,
         presentation = new FamilyPresentation();
       presentation.bind(1, scope);
+      const usageIds = new Set();
       let starts = 0;
       const trace = await nativeBashTrace(
         scope,
         (commit) => {
           const d = presentation.prepare(commit);
+          const counts = visibleOutput(commit.writes);
+          for (const key of ["texts", "calls", "results"]) visible[key] += counts[key];
+          if (counts.texts || counts.calls || counts.results) visible.records++;
+          const usageOrdinals = [];
+          for (const [ordinal, w] of commit.writes.entries()) {
+            if (w.type === "document.create" && w.record.kind === "pi.usage")
+              usageIds.add(w.record.id);
+            if (w.type === "document.change" && usageIds.has(w.id)) usageOrdinals.push(ordinal);
+            if (w.type === "document.retire") usageIds.delete(w.id);
+          }
+          usage.updates += usageOrdinals.length;
+          if (usageOrdinals.length && usageOrdinals.length === commit.writes.length)
+            usage.standalone++;
           for (const w of commit.writes)
             if (w.type === "entry") entries[w.value.kind] = (entries[w.value.kind] ?? 0) + 1;
           const indexOfCall = starts * fixture.owners.length + i;
@@ -65,7 +83,7 @@ export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
           }
           for (const group of d.display)
             for (const { event } of group.events) kinds[event.type] = (kinds[event.type] ?? 0) + 1;
-          const sent = append(owner, f, !!operation, presentation.live);
+          const sent = append(owner, f, !!operation, presentation.live, usageOrdinals);
           if (sent) return sent.then(d.confirmed);
           d.confirmed();
         },
@@ -98,6 +116,8 @@ export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
   return {
     frames,
     summary: {
+      visible,
+      usage,
       intents,
       kinds,
       entries,
@@ -108,4 +128,23 @@ export async function mixedDisplayTape(fixture, arm, publish, callsPerRun = 1) {
       longest: Math.max(...adjacentSizes),
     },
   };
+}
+
+// Disposable replay control. Keep native sequence and every display reference; never use on a serving writer.
+export function withoutUsageUpdates(frame) {
+  if (!frame.usageOrdinals?.length) return frame;
+  const wire = JSON.parse(frame.value);
+  const removed = frame.usageOrdinals;
+  assert(
+    removed.length < wire.commit.writes.length,
+    "Cannot omit a standalone commit in this diagnostic",
+  );
+  for (const group of wire.display)
+    for (const { source } of group.events) {
+      if (source?.kind !== "write") continue;
+      assert(!removed.includes(source.ordinal));
+      source.ordinal -= removed.filter((i) => i < source.ordinal).length;
+    }
+  wire.commit.writes = wire.commit.writes.filter((_, i) => !removed.includes(i));
+  return { ...frame, value: JSON.stringify(wire) };
 }

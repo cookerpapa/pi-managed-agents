@@ -35,22 +35,9 @@ PG owns `model_invocations`, immutable `model_metering_events`, and
 Deleting a chat, Compaction and Fork do not erase or copy actual consumption.
 The only cleanup exception is the explicitly owned acceptance-fixture purger.
 
-Under [ADR-0330](adr/0330-model-charge-eligibility.md), model-task settlement
-evidence accompanies the same native Kafka commit as Pi's state transition.
-Projector inserts an immutable `execution` accounting event only when that batch
-is accepted. One `model_execution_writers` closure fact retains each writer's
-ordered cutoff independently of Session deletion. Neither fact grants execution.
-The independent accounting view `model_billing_events` joins these exact identities
-to raw usage and source completion. It does not poll Worker leases or give CPA a
-live fencing cache. Either source may arrive first; missing evidence remains pending.
+Under [ADR-0355](adr/0355-provider-usage-outside-session-projection.md), model requests retain their gateway invocation and provider execution IDs. The Session Projector handles native history, tool dispatch and fencing without generating financial proofs. The usage reader counts complete provider receipts independently of Session replay, Stop or handoff. A repeated receipt contributes once. A superseded writer can consume actual provider tokens.
 
-Customer eligibility is separate from actual usage. Completed work and valid
-native user cancellation are chargeable with complete usage. Failed/superseded
-work, a closed writer without accepted settlement, and ambiguous multi-attempt
-provider attribution are platform cost. A valid pre-seal settlement remains
-eligible when its usage arrives after replacement. No token count is split using
-a seal timestamp. The statement shows actual quantities separately from billable
-tokens and masks customer amounts without changing raw receipts or tariff quotes.
+The model statement shows actual tokens and upstream estimates. Customer amounts for new requests remain unconfirmed pending a separate metering decision. Historical customer decisions and their original receipts and prices remain available. There is no payment collection.
 
 ## Missing observations and limits
 
@@ -93,8 +80,7 @@ Image generation, hosted search and other unsupported media dimensions remain
 unpriced even when token counts are available. Ordinary vision tokens can be
 counted when the provider supplies canonical quantities. Incomplete quantities
 remain unconfirmed. `includeFailed` is accepted only for `upstream_estimate` rates.
-Customer failure/Stop handling follows native execution eligibility, not the
-provider's failure flag: a valid user Stop with complete usage remains chargeable.
+A complete provider receipt after Stop contributes to actual usage.
 
 ## API
 

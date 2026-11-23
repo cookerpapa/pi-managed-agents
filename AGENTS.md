@@ -188,12 +188,11 @@ protocol, record the decision under `docs/adr/` before implementation.
   Resource-owner facts and per-resource receipt/checkpoint transactions remain
   separate from lifecycle authority. Model and capacity pricing retain their own evidence.
   Accounting never becomes resource authority.
-  Under ADR-0330 actual model usage and customer eligibility are separate.
-  Model invocation identity is checked at the Worker gateway and settlement
-  evidence is co-committed with accepted native task changes. Financial writer
-  closure evidence survives Session deletion. Valid user Stop with complete usage
-  remains chargeable; failed/superseded/unaccepted work is platform cost and
-  missing usage is never estimated into a customer charge. CPA has no live fence view.
+  Under ADR-0355 the Worker attributes each actual model HTTP request. The gateway
+  records provider usage. Session Kafka commits and Projector transactions carry
+  no model accounting obligations. Preserve native admission, fencing, exact
+  Stop semantics and historical financial records. New customer eligibility
+  remains unconfirmed until metering implements an independent decision.
 - Under ADR-0315 ordinary control Tools do not query Worker lease validity.
   Under ADR-0316 role loaders, secret mounts and image source subsets follow their
   real consumers. Under ADR-0319 registered backend revisions update existing

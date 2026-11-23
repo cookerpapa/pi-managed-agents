@@ -9,7 +9,7 @@ import pg from "pg";
 import { Kysely, PostgresDialect, CompiledQuery } from "kysely";
 import { testPostgres } from "../../lib/test-postgres.mjs";
 import { applyMovingSql } from "./ready-projection-sql.mjs";
-import { ModelExecutionAccounting } from "../../../packages/accounting/src/model-execution-accounting.ts";
+import { ModelExecutionAccounting } from "../../../packages/accounting/test/fixtures/historical-model-execution.ts";
 import { readSessionModelUsage } from "../../../packages/accounting/src/session-model-usage.ts";
 import { ModelMeteringService } from "../../../packages/accounting/src/model-metering-service.ts";
 import * as model from "../../../packages/database/src/migrations/210_model_metering.ts";

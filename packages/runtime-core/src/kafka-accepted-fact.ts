@@ -7,7 +7,6 @@ import {
   parseToolCancellation,
   parseDurableSessionCommit,
   DurableCommitIndex,
-  parseModelExecutionEvidence,
   type AcceptedToolCommand,
 } from "@pi-cloud/protocol";
 import type { AcceptedFact, SessionLogFact } from "./accepted-fact.ts";
@@ -68,29 +67,6 @@ export function prepareAcceptedFact(
 ): PreparedSessionLogFact & { fact: AcceptedFact } {
   const fact = validateAcceptedFact(value);
   const index = fact.kind === "durable_commit" ? new DurableCommitIndex(fact.commit) : undefined;
-  if (fact.kind === "durable_commit" && fact.modelEvidence !== undefined) {
-    if (!Array.isArray(fact.modelEvidence) || fact.modelEvidence.length > 256)
-      throw new Error("Invalid model accounting evidence batch");
-    const identities = new Set<string>();
-    for (const raw of fact.modelEvidence) {
-      const { context } = parseModelExecutionEvidence(raw);
-      const execution = context.execution!;
-      const task = index!.task(execution.taskId!);
-      const origin = fact.origins.find((origin) => origin.recordId === execution.taskId);
-      if (
-        context.tenantId !== fact.scope.tenantId ||
-        context.piSessionId !== fact.scope.piSessionId ||
-        context.runId !== fact.scope.runId ||
-        execution.writerId !== fact.scope.writerId ||
-        execution.fencingToken !== fact.scope.fencingToken ||
-        task?.conversationId !== context.conversationId ||
-        origin?.sessionId !== context.sessionId ||
-        identities.has(context.invocationId)
-      )
-        throw new Error("Model accounting evidence changed execution identity");
-      identities.add(context.invocationId);
-    }
-  }
   validateControlToolReferences(fact, index);
   return { fact, tools: toolCommandsForFact(fact, index) };
 }

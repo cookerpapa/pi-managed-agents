@@ -45,7 +45,7 @@ import {
 import { brokers, topic, actor, send, fail, listen, openPool } from "./actor.mjs";
 import { emitFrames } from "./pg-path-replay.mjs";
 import { fanoutReceiver } from "./fanout-network.mjs";
-import { mixedDisplayTape } from "./native-display-tape.mjs";
+import { mixedDisplayTape, withoutUsageUpdates } from "./native-display-tape.mjs";
 import { attachStart, displayFanoutTemplate } from "./display-fanout.mjs";
 import { fanoutFixture, partitions } from "./fanout-fixture.mjs";
 import { messageTape } from "./complete-message-rate.mjs";
@@ -738,7 +738,9 @@ listen(
       fanoutSource ??= fanoutFixture(topic.slice(-16));
       if (m.mixed) {
         nativeFanoutTape ??= await mixedDisplayTape(fanoutSource, m.arm, undefined, m.callsPerRun);
-        pathFrames = nativeFanoutTape.frames;
+        pathFrames = m.omitUsage
+          ? nativeFanoutTape.frames.map(withoutUsageUpdates)
+          : nativeFanoutTape.frames;
         send("fanoutTapeReady", {
           bytes: pathFrames.reduce((n, f) => n + Buffer.byteLength(f.value), 0),
           mix: nativeFanoutTape.summary,

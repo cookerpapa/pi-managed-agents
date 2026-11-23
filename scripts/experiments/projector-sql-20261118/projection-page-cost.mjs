@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { isDeepStrictEqual } from "node:util";
 import { sql } from "kysely";
-import { ModelExecutionAccounting } from "@pi-cloud/accounting";
 import { ExecutionStreamProjector } from "../../../packages/runtime-core/src/execution-stream-projection.ts";
 import { readCanonicalHistoryWindow } from "../../../packages/runtime-core/src/canonical-history-window.ts";
 import { decodeHistoryPosition } from "../../../packages/runtime-core/src/history-position.ts";
@@ -22,7 +21,7 @@ export async function comparePages(db, cases) {
     let offset = 100n,
       seq = fact.commit.seq,
       nextId = fact.commit.nextId;
-    const projector = new ExecutionStreamProjector(db, new ModelExecutionAccounting());
+    const projector = new ExecutionStreamProjector(db);
     const project = (f) => projector.project({ topic, partition, offset: ++offset, fact: f });
     assert((await project(fact)).admitted);
     for (let n = 0; n < extra; n += 64) {

@@ -1,9 +1,13 @@
 import type { Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
-import { parseModelExecutionEvidence, type ModelExecutionEvidence } from "@pi-cloud/protocol";
-import { ensureModelInvocation } from "./model-invocations.ts";
-import { receiptHash, MeteringConflict } from "./receipt-identity.ts";
+import { type ModelMeteringContext } from "@pi-cloud/protocol";
+import { ensureModelInvocation } from "../../src/model-invocations.ts";
+import { receiptHash, MeteringConflict } from "../../src/receipt-identity.ts";
 
+export type ModelExecutionEvidence = {
+  context: ModelMeteringContext;
+  outcome: "completed" | "cancelled" | "failed" | "superseded";
+};
 type Scope = {
   tenantId: string;
   piSessionId: string;
@@ -13,7 +17,7 @@ type Scope = {
 };
 type Position = { topic: string; partition: number; offset: bigint };
 
-/** The execution role supplies committed facts, never prices or charge decisions. */
+/** Seeds pre-ADR-0355 records for historical statement and cost comparisons. */
 export class ModelExecutionAccounting {
   async settle(
     tx: Transaction<Database>,
@@ -21,11 +25,10 @@ export class ModelExecutionAccounting {
     evidence: readonly ModelExecutionEvidence[],
     position: Position,
   ): Promise<void> {
-    for (const raw of [...evidence].sort((a, b) =>
+    for (const item of [...evidence].sort((a, b) =>
       a.context.invocationId.localeCompare(b.context.invocationId),
     )) {
-      const item = parseModelExecutionEvidence(raw),
-        c = item.context;
+      const c = item.context;
       if (
         c.tenantId !== scope.tenantId ||
         c.runId !== scope.runId ||

@@ -128,12 +128,7 @@ test("control metadata and non-text content keep the conservative synchronous po
   };
   const frame = { ops: [{ kind: "message" }] };
   assert(plainAnswer(frame, f));
-  for (const extra of [
-    { display: [{}] },
-    { inputQueueSessions: ["s"] },
-    { modelEvidence: [{}] },
-    { cancellations: [{}] },
-  ])
+  for (const extra of [{ display: [{}] }, { inputQueueSessions: ["s"] }, { cancellations: [{}] }])
     assert(!plainAnswer(frame, { ...f, ...extra }));
   assert(!plainAnswer({ ...frame, anchor: [] }, f));
   assert(!plainAnswer({ ops: [{ kind: "finish" }] }, f));

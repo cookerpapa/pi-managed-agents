@@ -112,10 +112,13 @@ export async function runFanout({
       display = false,
       mixed = false,
       liveSource = false,
-      rate = offered,
+      rate: rawRate = offered,
+      targetVisibleRate,
       entryIndex,
+      omitUsage = false,
     },
   ] of cases(suite).entries()) {
+    let rate = rawRate;
     const arm = mixed ? 1 : i + 1,
       count = rounds * targets;
     if (mode !== "direct") await seed(arm, display ? rounds : 0, mixed, entryIndex);
@@ -135,9 +138,14 @@ export async function runFanout({
           arm,
           count,
           mixed,
+          omitUsage,
           callsPerRun: rounds,
           displayRounds: display ? rounds : 0,
         }));
+      if (targetVisibleRate !== undefined) {
+        assert(!liveSource && !preload && mix.visible.records > 0);
+        rate = Math.round((targetVisibleRate * mix.records) / mix.visible.records);
+      }
       // This comparison owns a dedicated PG Pod. Keep seed/DDL WAL out of the
       // window and give each arm the same full-page-image starting condition.
       let walStart;
@@ -219,7 +227,8 @@ export async function runFanout({
           count,
         );
         if (rounds > 1) await verifyLoopHistory(db, owners, mix, rounds);
-        if (suite === "grants-million-day") assert.equal(mix.records, 187 * targets);
+        if (suite === "grants-million-day")
+          assert.equal(mix.visible.texts + mix.visible.calls + mix.visible.results, 41 * targets);
       } else await verify(arm, rounds);
     }
     const deliveryRounds = mode.endsWith("-control") ? 0 : rounds;
@@ -264,6 +273,7 @@ export async function runFanout({
       mode,
       delay: ms,
       rate,
+      targetVisibleRate,
       display,
       liveSource,
       mix,
@@ -272,6 +282,7 @@ export async function runFanout({
       count,
       preload,
       bytes,
+      omitUsage,
       source,
       result,
       network,
@@ -289,7 +300,14 @@ export async function runFanout({
         count,
         preload,
         input: Math.round(source?.rate ?? 0),
-        rps: Math.round(result.rps),
+        ...(mix?.visible
+          ? {
+              visibleKafkaRecordsPerSec: Math.round(
+                (mix.visible.records * 1000) / (result.processedAt - result.startAt),
+              ),
+            }
+          : {}),
+        toolDispatchesPerSec: Math.round(result.rps),
         peakLag: result.peakLag,
         peak: result.peakActive,
         rssMiB: Math.round(result.peakRss / 1048576),
@@ -349,15 +367,34 @@ function cases(suite) {
   const trial = (mode, ms, rounds, options) => ({ mode, ms, rounds, ...options });
   if (suite === "grants-tool-loop" || suite === "grants-million-day") {
     const short = suite === "grants-million-day";
-    // A fixed native 20-call trace has 187 Session records, including closure.
-    const dailyRate = (187 * 1_000_000) / 86_400;
+    // 20 tool calls, 20 results and one answer per Run in this fixed trace.
+    const dailyVisibleRate = (41 * 1_000_000) / 86_400;
+    if (short && process.env.PI_CLOUD_COMPARE_USAGE_WIRE === "1") {
+      return [
+        { liveSource: true },
+        ...[false, true, true, false].map((omitUsage) => ({
+          omitUsage,
+          preload: true,
+          rate: 16000,
+        })),
+        { targetVisibleRate: dailyVisibleRate },
+      ].map((options) =>
+        trial("concurrent", 100, 20, {
+          grantWidth: 8,
+          batchProjection: true,
+          display: true,
+          mixed: true,
+          ...options,
+        }),
+      );
+    }
     if (short && process.env.PI_CLOUD_COMPARE_ENTRY_INDEX === "1") {
       const ordered = [false, true, true, false, true, false, false, true];
-      const fixedRate = Math.round(1.5 * dailyRate);
+      const fixedRate = 1.5 * dailyVisibleRate;
       return [
         { liveSource: true },
         ...ordered.map((entryIndex) => ({ entryIndex, preload: true, rate: 16000 })),
-        ...ordered.slice(0, 4).map((entryIndex) => ({ entryIndex, rate: fixedRate })),
+        ...ordered.slice(0, 4).map((entryIndex) => ({ entryIndex, targetVisibleRate: fixedRate })),
       ].map((options) =>
         trial("concurrent", 100, 20, {
           grantWidth: 8,
@@ -373,7 +410,7 @@ function cases(suite) {
     const multipliers =
       process.env.PI_CLOUD_REPEAT_MILLION_RATE === "1" ? [1.5, 3, 1.5, 1.5] : [1, 2, 3, 1.5, 1];
     const rates = short
-      ? multipliers.map((multiplier) => ({ rate: Math.round(multiplier * dailyRate) }))
+      ? multipliers.map((multiplier) => ({ targetVisibleRate: multiplier * dailyVisibleRate }))
       : [
           { rate: 2500 },
           { rate: 3500 },

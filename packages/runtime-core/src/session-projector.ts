@@ -44,7 +44,6 @@ import type {
 } from "./kafka-accepted-fact-consumer.ts";
 import { ProjectionTiming } from "./projection-timing.ts";
 import { RunObservations } from "./run-observations.ts";
-import type { ModelAccountingPort } from "./model-accounting-port.ts";
 
 type ProjectionDecision = { projected: ExecutionProjectionResult | undefined; applicable: boolean };
 
@@ -79,7 +78,6 @@ export class SessionProjector {
       notificationConnectionString: string;
       advertisedBaseUrl: string;
       publicationToken: string;
-      modelAccounting?: ModelAccountingPort;
       nativeStore?: import("./execution-stream-projection.ts").SessionNativeStore;
       recoveryCheckpoint?: {
         tracks(scope: AcceptedFactScope): boolean;
@@ -179,7 +177,6 @@ export class SessionProjector {
     const families = recovery ? new Map<string, AcceptedFamilyCheckpoint>() : undefined;
     this.#projection = new ExecutionStreamProjector(
       options.database,
-      options.modelAccounting,
       undefined,
       recovery && families
         ? async (tx, fact, position, current) => {

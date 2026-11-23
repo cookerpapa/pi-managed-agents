@@ -907,9 +907,7 @@ async function startProjector() {
     {
       database,
       publicationDatabase: database,
-      ...(primary
-        ? { nativeStore: primary.nativeStore, modelAccounting: primary.modelAccounting }
-        : {}),
+      ...(primary ? { nativeStore: primary.nativeStore } : {}),
       ...(atomicHandoff
         ? {
             recoveryCheckpoint: {

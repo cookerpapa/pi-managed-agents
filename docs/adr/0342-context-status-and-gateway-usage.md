@@ -1,5 +1,7 @@
 # ADR-0342. Separate context status and provider usage
 
+ADR-0355 supersedes the atomic accounting paragraphs below for the matched candidate.
+
 Accepted for the performance candidate, with publication under the existing #48 gate.
 The authenticated read-only Session API exposes two independent commands. Status
 reads the selected Conversation's active native context estimate and model window.

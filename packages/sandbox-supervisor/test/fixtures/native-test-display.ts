@@ -23,14 +23,8 @@ export function nativeTestDisplay(
   pack?: (commit: DurableSessionCommit) => Promise<DurableSessionCommit>,
 ) {
   let prepare: Parameters<DurableSessionHandle["prepareDisplay"]>[0] | undefined;
-  let prepareAccounting: Parameters<DurableSessionHandle["prepareModelEvidence"]>[0] | undefined;
-  const modelEvidence: import("@pi-cloud/protocol").ModelExecutionEvidence[] = [];
   let tail: Promise<unknown> = Promise.resolve();
   return {
-    modelEvidence,
-    prepareModelEvidence(value: NonNullable<typeof prepareAccounting>) {
-      prepareAccounting = value;
-    },
     prepareDisplay(value: NonNullable<typeof prepare>) {
       prepare = value;
     },
@@ -65,15 +59,10 @@ export function nativeTestDisplay(
       }
       const commit = { seq, nextId: 10000, writes } as unknown as DurableSessionCommit;
       const prepared = prepare?.(commit, documents);
-      const accounting = prepareAccounting?.(commit);
       // Production resolves public image displays after native bytes become attachment references.
       const transport = pack ? await pack(commit) : commit;
       return () => {
         prepared?.confirmed();
-        if (accounting) {
-          modelEvidence.push(...accounting.evidence);
-          accounting.confirmed();
-        }
         for (const text of prepared?.events ?? [])
           onText(
             resolveDurableDisplay(

@@ -1,5 +1,7 @@
 # Candidate model settlement and projection cost
 
+Historical measurement at `716d13ef`. The candidate adopted [ADR-0355](../adr/0355-provider-usage-outside-session-projection.md) after this comparison. Run the accounting comparison commands below at that revision.
+
 ## Correctness
 
 The #52 serving candidate previously rejected native commits containing Worker model execution evidence. Its usage reader also traversed the old child-session directory. A named child has a public UUID and a founding Run in the candidate. The Session API now walks those Run relationships at read time. It reads provider receipts using the original public UUID for each agent.

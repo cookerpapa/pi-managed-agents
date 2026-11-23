@@ -1,5 +1,7 @@
 # Runtime capacity evaluation
 
+The primary mixed-load Projector metric is **completed user-visible Kafka records per second**. Count each handled record containing assistant text, tool calls or tool results once. Also report those items separately, along with offered load, peak and final Kafka lag, and post-input drain time. Publish live, paced and preloaded results separately. The [20-tool experiment](reports/provider-only-visible-throughput-20261123.md) includes the comparison with native usage updates omitted.
+
 The [Fork storage experiment](reports/minimal-projection-fork-20261120.md) compares normal append costs and measures user-initiated PG Fork transactions at different history sizes.
 
 The [complete-message capacity study](reports/complete-message-capacity-20261120.md) measures ordered PG projection in entries per second for Runs with 100 recorded tool-call/result pairs. Paced input and consumption of a preloaded Kafka backlog are reported separately.
