@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Check generated branching histories and shared-prefix collection against an independent reference. Exercise public Flow history requests from Chrome while the candidate projects Kafka records. [Measurements](reports/flow-tree-and-paging-20261123.md).
+
 - [x] Compare a frozen branch base with a moving Session head on identical admission workloads. Check deletion in both orders, WAL, recent pages and bounded collection. [Results](reports/flow-base-admission-20261123.md).
 
 - [x] Verify directory loss, native abort, returned drafts, Chrome reselection and cold continuation. [Candidate acceptance](reports/directory-recovery-and-flow-20261123.md).

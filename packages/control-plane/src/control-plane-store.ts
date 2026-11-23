@@ -85,6 +85,7 @@ export type ControlPlaneStoreOptions = {
   database: Kysely<Database>;
   conversationReadDatabase?: Kysely<Database>;
   rootMessageHistory?: boolean;
+  flowRootHistory?: boolean;
   delegatedRunHistory?: boolean;
   tenantId: string;
   defaultModelProfileId: string;
@@ -293,6 +294,7 @@ export class ControlPlaneStore {
       options.conversationReadDatabase ?? options.database,
       options.tenantId,
       options.rootMessageHistory,
+      options.flowRootHistory,
     );
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#delegatedRunHistory = options.delegatedRunHistory ?? false;

@@ -1,0 +1,374 @@
+{
+  "pg": {
+    "version": "17.6",
+    "cpus": 2,
+    "memoryMiB": 768
+  },
+  "tree": [
+    {
+      "seed": 17,
+      "append": 96,
+      "fork": 52,
+      "prune": 23,
+      "drop": 54,
+      "viewChecks": 2496,
+      "collections": 117,
+      "maxWindows": 15,
+      "rolledBackContendingCollector": true
+    },
+    {
+      "seed": 47,
+      "append": 120,
+      "fork": 39,
+      "prune": 25,
+      "drop": 41,
+      "viewChecks": 2525,
+      "collections": 119,
+      "maxWindows": 15,
+      "rolledBackContendingCollector": true
+    },
+    {
+      "seed": 81,
+      "append": 87,
+      "fork": 50,
+      "prune": 36,
+      "drop": 52,
+      "viewChecks": 1749,
+      "collections": 118,
+      "maxWindows": 15,
+      "rolledBackContendingCollector": true
+    },
+    {
+      "seed": 20261123,
+      "append": 94,
+      "fork": 48,
+      "prune": 33,
+      "drop": 50,
+      "viewChecks": 2318,
+      "collections": 117,
+      "maxWindows": 15,
+      "rolledBackContendingCollector": true
+    }
+  ],
+  "load": [
+    {
+      "mode": "page-plan",
+      "page": "latest",
+      "httpMs": 30.02,
+      "sql": [
+        {
+          "label": "session metadata",
+          "clientMs": 1.27,
+          "planMs": 8.732,
+          "execMs": 0.51,
+          "sharedHits": 9,
+          "maxVisitedRows": 5
+        },
+        {
+          "label": "select visible runs",
+          "clientMs": 4.37,
+          "planMs": 8.591,
+          "execMs": 2.057,
+          "sharedHits": 58,
+          "maxVisitedRows": 48
+        },
+        {
+          "label": "locate page entries",
+          "clientMs": 2.5,
+          "planMs": 5.19,
+          "execMs": 1.208,
+          "sharedHits": 573,
+          "maxVisitedRows": 67
+        },
+        {
+          "label": "load bodies and tool dependencies",
+          "clientMs": 2,
+          "planMs": 1.374,
+          "execMs": 0.805,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "label": "load terminal metadata",
+          "clientMs": 1.67,
+          "planMs": 1.509,
+          "execMs": 0.354,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "label": "load run headers",
+          "clientMs": 1.39,
+          "planMs": 0.176,
+          "execMs": 0.177,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "label": "other read",
+          "clientMs": 1.08,
+          "planMs": 3.448,
+          "execMs": 0.295,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "mode": "page-plan",
+      "page": "older",
+      "httpMs": 33.94,
+      "sql": [
+        {
+          "label": "session metadata",
+          "clientMs": 1.6,
+          "planMs": 9.648,
+          "execMs": 0.392,
+          "sharedHits": 9,
+          "maxVisitedRows": 5
+        },
+        {
+          "label": "resolve cursor run",
+          "clientMs": 1.56,
+          "planMs": 7.173,
+          "execMs": 0.856,
+          "sharedHits": 39,
+          "maxVisitedRows": 3
+        },
+        {
+          "label": "select visible runs",
+          "clientMs": 4.7,
+          "planMs": 2.029,
+          "execMs": 0.83,
+          "sharedHits": 47,
+          "maxVisitedRows": 42
+        },
+        {
+          "label": "locate page entries",
+          "clientMs": 2.73,
+          "planMs": 5.45,
+          "execMs": 1.447,
+          "sharedHits": 580,
+          "maxVisitedRows": 67
+        },
+        {
+          "label": "load bodies and tool dependencies",
+          "clientMs": 2.1,
+          "planMs": 1.649,
+          "execMs": 0.962,
+          "sharedHits": 384,
+          "maxVisitedRows": 32
+        },
+        {
+          "label": "load terminal metadata",
+          "clientMs": 1.61,
+          "planMs": 1.575,
+          "execMs": 0.384,
+          "sharedHits": 240,
+          "maxVisitedRows": 40
+        },
+        {
+          "label": "load run headers",
+          "clientMs": 1.51,
+          "planMs": 0.229,
+          "execMs": 0.169,
+          "sharedHits": 128,
+          "maxVisitedRows": 32
+        },
+        {
+          "label": "other read",
+          "clientMs": 1.22,
+          "planMs": 2.341,
+          "execMs": 0.179,
+          "sharedHits": 7,
+          "maxVisitedRows": 1
+        }
+      ]
+    },
+    {
+      "phase": "http-lineage",
+      "checkedHeaders": 96,
+      "sourceDeleted": true,
+      "cutAcrossFlows": true,
+      "forwardCursor": true
+    },
+    {
+      "mode": "read-only-paced",
+      "latencyMs": {
+        "n": 32,
+        "p50": 48.05,
+        "p95": 155.54,
+        "p99": 156.28
+      },
+      "pagesPerSecond": 9.14,
+      "counts": {
+        "latest": 16,
+        "older": 8,
+        "newer": 8
+      }
+    },
+    {
+      "mode": "read-only-saturated",
+      "latencyMs": {
+        "n": 249,
+        "p50": 104.88,
+        "p95": 158.99,
+        "p99": 226.28
+      },
+      "pagesPerSecond": 71.13,
+      "counts": {
+        "latest": 89,
+        "older": 85,
+        "newer": 83
+      }
+    },
+    {
+      "mode": "writer",
+      "runs": 64,
+      "total": 11904,
+      "visible": 2624,
+      "visiblePerSecond": 327,
+      "seconds": 8.03,
+      "pgCommits": 5504,
+      "pgCpuSeconds": 15.983,
+      "pgThrottlePeriods": 77,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 1280,
+      "pages": null,
+      "browserOlderPages": 0
+    },
+    {
+      "mode": "paced",
+      "runs": 64,
+      "total": 11904,
+      "visible": 2624,
+      "visiblePerSecond": 271,
+      "seconds": 9.7,
+      "pgCommits": 5504,
+      "pgCpuSeconds": 18.934,
+      "pgThrottlePeriods": 92,
+      "allPartitionsDrained": true,
+      "livePageItems": 10,
+      "toolResults": 1280,
+      "pages": {
+        "latencyMs": {
+          "n": 80,
+          "p50": 240.47,
+          "p95": 484.77,
+          "p99": 591.52
+        },
+        "pagesPerSecond": 8.25,
+        "counts": {
+          "latest": 32,
+          "older": 24,
+          "newer": 24
+        }
+      },
+      "browserOlderPages": 1
+    },
+    {
+      "mode": "saturated",
+      "runs": 64,
+      "total": 11904,
+      "visible": 2624,
+      "visiblePerSecond": 137,
+      "seconds": 19.16,
+      "pgCommits": 5504,
+      "pgCpuSeconds": 38.332,
+      "pgThrottlePeriods": 191,
+      "allPartitionsDrained": true,
+      "livePageItems": 19,
+      "toolResults": 1280,
+      "pages": {
+        "latencyMs": {
+          "n": 468,
+          "p50": 318.4,
+          "p95": 470.51,
+          "p99": 546.48
+        },
+        "pagesPerSecond": 24.43,
+        "counts": {
+          "latest": 161,
+          "older": 160,
+          "newer": 156
+        }
+      },
+      "browserOlderPages": 1
+    },
+    {
+      "mode": "saturated",
+      "runs": 64,
+      "total": 11904,
+      "visible": 2624,
+      "visiblePerSecond": 140,
+      "seconds": 18.68,
+      "pgCommits": 5504,
+      "pgCpuSeconds": 37.333,
+      "pgThrottlePeriods": 186,
+      "allPartitionsDrained": true,
+      "livePageItems": 20,
+      "toolResults": 1280,
+      "pages": {
+        "latencyMs": {
+          "n": 524,
+          "p50": 282.79,
+          "p95": 421.29,
+          "p99": 482.75
+        },
+        "pagesPerSecond": 28.05,
+        "counts": {
+          "latest": 181,
+          "older": 177,
+          "newer": 175
+        }
+      },
+      "browserOlderPages": 1
+    },
+    {
+      "mode": "paced",
+      "runs": 64,
+      "total": 11904,
+      "visible": 2624,
+      "visiblePerSecond": 239,
+      "seconds": 10.97,
+      "pgCommits": 5504,
+      "pgCpuSeconds": 21.986,
+      "pgThrottlePeriods": 108,
+      "allPartitionsDrained": true,
+      "livePageItems": 17,
+      "toolResults": 1280,
+      "pages": {
+        "latencyMs": {
+          "n": 88,
+          "p50": 268.72,
+          "p95": 351.57,
+          "p99": 435.33
+        },
+        "pagesPerSecond": 8.02,
+        "counts": {
+          "latest": 32,
+          "older": 32,
+          "newer": 24
+        }
+      },
+      "browserOlderPages": 1
+    },
+    {
+      "mode": "writer",
+      "runs": 64,
+      "total": 11904,
+      "visible": 2624,
+      "visiblePerSecond": 275,
+      "seconds": 9.53,
+      "pgCommits": 5504,
+      "pgCpuSeconds": 19.344,
+      "pgThrottlePeriods": 91,
+      "allPartitionsDrained": true,
+      "livePageItems": null,
+      "toolResults": 1280,
+      "pages": null,
+      "browserOlderPages": 0
+    }
+  ]
+}

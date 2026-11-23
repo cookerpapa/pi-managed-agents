@@ -38,7 +38,7 @@ export async function installFlowHistory(
   );
 }
 export async function removeFlowOverlay(db) {
-  await db.query(`drop function flow_swap_pending(uuid,uuid,uuid,uuid),flow_collect(uuid,int),flow_detach(uuid,uuid,uuid,uuid),flow_fork(uuid,uuid,uuid,uuid,uuid),flow_visible(uuid,uuid,uuid),flow_admit(uuid,uuid,uuid,uuid,text); drop view flow_session_tips;
+  await db.query(`drop function if exists flow_read_ranges(uuid,uuid); drop function flow_swap_pending(uuid,uuid,uuid,uuid),flow_collect(uuid,int),flow_detach(uuid,uuid,uuid,uuid),flow_fork(uuid,uuid,uuid,uuid,uuid),flow_visible(uuid,uuid,uuid),flow_admit(uuid,uuid,uuid,uuid,text); drop view flow_session_tips;
    drop table sessions,flow_gc_outbox; drop index flow_unsettled;
    alter table runs drop constraint flow_predecessor,drop constraint flow_run_identity,drop column prev_run_id`);
 }

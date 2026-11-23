@@ -2,6 +2,7 @@ import {
   rootMessageHeaders,
   rootMessagePosition,
   rootMessageTurns,
+  flowRootMessageTurns,
   childMessageTurns,
   readRootMessageWindow,
 } from "@pi-cloud/runtime-core/root-message-history";
@@ -103,6 +104,7 @@ export class ConversationReader {
     database: Kysely<Database>,
     tenantId: string,
     private readonly rootMessageHistory = false,
+    private readonly flowRootHistory = false,
   ) {
     this.#database = database;
     this.#tenantId = tenantId;
@@ -249,7 +251,12 @@ export class ConversationReader {
       .transaction()
       .setIsolationLevel("repeatable read")
       .execute((transaction) => {
-        const reader = new ConversationReader(transaction, this.#tenantId, this.rootMessageHistory);
+        const reader = new ConversationReader(
+          transaction,
+          this.#tenantId,
+          this.rootMessageHistory,
+          this.flowRootHistory,
+        );
         return reader.#readConversation(sessionId, query, filters);
       });
   }
@@ -338,7 +345,10 @@ export class ConversationReader {
         "workspace.deleted_at as workspaceDeletedAt",
         "workspace.seed_kind as workspaceSeedKind",
         "session_row.next_event_seq as nextEventSequence",
-        "session_row.pi_session_id as piSessionId",
+        (this.flowRootHistory
+          ? sql<string>`coalesce((select f.flow_id::text from flow_session_tips f where f.tenant_id=session_row.tenant_id and f.id=session_row.id),session_row.pi_session_id)`
+          : sql<string>`session_row.pi_session_id`
+        ).as("piSessionId"),
         // A Fork may have no Runs of its own but still own a shared history root.
         // Read these indexed facts in the same snapshot as the Session metadata.
         (this.rootMessageHistory
@@ -359,10 +369,14 @@ export class ConversationReader {
     }
 
     const childMessages = this.rootMessageHistory && conversation.sessionKind === "subagent";
+    const flows =
+      this.flowRootHistory &&
+      this.rootMessageHistory &&
+      conversation.sessionKind === "conversation";
     const rootMessages =
       this.rootMessageHistory &&
       conversation.sessionKind === "conversation" &&
-      conversation.parentSessionId === null;
+      (flows || conversation.parentSessionId === null);
     const messages = rootMessages || childMessages;
     let childState = "unknown";
     if (this.rootMessageHistory && conversation.sessionKind === "subagent") {
@@ -385,7 +399,9 @@ export class ConversationReader {
     const relation = childMessages
       ? childMessageTurns(childState)
       : rootMessages
-        ? rootMessageTurns
+        ? flows
+          ? flowRootMessageTurns(this.#tenantId, sessionId)
+          : rootMessageTurns
         : sql`pi_history_turns`;
     const owner = { tenantId: this.#tenantId, sessionId };
     const findTurn = async (id: string) =>
@@ -405,7 +421,7 @@ export class ConversationReader {
     } catch {
       throw new ControlPlaneStoreError("invalid_request", "Invalid conversation history cursor");
     }
-    if (position?.storageId && position.storageId !== conversation.piSessionId)
+    if (!flows && position?.storageId && position.storageId !== conversation.piSessionId)
       throw new ControlPlaneStoreError(
         "not_found",
         "History storage changed; refresh the history window",
@@ -416,14 +432,17 @@ export class ConversationReader {
     const anchor = anchorTurn ? await findTurn(anchorTurn) : undefined;
     if (
       anchorTurn &&
-      (!anchor || (position && position.originSessionId !== anchor.origin_session_id))
+      (!anchor ||
+        (position &&
+          (position.originSessionId !== anchor.origin_session_id ||
+            (flows && position.storageId !== anchor.pi_session_id))))
     )
       throw new ControlPlaneStoreError("not_found", "History anchor is not in this conversation");
     if (query.turnId && anchor) {
       position = {
         version: 2,
         sessionId,
-        storageId: conversation.piSessionId,
+        storageId: flows ? anchor.pi_session_id : conversation.piSessionId,
         originSessionId: anchor.origin_session_id,
         turnId: query.turnId,
         sequence: 0,
@@ -484,10 +503,19 @@ export class ConversationReader {
         position.ordinal = record.ordinal;
       } else direction = "after";
     }
+    const pageRelation = flows
+      ? flowRootMessageTurns(this.#tenantId, sessionId, {
+          direction,
+          ...(anchor ? { position: anchor.mailbox_position } : {}),
+          ...(cutoff ? { cutoff: cutoff.mailbox_position } : {}),
+          completed: !!filters.completedOnly,
+          limit: MAX_CONVERSATION_TURNS + 1,
+        })
+      : relation;
     const rows = conversation.emptyHistory
       ? []
       : (
-          await sql<HistoryTurnRow>`select * from ${relation} where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
+          await sql<HistoryTurnRow>`select * from ${pageRelation} where tenant_id=${this.#tenantId}::uuid and session_id=${sessionId}::uuid
       ${filters.completedOnly ? sql`and state in ('completed','failed','cancelled','timed_out') and not waiting_for_seal` : sql``}
       ${cutoff ? sql`and mailbox_position<=${cutoff.mailbox_position}::bigint` : sql``}
       ${anchor ? sql`and mailbox_position ${sql.raw(direction === "before" ? "<=" : ">=")} ${anchor.mailbox_position}::bigint` : sql``}
@@ -520,12 +548,19 @@ export class ConversationReader {
       inclusive,
     };
     const window = messages
-      ? await readRootMessageWindow(this.#database, windowInput, childMessages)
+      ? await readRootMessageWindow(this.#database, windowInput, childMessages, flows)
       : await readCanonicalHistoryWindow(this.#database, windowInput);
     const sourceByTurn = new Map(sources.map((r) => [r.turnId, r]));
     const ids = [...window.headers];
     const headerByTurn = messages
-      ? await rootMessageHeaders(this.#database, this.#tenantId, sessionId, ids, childMessages)
+      ? await rootMessageHeaders(
+          this.#database,
+          this.#tenantId,
+          sessionId,
+          ids,
+          childMessages,
+          flows ? ids.map((id) => sourceByTurn.get(id)!.piSessionId) : undefined,
+        )
       : await historyHeaders(this.#database, this.#tenantId, sessionId, ids);
     const selectedTurns = [...new Set(window.positions.map((p) => p.turnId))];
     const turns = selectedTurns.map((id) => {
@@ -594,7 +629,13 @@ export class ConversationReader {
     const canonicalThroughSequence = Math.max(
       nonNegativeSafeInteger(conversation.nextEventSequence, "Conversation next event sequence") -
         1,
-      ...sources.filter((r) => r.originSessionId === sessionId).map((r) => Number(r.coverage)),
+      ...sources
+        .filter(
+          (r) =>
+            r.originSessionId === sessionId &&
+            (!flows || r.piSessionId === conversation.piSessionId),
+        )
+        .map((r) => Number(r.coverage)),
     );
     const environment = await this.#loadActiveProjectEnvironment(conversation.projectId);
     const inheritedContext =

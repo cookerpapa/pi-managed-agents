@@ -111,6 +111,7 @@ export class ControlPlaneModule {
       ...(options.idGenerator === undefined ? {} : { idGenerator: options.idGenerator }),
     });
     const controlPlaneStores = new ControlPlaneStoreFactory({
+      flowRootHistory: options.flowRootHistory ?? false,
       delegatedRunHistory: options.delegatedRunHistory ?? false,
       rootMessageHistory: options.rootMessageHistory ?? false,
       database: options.database,

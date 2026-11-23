@@ -110,14 +110,27 @@ const groups = lanes.map((runs, partition) => {
 });
 const own = await testPostgres({});
 try {
+  const comparePages = process.argv[3] === "flow-pages";
+  if (comparePages) {
+    const { studyFlowPaging } = await import("./flow-paging-load.mjs");
+    await studyFlowPaging(
+      own.url,
+      tenantId,
+      groups,
+      lanes.flat().map((r) => r.scope),
+      visiblePerRun,
+    );
+  }
   const compareFlow = process.argv[3] === "flow",
     compareSql = process.argv[3] === "flow-sql";
   const tape = Array.from({ length: partitions }, () => []);
-  const layouts = compareFlow
-    ? [false, true, true, false, true, false, false, true]
-    : compareSql
-      ? [false]
-      : [false, false];
+  const layouts = comparePages
+    ? []
+    : compareFlow
+      ? [false, true, true, false, true, false, false, true]
+      : compareSql
+        ? [false]
+        : [false, false];
   for (const [index, flowHistory] of layouts.entries()) {
     const sample = index + 1;
     const schema = "rate_" + randomUUID().replaceAll("-", "");

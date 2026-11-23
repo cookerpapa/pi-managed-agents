@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Branch correctness and concurrent history paging](flow-tree-and-paging-20261123.md) checks nested Fork/prune and compares a fixed Kafka tape under three browser read loads.
+
 - [Frozen fork base versus moving Session head](flow-base-admission-20261123.md) compares registration, history reads and cleanup on PostgreSQL.
 
 - [Directory recovery and Run-linked Flow](directory-recovery-and-flow-20261123.md) covers an isolated real Guest, Chrome, the projection workload and long-history reads and collection.

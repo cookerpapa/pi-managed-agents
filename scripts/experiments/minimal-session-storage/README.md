@@ -671,6 +671,16 @@ node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments
 
 [Measurements and recovery behavior](../../../docs/reports/flow-base-admission-20261123.md).
 
+The branch-tree oracle checks independent copies of visible history after mixed mutations and inspects stored Runs and messages after collection. The mixed test starts disposable PG and RF3 Kafka, the actual Session API in its own process and the built Web UI in Chrome. It reuses one preloaded 32-partition native tape across six trials. Run serially from the repository root.
+
+```sh
+node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/flow-tree-study.mjs
+npm run build --workspace @pi-cloud/web-ui
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 2 flow-pages
+```
+
+[Mixed-load results and study boundaries](../../../docs/reports/flow-tree-and-paging-20261123.md).
+
 Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.
 
 For the directory closure path use the existing operator fixture with `--directory-recovery-web` and an unused report path. It stages the matched fixed Guest executable only in its owned disposable VM. Real Chrome receives the returned drafts, selects a real directory and submits the next Run through the Session API. [Evidence](../../../docs/reports/directory-recovery-and-flow-20261123.md).

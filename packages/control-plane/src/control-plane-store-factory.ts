@@ -9,6 +9,7 @@ export class ControlPlaneStoreFactory {
   readonly #database: Kysely<Database>;
   readonly #conversationReadDatabase: Kysely<Database>;
   readonly #rootMessageHistory: boolean;
+  readonly #flowRootHistory: boolean;
   readonly #idGenerator: (() => string) | undefined;
   readonly #environmentImageRevision: string | undefined;
   readonly #metrics: PiCloudMetrics | undefined;
@@ -17,6 +18,7 @@ export class ControlPlaneStoreFactory {
     database: Kysely<Database>;
     conversationReadDatabase?: Kysely<Database>;
     rootMessageHistory?: boolean;
+    flowRootHistory?: boolean;
     delegatedRunHistory?: boolean;
     idGenerator?: () => string;
     environmentImageRevision?: string;
@@ -25,6 +27,7 @@ export class ControlPlaneStoreFactory {
     this.#delegatedRunHistory = options.delegatedRunHistory ?? false;
     this.#database = options.database;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
+    this.#flowRootHistory = options.flowRootHistory ?? false;
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#idGenerator = options.idGenerator;
     this.#environmentImageRevision = options.environmentImageRevision;
@@ -37,6 +40,7 @@ export class ControlPlaneStoreFactory {
       conversationReadDatabase: this.#conversationReadDatabase,
       tenantId: identity.tenantId,
       rootMessageHistory: this.#rootMessageHistory,
+      flowRootHistory: this.#flowRootHistory,
       delegatedRunHistory: this.#delegatedRunHistory,
       defaultModelProfileId: identity.defaultModelProfileId,
       ...(this.#environmentImageRevision === undefined

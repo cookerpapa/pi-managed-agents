@@ -252,6 +252,7 @@ export function normalRootProjection(
   };
   return {
     view,
+    prepareHistory: (records, current) => router.prepareHistory(records, current),
     nativeStore,
     async dispatch(r, current, grant) {
       if (r.fact.kind === "work_finished" || r.fact.kind === "execution_seal") {

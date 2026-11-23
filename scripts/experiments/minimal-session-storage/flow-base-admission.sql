@@ -25,3 +25,19 @@ begin
         new_run,prompt,'fixture','queued',jsonb_build_object('workspaceId',own.workspace_id,'cwd',own.working_directory));
  return new_run;
 end $$;
+
+-- Visit one edge per inherited flow. Queue positions restart at one on each
+-- branch, so add the lengths of earlier retained prefixes for presentation.
+create function flow_read_ranges(t uuid, window_id uuid)
+returns table(physical uuid, through_position bigint, prior_positions bigint) language sql stable as $$
+ with recursive ranges(physical, through_position, depth) as (
+   select r.RUN_FLOW,r.mailbox_position,0 from flow_session_tips s
+   join runs r on r.tenant_id=t and r.id=s.tip_run_id where s.tenant_id=t and s.id=window_id
+   union all
+   select parent.RUN_FLOW,parent.mailbox_position,p.depth+1 from ranges p
+   join runs first on first.tenant_id=t and first.RUN_FLOW=p.physical and first.mailbox_position=1
+   join runs parent on parent.tenant_id=t and parent.id=first.prev_run_id
+ ) select physical,through_position,
+ coalesce(sum(through_position) over(order by depth desc rows between unbounded preceding and 1 preceding),0)::bigint
+ from ranges
+$$;

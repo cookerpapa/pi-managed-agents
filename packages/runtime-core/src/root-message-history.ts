@@ -22,6 +22,32 @@ export const rootMessageTurns = sql<HistoryTurnRow>`(select r.tenant_id,r.sessio
   from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id where r.pruned_at is null and s.pruned_at is null
     and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact') and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)) root_turns`;
 
+// The Session ID identifies the public window. The message stream belongs to
+// the Run's writing flow, which may outlive the window that created it.
+export const flowRootMessageTurns = (
+  tenant: string,
+  session: string,
+  page?: {
+    direction: "before" | "after";
+    position?: string;
+    cutoff?: string;
+    completed: boolean;
+    limit: number;
+  },
+) =>
+  sql<HistoryTurnRow>`(select r.tenant_id,${session}::uuid as session_id,${session}::uuid as origin_session_id,
+   r.id as turn_id,r.id as run_id,r.session_id::text as pi_session_id,
+   (f.prior_positions+r.mailbox_position) as mailbox_position,r.operation_kind,r.state,r.stop_reason,
+   r.output_display_seq,r.output_display_native_seq,(r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
+   from flow_read_ranges(${tenant}::uuid,${session}::uuid) f
+   cross join lateral(select * from runs r where r.tenant_id=${tenant}::uuid and r.session_id=f.physical and r.mailbox_position<=f.through_position and r.mailbox_position is not null
+   and r.pruned_at is null and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact')
+   and not(r.operation_kind='chat' and r.state='cancelled' and r.started_at is null)
+   ${page?.position ? sql`and r.mailbox_position ${sql.raw(page.direction === "before" ? "<=" : ">=")} ${page.position}::bigint-f.prior_positions` : sql``}
+   ${page?.cutoff ? sql`and r.mailbox_position<=${page.cutoff}::bigint-f.prior_positions` : sql``}
+   ${page?.completed ? sql`and r.state in ('completed','failed','cancelled','timed_out') and (r.output_seal_id is null or r.output_sealed_at is not null)` : sql``}
+   ${page ? sql`order by r.mailbox_position ${sql.raw(page.direction === "before" ? "desc" : "asc")} limit ${page.limit}` : sql``}) r) root_turns`;
+
 // Resolve the public child Session and Turn before looking at the shared
 // physical stream. The parent Run supplies the original pending Tool references.
 const childMessageRuns = sql`(select e.root_run_id as id,e.tenant_id,e.child_session_id as session_id,
@@ -86,13 +112,15 @@ export async function rootMessageHeaders(
   session: string,
   ids: readonly string[],
   child = false,
+  physicalFlows?: readonly string[],
 ) {
   if (!ids.length) return new Map<string, HistoryHeader>();
   if (child) return childMessageHeaders(db, tenant, session, ids);
   const rows = await sql<
     HistoryHeader & { turn_id: string }
-  >`select turn_id,input_text,null::text as input_source,input_uploads,scheduled_origin,output_display_seq
-    from runs where tenant_id=${tenant}::uuid and session_id=${session}::uuid and turn_id=any(${[...ids]}::uuid[]) and pruned_at is null`.execute(
+  >`select ${physicalFlows ? sql`r.id` : sql`r.turn_id`} as turn_id,input_text,null::text as input_source,input_uploads,scheduled_origin,output_display_seq
+    from runs r ${physicalFlows ? sql`join unnest(${[...ids]}::uuid[],${[...physicalFlows]}::uuid[]) p(id,flow) on r.id=p.id and r.session_id=p.flow` : sql``}
+    where tenant_id=${tenant}::uuid ${physicalFlows ? sql`` : sql`and session_id=${session}::uuid and turn_id=any(${[...ids]}::uuid[])`} and pruned_at is null`.execute(
     db,
   );
   return new Map(rows.rows.map((r) => [r.turn_id, r]));
@@ -129,6 +157,7 @@ export async function readRootMessageWindow(
   db: Kysely<Database>,
   input: HistoryWindowInput,
   child = false,
+  flows = false,
 ) {
   if (!input.turns.length)
     return {
@@ -155,9 +184,15 @@ export async function readRootMessageWindow(
       ? sql`,${input.turns.map((t) => (t.turnId === cursor.turnId ? String(cursor.sequence) : input.direction === "before" ? "9223372036854775807" : "-1"))}::bigint[],
       ${input.turns.map((t) => (t.turnId === cursor.turnId ? cursor.ordinal : 0))}::int[]`
       : sql``,
-    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]${seek}) with ordinality t(turn_id,through_seq,through_ordinal${cursor ? sql`,seek_seq,seek_ordinal` : sql``},turn_index)
-      join ${runSource} r on r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid and r.turn_id=t.turn_id and r.pruned_at is null
-      join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id and s.pruned_at is null`,
+    // For a Flow page the enclosing repeatable-read transaction has already
+    // established these exact turn/stream pairs against the public window.
+    turnId = flows ? sql`r.id` : sql`r.turn_id`,
+    sessionJoin = flows
+      ? sql`cross join lateral (select r.session_id::text as pi_session_id) s`
+      : sql`join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id and s.pruned_at is null`,
+    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]${flows ? sql`,${input.turns.map((t) => t.piSessionId)}::uuid[]` : sql``}${seek}) with ordinality t(turn_id,through_seq,through_ordinal${flows ? sql`,physical` : sql``}${cursor ? sql`,seek_seq,seek_ordinal` : sql``},turn_index)
+      join ${runSource} r on r.tenant_id=${input.tenantId}::uuid and r.session_id=${flows ? sql`t.physical` : sql`${input.sessionId}::uuid`} and ${turnId}=t.turn_id and r.pruned_at is null
+      ${sessionJoin}`,
     bound = (
       seq: ReturnType<typeof sql.raw>,
       ord: ReturnType<typeof sql.raw>,
@@ -166,7 +201,7 @@ export async function readRootMessageWindow(
     limit = (input.maxRecords ?? HISTORY_PAGE_RECORDS) + 1;
   const meta = await sql<
     HistoryWindowPoint & { pending: boolean; run_id: string }
-  >`select p.*,r.id as run_id,r.turn_id,s.pi_session_id,r.session_id as origin_session_id,t.turn_index,
+  >`select p.*,r.id as run_id,${turnId} as turn_id,s.pi_session_id,${flows ? sql`${input.sessionId}::uuid` : sql`r.session_id`} as origin_session_id,t.turn_index,
       coalesce(octet_length(a.content),0) as assistant_bytes
     from ${scope} cross join lateral (
       (select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
@@ -210,8 +245,8 @@ export async function readRootMessageWindow(
         substring(r.root_human_inputs from strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')+length(to_json(m.source_input_id)::text)+1 for p.human_limit) end as human,coalesce(m.created_at,r.created_at) as created_at,
         case when p.pending then r.projection_tools->p.id::text end as pending,a.entry_id::text as assistant_id,a.content as proposal
       from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
-      join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid and r.session_id=${input.sessionId}::uuid
-      join sessions s on s.id=r.session_id and s.tenant_id=r.tenant_id
+      join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid ${flows ? sql`` : sql`and r.session_id=${input.sessionId}::uuid`}
+      ${sessionJoin}
       left join messages m on not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid and m.run_id=r.id and m.entry_id=p.id and m.conversation_id=${lane}
       left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.run_id=r.id and a.entry_id=p.assistant_id and a.conversation_id=${lane}`.execute(
       db,
@@ -265,8 +300,8 @@ export async function readRootMessageWindow(
     type: string;
     payload: Record<string, unknown>;
     occurred_at: Date;
-  }>`select r.turn_id,r.output_display_seq as coverage,r.created_at,e.seq,e.type,e.payload,e.occurred_at from ${scope}
-      left join lateral(select seq,type,payload,occurred_at from session_terminal_events where tenant_id=r.tenant_id and session_id=r.session_id and turn_id=r.turn_id order by seq desc limit 1)e on true`.execute(
+  }>`select ${turnId} as turn_id,r.output_display_seq as coverage,r.created_at,e.seq,e.type,e.payload,e.occurred_at from ${scope}
+      left join lateral(select seq,type,payload,occurred_at from session_terminal_events where tenant_id=r.tenant_id and session_id=r.session_id and turn_id=${turnId} order by seq desc limit 1)e on true`.execute(
     db,
   );
   const byTurn = new Map(metadata.rows.map((r) => [r.turn_id, r]));
