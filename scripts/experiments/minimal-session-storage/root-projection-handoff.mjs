@@ -13,11 +13,12 @@ export async function reopenRootProjection(
   sequence,
   withChildren = false,
   delegatedRuns = false,
+  bashLog = false,
 ) {
   const {
     rows: [r],
   } = await pool.query(
-    `select r.native_work_handoff as h,r.projection_tools,r.projection_pin,r.mailbox_position,
+    `select r.native_work_handoff as h,r.projection_tools ${bashLog ? "|| bash_wait_refs(r.tenant_id,r.session_id,r.id)" : ""} as projection_tools,r.projection_pin,r.mailbox_position,
       (select p.history_head from runs p where r.mailbox_position>1 and p.tenant_id=r.tenant_id and p.session_id=r.session_id
         and p.mailbox_position=r.mailbox_position-1 and p.state in ('completed','cancelled','failed')) as prior_head,
       (select jsonb_agg(jsonb_build_object('id',i.doc_id::text,'lane',i.conversation_id::text,'seq',i.commit_seq::text,'items',i.items)) from inboxes i where i.tenant_id=r.tenant_id and i.pi_session_id=r.session_id) as queues,old.writer_seal_offset,old.fencing_token as predecessor

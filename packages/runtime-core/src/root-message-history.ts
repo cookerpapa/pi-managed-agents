@@ -166,6 +166,8 @@ export async function readRootMessageWindow(
   input: HistoryWindowInput,
   child = false,
   flows = false,
+  // Child Turns can use the Flow point reader with their own lane addressing.
+  flowPoints = flows,
 ) {
   if (!input.turns.length)
     return {
@@ -217,10 +219,16 @@ export async function readRootMessageWindow(
   >`select p.*,r.id as run_id,${turnId} as turn_id,s.pi_session_id,${flows ? sql`${input.sessionId}::uuid` : sql`r.session_id`} as origin_session_id,t.turn_index,
       coalesce(octet_length(a.content),0) as assistant_bytes
     from ${scope} cross join lateral (
-      (select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
+      (${
+        flowPoints
+          ? sql`select m.id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
+        m.body_bytes,m.assistant_entry_id::text as assistant_id,case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,m.pending
+        from flow_transcript_points m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=${lane}`
+          : sql`select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
         octet_length(m.content) as body_bytes,m.assistant_entry_id::text as assistant_id,
         case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,false as pending
-        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=${lane} and m.entry_id is not null and m.role not in ('system','pi.system')
+        from messages m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=${lane} and m.entry_id is not null and m.role not in ('system','pi.system')`
+      }
           ${bound(sql.raw("m.commit_seq"), sql.raw("m.ordinal"))}
         order by m.commit_seq ${order},m.ordinal ${order} limit ${limit})
       union all select k,(v->>'seq')::bigint,(v->>'ordinal')::int,'{}'::jsonb,octet_length(v::text),v->>'assistantEntryId','"pi.tool"',false,true
@@ -250,13 +258,18 @@ export async function readRootMessageWindow(
       human: string | null;
       native_input_id: string | null;
       created_at: Date;
-      pending: { arguments: unknown; startedAt: string; reply: { toolCallId: string } } | null;
+      pending: {
+        arguments: Record<string, unknown>;
+        commandFromProposal?: boolean;
+        startedAt: string;
+        reply: { toolCallId: string };
+      } | null;
       assistant_id: string | null;
       proposal: string | null;
     }>`
       select p.id::text,p.seq::text,p.ordinal,s.pi_session_id,m.content,m.source_input_id,r.root_input_receipts->m.source_input_id->>'id' as native_input_id,case when starts_with(m.source_input_id,'input-') and strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')>0 then
         substring(r.root_human_inputs from strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')+length(to_json(m.source_input_id)::text)+1 for p.human_limit) end as human,coalesce(m.created_at,r.created_at) as created_at,
-        case when p.pending then r.projection_tools->p.id::text end as pending,a.entry_id::text as assistant_id,a.content as proposal
+        case when p.pending then ${flowPoints ? sql`coalesce(r.projection_tools->p.id::text,flow_pending_tool(r.tenant_id,s.pi_session_id::uuid,r.id,${lane},p.id))` : sql`r.projection_tools->p.id::text`} end as pending,a.entry_id::text as assistant_id,a.content as proposal
       from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
       join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid ${flows ? sql`` : sql`and r.session_id=${input.sessionId}::uuid`}
       ${sessionJoin}
@@ -265,13 +278,26 @@ export async function readRootMessageWindow(
           and m.entry_id=p.id and m.conversation_id=${lane} limit 1) m on m.run_id=r.id
       ${assistantAt}`.execute(db);
     for (const r of bodies.rows) {
+      let pendingArgs = r.pending?.arguments;
+      if (r.pending?.commandFromProposal) {
+        const blocks = r.proposal && JSON.parse(r.proposal).model?.[0]?.content;
+        const call = Array.isArray(blocks)
+          ? blocks.find(
+              (b) =>
+                b.type === "toolCall" && b.name === "bash" && b.id === r.pending!.reply.toolCallId,
+            )
+          : undefined;
+        if (typeof call?.arguments?.command !== "string")
+          throw Error("Pending Bash proposal is missing");
+        pendingArgs = { ...pendingArgs, command: call.arguments.command };
+      }
       const entry = r.pending
         ? {
             kind: "pi.tool",
             input: { callId: r.pending.reply.toolCallId },
             state: {
               status: "running",
-              checkpoint: { phase: "execute", arguments: r.pending.arguments },
+              checkpoint: { phase: "execute", arguments: pendingArgs },
             },
           }
         : JSON.parse(r.content!);

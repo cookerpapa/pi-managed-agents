@@ -73,6 +73,74 @@ function pendingReferences(state: SealedNativeState, refs: Record<string, Pendin
   });
 }
 
+// A matched append-layout handoff returns only task identity. The successor
+// settles these Bash tasks without opening a predecessor reply topic.
+async function pendingBashAtSeal(
+  tx: Transaction<Database>,
+  scope: FamilyScope,
+  state: SealedNativeState,
+  loaded?: readonly { entry_id: string; conversation_id: string; content: string }[],
+) {
+  const active = state.records.flatMap(({ write }) => {
+    if (write.type !== "task") return [];
+    // A requested cancellation still needs its original target until the
+    // native task commits its terminal result. It never authorizes dispatch.
+    const record = write.value;
+    const task = durableToolState(
+      record.abortRequested ? { ...record, abortRequested: false } : record,
+    );
+    if (!task?.intent) return [];
+    return [
+      {
+        taskId: task.id,
+        conversationId: task.conversationId,
+        assistant: (write.value.input as { assistant: number }).assistant,
+        callId: task.intent.callId,
+      },
+    ];
+  });
+  const proposals =
+    loaded ??
+    (
+      await sql<{
+        entry_id: string;
+        conversation_id: string;
+        content: string;
+      }>`select entry_id::text,conversation_id::text,content from message_entries where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}::uuid and run_id=${scope.runId}::uuid and entry_id=any(${active.map((a) => a.assistant)}::bigint[])`.execute(
+        tx,
+      )
+    ).rows;
+  const byId = new Map(proposals.map((p) => [Number(p.entry_id), p]));
+  const expected = new Map<number, { conversationId: number; callId: string }>();
+  for (const a of active) {
+    const p = byId.get(a.assistant);
+    const blocks = p && JSON.parse(p.content).model?.[0]?.content;
+    const call =
+      Array.isArray(blocks) && blocks.find((b) => b.type === "toolCall" && b.id === a.callId);
+    if (!call || Number(p?.conversation_id) !== a.conversationId)
+      throw Error("Missing sealed native Tool proposal");
+    if (call.name === "bash") expected.set(a.taskId, a);
+  }
+  const { rows } = await sql<{
+    taskId: number;
+    conversationId: number;
+    callId: string;
+  }>`select tool_task_id::float8 as "taskId",conversation_id::float8 as "conversationId",content::jsonb->>'callId' as "callId"
+    from pending_bash_intents where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}::uuid and run_id=${scope.runId}::uuid`.execute(
+    tx,
+  );
+  if (
+    rows.length !== expected.size ||
+    rows.some(
+      (r) =>
+        expected.get(r.taskId)?.callId !== r.callId ||
+        expected.get(r.taskId)?.conversationId !== r.conversationId,
+    )
+  )
+    throw Error("Unmatched logged Bash intent at seal");
+  return rows;
+}
+
 // The candidate worker and projector both require the same immediate predecessor.
 // At a recoverable seal the current lease may already be marked closed inside
 // this transaction, so only a Worker cold-read also requires an active writer.
@@ -193,6 +261,7 @@ export async function saveSealedFamily(
   position: { topic: string; partition: number; offset: bigint },
   sealId: string,
   state: SealedNativeState,
+  { bashIntentLog = false } = {},
 ): Promise<void> {
   // Keeping the encoded native values as text inside the envelope preserves
   // NUL and lone surrogates across PostgreSQL jsonb conversion.
@@ -226,6 +295,7 @@ export async function saveSealedFamily(
       returning projection_tools as refs`.execute(tx);
   if (result.rows.length !== 1) throw Error("Native handoff does not match the requested Run seal");
   pendingReferences(state, result.rows[0]!.refs);
+  if (bashIntentLog) await pendingBashAtSeal(tx, scope, state);
 }
 
 // Match Pi's nearest visible head at each native request cutoff, including an
@@ -383,7 +453,7 @@ export async function readSealedFamily(
   db: Kysely<Database>,
   scope: FamilyScope,
   topic: string,
-  { delegatedRuns = false } = {},
+  { delegatedRuns = false, bashIntentLog = false } = {},
 ) {
   return db
     .transaction()
@@ -479,11 +549,13 @@ export async function readSealedFamily(
       from inboxes where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}
         ${delegatedRuns ? sql`and conversation_id=any(${lanes}::bigint[])` : sql``}`.execute(tx);
       const intents = pendingReferences(h.state, row.refs);
+      const bash = bashIntentLog ? await pendingBashAtSeal(tx, scope, h.state, entries) : undefined;
       return {
         handoff: h,
         entries,
         queues,
         intents,
+        ...(bash ? { bash } : {}),
         ...(delegatedRuns ? { archives, deferred } : {}),
         settledThrough: prior?.seq ?? 0,
       };

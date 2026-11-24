@@ -3,6 +3,8 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
+import { setBashLogReader, setBashLogIndexes } from "./bash-intent-log.mjs";
+import { seedActiveBashHistory } from "./bash-intent-read-cost.mjs";
 import { seedToolsWindow } from "./scroll-demand-study.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import native from "@confluentinc/kafka-javascript";
@@ -23,6 +25,8 @@ import { writeTrialFunctions } from "./write-trial-sql.mjs";
 
 const visibleRecord = (writes) =>
   Object.values(visibleOutput(writes)).some((count) => count > 0) ? 1 : 0;
+const sqlStudy = process.argv.includes("--intent-sql");
+const appendStudy = sqlStudy || process.argv.includes("--intent-log");
 const partitions = 32,
   tools = 20,
   runs = 64,
@@ -153,7 +157,8 @@ async function counters(pool) {
   try {
     await Promise.all(clients.map((c) => c.query("select pg_stat_force_next_flush()")));
     return (
-      await clients[0].query(`select n_tup_upd::int updates, pg_current_wal_insert_lsn()::text lsn,
+      await clients[0]
+        .query(`select (select n_tup_ins from pg_stat_user_tables where relname='messages' and schemaname=current_schema())::int inserts,n_tup_upd::int updates, pg_current_wal_insert_lsn()::text lsn,
       (select wal_sync_time from pg_stat_wal)::float8 as sync_ms,
       (select wal_sync from pg_stat_wal)::float8 as syncs,
       (select wal_write_time from pg_stat_wal)::float8 as write_ms,
@@ -180,7 +185,19 @@ async function trial(api, install, mode, transport, data, offered, warmup = fals
       partitions: old.map((p) => ({ partition: p.partition, offset: p.offset })),
     });
   const pageArm = mode.endsWith("-page");
-  await install(pageArm ? "baseline" : mode);
+  const bashLog =
+    {
+      "intent-log": "intents",
+      "intent-coverage": "coverage",
+      "intent-folded": "folded",
+      "folded-page": "folded",
+    }[mode] ?? false;
+  await install(appendStudy ? "combined" : pageArm ? "baseline" : mode);
+  if (appendStudy) {
+    await setBashLogIndexes(db, bashLog);
+    await setBashLogReader(db, bashLog);
+    await data.selectReadLayout?.(bashLog ? "bounded" : "combined");
+  }
   await api.dependencyProbe(mode === "old-page" ? "original" : false);
   await db.query("delete from messages where run_id=any($1)", [runIds]);
   await db.query("delete from inboxes where pi_session_id=any($1)", [
@@ -229,8 +246,10 @@ async function trial(api, install, mode, transport, data, offered, warmup = fals
     (s) => ({ bindingId: s.runId, allocationId: s.runId }),
     () => ({ submit }),
     undefined,
-    { partitions },
+    { partitions, bashLog },
   );
+  if (data.sqlTape)
+    projector.view.capturePrefix = (text, params) => data.sqlTape[params[1]].push({ text, params });
   await projector.view.reset(starts, 16, "recorded-history");
   const observed = owners[0].s.sessionId;
   await watch(api, observed, data.prefixes);
@@ -412,6 +431,35 @@ async function trial(api, install, mode, transport, data, offered, warmup = fals
       (await db.query("select pg_wal_lsn_diff($1,$2) bytes", [after.lsn, before.lsn])).rows[0]
         .bytes,
     );
+    let appendCounters;
+    if (appendStudy) {
+      const {
+        rows: [counts],
+      } = await db.query(
+        `select count(*)::int intents,count(*) filter(where m.display_through is not null)::int with_coverage,
+        coalesce(avg(pg_column_size(m)),0)::float as mean_intent_bytes, count(*) filter(where m.content::jsonb->'args'?'command')::int copied_commands
+        from messages m where m.run_id=any($1) and m.role='pma.bash-intent'`,
+        [runIds],
+      );
+      assert.equal(counts.intents, bashLog ? tools * runs : 0);
+      assert.equal(counts.copied_commands, 0);
+      assert.equal(
+        (await db.query("select from pending_bash_intents where run_id=any($1)", [runIds]))
+          .rowCount,
+        0,
+      );
+      const stable = (
+        await db.query(
+          "select count(*)::int n from messages where run_id=any($1) and entry_id is not null and display_through is not null",
+          [runIds],
+        )
+      ).rows[0].n;
+      if (bashLog === "coverage" || bashLog === "folded") {
+        assert.equal(counts.with_coverage, tools * runs);
+        assert(stable >= tools * runs);
+      }
+      appendCounters = { ...counts, covered_entries: stable };
+    }
     const seconds = (end - start) / 1000;
     assert.equal(grants.length, effects.size);
     function mean(v) {
@@ -443,6 +491,8 @@ async function trial(api, install, mode, transport, data, offered, warmup = fals
         warmup,
         phases,
         runUpdates: after.updates - before.updates,
+        messageInserts: after.inserts - before.inserts,
+        ...(appendCounters ? { appendCounters } : {}),
         fused: after.fused - before.fused,
         walBytes,
         seconds,
@@ -459,6 +509,12 @@ async function trial(api, install, mode, transport, data, offered, warmup = fals
         results: resultCount,
         acks: acks.size,
         transactions: projector.view.stats.commits,
+        ...(appendStudy
+          ? {
+              snapshotAdvances: projector.view.stats.checkpointAdvances,
+              firstRecoveryPins: projector.view.stats.firstPins,
+            }
+          : {}),
         timeline,
       }),
     );
@@ -482,8 +538,10 @@ try {
       const { db } = api;
       await installWorkspaceRoutes(db);
       const install = await writeTrialFunctions(db);
-      await checkWriterGuard(db, install);
-      await checkMemoryWait(api, tenant, install);
+      if (!appendStudy) {
+        await checkWriterGuard(db, install);
+        await checkMemoryWait(api, tenant, install);
+      }
       if (process.argv.includes("--faults-only")) return;
       const observed = api.live;
       await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$1)", [
@@ -491,8 +549,16 @@ try {
         tenant,
       ]);
       const data = await makeTape(observed);
-      const pageWindow = await api.createScrollWindow("History reader under projection");
-      await seedToolsWindow(api, tenant, undefined, { id: pageWindow, runs: 1, toolCount: 1024 });
+      let pageWindow;
+      if (appendStudy && process.argv.includes("--confirm")) {
+        const long = await seedActiveBashHistory(api, tenant);
+        pageWindow = long.session;
+        data.selectReadLayout = long.select;
+        await long.select("combined");
+      } else {
+        pageWindow = await api.createScrollWindow("History reader under projection");
+        await seedToolsWindow(api, tenant, undefined, { id: pageWindow, runs: 1, toolCount: 1024 });
+      }
       data.pageWindow = pageWindow;
       data.cursors = [];
       for (let i = 0; i < 12; i++) {
@@ -512,11 +578,27 @@ try {
         const topic = "write-study-" + randomUUID();
         await createTopic(admin, topic);
         const connection = { admin, producer, brokers: kafka.brokers, topic };
+        if (sqlStudy) data.sqlTape = Array.from({ length: partitions }, () => []);
         await trial(api, install, "baseline", connection, data, 475, true);
+        if (sqlStudy) {
+          const { compareBashWriteSql } = await import("./bash-intent-sql-study.mjs");
+          await compareBashWriteSql(
+            database.url,
+            api.db,
+            data.sqlTape,
+            owners.map((o) => o.s),
+            topic,
+          );
+          return;
+        }
         for (const offered of [475, 1200]) {
-          const order = process.argv.includes("--confirm")
-            ? ["baseline", "combined", "old-page", "exact-page"]
-            : ["baseline", "fused", "combined", "cursor", "memory"];
+          const order = appendStudy
+            ? process.argv.includes("--confirm")
+              ? ["combined", "intent-folded", "combined-page", "folded-page"]
+              : ["combined", "intent-log", "intent-coverage", "intent-folded"]
+            : process.argv.includes("--confirm")
+              ? ["baseline", "combined", "old-page", "exact-page"]
+              : ["baseline", "fused", "combined", "cursor", "memory"];
           if (offered === 1200) order.reverse();
           for (const mode of [...order, ...order.reverse()])
             await trial(api, install, mode, connection, data, offered);
@@ -526,7 +608,7 @@ try {
         await kafka.close();
       }
     },
-    { liveStream: true, ioTiming: true },
+    { liveStream: true, ioTiming: true, bashLogStudy: appendStudy },
   );
 } finally {
   await database.close();

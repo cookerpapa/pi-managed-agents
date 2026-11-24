@@ -1,3 +1,4 @@
+import { bashLogFrames, foldBashProposals } from "./bash-intent-log.mjs";
 import { projectWorld } from "./conversation-world.mjs";
 import { projectChildOutcomes } from "./child-outcomes.mjs";
 import { foldRootPresentation } from "./root-presentation-frame.mjs";
@@ -330,6 +331,7 @@ export class ReadyProjection {
             r.workspaceBatch,
             r.rootPresentation,
           );
+          if (this.bashLog || this.capturePrefix) foldBashProposals(view, f, draft.frame);
           if (f.tools?.length && !registered)
             throw new Error(
               "Moving projection requires a retained native reference for every dispatched Tool",
@@ -471,18 +473,20 @@ export class ReadyProjection {
         const usageCount = draft.frames.reduce((n, f) => n + (f.usage?.length ?? 0), 0);
         const grouped = this.bulkUsage && moving && canGroupUsage(draft.frames, usageCount);
         const statement = grouped ? applyBulkUsageSql : moving ? applyMovingSql : applyPrefixSql;
-        const {
-          rows: [row],
-        } = await c.query(statement, [
+        const params = [
           this.topic,
           partition,
           String(expected),
           String(next),
-          JSON.stringify(draft.frames),
+          JSON.stringify(this.bashLog ? bashLogFrames(draft.frames, this.bashLog) : draft.frames),
           ...(moving
             ? [relaxed, this.policy === "replay-finish" || this.policy === "recorded-history"]
             : []),
-        ]);
+        ];
+        const {
+          rows: [row],
+        } = await c.query(statement, params);
+        if (row.outcome === "applied") this.capturePrefix?.(statement, params);
         outcome = row.outcome;
         if (outcome === "recorded_without_dispatch") {
           // Tool intent terminates the ready prefix. Preserve the ordered writes,

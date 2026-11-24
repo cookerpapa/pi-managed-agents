@@ -1,0 +1,7 @@
+# ADR-0360. Derive outstanding Bash tasks from admitted intent and result records
+
+Test this layout on the #52 candidate primary, independently of the default. Keep the existing Pi commits, writer fencing, ordered dispatch grant and native result semantics. Append one internal message at the native execute-task coordinate. Scope it to its physical stream, Run, Conversation, task and originating assistant entry. A later canonical result for the same task resolves it, including failure, cancellation and unknown. Preserve the original dispatch position for explicit Stop and the retention floor for a healthy worker. The successor in the ADR-0359 policy needs only task and call identity. No new broker, durable authority or hot status table.
+
+Co-commit contiguous root display coverage on one matching stable Entry or the intent. Keep the first publication anchor and use the Run for control-only coverage and retain the existing child display path. Compare exact public pages, Stop, stale ownership, late replies and crash boundaries. Compare identical 20-tool traces on one primary, including inserts, Run updates, WAL, broker backlog and time to the browser. A failed correctness or throughput gate keeps the layout experimental.
+
+Keep the layout opt-in. The bounded Flow reader pairs tasks within the page, and a matching checkpoint UPDATE can admit the covered Entry. The [write, read and failure measurements](../reports/bash-intent-log-20261125.md) establish reduced Run writes and WAL. Saturation throughput still depends on the tested load and host.

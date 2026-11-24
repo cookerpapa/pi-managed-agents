@@ -13,6 +13,7 @@ import { openPageApi } from "./flow-page-api.mjs";
 import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import { withChromePage } from "../../lib/chrome-cdp.mjs";
 import { installFlowHistory } from "./flow-history.mjs";
+import { installBashIntentLog, setBashLogReader } from "./bash-intent-log.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 
 export async function installPagingProjection(db) {
@@ -42,7 +43,7 @@ export async function withPagingFixture(
   url,
   tenantId,
   work,
-  { ioTiming = false, liveStream = false } = {},
+  { ioTiming = false, liveStream = false, bashLogStudy = false } = {},
 ) {
   const meta = createDatabase({ connectionString: url, maxConnections: 5 });
   const db = new pg.Pool({
@@ -90,6 +91,10 @@ export async function withPagingFixture(
     const topic = "flow-pages";
     await db.query("create view flow_web.sessions as select * from public.sessions");
     await installFlowHistory(db, true, false, "base");
+    if (bashLogStudy) {
+      await installBashIntentLog(db);
+      await setBashLogReader(db, false);
+    }
     const f = randomUUID(),
       lf = randomUUID(),
       rf = randomUUID();

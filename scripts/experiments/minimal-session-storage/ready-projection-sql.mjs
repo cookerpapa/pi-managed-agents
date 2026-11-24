@@ -27,7 +27,7 @@ export async function installPrefixSql(db, { message, presentedMessage, inbox, f
     create function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${finishAndRelease} $fn$;
     create function project_ready(p_topic text,p_partition int,p_expected bigint,p_next bigint,p_frames jsonb,p_relaxed boolean default false,p_allow_finish boolean default false,p_bulk_usage boolean default false)
     returns text language plpgsql as $body$
-    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; owner_state text; suppress_dispatch boolean := false; snap jsonb; pending_usage jsonb[]; display_written boolean; combine_wait_display boolean; d jsonb;
+    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; owner_state text; suppress_dispatch boolean := false; suppress_this boolean; snap jsonb; pending_usage jsonb[]; display_written boolean; combine_wait_display boolean; d jsonb;
     begin
       select next_offset into strict saved from accepted_fact_projection_offsets
        where topic=p_topic and partition=p_partition for update;
@@ -41,7 +41,7 @@ export async function installPrefixSql(db, { message, presentedMessage, inbox, f
         combine_wait_display:=d is not null and (frame->'ops' @> '[{"kind":"tool"}]' or frame->'ops' @> '[{"kind":"tool-settled"}]');
         for op in select value from jsonb_array_elements(frame->'ops') loop
           a:=op->'args';
-          if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin','world') and not (op->>'kind'='finish' and p_allow_finish)) or
+          if p_relaxed and ((op->>'kind' not in ('message','tool','logged-entry','bash-intent','inbox','pin','world') and not (op->>'kind' in ('finish','log-finish') and p_allow_finish)) or
             (op->>'kind'='inbox' and (a->>6)::jsonb <> '[]'::jsonb)) then raise exception 'Control operation in asynchronous transaction'; end if;
           case op->>'kind'
           when 'child-outcomes','delegated-outcomes' then
@@ -89,6 +89,23 @@ export async function installPrefixSql(db, { message, presentedMessage, inbox, f
               root_human_inputs=coalesce(op->>'document',root_human_inputs),root_input_seq=(frame->>'nativeSeq')::bigint
               where id=(a->>2)::uuid and tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
             ok:=found;n:=1;
+          when 'logged-entry' then
+            if op?'snapshot' then
+              select accepted,writes into strict ok,n from log_checkpoint_entry((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid,(op->>'displayOrdinal')::int,(op->>'through')::bigint,p_partition,(frame->>'offset')::bigint,op->'snapshot');
+            else
+            select accepted,writes into strict ok,n from log_covered_entry((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid,(op->>'displayOrdinal')::int,(op->>'through')::bigint);
+            end if;
+          when 'bash-intent','bash-settlement','log-cancel' then
+            select admitted,affected,blocked into strict ok,n,suppress_this from project_bash_log_op(p_topic,p_partition,op,frame->>'offset');
+            if suppress_this then
+              if frame?'intentPrefix' and jsonb_array_length(p_frames)>1 then raise exception 'Isolate cancelling tool owner' using errcode='PZ001'; end if;
+              suppress_dispatch:=true;
+            end if;
+          when 'log-finish' then
+            if exists(select from pending_bash_intents i join runs r on r.id=i.run_id and r.lease_id=(a->>3)::uuid and r.state='running' where i.tenant_id=(a->>0)::uuid and i.pi_session_id=(a->>1)::uuid and i.run_id=(a->>2)::uuid)
+              then raise exception 'Unsettled Bash at Run completion' using errcode='PZ002'; end if;
+            select count(*)::int into n from prefix_finish((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::uuid,a->>4);
+            ok:=n=1;
           when 'message' then
             if d is not null and not display_written and not combine_wait_display and d->>'tenant'=a->>0 and d->>'session'=a->>1
               and d->>'run'=a->>2 and d->>'writer'=a->>5 and (d->>'seq')::bigint=(a->>3)::bigint then

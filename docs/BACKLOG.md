@@ -2,10 +2,12 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Compare immutable Bash intent, derived waits and record-local root display coverage on the candidate primary. [Write, read and recovery study](reports/bash-intent-log-20261125.md).
+
 - [x] Exercise proposal, execute-intent, reply-only and canonical Bash-result boundaries across one or two Worker losses. [Sealed Bash experiment](reports/sealed-bash-unknown-20261125.md).
 
 - [x] Validate exact Entry paging, combine Run updates with matching display coverage, and test partition handoff and memory-only Tool waits. [Candidate page and write measurements](reports/candidate-page-and-write-cost-20261124.md).
-- [ ] Resolve cold-reader and broker-retention requirements before removing durable pending Tool references. The current candidate keeps them.
+- [ ] Decide on the matched storage cutover after fleet-representative peak tests. The Bash log experiment supplies a cold pending reader and a healthy-boot retention floor. Other tool kinds and the default layout still use durable Run references.
 
 - [x] Audit single-primary history load using actual Chrome wheel events, indexed page plans, separate backend CPU counters and a controlled projector replay. [Scroll and IO evidence](reports/scroll-demand-and-primary-cost-20261124.md).
 

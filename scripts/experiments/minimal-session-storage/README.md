@@ -744,3 +744,5 @@ Run the [sealed Bash fault matrix](../../../docs/reports/sealed-bash-unknown-202
 ```sh
 TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/bash-loss-study.mjs
 ```
+
+The [append-layout study](../../../docs/reports/bash-intent-log-20261125.md) includes the corresponding fault, browser and load commands. Select it explicitly in the isolated worker and projection fixtures.

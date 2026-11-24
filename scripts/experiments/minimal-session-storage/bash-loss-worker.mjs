@@ -128,7 +128,7 @@ try {
       database: db,
       sealedRecovery: {
         topic,
-        bashOnWorkerLoss: "unknown",
+        bashOnWorkerLoss: init.bashIntentLog ? "unknown-from-log" : "unknown",
         async hydrate(family, authority, publish) {
           store.positions = await hydrateSealedFamily(family, store);
           publishThroughHost = publish;

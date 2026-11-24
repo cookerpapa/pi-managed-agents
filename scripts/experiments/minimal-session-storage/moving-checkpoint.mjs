@@ -230,6 +230,7 @@ export function foldToolReferences(
       assert(writes.some((t) => t.id === cancel.taskId && t.abortRequested));
       frame.ops.push({
         kind: "cancel",
+        nativeSeq: fact.commit.seq,
         args: [...scope, cancel.operationId, cancel.taskId],
         count: 1,
       });

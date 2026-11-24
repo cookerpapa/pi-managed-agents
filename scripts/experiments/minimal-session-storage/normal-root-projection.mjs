@@ -22,9 +22,14 @@ export function normalRootProjection(
   {
     delegatedRuns = false,
     partitions = 1,
+    bashLog = false,
     namedExecutor = Boolean(process.env.PI_CLOUD_SUBAGENT_EXECUTOR_URL),
   } = {},
 ) {
+  assert(
+    [false, "intents", "coverage", "folded"].includes(bashLog),
+    "Unknown candidate Bash projection layout",
+  );
   if (namedExecutor && !validateChild)
     validateChild = async (scope, child) => {
       const result = await pool.query(
@@ -35,6 +40,7 @@ export function normalRootProjection(
     };
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
   view.delegatedRuns = delegatedRuns;
+  view.bashLog = bashLog;
   view.namedExecutor = namedExecutor;
   view.configure(16, "recorded-history");
   const env = {
@@ -62,6 +68,14 @@ export function normalRootProjection(
   const nativeStore = {
     brokerTimedRetention: {
       replyFloors(database, topics) {
+        if (bashLog)
+          return sql`select topic,min(floor)::text floor from (
+           select p.v#>>'{reply,topic}' as topic,(p.v#>>'{reply,offset}')::bigint as floor
+           from runs r cross join lateral jsonb_each(r.projection_tools) p(k,v) where p.v#>>'{reply,topic}'=any(${topics}::text[])
+           union all select i.bash_reply_topic,i.bash_reply_floor
+           from pending_bash_intents i where i.bash_reply_topic=any(${topics}::text[])) waits group by topic`.execute(
+            database,
+          );
         return sql`select p.v#>>'{reply,topic}' as topic,min((p.v#>>'{reply,offset}')::bigint)::text as floor
         from runs r cross join lateral jsonb_each(r.projection_tools) p(k,v) where p.v#>>'{reply,topic}'=any(${topics}::text[]) group by p.v#>>'{reply,topic}'`.execute(
           database,
@@ -135,6 +149,7 @@ export function normalRootProjection(
               fact.commit.seq,
               !!validateChild,
               delegatedRuns,
+              bashLog,
             );
           if (!current()) return { admitted: false, events: [], covers: [] };
           if (previous) view.sessions.set(scope.runId, previous);
@@ -243,7 +258,7 @@ export function normalRootProjection(
       }
       const checked =
         await sql`with bound as (update runs set history_head=${JSON.stringify(h)}::jsonb,projection_first=null,projection_partition=null,projection_pin=null,projection_state=null,native_work_handoff=null,cancel_positions='{}'::jsonb
-        where id=${f.scope.runId}::uuid and tenant_id=${f.scope.tenantId}::uuid and lease_id=${s.writer}::uuid and state=${state} and output_seal_offset=${String(pos.offset)}::bigint and projection_tools='{}'::jsonb returning id),
+        where id=${f.scope.runId}::uuid and tenant_id=${f.scope.tenantId}::uuid and lease_id=${s.writer}::uuid and state=${state} and output_seal_offset=${String(pos.offset)}::bigint and projection_tools='{}'::jsonb ${bashLog ? sql`and not exists(select from pending_bash_intents where run_id=${f.scope.runId}::uuid)` : sql``} returning id),
         retired as (delete from workspace_route_spans where run_id in(select id from bound))select id from bound`.execute(
           tx,
         );

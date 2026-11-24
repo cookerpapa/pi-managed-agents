@@ -14,7 +14,7 @@ create table messages (
   navigation_caption text, assistant_entry_id bigint, tool_task_id bigint, role text not null, content text not null, source_input_id text, commit_seq bigint not null,
   ordinal integer not null, created_at timestamptz not null default clock_timestamp(),
   primary key (tenant_id,pi_session_id,commit_seq,ordinal),
-  check ((entry_id is not null and document_id is null) or
+  constraint message_record_shape check ((entry_id is not null and document_id is null) or
     (entry_id is null and document_id is not null and role='pi.agent' and source_input_id is null and navigation_caption is null and assistant_entry_id is null and tool_task_id is null))
 );
 create unique index messages_entry on messages(tenant_id,pi_session_id,entry_id) where entry_id is not null;

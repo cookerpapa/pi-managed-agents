@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Bash intent log and display coverage](bash-intent-log-20261125.md) compares PG writes, bounded history reads, Stop and sealed takeover.
+
 - [Bash outcome after Worker loss](sealed-bash-unknown-20261125.md) covers the cut between the original reply mailbox and accepted native history.
 
 - [Candidate page and write costs](candidate-page-and-write-cost-20261124.md) covers exact Entry reads, combined Run writes, failure gates and browser-visible result latency.

@@ -164,7 +164,7 @@ export class PostgresDurableSessionHost {
        * native store owns subsequent publications; the host owns lease and mailbox lifetime. */
       sealedRecovery?: {
         /** ADR-0359 experiment. Other pending Tools still restore their original mailbox. */
-        bashOnWorkerLoss?: "unknown";
+        bashOnWorkerLoss?: "unknown" | "unknown-from-log";
         topic: string;
         delegatedRuns?: boolean;
         hydrate(
@@ -698,7 +698,7 @@ export class PostgresDurableSessionHost {
       const runs = new Map<number, DurableSessionOpen>(),
         bindings = new Map<number, DurableRunBinding>();
       const interruptedBash: Owner["interruptedBash"] =
-        this.options.sealedRecovery?.bashOnWorkerLoss === "unknown" && !input.stopOnResume
+        this.options.sealedRecovery?.bashOnWorkerLoss && !input.stopOnResume
           ? new Map()
           : undefined;
       const recoveredOperations: Owner["recoveredOperations"] = new Map();
@@ -846,7 +846,10 @@ export class PostgresDurableSessionHost {
                 this.options.database,
                 { ...binding, fencingToken: identity.fencingToken },
                 source.topic,
-                { delegatedRuns: source.delegatedRuns === true },
+                {
+                  delegatedRuns: source.delegatedRuns === true,
+                  bashIntentLog: source.bashOnWorkerLoss === "unknown-from-log",
+                },
               ),
             readSignal,
             readFailed,
@@ -855,6 +858,9 @@ export class PostgresDurableSessionHost {
           try {
             await authority.assertCurrent();
             if (!input.stopOnResume) {
+              if (interruptedBash)
+                for (const { taskId, conversationId, callId } of family.bash ?? [])
+                  interruptedBash.set(taskId, { conversationId, callId });
               const waits = family.intents.filter(({ taskId, conversationId, reply }) => {
                 if (!interruptedBash || reply.toolName !== "bash") return true;
                 interruptedBash.set(taskId, { conversationId, callId: reply.toolCallId });

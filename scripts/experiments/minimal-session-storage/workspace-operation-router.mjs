@@ -15,14 +15,17 @@ export class WorkspaceOperationRouter {
     this.spans = new WorkspaceRouteSpans(pool);
   }
   async original(scope, op, position) {
+    const waiter = this.view.bashLog
+      ? "coalesce(projection_tools->$5::text,bash_wait_refs(tenant_id,session_id,id,$5::text::bigint)->$5::text)"
+      : "projection_tools->$5";
     const {
       rows: [r],
     } = await this.pool.query(
-      `select projection_tools->$5 as waiter, cancel_positions->$4 as cancelled
+      `select ${waiter} as waiter, cancel_positions->$4 as cancelled
       from runs where tenant_id=$1 and session_id=$2 and id=$3`,
       [scope.tenantId, scope.piSessionId, scope.runId, op.operationId, String(op.taskId)],
     );
-    const locator = r?.waiter ?? r?.cancelled;
+    const locator = r?.waiter ?? (op.action === "execute" ? undefined : r?.cancelled);
     if (
       !locator ||
       locator.operationId !== op.operationId ||
@@ -30,7 +33,17 @@ export class WorkspaceOperationRouter {
       (op.conversationId !== undefined && locator.conversationId !== op.conversationId)
     )
       return;
-    if (op.reply) assert.deepEqual(locator.reply, op.reply, "Original reply reference changed");
+    if (op.reply) {
+      if (
+        this.view.bashLog &&
+        locator.reply?.toolName === "bash" &&
+        locator.reply.deadlineAt === undefined
+      ) {
+        const { deadlineAt, ...routing } = op.reply;
+        assert(Number.isSafeInteger(deadlineAt));
+        assert.deepEqual(locator.reply, routing, "Original Bash reply route changed");
+      } else assert.deepEqual(locator.reply, op.reply, "Original reply reference changed");
+    }
     const span = await this.spans.at(scope, locator.conversationId, {
       ...position,
       offset: BigInt(locator.offset),

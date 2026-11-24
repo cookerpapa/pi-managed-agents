@@ -545,7 +545,13 @@ export class ConversationReader {
       inclusive,
     };
     const window = messages
-      ? await readRootMessageWindow(this.#database, windowInput, childMessages, flows)
+      ? await readRootMessageWindow(
+          this.#database,
+          windowInput,
+          childMessages,
+          flows,
+          this.flowRootHistory,
+        )
       : await readCanonicalHistoryWindow(this.#database, windowInput);
     const sourceByTurn = new Map(sources.map((r) => [r.turnId, r]));
     const ids = [...window.headers];

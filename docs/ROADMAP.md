@@ -2,6 +2,8 @@
 
 The candidate exposes direct subagent delegation and management. [ADR-0352](adr/0352-retire-workflow-tool.md) removes the guest-script orchestration path.
 
+A [matched Bash storage study](reports/bash-intent-log-20261125.md) measures an appended execute intent and record-local root display coverage under tool-heavy load.
+
 The [Bash takeover experiment](reports/sealed-bash-unknown-20261125.md) verifies a successor can settle an outstanding command as unknown using the ordered seal.
 
 The first implementation milestone for [#48](https://github.com/cookerpapa/pi-managed-agents/issues/48) is [#52, active child Tool recovery on the new store](https://github.com/cookerpapa/pi-managed-agents/issues/52). Its verified transaction and recovery boundaries will inform [#51, database placement](https://github.com/cookerpapa/pi-managed-agents/issues/51).

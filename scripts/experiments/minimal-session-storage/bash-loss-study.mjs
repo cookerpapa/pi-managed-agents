@@ -1,3 +1,4 @@
+import { installBashIntentLog, setBashLogIndexes } from "./bash-intent-log.mjs";
 // Native Pi + real PG and RF3 Kafka. Session control is driven at explicit log
 // barriers. The sandbox executes one fixed marker command in a disposable container.
 import assert from "node:assert/strict";
@@ -20,6 +21,7 @@ import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
 import { familyWorker, until } from "./family-process.mjs";
 import { decodeWorkspaceFact } from "./workspace-operations.mjs";
 
+const bashIntentLog = process.argv.includes("--intent-log");
 const exec = promisify(execFile);
 const command = "printf 'ran\\n' >> executions; printf 'fixture-ok\\n'";
 const image = "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94";
@@ -57,6 +59,10 @@ const gate = async (fn, description) =>
   );
 try {
   await installPagingProjection(pool);
+  if (bashIntentLog) {
+    await installBashIntentLog(pool);
+    await setBashLogIndexes(pool, "coverage");
+  }
   await installWorkspaceRoutes(pool);
   await pool.query(`alter table runs add output_seal_offset bigint,add fencing_token bigint,add recovery_requested_at timestamptz;
    create table session_leases(tenant_id uuid,pi_session_id text,lease_id uuid primary key,fencing_token bigint,valid_until timestamptz,writer_failed_at timestamptz,writer_sealed_at timestamptz,released_at timestamptz,writer_seal_offset bigint)`);
@@ -153,7 +159,7 @@ try {
       },
     }),
     undefined,
-    { partitions: 1 },
+    { partitions: 1, bashLog: bashIntentLog ? "folded" : false },
   );
   await p.view.reset(new Map([[0, 0n]]), 16, "recorded-history");
   reader = new KafkaLogConsumer({
@@ -186,7 +192,22 @@ try {
             await sql`update runs set recovery_requested_at=now(),output_seal_id=${f.id}::uuid where id=${s.scope.runId}::uuid`.execute(
               tx,
             );
-            await saveSealedFamily(tx, s.scope, r, f.id, checkpoint);
+            if (bashIntentLog && s.checkMissing) {
+              await sql`savepoint omit_bash_ref`.execute(tx);
+              const removed =
+                await sql`delete from messages where run_id=${s.scope.runId}::uuid and role='pma.bash-intent' returning tool_task_id`.execute(
+                  tx,
+                );
+              assert.equal(removed.rows.length, 1);
+              await assert.rejects(
+                saveSealedFamily(tx, s.scope, r, f.id, checkpoint, { bashIntentLog }),
+                /Unmatched logged Bash intent/,
+              );
+              await sql`rollback to savepoint omit_bash_ref`.execute(tx);
+              await sql`release savepoint omit_bash_ref`.execute(tx);
+              s.checkMissing = false;
+            }
+            await saveSealedFamily(tx, s.scope, r, f.id, checkpoint, { bashIntentLog });
             await sql`update session_leases set writer_sealed_at=now(),released_at=now(),writer_seal_offset=${String(r.offset)} where lease_id=${s.scope.writerId}::uuid`.execute(
               tx,
             );
@@ -260,6 +281,7 @@ try {
       directory: "/tmp/" + run,
       family: new AcceptedFamilyCheckpoint(),
       executions: [],
+      checkMissing: scene === "pending",
       drop: scene === "not-delivered",
       holdReply: ["pending", "twice-before", "twice-after", "stop"].includes(scene),
       blockResult: scene === "canonical-kafka" ? Promise.withResolvers() : undefined,
@@ -279,7 +301,16 @@ try {
       topics = [];
     async function spawn(hold, stop = false) {
       const a = familyWorker(
-        { scope: s.scope, topic, brokers: kafka.brokers, url: pgFixture.url, hold, stop, command },
+        {
+          scope: s.scope,
+          topic,
+          bashIntentLog,
+          brokers: kafka.brokers,
+          url: pgFixture.url,
+          hold,
+          stop,
+          command,
+        },
         "./bash-loss-worker.mjs",
       );
       actors.push(a);
@@ -382,6 +413,20 @@ try {
         assert(s.unknownAt < s.replyDeadline, "Successor waited for the old mailbox deadline");
       const remaining = (await pool.query("select projection_tools from runs where id=$1", [run]))
         .rows[0].projection_tools;
+      if (bashIntentLog)
+        assert.equal(
+          (await pool.query("select from pending_bash_intents where run_id=$1", [run])).rowCount,
+          0,
+        );
+      if (bashIntentLog) {
+        const paired = await pool.query(
+          `select i.tool_task_id from messages i join messages o
+           using(tenant_id,pi_session_id,run_id,conversation_id,tool_task_id,assistant_entry_id)
+           where i.run_id=$1 and i.role='pma.bash-intent' and o.role='toolResult'`,
+          [run],
+        );
+        assert.equal(paired.rowCount, 1);
+      }
       assert.deepEqual(remaining, {}, "Canonical settlement must retire the pending operation");
       if (scene === "stop") {
         assert.equal(completed.modelCalls, 0);
