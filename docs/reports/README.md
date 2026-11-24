@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Browser scroll demand and single-primary database cost](scroll-demand-and-primary-cost-20261124.md) distinguishes wheel gestures from history requests, and buffer hits from device reads.
+
 - [Physical PostgreSQL history read splitting](physical-history-read-split-20261124.md) measures older-page routing, replication lag, mixed-load throughput and fallback.
 
 - [Visible Run selection for chat pages](flow-page-selector-20261124.md) compares two actual Session APIs and measures full-page CPU and mixed Kafka projection.

@@ -115,7 +115,17 @@ try {
   const waitStudy = process.argv[3] === "flow-page-locks";
   const pageCost = process.argv[3] === "flow-page-cost" && (process.argv[4] ?? "main");
   if (pageCost)
-    assert(["main", "fixed32", "selector", "standby", "standby-control"].includes(pageCost));
+    assert(
+      [
+        "main",
+        "fixed32",
+        "selector",
+        "standby",
+        "standby-control",
+        "scroll",
+        "scroll-tools",
+      ].includes(pageCost),
+    );
   if (pageCost === "selector") assert(process.argv[5], "Pass the reference checkout");
   const comparePages = pageCost || waitStudy || process.argv[3] === "flow-pages";
   if (comparePages) {

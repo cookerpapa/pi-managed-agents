@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Audit single-primary history load using actual Chrome wheel events, indexed page plans, separate backend CPU counters and a controlled projector replay. [Scroll and IO evidence](reports/scroll-demand-and-primary-cost-20261124.md).
+
 - [x] Exercise physical PG read splitting with paired Kafka projection, lagged history, primary SSE recovery and a stopped standby. [Study](reports/physical-history-read-split-20261124.md).
 
 - [x] Compare and simplify the visible-Run page query, verify a scoped plan on the public reader and test early stopping across 128 physical history ranges. [Experiment](reports/flow-page-selector-20261124.md).

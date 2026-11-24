@@ -22,7 +22,7 @@ function label(sql) {
 }
 // Sample the actual Session API backend around each SELECT. The observer
 // reads Linux scheduler counters on its own connection; its CPU is excluded.
-async function tracePageCpu(diag, read, query) {
+export async function tracePageCpu(diag, read, query) {
   const original = pg.Client.prototype.query,
     totals = new Map();
   const stamp = async (pid) =>

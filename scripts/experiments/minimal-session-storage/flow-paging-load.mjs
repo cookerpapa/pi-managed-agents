@@ -14,6 +14,12 @@ import {
   loadMatchedPages,
 } from "./matched-page-cost.mjs";
 import { studyReplicaConsistency, observeReplay, splitTrials } from "./replica-study.mjs";
+import {
+  prepareScrollLoad,
+  scrollTrials,
+  mixSnapshot,
+  mixDelta,
+} from "./scroll-projection-load.mjs";
 import { withPagingFixture } from "./flow-paging-fixture.mjs";
 
 function latency(ms) {
@@ -87,19 +93,24 @@ export async function studyFlowPaging(
     }
   const live = scopes[0],
     total = groups.reduce((n, g) => n + g.length, 0);
-  const fixture = pageCost
-    ? (url, tenant, work) =>
-        withMatchedPageFixture(
-          url,
-          tenant,
-          work,
-          referenceRoot,
-          standbyUrl,
-          pageCost === "standby-control",
-        )
-    : withPagingFixture;
+  const scroll = pageCost === "scroll" || pageCost === "scroll-tools";
+  const fixture =
+    pageCost && !scroll
+      ? (url, tenant, work) =>
+          withMatchedPageFixture(
+            url,
+            tenant,
+            work,
+            referenceRoot,
+            standbyUrl,
+            pageCost === "standby-control",
+          )
+      : (url, tenant, work) => withPagingFixture(url, tenant, work, { ioTiming: scroll });
   await fixture(url, tenant, async (api) => {
     let arms = api.arms;
+    const wheelLoad = scroll
+      ? await prepareScrollLoad(api, tenant, pageCost === "scroll-tools")
+      : undefined;
     if (standbyUrl) {
       const primary = arms.branch,
         standby = { ...primary, page: primary.split.page };
@@ -127,7 +138,7 @@ export async function studyFlowPaging(
         for (const arm of [reference, candidate])
           await Promise.all(Array.from({ length: 8 }, () => arm.page(q)));
       }
-    } else if (pageCost) await measurePageCpu(arms);
+    } else if (pageCost && !scroll) await measurePageCpu(arms);
     const kafka = await testKafka({});
     const { topic } = api;
     const k = new native.KafkaJS.Kafka({
@@ -137,16 +148,31 @@ export async function studyFlowPaging(
       producer = k.producer({ kafkaJS: { acks: -1, idempotent: true } });
     try {
       await admin.connect();
-      await admin.createTopics({
-        topics: [
-          {
-            topic,
-            numPartitions: groups.length,
-            replicationFactor: 3,
-            configEntries: [{ name: "min.insync.replicas", value: "2" }],
-          },
-        ],
-      });
+      // A new disposable controller can move while librdkafka sends CreateTopics.
+      // Reissuing the same definition on this private cluster is idempotent.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await admin.createTopics({
+            topics: [
+              {
+                topic,
+                numPartitions: groups.length,
+                replicationFactor: 3,
+                configEntries: [{ name: "min.insync.replicas", value: "2" }],
+              },
+            ],
+          });
+          break;
+        } catch (error) {
+          if (
+            attempt >= 3 ||
+            !error.errors?.length ||
+            !error.errors.every((e) => e.type === "ERR__DESTROY_BROKER")
+          )
+            throw error;
+          await delay(250 * (attempt + 1));
+        }
+      }
       await producer.connect();
       for (let start = 0; start < groups[0].length; start += 12) {
         await producer.send({
@@ -186,27 +212,29 @@ export async function studyFlowPaging(
           }),
         );
       }
-      const trials = standbyUrl
-        ? splitTrials(pageCost === "standby-control")
-        : pageCost
-          ? pageCostTrials(pageCost)
-          : setCpuLimit
-            ? [
-                [2, "writer"],
-                [2, "saturated"],
-                [4, "saturated"],
-                [4, "writer"],
-                [4, "writer"],
-                [4, "saturated"],
-                [2, "saturated"],
-                [2, "writer"],
-              ]
-            : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [
-                2,
-                mode,
-              ]);
+      const trials = scroll
+        ? scrollTrials(pageCost === "scroll-tools")
+        : standbyUrl
+          ? splitTrials(pageCost === "standby-control")
+          : pageCost
+            ? pageCostTrials(pageCost)
+            : setCpuLimit
+              ? [
+                  [2, "writer"],
+                  [2, "saturated"],
+                  [4, "saturated"],
+                  [4, "writer"],
+                  [4, "writer"],
+                  [4, "saturated"],
+                  [2, "saturated"],
+                  [2, "writer"],
+                ]
+              : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [
+                  2,
+                  mode,
+                ]);
       for (const [layout, mode] of trials) {
-        const arm = pageCost ? arms[layout] : api;
+        const arm = pageCost && !scroll ? arms[layout] : api;
         const { db, projector } = arm;
         if (setCpuLimit) await setCpuLimit(layout);
         const ids = scopes.map((s) => s.runId);
@@ -294,12 +322,16 @@ export async function studyFlowPaging(
           );
         };
         const chromeBefore = api.browserReads?.();
-        let cpuBefore, cpuAfter, observer, replay, countsBefore;
+        let cpuBefore, cpuAfter, observer, replay, countsBefore, scrollBefore, scrollAfter;
         try {
           if (setCpuLimit) observer = await observePagingWaits(url, layout);
           if (standbyUrl) {
             countsBefore = await api.arms.branch.split.counts();
             replay = await observeReplay(url, standbyUrl);
+          }
+          if (scroll) {
+            await wheelLoad.reset?.();
+            scrollBefore = await mixSnapshot(api, true);
           }
           cpuBefore = await counters();
           await reader.start();
@@ -307,7 +339,11 @@ export async function studyFlowPaging(
           while (!t0 && !firstError && performance.now() < limit) await delay(10);
           assert(t0, "No partition delivery");
           if (mode !== "writer") {
-            loads = pageCost ? loadMatchedPages(arm, mode) : await readers(api, mode, limit);
+            loads = scroll
+              ? await wheelLoad.start(mode)
+              : pageCost
+                ? loadMatchedPages(arm, mode)
+                : await readers(api, mode, limit);
             if (!pageCost) scrollJob = api.scroll();
           }
           await Promise.race([
@@ -319,6 +355,7 @@ export async function studyFlowPaging(
           cpuAfter = await counters();
           const pages = loads ? await loads.stop(t0, end) : null;
           loads = undefined;
+          if (scroll) scrollAfter = await mixSnapshot(api, false);
           await scrollJob;
           const {
             rows: [t],
@@ -353,6 +390,7 @@ export async function studyFlowPaging(
               visiblePerSecond: Math.round((visible * 1000) / (end - t0)),
               seconds: +((end - t0) / 1000).toFixed(2),
               pgCommits: projector.view.stats.commits,
+              ...(scroll ? { singlePrimary: mixDelta(scrollBefore, scrollAfter) } : {}),
               asyncCommits: projector.view.stats.asyncTransactions,
               ...(replicaEvidence ? { replicaEvidence } : {}),
               ...(observer ? { waitStudy: observer.summary(t0, end) } : {}),

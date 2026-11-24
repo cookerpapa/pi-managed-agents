@@ -1,0 +1,2960 @@
+{
+  "pg": {
+    "version": "17.6",
+    "cpuQuota": 2,
+    "memoryMiB": 768
+  },
+  "quantitiesPerMixedTrial": {
+    "runs": 192,
+    "records": 35712,
+    "visible": 7872,
+    "pgCommits": 16512,
+    "asyncCommits": 8256,
+    "toolResults": 3840,
+    "partitionsDrained": 32
+  },
+  "browserAndIo": [
+    {
+      "kind": "wheel-demand",
+      "shape": "text",
+      "viewportPx": 702,
+      "initialScrollHeight": 12336,
+      "prefetchPx": 952,
+      "phases": [
+        {
+          "name": "idle",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 5.003,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 11634,
+          "endScrollTop": 11634,
+          "requestOffsetsMs": []
+        },
+        {
+          "name": "read",
+          "gestures": 40,
+          "nominalGesturePx": 527,
+          "seconds": 30.553,
+          "olderPages": 1,
+          "olderPerSecond": 0.033,
+          "otherHistoryGets": 0,
+          "distinctCursors": 1,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [547],
+          "startScrollTop": 11634,
+          "endScrollTop": 6453,
+          "requestOffsetsMs": [18007.843]
+        },
+        {
+          "name": "fast",
+          "gestures": 100,
+          "nominalGesturePx": 702,
+          "seconds": 11.552,
+          "olderPages": 5,
+          "olderPerSecond": 0.433,
+          "otherHistoryGets": 0,
+          "distinctCursors": 5,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [628, 892, 495, 718, 280],
+          "startScrollTop": 6453,
+          "endScrollTop": 7425,
+          "requestOffsetsMs": [900.565, 3099.186, 5400.611, 7598.81, 9915.669]
+        },
+        {
+          "name": "pause",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 3.503,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 7425,
+          "endScrollTop": 7425,
+          "requestOffsetsMs": []
+        }
+      ]
+    },
+    {
+      "kind": "io",
+      "name": "same-hot-page",
+      "pages": 128,
+      "historyCpuMsPerPage": 4.297,
+      "controlCpuMsPerPage": 0.391,
+      "sharedHits": 184611,
+      "sharedReads": 0,
+      "sharedReadMs": 0,
+      "tempBytes": 0,
+      "deviceReadBytes": {
+        "8:48": 49152
+      },
+      "indexScans": {
+        "messages_run": 21284,
+        "runs_pkey": 425,
+        "runs_tenant_id_session_id_mailbox_position_key": 896,
+        "flow_run_identity": 18057
+      }
+    },
+    {
+      "kind": "pg-buffer-eviction",
+      "targeted": 15112,
+      "evicted": 15112
+    },
+    {
+      "kind": "io",
+      "name": "96-distinct-first-pass",
+      "pages": 96,
+      "historyCpuMsPerPage": 4.688,
+      "controlCpuMsPerPage": 0.417,
+      "sharedHits": 137058,
+      "sharedReads": 2335,
+      "sharedReadMs": 16.344,
+      "tempBytes": 0,
+      "deviceReadBytes": {
+        "8:48": 0
+      },
+      "indexScans": {
+        "messages_run": 15972,
+        "runs_pkey": 425,
+        "runs_tenant_id_session_id_mailbox_position_key": 672,
+        "flow_run_identity": 13449
+      }
+    },
+    {
+      "kind": "io",
+      "name": "96-distinct-second-pass",
+      "pages": 96,
+      "historyCpuMsPerPage": 4.063,
+      "controlCpuMsPerPage": 0.313,
+      "sharedHits": 135076,
+      "sharedReads": 0,
+      "sharedReadMs": 0,
+      "tempBytes": 0,
+      "deviceReadBytes": {
+        "8:48": 0
+      },
+      "indexScans": {
+        "messages_run": 15936,
+        "runs_tenant_id_session_id_mailbox_position_key": 672,
+        "flow_run_identity": 13824
+      }
+    },
+    {
+      "kind": "older-page-SQL",
+      "count": 8,
+      "stages": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.258
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 0.417
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 0.604
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 0.867
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 0.75
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.432
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.308
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.197
+        }
+      ]
+    },
+    {
+      "kind": "warm-plans",
+      "plans": [
+        {
+          "hits": 9,
+          "reads": 0,
+          "execMs": 0.247,
+          "nodes": [
+            {
+              "type": "Index Scan",
+              "relation": "sessions",
+              "index": "sessions_tenant_id_id_unique",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "projects",
+              "index": "projects_tenant_id_id_unique",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "workspaces",
+              "index": "workspaces_tenant_id_id_unique",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "sessions",
+              "index": "sessions_tenant_id_id_unique",
+              "rows": 4,
+              "loops": 1,
+              "removed": 1
+            },
+            {
+              "type": "Seq Scan",
+              "relation": "sessions",
+              "rows": 1,
+              "loops": 1,
+              "removed": 2
+            }
+          ]
+        },
+        {
+          "hits": 31,
+          "reads": 0,
+          "execMs": 0.464,
+          "nodes": [
+            {
+              "type": "Seq Scan",
+              "relation": "sessions",
+              "rows": 1,
+              "loops": 1,
+              "removed": 2
+            },
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "flow_run_identity",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "runs_tenant_id_session_id_mailbox_position_key",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "runs_tenant_id_session_id_mailbox_position_key",
+              "rows": 1,
+              "loops": 2,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "flow_run_identity",
+              "rows": 0,
+              "loops": 2,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "flow_run_identity",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            }
+          ]
+        },
+        {
+          "hits": 186,
+          "reads": 0,
+          "execMs": 3.725,
+          "nodes": []
+        },
+        {
+          "hits": 580,
+          "reads": 0,
+          "execMs": 0.93,
+          "nodes": [
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "runs_pkey",
+              "rows": 1,
+              "loops": 35,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "messages",
+              "index": "messages_run",
+              "rows": 1,
+              "loops": 35,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "messages",
+              "index": "messages_run",
+              "rows": 1,
+              "loops": 67,
+              "removed": 0
+            }
+          ]
+        },
+        {
+          "hits": 384,
+          "reads": 0,
+          "execMs": 0.467,
+          "nodes": [
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "flow_run_identity",
+              "rows": 1,
+              "loops": 32,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "messages",
+              "index": "messages_run",
+              "rows": 1,
+              "loops": 32,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "messages",
+              "index": "messages_run",
+              "rows": 1,
+              "loops": 32,
+              "removed": 0
+            }
+          ]
+        },
+        {
+          "hits": 240,
+          "reads": 0,
+          "execMs": 0.237,
+          "nodes": [
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "runs_pkey",
+              "rows": 1,
+              "loops": 40,
+              "removed": 0
+            },
+            {
+              "type": "Index Scan",
+              "relation": "session_terminal_events",
+              "index": "session_terminal_events_replay_idx",
+              "rows": 0,
+              "loops": 40,
+              "removed": 0
+            }
+          ]
+        },
+        {
+          "hits": 128,
+          "reads": 0,
+          "execMs": 0.197,
+          "nodes": [
+            {
+              "type": "Index Scan",
+              "relation": "runs",
+              "index": "flow_run_identity",
+              "rows": 1,
+              "loops": 32,
+              "removed": 0
+            }
+          ]
+        },
+        {
+          "hits": 7,
+          "reads": 0,
+          "execMs": 0.097,
+          "nodes": [
+            {
+              "type": "Index Scan",
+              "relation": "environment_versions",
+              "index": "environment_versions_one_active_per_project",
+              "rows": 1,
+              "loops": 1,
+              "removed": 0
+            },
+            {
+              "type": "Bitmap Heap Scan",
+              "relation": "environment_validations",
+              "rows": 0,
+              "loops": 1,
+              "removed": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "text",
+      "sql": "locate",
+      "returnedRows": 65,
+      "originalCpuMs": [0.823, 0.901, 0.775, 0.79],
+      "gatedCpuMs": [0.689, 0.731, 0.687, 0.752],
+      "plans": [
+        {
+          "hits": 580,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 67,
+              "index": "messages_run",
+              "rows": 1
+            }
+          ]
+        },
+        {
+          "hits": 312,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 0,
+              "index": "messages_run",
+              "rows": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "text",
+      "sql": "bodies",
+      "returnedRows": 32,
+      "originalCpuMs": [0.645, 0.657, 0.71, 0.674],
+      "gatedCpuMs": [0.604, 0.59, 0.661, 0.653],
+      "plans": [
+        {
+          "hits": 384,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 32,
+              "index": "messages_run",
+              "rows": 1
+            }
+          ]
+        },
+        {
+          "hits": 256,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 0,
+              "index": "messages_run",
+              "rows": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "wheel-demand",
+      "shape": "20-tools",
+      "viewportPx": 702,
+      "initialScrollHeight": 702,
+      "prefetchPx": 952,
+      "phases": [
+        {
+          "name": "idle",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 5.002,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 0,
+          "endScrollTop": 0,
+          "requestOffsetsMs": []
+        },
+        {
+          "name": "read",
+          "gestures": 40,
+          "nominalGesturePx": 527,
+          "seconds": 30.553,
+          "olderPages": 46,
+          "olderPerSecond": 1.506,
+          "otherHistoryGets": 0,
+          "distinctCursors": 46,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [
+            0, 466, 810, 847, 787, 824, 703, 740, 619, 656, 535, 572, 451, 488, 428, 465, 809, 891,
+            824, 683, 579, 475, 573, 917, 847, 787, 824, 703, 740, 619, 656, 535, 572, 451, 488,
+            428, 465, 809, 891, 824, 683, 579, 475, 573, 917, 847
+          ],
+          "startScrollTop": 0,
+          "endScrollTop": 1314,
+          "requestOffsetsMs": [
+            14.977, 303.917, 575.653, 766.891, 1515.686, 2265.132, 3014.957, 3765.349, 4515.501,
+            5265.163, 6015.361, 6765.496, 7516.557, 8264.669, 9014.65, 9764.739, 10102.735,
+            10515.738, 11265.792, 12015.629, 12766.174, 13516.117, 14265.238, 14503.792, 15016.266,
+            15765.121, 16514.631, 17264.871, 18015.889, 18764.849, 19515.093, 20264.911, 21014.751,
+            21764.486, 22522.39, 23264.503, 24014.295, 24253.313, 24765.174, 25514.059, 26264.885,
+            27014.611, 27765.671, 28514.05, 28750.022, 29264.485
+          ]
+        },
+        {
+          "name": "fast",
+          "gestures": 100,
+          "nominalGesturePx": 702,
+          "seconds": 11.552,
+          "olderPages": 102,
+          "olderPerSecond": 8.83,
+          "otherHistoryGets": 0,
+          "distinctCursors": 102,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [
+            612, 474, 178, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            564, 268, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 423, 846
+          ],
+          "startScrollTop": 1314,
+          "endScrollTop": 1391,
+          "requestOffsetsMs": [
+            6.068, 139.735, 239.492, 355.96, 472.774, 572.567, 674.196, 789.219, 905.656, 1023.475,
+            1122.503, 1223.263, 1338.571, 1439.656, 1556.842, 1655.68, 1773.231, 1889.969, 2005.655,
+            2123.12, 2222.502, 2339.733, 2457.365, 2556.649, 2656.275, 2772.385, 2890.13, 3006.341,
+            3106.542, 3206.217, 3322.303, 3439.001, 3555.83, 3656.14, 3757.112, 3872.287, 3972.566,
+            4089.984, 4205.898, 4322.659, 4422.858, 4521.868, 4638.935, 4756.944, 4872.752,
+            4972.599, 5072.22, 5189.601, 5306.64, 5421.962, 5522.538, 5621.93, 5738.915, 5855.501,
+            5972.032, 6072.336, 6190.185, 6289.123, 6406.642, 6523.091, 6623.303, 6722.258, 6838.73,
+            6956.205, 7072.477, 7173.607, 7273.068, 7389.595, 7505.743, 7623.699, 7721.858,
+            7821.619, 7938.889, 8055.999, 8172.557, 8272.834, 8371.782, 8489.213, 8589.737,
+            8706.096, 8822.053, 8938.929, 9055.485, 9155.703, 9272.433, 9374.648, 9472.522,
+            9606.229, 9706.127, 9805.387, 9922.806, 10039.158, 10155.759, 10255.193, 10354.871,
+            10471.753, 10590.546, 10689.94, 10806.15, 10906.818, 11142.613, 11390.421
+          ]
+        },
+        {
+          "name": "pause",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 3.504,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 1391,
+          "endScrollTop": 1391,
+          "requestOffsetsMs": []
+        }
+      ]
+    },
+    {
+      "kind": "tool-page-cost",
+      "turns": 3,
+      "toolItems": 30,
+      "bytes": 24583,
+      "pages": 96,
+      "historyCpuMsPerPage": 14.688,
+      "controlCpuMsPerPage": 0.625,
+      "sharedHits": 686550,
+      "sharedReads": 16156,
+      "sharedReadMs": 0,
+      "tempBytes": 0,
+      "deviceReadBytes": {
+        "8:48": 0
+      },
+      "stages": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.795
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 1.052
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 1.108
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 5.114
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 5.07
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.918
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.677
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.454
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "20-tools",
+      "sql": "locate",
+      "returnedRows": 65,
+      "originalCpuMs": [4.486, 4.581, 4.981, 5.508],
+      "gatedCpuMs": [1.441, 1.435, 1.576, 1.367],
+      "plans": [
+        {
+          "hits": 3464,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 105,
+              "index": "messages_run",
+              "rows": 41
+            }
+          ]
+        },
+        {
+          "hits": 300,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 49,
+              "index": "messages_conversation_entry",
+              "rows": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "20-tools",
+      "sql": "bodies",
+      "returnedRows": 62,
+      "originalCpuMs": [4.469, 4.547, 4.705, 4.247],
+      "gatedCpuMs": [3.126, 2.988, 2.973, 3.169],
+      "plans": [
+        {
+          "hits": 3304,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 62,
+              "index": "messages_run",
+              "rows": 41
+            }
+          ]
+        },
+        {
+          "hits": 1896,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 30,
+              "index": "messages_conversation_entry",
+              "rows": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "codingConfirmation": [
+    {
+      "kind": "whole-page-probe",
+      "shape": "20-tools-before-analyze",
+      "pagesPerArm": 256,
+      "identical": true,
+      "blocks": [
+        {
+          "gated": false,
+          "pgMsPerPage": 12.5,
+          "containerMsPerPage": 12.856
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 7.5,
+          "containerMsPerPage": 7.646
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 6.094,
+          "containerMsPerPage": 6.381
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 9.688,
+          "containerMsPerPage": 9.999
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 6.719,
+          "containerMsPerPage": 6.285
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 10.156,
+          "containerMsPerPage": 10.039
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 9.375,
+          "containerMsPerPage": 9.57
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 5.469,
+          "containerMsPerPage": 6.275
+        }
+      ]
+    },
+    {
+      "kind": "wheel-demand",
+      "shape": "20-tools",
+      "viewportPx": 702,
+      "initialScrollHeight": 702,
+      "prefetchPx": 952,
+      "phases": [
+        {
+          "name": "idle",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 5.007,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 0,
+          "endScrollTop": 0,
+          "requestOffsetsMs": []
+        },
+        {
+          "name": "one-notch",
+          "gestures": 1,
+          "nominalGesturePx": 119,
+          "seconds": 2.603,
+          "olderPages": 3,
+          "olderPerSecond": 1.152,
+          "otherHistoryGets": 0,
+          "distinctCursors": 3,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [0, 466, 810],
+          "startScrollTop": 0,
+          "endScrollTop": 1374,
+          "requestOffsetsMs": [19.271, 262.443, 488.93]
+        },
+        {
+          "name": "read",
+          "gestures": 40,
+          "nominalGesturePx": 527,
+          "seconds": 30.554,
+          "olderPages": 44,
+          "olderPerSecond": 1.44,
+          "otherHistoryGets": 0,
+          "distinctCursors": 44,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [
+            847, 787, 824, 703, 740, 619, 656, 535, 572, 451, 488, 428, 465, 809, 891, 824, 683,
+            579, 475, 573, 917, 847, 787, 824, 703, 740, 619, 656, 535, 572, 451, 488, 428, 465,
+            809, 891, 824, 683, 579, 475, 573, 917, 847, 787
+          ],
+          "startScrollTop": 1374,
+          "endScrollTop": 1351,
+          "requestOffsetsMs": [
+            12.035, 762.2, 1510.94, 2262.1, 3010.82, 3761.083, 4512.892, 5261.732, 6011.662,
+            6761.702, 7511.762, 8261.583, 9010.609, 9250.103, 9762.493, 10510.782, 11260.761,
+            12012.424, 12762.253, 13513.142, 13754.672, 14262.099, 15011.028, 15761.846, 16511.112,
+            17260.939, 18011.341, 18762.192, 19512.417, 20261.481, 21011.806, 21761.756, 22511.329,
+            23260.706, 23499.28, 24010.795, 24760.948, 25511.391, 26262.417, 27011.164, 27760.37,
+            27996.124, 28511.299, 29260.287
+          ]
+        },
+        {
+          "name": "fast",
+          "gestures": 100,
+          "nominalGesturePx": 702,
+          "seconds": 11.552,
+          "olderPages": 101,
+          "olderPerSecond": 8.743,
+          "otherHistoryGets": 0,
+          "distinctCursors": 101,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [
+            649, 353, 215, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 423
+          ],
+          "startScrollTop": 1351,
+          "endScrollTop": 1048,
+          "requestOffsetsMs": [
+            17.206, 136.045, 252.294, 351.221, 468.567, 584.025, 684.298, 784.295, 901.357,
+            1018.264, 1134.563, 1234.44, 1333.961, 1451.893, 1550.706, 1666.939, 1784.335, 1901.337,
+            2001.622, 2100.253, 2217.38, 2334.722, 2451.119, 2550.868, 2650.247, 2767.478, 2884.32,
+            3001.482, 3117.299, 3217.179, 3317.891, 3434.074, 3551.324, 3651.459, 3767.85, 3868.122,
+            3984.038, 4100.746, 4201.593, 4300.471, 4417.043, 4533.941, 4651.05, 4750.934, 4850.607,
+            4968.536, 5084.216, 5201.555, 5302.226, 5400.026, 5518.59, 5633.941, 5750.922, 5850.134,
+            5950.68, 6066.392, 6167.293, 6284.302, 6400.319, 6518.907, 6633.792, 6734.925, 6849.85,
+            6967.197, 7067.166, 7167.489, 7285.285, 7401.04, 7500.543, 7601.54, 7717.799, 7833.593,
+            7950.445, 8067.151, 8167.701, 8267.462, 8383.665, 8483.426, 8600.818, 8718.231,
+            8834.278, 8933.712, 9034.281, 9151.221, 9267.508, 9384.193, 9484.932, 9583.467,
+            9700.321, 9817.787, 9934.131, 10033.58, 10133.507, 10250.796, 10368.227, 10483.246,
+            10583.579, 10699.97, 10800.878, 10918.063, 11154.581
+          ]
+        },
+        {
+          "name": "pause",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 3.503,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 1048,
+          "endScrollTop": 1048,
+          "requestOffsetsMs": []
+        }
+      ]
+    },
+    {
+      "kind": "tool-page-cost",
+      "turns": 3,
+      "toolItems": 30,
+      "bytes": 24583,
+      "pages": 96,
+      "historyCpuMsPerPage": 13.646,
+      "controlCpuMsPerPage": 0.729,
+      "sharedHits": 683742,
+      "sharedReads": 0,
+      "sharedReadMs": 0,
+      "tempBytes": 0,
+      "deviceReadBytes": {
+        "8:48": 0
+      },
+      "stages": [
+        {
+          "stage": "session metadata",
+          "calls": 48,
+          "msPerPage": 0.81
+        },
+        {
+          "stage": "resolve cursor run",
+          "calls": 48,
+          "msPerPage": 1.076
+        },
+        {
+          "stage": "select visible runs",
+          "calls": 48,
+          "msPerPage": 1.164
+        },
+        {
+          "stage": "locate page entries",
+          "calls": 48,
+          "msPerPage": 5.104
+        },
+        {
+          "stage": "load bodies and tool dependencies",
+          "calls": 48,
+          "msPerPage": 5.174
+        },
+        {
+          "stage": "load terminal metadata",
+          "calls": 48,
+          "msPerPage": 0.929
+        },
+        {
+          "stage": "load run headers",
+          "calls": 48,
+          "msPerPage": 0.681
+        },
+        {
+          "stage": "project environment",
+          "calls": 48,
+          "msPerPage": 0.473
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "20-tools",
+      "sql": "locate",
+      "returnedRows": 65,
+      "originalCpuMs": [4.879, 4.551, 4.757, 4.717],
+      "gatedCpuMs": [1.65, 1.772, 1.458, 1.565],
+      "plans": [
+        {
+          "hits": 3464,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 105,
+              "index": "messages_run",
+              "rows": 41
+            }
+          ]
+        },
+        {
+          "hits": 300,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 49,
+              "index": "messages_conversation_entry",
+              "rows": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "20-tools",
+      "sql": "bodies",
+      "returnedRows": 62,
+      "originalCpuMs": [4.417, 5.393, 4.703, 4.982],
+      "gatedCpuMs": [3.407, 3.478, 3.038, 3.038],
+      "plans": [
+        {
+          "hits": 3304,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 62,
+              "index": "messages_run",
+              "rows": 41
+            }
+          ]
+        },
+        {
+          "hits": 1896,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 30,
+              "index": "messages_conversation_entry",
+              "rows": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "whole-page-probe",
+      "shape": "20-tools-analyzed",
+      "pagesPerArm": 256,
+      "identical": true,
+      "blocks": [
+        {
+          "gated": false,
+          "pgMsPerPage": 25.781,
+          "containerMsPerPage": 25.78
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 12.5,
+          "containerMsPerPage": 12.751
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 10.938,
+          "containerMsPerPage": 10.665
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 18.438,
+          "containerMsPerPage": 19.002
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 10.781,
+          "containerMsPerPage": 10.92
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 19.219,
+          "containerMsPerPage": 19.456
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 20.625,
+          "containerMsPerPage": 20.517
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 10.938,
+          "containerMsPerPage": 10.77
+        }
+      ]
+    }
+  ],
+  "singleLongRun": [
+    {
+      "kind": "wheel-demand",
+      "shape": "one-long-run",
+      "wheelEvents": 1,
+      "distinctOlderPages": 32,
+      "lastPageHasBefore": false,
+      "viewportPx": 688,
+      "initialScrollHeight": 688,
+      "prefetchPx": 938,
+      "phases": [
+        {
+          "name": "idle",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 4.003,
+          "olderPages": 0,
+          "olderPerSecond": 0,
+          "otherHistoryGets": 0,
+          "distinctCursors": 0,
+          "maxOutstanding": 0,
+          "requestScrollTopPx": [],
+          "startScrollTop": 0,
+          "endScrollTop": 0,
+          "requestOffsetsMs": []
+        },
+        {
+          "name": "one-notch",
+          "gestures": 1,
+          "nominalGesturePx": 117,
+          "seconds": 1.602,
+          "olderPages": 4,
+          "olderPerSecond": 2.496,
+          "otherHistoryGets": 0,
+          "distinctCursors": 4,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [0, 0, 69, 255],
+          "startScrollTop": 0,
+          "endScrollTop": 255,
+          "requestOffsetsMs": [18.89, 460.061, 906.125, 1380.683]
+        },
+        {
+          "name": "no-further-input",
+          "gestures": 0,
+          "nominalGesturePx": 0,
+          "seconds": 12.002,
+          "olderPages": 28,
+          "olderPerSecond": 2.333,
+          "otherHistoryGets": 0,
+          "distinctCursors": 28,
+          "maxOutstanding": 1,
+          "requestScrollTopPx": [
+            176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176,
+            176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176
+          ],
+          "startScrollTop": 255,
+          "endScrollTop": 69,
+          "requestOffsetsMs": [
+            244.926, 712.131, 1176.555, 1669.853, 2170.855, 2630.821, 3052.501, 3480.589, 3913.373,
+            4357.221, 4802.278, 5212.616, 5635.513, 6059.887, 6512.478, 6951.642, 7385.836,
+            7816.679, 8245.087, 8679.083, 9114.163, 9536.904, 9950.293, 10380.529, 10825.73,
+            11244.211, 11596.47, 11940.153
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "one-long-run",
+      "sql": "locate",
+      "returnedRows": 65,
+      "originalCpuMs": [45.067, 46.136, 46.031, 46.538],
+      "gatedCpuMs": [7.048, 7.038, 7.099, 7.13],
+      "plans": [
+        {
+          "hits": 8461,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 66,
+              "index": "messages_run",
+              "rows": 2049
+            }
+          ]
+        },
+        {
+          "hits": 3938,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 32,
+              "index": "messages_run",
+              "rows": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "one-long-run",
+      "sql": "bodies",
+      "returnedRows": 64,
+      "originalCpuMs": [85.735, 87.966, 87.793, 86.305],
+      "gatedCpuMs": [49.38, 49.448, 50.441, 49.424],
+      "plans": [
+        {
+          "hits": 16640,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 64,
+              "index": "messages_run",
+              "rows": 2049
+            }
+          ]
+        },
+        {
+          "hits": 12373,
+          "reads": 0,
+          "dependencyLookups": [
+            {
+              "loops": 32,
+              "index": "messages_run",
+              "rows": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "exactEntryPlansAndPage": [
+    {
+      "kind": "dependency-probe",
+      "shape": "one-long-run",
+      "sql": "locate",
+      "returnedRows": 65,
+      "originalCpuMs": [46.826, 47.416, 46.344, 45.338],
+      "gatedCpuMs": [6.936, 7.017, 6.924, 6.916],
+      "exactEntryCpuMs": [0.678, 0.68, 0.701, 0.676],
+      "plans": [
+        {
+          "hits": 8460,
+          "reads": 0,
+          "messageIndexes": [
+            {
+              "alias": "m",
+              "index": "messages_run",
+              "loops": 1,
+              "rows": 65,
+              "filtered": 0
+            },
+            {
+              "alias": "a",
+              "index": "messages_run",
+              "loops": 66,
+              "rows": 2049,
+              "filtered": 0
+            }
+          ],
+          "dependencyLookups": [
+            {
+              "loops": 66,
+              "index": "messages_run",
+              "rows": 2049
+            }
+          ]
+        },
+        {
+          "hits": 3929,
+          "reads": 0,
+          "messageIndexes": [
+            {
+              "alias": "m",
+              "index": "messages_run",
+              "loops": 1,
+              "rows": 65,
+              "filtered": 0
+            },
+            {
+              "alias": "a",
+              "index": "messages_run",
+              "loops": 32,
+              "rows": 1,
+              "filtered": 1951
+            }
+          ],
+          "dependencyLookups": [
+            {
+              "loops": 32,
+              "index": "messages_run",
+              "rows": 1
+            }
+          ]
+        },
+        {
+          "hits": 140,
+          "reads": 0,
+          "messageIndexes": [
+            {
+              "alias": "m",
+              "index": "messages_run",
+              "loops": 1,
+              "rows": 65,
+              "filtered": 0
+            },
+            {
+              "alias": "a_1",
+              "index": "messages_conversation_entry",
+              "loops": 32,
+              "rows": 1,
+              "filtered": 0
+            }
+          ],
+          "dependencyLookups": []
+        }
+      ]
+    },
+    {
+      "kind": "dependency-probe",
+      "shape": "one-long-run",
+      "sql": "bodies",
+      "returnedRows": 64,
+      "originalCpuMs": [87.998, 87.316, 88.805, 87.858],
+      "gatedCpuMs": [49.534, 49.721, 49.354, 49.66],
+      "exactEntryCpuMs": [0.787, 0.799, 0.816, 0.866],
+      "plans": [
+        {
+          "hits": 16640,
+          "reads": 0,
+          "messageIndexes": [
+            {
+              "alias": "m",
+              "index": "messages_run",
+              "loops": 64,
+              "rows": 2049,
+              "filtered": 0
+            },
+            {
+              "alias": "a",
+              "index": "messages_run",
+              "loops": 64,
+              "rows": 2049,
+              "filtered": 0
+            }
+          ],
+          "dependencyLookups": [
+            {
+              "loops": 64,
+              "index": "messages_run",
+              "rows": 2049
+            }
+          ]
+        },
+        {
+          "hits": 12365,
+          "reads": 0,
+          "messageIndexes": [
+            {
+              "alias": "m",
+              "index": "messages_run",
+              "loops": 64,
+              "rows": 2049,
+              "filtered": 0
+            },
+            {
+              "alias": "a",
+              "index": "messages_run",
+              "loops": 32,
+              "rows": 1,
+              "filtered": 1951
+            }
+          ],
+          "dependencyLookups": [
+            {
+              "loops": 32,
+              "index": "messages_run",
+              "rows": 1
+            }
+          ]
+        },
+        {
+          "hits": 640,
+          "reads": 0,
+          "messageIndexes": [
+            {
+              "alias": "m_1",
+              "index": "messages_conversation_entry",
+              "loops": 64,
+              "rows": 1,
+              "filtered": 0
+            },
+            {
+              "alias": "a_1",
+              "index": "messages_conversation_entry",
+              "loops": 32,
+              "rows": 1,
+              "filtered": 0
+            }
+          ],
+          "dependencyLookups": []
+        }
+      ]
+    },
+    {
+      "kind": "whole-page-probe",
+      "shape": "one-long-run-exact",
+      "pagesPerArm": 64,
+      "identical": true,
+      "blocks": [
+        {
+          "gated": false,
+          "pgMsPerPage": 273.75,
+          "containerMsPerPage": 274.073
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 16.875,
+          "containerMsPerPage": 18.506
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 11.875,
+          "containerMsPerPage": 10.586
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 273.75,
+          "containerMsPerPage": 277.162
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 10,
+          "containerMsPerPage": 7.473
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 263.125,
+          "containerMsPerPage": 264.445
+        },
+        {
+          "gated": false,
+          "pgMsPerPage": 279.375,
+          "containerMsPerPage": 280.457
+        },
+        {
+          "gated": true,
+          "pgMsPerPage": 8.125,
+          "containerMsPerPage": 8.149
+        }
+      ]
+    }
+  ],
+  "textMixed": [
+    {
+      "mode": "writer",
+      "seconds": 10.01,
+      "visibleRecordsPerSecond": 786,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 0,
+          "flow-control": 0,
+          "flow-projector": 18830
+        },
+        "pgCpuMs": 19023.352,
+        "quotaPeriods": 121,
+        "throttledPeriods": 82,
+        "buffers": {
+          "hits": 2538226,
+          "reads": 73,
+          "readMs": 2.743,
+          "writeMs": 107.352,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 32651984,
+          "syncMs": 8771.377,
+          "writeMs": 146.829,
+          "syncs": 2400
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 40960,
+            "w": 107823104
+          }
+        },
+        "calibrationCpuMs": [3.455, 3.723]
+      }
+    },
+    {
+      "mode": "one-reader",
+      "seconds": 9.75,
+      "visibleRecordsPerSecond": 807,
+      "pages": {
+        "completed": 1,
+        "rate": 0.103,
+        "p95Ms": 101.193,
+        "dispatched": 1,
+        "distinctCursors": 1,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 19100,
+          "flow-page": 30,
+          "flow-control": 0
+        },
+        "pgCpuMs": 19299.954,
+        "quotaPeriods": 109,
+        "throttledPeriods": 90,
+        "buffers": {
+          "hits": 2563496,
+          "reads": 25,
+          "readMs": 1.204,
+          "writeMs": 47.741,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31167936,
+          "syncMs": 8535.605,
+          "writeMs": 81.982,
+          "syncs": 2264
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 356352,
+            "w": 88936448
+          }
+        },
+        "calibrationCpuMs": [3.462, 3.863]
+      }
+    },
+    {
+      "mode": "eight-fast",
+      "seconds": 11.15,
+      "visibleRecordsPerSecond": 706,
+      "pages": {
+        "completed": 40,
+        "rate": 3.588,
+        "p95Ms": 73.292,
+        "dispatched": 40,
+        "distinctCursors": 40,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 21260,
+          "flow-control": 30,
+          "flow-page": 310
+        },
+        "pgCpuMs": 21725.423,
+        "quotaPeriods": 116,
+        "throttledPeriods": 97,
+        "buffers": {
+          "hits": 2630447,
+          "reads": 572,
+          "readMs": 82.264,
+          "writeMs": 196.809,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31413922,
+          "syncMs": 9626.861,
+          "writeMs": 91.26,
+          "syncs": 2408
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 4096
+          },
+          "8:48": {
+            "r": 2088960,
+            "w": 118243328
+          }
+        },
+        "calibrationCpuMs": [3.548, 6.97]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 19.88,
+      "visibleRecordsPerSecond": 396,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 37900,
+          "flow-control": 0,
+          "flow-page": 0
+        },
+        "pgCpuMs": 39077.022,
+        "quotaPeriods": 201,
+        "throttledPeriods": 191,
+        "buffers": {
+          "hits": 2606494,
+          "reads": 18260,
+          "readMs": 2.38,
+          "writeMs": 140.368,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 34921073,
+          "syncMs": 14249.057,
+          "writeMs": 249.433,
+          "syncs": 2905
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 8192
+          },
+          "8:48": {
+            "r": 35184640,
+            "w": 92545024
+          }
+        },
+        "calibrationCpuMs": [6.795, 6.805]
+      }
+    },
+    {
+      "mode": "32-hot",
+      "seconds": 23.09,
+      "visibleRecordsPerSecond": 341,
+      "pages": {
+        "completed": 723,
+        "rate": 31.311,
+        "p95Ms": 148.655,
+        "dispatched": 724,
+        "distinctCursors": 3,
+        "skipped": 15
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 37700,
+          "flow-control": 510,
+          "flow-page": 5820
+        },
+        "pgCpuMs": 45750.822,
+        "quotaPeriods": 236,
+        "throttledPeriods": 221,
+        "buffers": {
+          "hits": 1977381,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 2.046,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31351301,
+          "syncMs": 17672.29,
+          "writeMs": 276.132,
+          "syncs": 3343
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 102342656
+          }
+        },
+        "calibrationCpuMs": [6.193, 6.769]
+      }
+    },
+    {
+      "mode": "32-advancing",
+      "seconds": 19.46,
+      "visibleRecordsPerSecond": 405,
+      "pages": {
+        "completed": 622,
+        "rate": 31.969,
+        "p95Ms": 107.999,
+        "dispatched": 622,
+        "distinctCursors": 622,
+        "skipped": 1
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 32520,
+          "flow-page": 4880,
+          "flow-control": 380
+        },
+        "pgCpuMs": 38568.558,
+        "quotaPeriods": 197,
+        "throttledPeriods": 190,
+        "buffers": {
+          "hits": 1902137,
+          "reads": 2905,
+          "readMs": 107.657,
+          "writeMs": 0.35,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 33073030,
+          "syncMs": 15461.21,
+          "writeMs": 289.401,
+          "syncs": 2916
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 233472
+          },
+          "8:48": {
+            "r": 18423808,
+            "w": 92389376
+          }
+        },
+        "calibrationCpuMs": [5.846, 3.453]
+      }
+    },
+    {
+      "mode": "saturated-hot",
+      "seconds": 15,
+      "visibleRecordsPerSecond": 525,
+      "pages": {
+        "completed": 2080,
+        "rate": 138.694,
+        "p95Ms": 89.39,
+        "dispatched": 2088,
+        "distinctCursors": 3,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 19270,
+          "flow-page": 9640,
+          "flow-control": 680
+        },
+        "pgCpuMs": 29812.806,
+        "quotaPeriods": 153,
+        "throttledPeriods": 142,
+        "buffers": {
+          "hits": 3892653,
+          "reads": 17052,
+          "readMs": 0,
+          "writeMs": 43.621,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 32621780,
+          "syncMs": 12416.468,
+          "writeMs": 126.618,
+          "syncs": 2780
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 20480
+          },
+          "8:48": {
+            "r": 0,
+            "w": 89034752
+          }
+        },
+        "calibrationCpuMs": [3.73, 3.775]
+      }
+    },
+    {
+      "mode": "saturated-hot",
+      "seconds": 14.46,
+      "visibleRecordsPerSecond": 544,
+      "pages": {
+        "completed": 1928,
+        "rate": 133.348,
+        "p95Ms": 88.578,
+        "dispatched": 1936,
+        "distinctCursors": 3,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 19380,
+          "flow-page": 8770,
+          "flow-control": 620
+        },
+        "pgCpuMs": 28819.309,
+        "quotaPeriods": 147,
+        "throttledPeriods": 139,
+        "buffers": {
+          "hits": 3663938,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 14.682,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 39151581,
+          "syncMs": 12228.646,
+          "writeMs": 109.929,
+          "syncs": 2656
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 12288,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 102387712
+          }
+        },
+        "calibrationCpuMs": [3.685, 3.434]
+      }
+    },
+    {
+      "mode": "32-advancing",
+      "seconds": 10,
+      "visibleRecordsPerSecond": 787,
+      "pages": {
+        "completed": 320,
+        "rate": 31.995,
+        "p95Ms": 57.271,
+        "dispatched": 321,
+        "distinctCursors": 321,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 18080,
+          "flow-page": 1390,
+          "flow-control": 100
+        },
+        "pgCpuMs": 19672.194,
+        "quotaPeriods": 105,
+        "throttledPeriods": 91,
+        "buffers": {
+          "hits": 1368545,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 42.739,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30700702,
+          "syncMs": 9101.687,
+          "writeMs": 184.268,
+          "syncs": 2260
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 4096,
+            "w": 87654400
+          }
+        },
+        "calibrationCpuMs": [3.591, 3.775]
+      }
+    },
+    {
+      "mode": "32-hot",
+      "seconds": 27.15,
+      "visibleRecordsPerSecond": 290,
+      "pages": {
+        "completed": 841,
+        "rate": 30.971,
+        "p95Ms": 200.351,
+        "dispatched": 842,
+        "distinctCursors": 3,
+        "skipped": 27
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 42180,
+          "flow-control": 490,
+          "flow-page": 7370
+        },
+        "pgCpuMs": 53664.16,
+        "quotaPeriods": 285,
+        "throttledPeriods": 263,
+        "buffers": {
+          "hits": 2255465,
+          "reads": 19477,
+          "readMs": 0.044,
+          "writeMs": 23.333,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 35130886,
+          "syncMs": 18910.949,
+          "writeMs": 636.295,
+          "syncs": 3335
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 356352
+          },
+          "8:48": {
+            "r": 14856192,
+            "w": 116293632
+          }
+        },
+        "calibrationCpuMs": [3.5, 6.442]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 16.85,
+      "visibleRecordsPerSecond": 467,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-control": 0,
+          "flow-page": 0,
+          "flow-projector": 33000
+        },
+        "pgCpuMs": 33171.648,
+        "quotaPeriods": 178,
+        "throttledPeriods": 163,
+        "buffers": {
+          "hits": 914504,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 0.695,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30373046,
+          "syncMs": 13432.802,
+          "writeMs": 379.977,
+          "syncs": 2654
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 90947584
+          }
+        },
+        "calibrationCpuMs": [5.984, 5.67]
+      }
+    },
+    {
+      "mode": "eight-fast",
+      "seconds": 15.9,
+      "visibleRecordsPerSecond": 495,
+      "pages": {
+        "completed": 55,
+        "rate": 3.458,
+        "p95Ms": 109.603,
+        "dispatched": 56,
+        "distinctCursors": 56,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-control": 50,
+          "flow-page": 580,
+          "flow-projector": 30540
+        },
+        "pgCpuMs": 31403.859,
+        "quotaPeriods": 170,
+        "throttledPeriods": 154,
+        "buffers": {
+          "hits": 1010297,
+          "reads": 6,
+          "readMs": 0.068,
+          "writeMs": 0.883,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30631381,
+          "syncMs": 12504.258,
+          "writeMs": 234.356,
+          "syncs": 2636
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 91111424
+          }
+        },
+        "calibrationCpuMs": [6.909, 4.232]
+      }
+    },
+    {
+      "mode": "one-reader",
+      "seconds": 8.81,
+      "visibleRecordsPerSecond": 893,
+      "pages": {
+        "completed": 1,
+        "rate": 0.114,
+        "p95Ms": 78.114,
+        "dispatched": 1,
+        "distinctCursors": 1,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-control": 0,
+          "flow-page": 30,
+          "flow-projector": 16960
+        },
+        "pgCpuMs": 17406.347,
+        "quotaPeriods": 105,
+        "throttledPeriods": 77,
+        "buffers": {
+          "hits": 942423,
+          "reads": 19484,
+          "readMs": 0,
+          "writeMs": 0.462,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31029302,
+          "syncMs": 8126.752,
+          "writeMs": 79.278,
+          "syncs": 2219
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 8192,
+            "w": 85065728
+          }
+        },
+        "calibrationCpuMs": [3.514, 3.618]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 9.2,
+      "visibleRecordsPerSecond": 855,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 0,
+          "flow-control": 0,
+          "flow-projector": 17300
+        },
+        "pgCpuMs": 17383.674,
+        "quotaPeriods": 98,
+        "throttledPeriods": 78,
+        "buffers": {
+          "hits": 919970,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 40.675,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30054593,
+          "syncMs": 8183.225,
+          "writeMs": 82.844,
+          "syncs": 2214
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 82305024
+          }
+        },
+        "calibrationCpuMs": [3.36, 3.582]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 9.11,
+      "visibleRecordsPerSecond": 864,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 17510,
+          "flow-control": 0,
+          "flow-page": 0
+        },
+        "pgCpuMs": 17591.075,
+        "quotaPeriods": 96,
+        "throttledPeriods": 83,
+        "buffers": {
+          "hits": 911957,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 125.614,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 29950504,
+          "syncMs": 8117.401,
+          "writeMs": 108.382,
+          "syncs": 2225
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 88514560
+          }
+        },
+        "calibrationCpuMs": [3.8, 3.474]
+      }
+    },
+    {
+      "mode": "32-hot",
+      "seconds": 11.37,
+      "visibleRecordsPerSecond": 692,
+      "pages": {
+        "completed": 361,
+        "rate": 31.738,
+        "p95Ms": 72.079,
+        "dispatched": 362,
+        "distinctCursors": 3,
+        "skipped": 2
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 19620,
+          "flow-control": 170,
+          "flow-page": 2280
+        },
+        "pgCpuMs": 22345.379,
+        "quotaPeriods": 119,
+        "throttledPeriods": 98,
+        "buffers": {
+          "hits": 1466910,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 123.084,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31094964,
+          "syncMs": 9732.987,
+          "writeMs": 137.552,
+          "syncs": 2490
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 88244224
+          }
+        },
+        "calibrationCpuMs": [3.52, 8.837]
+      }
+    },
+    {
+      "mode": "32-advancing",
+      "seconds": 25.45,
+      "visibleRecordsPerSecond": 309,
+      "pages": {
+        "completed": 802,
+        "rate": 31.511,
+        "p95Ms": 178.004,
+        "dispatched": 803,
+        "distinctCursors": 803,
+        "skipped": 12
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 40270,
+          "flow-page": 7080,
+          "flow-control": 450
+        },
+        "pgCpuMs": 50910.371,
+        "quotaPeriods": 266,
+        "throttledPeriods": 253,
+        "buffers": {
+          "hits": 2206537,
+          "reads": 20363,
+          "readMs": 50.519,
+          "writeMs": 16.639,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 34974533,
+          "syncMs": 17919.303,
+          "writeMs": 770.095,
+          "syncs": 3248
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 2666496,
+            "w": 114630656
+          }
+        },
+        "calibrationCpuMs": [7.765, 6.652]
+      }
+    },
+    {
+      "mode": "saturated-hot",
+      "seconds": 29.46,
+      "visibleRecordsPerSecond": 267,
+      "pages": {
+        "completed": 1748,
+        "rate": 59.334,
+        "p95Ms": 202.973,
+        "dispatched": 1756,
+        "distinctCursors": 3,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 40290,
+          "flow-page": 16650,
+          "flow-control": 1190
+        },
+        "pgCpuMs": 58273.327,
+        "quotaPeriods": 303,
+        "throttledPeriods": 281,
+        "buffers": {
+          "hits": 3420986,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 0,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 32555187,
+          "syncMs": 19483.118,
+          "writeMs": 552.404,
+          "syncs": 3545
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 102834176
+          }
+        },
+        "calibrationCpuMs": [7.43, 8.113]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 12.81,
+      "visibleRecordsPerSecond": 614,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 23860,
+          "flow-control": 0,
+          "flow-page": 0
+        },
+        "pgCpuMs": 24765.133,
+        "quotaPeriods": 137,
+        "throttledPeriods": 117,
+        "buffers": {
+          "hits": 1184440,
+          "reads": 16556,
+          "readMs": 0.192,
+          "writeMs": 0.277,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 34157262,
+          "syncMs": 10699.776,
+          "writeMs": 149.786,
+          "syncs": 2502
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 1978368,
+            "w": 92332032
+          }
+        },
+        "calibrationCpuMs": [6.304, 3.665]
+      }
+    },
+    {
+      "mode": "one-reader",
+      "seconds": 8.87,
+      "visibleRecordsPerSecond": 887,
+      "pages": {
+        "completed": 1,
+        "rate": 0.113,
+        "p95Ms": 104.021,
+        "dispatched": 1,
+        "distinctCursors": 1,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 17290,
+          "flow-control": 0,
+          "flow-page": 40
+        },
+        "pgCpuMs": 17399.164,
+        "quotaPeriods": 98,
+        "throttledPeriods": 82,
+        "buffers": {
+          "hits": 930990,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 0,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30501005,
+          "syncMs": 8078.07,
+          "writeMs": 115.798,
+          "syncs": 2152
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 4096,
+            "w": 84942848
+          }
+        },
+        "calibrationCpuMs": [3.311, 3.403]
+      }
+    },
+    {
+      "mode": "eight-fast",
+      "seconds": 9.1,
+      "visibleRecordsPerSecond": 865,
+      "pages": {
+        "completed": 33,
+        "rate": 3.625,
+        "p95Ms": 68.591,
+        "dispatched": 33,
+        "distinctCursors": 33,
+        "skipped": 0
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 200,
+          "flow-projector": 17390,
+          "flow-control": 20
+        },
+        "pgCpuMs": 17728.084,
+        "quotaPeriods": 102,
+        "throttledPeriods": 83,
+        "buffers": {
+          "hits": 977484,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 6.175,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30417250,
+          "syncMs": 8225.871,
+          "writeMs": 78.93,
+          "syncs": 2237
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 85377024
+          }
+        },
+        "calibrationCpuMs": [3.564, 3.386]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 9.13,
+      "visibleRecordsPerSecond": 862,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 0,
+          "flow-control": 0,
+          "flow-projector": 17540
+        },
+        "pgCpuMs": 17635.259,
+        "quotaPeriods": 97,
+        "throttledPeriods": 83,
+        "buffers": {
+          "hits": 913928,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 15.874,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30234648,
+          "syncMs": 8258.91,
+          "writeMs": 118.818,
+          "syncs": 2179
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 68747264
+          }
+        },
+        "calibrationCpuMs": [3.509, 3.532]
+      }
+    }
+  ],
+  "toolMixed": [
+    {
+      "mode": "writer",
+      "seconds": 19.02,
+      "visibleRecordsPerSecond": 414,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 0,
+          "flow-projector": 37250,
+          "flow-control": 10
+        },
+        "pgCpuMs": 37523.743,
+        "quotaPeriods": 203,
+        "throttledPeriods": 179,
+        "buffers": {
+          "hits": 2550608,
+          "reads": 72,
+          "readMs": 63.537,
+          "writeMs": 378.805,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 32898105,
+          "syncMs": 14684.134,
+          "writeMs": 373.848,
+          "syncs": 3045
+        },
+        "deviceBytes": {
+          "8:48": {
+            "r": 86016,
+            "w": 114360320
+          }
+        },
+        "calibrationCpuMs": [6.465, 6.16]
+      }
+    },
+    {
+      "mode": "web-read",
+      "seconds": 15.56,
+      "visibleRecordsPerSecond": 506,
+      "pages": {
+        "completed": 25,
+        "rate": 1.607,
+        "p95Ms": 199.252,
+        "gestures": 21,
+        "peak": 1,
+        "distinctCursors": 25
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 28500,
+          "flow-control": 50,
+          "flow-page": 570
+        },
+        "pgCpuMs": 30288.842,
+        "quotaPeriods": 162,
+        "throttledPeriods": 147,
+        "buffers": {
+          "hits": 2472398,
+          "reads": 11663,
+          "readMs": 60.715,
+          "writeMs": 325.634,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 34100806,
+          "syncMs": 12032.288,
+          "writeMs": 312.793,
+          "syncs": 2691
+        },
+        "deviceBytes": {
+          "8:48": {
+            "r": 12709888,
+            "w": 122028032
+          }
+        },
+        "calibrationCpuMs": [6.069, 3.582]
+      }
+    },
+    {
+      "mode": "web-fast",
+      "seconds": 9.75,
+      "visibleRecordsPerSecond": 807,
+      "pages": {
+        "completed": 81,
+        "rate": 8.305,
+        "p95Ms": 69.385,
+        "gestures": 82,
+        "peak": 1,
+        "distinctCursors": 82
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 18410,
+          "flow-control": 50,
+          "flow-page": 730
+        },
+        "pgCpuMs": 19326.519,
+        "quotaPeriods": 108,
+        "throttledPeriods": 91,
+        "buffers": {
+          "hits": 1447704,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 92.138,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30886793,
+          "syncMs": 8727.668,
+          "writeMs": 113.08,
+          "syncs": 2246
+        },
+        "deviceBytes": {
+          "8:48": {
+            "r": 0,
+            "w": 91881472
+          }
+        },
+        "calibrationCpuMs": [3.375, 3.568]
+      }
+    },
+    {
+      "mode": "eight-fast",
+      "seconds": 14.4,
+      "visibleRecordsPerSecond": 547,
+      "pages": {
+        "completed": 955,
+        "rate": 66.332,
+        "p95Ms": 108.036,
+        "dispatched": 956,
+        "distinctCursors": 956,
+        "skipped": 60
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 19620,
+          "flow-control": 350,
+          "flow-page": 8860
+        },
+        "pgCpuMs": 28893.86,
+        "quotaPeriods": 149,
+        "throttledPeriods": 144,
+        "buffers": {
+          "hits": 6870191,
+          "reads": 470,
+          "readMs": 122.636,
+          "writeMs": 119.082,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 32677731,
+          "syncMs": 12769.178,
+          "writeMs": 295.059,
+          "syncs": 2344
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 4096
+          },
+          "8:48": {
+            "r": 294912,
+            "w": 119185408
+          }
+        },
+        "calibrationCpuMs": [3.323, 3.558]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 9.25,
+      "visibleRecordsPerSecond": 851,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 18230,
+          "flow-control": 0,
+          "flow-page": 0
+        },
+        "pgCpuMs": 18513.394,
+        "quotaPeriods": 97,
+        "throttledPeriods": 90,
+        "buffers": {
+          "hits": 979885,
+          "reads": 64,
+          "readMs": 2.537,
+          "writeMs": 47.945,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31057367,
+          "syncMs": 8129.996,
+          "writeMs": 184.545,
+          "syncs": 2101
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 12288
+          },
+          "8:48": {
+            "r": 23105536,
+            "w": 88449024
+          }
+        },
+        "calibrationCpuMs": [3.615, 3.752]
+      }
+    },
+    {
+      "mode": "eight-fast",
+      "seconds": 32.75,
+      "visibleRecordsPerSecond": 240,
+      "pages": {
+        "completed": 1113,
+        "rate": 33.985,
+        "p95Ms": 280.096,
+        "dispatched": 1116,
+        "distinctCursors": 1116,
+        "skipped": 1198
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 41270,
+          "flow-control": 800,
+          "flow-page": 23020
+        },
+        "pgCpuMs": 65298.054,
+        "quotaPeriods": 357,
+        "throttledPeriods": 319,
+        "buffers": {
+          "hits": 7884230,
+          "reads": 294,
+          "readMs": 63.7,
+          "writeMs": 5.268,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 34514166,
+          "syncMs": 22749.97,
+          "writeMs": 744.809,
+          "syncs": 3311
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 192512,
+            "w": 146284544
+          }
+        },
+        "calibrationCpuMs": [3.601, 7.751]
+      }
+    },
+    {
+      "mode": "web-fast",
+      "seconds": 20.51,
+      "visibleRecordsPerSecond": 384,
+      "pages": {
+        "completed": 144,
+        "rate": 7.02,
+        "p95Ms": 135.719,
+        "gestures": 176,
+        "peak": 1,
+        "distinctCursors": 145
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 37260,
+          "flow-page": 2510,
+          "flow-control": 110
+        },
+        "pgCpuMs": 40704.617,
+        "quotaPeriods": 208,
+        "throttledPeriods": 197,
+        "buffers": {
+          "hits": 1998681,
+          "reads": 24,
+          "readMs": 0.249,
+          "writeMs": 1.29,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 39182590,
+          "syncMs": 15761.005,
+          "writeMs": 646.704,
+          "syncs": 2981
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 8192,
+            "w": 0
+          },
+          "8:48": {
+            "r": 14553088,
+            "w": 118566912
+          }
+        },
+        "calibrationCpuMs": [5.095, 9.988]
+      }
+    },
+    {
+      "mode": "web-read",
+      "seconds": 11.1,
+      "visibleRecordsPerSecond": 709,
+      "pages": {
+        "completed": 18,
+        "rate": 1.621,
+        "p95Ms": 159.151,
+        "gestures": 15,
+        "peak": 1,
+        "distinctCursors": 18
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 20360,
+          "flow-page": 220,
+          "flow-control": 40
+        },
+        "pgCpuMs": 20721.689,
+        "quotaPeriods": 122,
+        "throttledPeriods": 98,
+        "buffers": {
+          "hits": 1026941,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 0,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30484850,
+          "syncMs": 9519.889,
+          "writeMs": 93.566,
+          "syncs": 2337
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 88506368
+          }
+        },
+        "calibrationCpuMs": [5.041, 3.574]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 9.09,
+      "visibleRecordsPerSecond": 866,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-projector": 17510,
+          "flow-control": 0,
+          "flow-page": 0
+        },
+        "pgCpuMs": 17627.759,
+        "quotaPeriods": 98,
+        "throttledPeriods": 81,
+        "buffers": {
+          "hits": 920682,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 3.445,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30111964,
+          "syncMs": 8250.613,
+          "writeMs": 106.394,
+          "syncs": 2135
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 86704128
+          }
+        },
+        "calibrationCpuMs": [3.345, 3.97]
+      }
+    },
+    {
+      "mode": "web-read",
+      "seconds": 9.11,
+      "visibleRecordsPerSecond": 864,
+      "pages": {
+        "completed": 14,
+        "rate": 1.537,
+        "p95Ms": 106.405,
+        "gestures": 12,
+        "peak": 1,
+        "distinctCursors": 14
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-control": 10,
+          "flow-page": 170,
+          "flow-projector": 17570
+        },
+        "pgCpuMs": 17882.785,
+        "quotaPeriods": 99,
+        "throttledPeriods": 86,
+        "buffers": {
+          "hits": 1020918,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 18.307,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30783591,
+          "syncMs": 8232.606,
+          "writeMs": 78.997,
+          "syncs": 2073
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 69656576
+          }
+        },
+        "calibrationCpuMs": [3.437, 3.661]
+      }
+    },
+    {
+      "mode": "eight-fast",
+      "seconds": 21.53,
+      "visibleRecordsPerSecond": 366,
+      "pages": {
+        "completed": 1050,
+        "rate": 48.778,
+        "p95Ms": 283.239,
+        "dispatched": 1058,
+        "distinctCursors": 1058,
+        "skipped": 465
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-control": 520,
+          "flow-page": 14560,
+          "flow-projector": 26700
+        },
+        "pgCpuMs": 43263.255,
+        "quotaPeriods": 220,
+        "throttledPeriods": 216,
+        "buffers": {
+          "hits": 7733624,
+          "reads": 22160,
+          "readMs": 0.083,
+          "writeMs": 326.52,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 37253487,
+          "syncMs": 16279.932,
+          "writeMs": 441.376,
+          "syncs": 2565
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 4096
+          },
+          "8:48": {
+            "r": 10780672,
+            "w": 129269760
+          }
+        },
+        "calibrationCpuMs": [3.638, 8.343]
+      }
+    },
+    {
+      "mode": "web-fast",
+      "seconds": 22.29,
+      "visibleRecordsPerSecond": 353,
+      "pages": {
+        "completed": 149,
+        "rate": 6.686,
+        "p95Ms": 165.537,
+        "gestures": 193,
+        "peak": 1,
+        "distinctCursors": 150
+      },
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 2870,
+          "flow-control": 100,
+          "flow-projector": 40670
+        },
+        "pgCpuMs": 43878.087,
+        "quotaPeriods": 234,
+        "throttledPeriods": 212,
+        "buffers": {
+          "hits": 1849784,
+          "reads": 0,
+          "readMs": 0,
+          "writeMs": 0,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 30857489,
+          "syncMs": 17123.35,
+          "writeMs": 255.757,
+          "syncs": 3013
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 0
+          },
+          "8:48": {
+            "r": 0,
+            "w": 95731712
+          }
+        },
+        "calibrationCpuMs": [5.311, 6.34]
+      }
+    },
+    {
+      "mode": "writer",
+      "seconds": 17.02,
+      "visibleRecordsPerSecond": 463,
+      "pages": null,
+      "pg": {
+        "backendCpuMs": {
+          "flow-page": 0,
+          "flow-projector": 33210,
+          "flow-control": 40
+        },
+        "pgCpuMs": 33837.685,
+        "quotaPeriods": 180,
+        "throttledPeriods": 163,
+        "buffers": {
+          "hits": 995952,
+          "reads": 35,
+          "readMs": 0.07,
+          "writeMs": 0,
+          "temp": 0
+        },
+        "wal": {
+          "bytes": 31059030,
+          "syncMs": 13726.732,
+          "writeMs": 337.758,
+          "syncs": 2886
+        },
+        "deviceBytes": {
+          "8:32": {
+            "r": 0,
+            "w": 24576
+          },
+          "8:48": {
+            "r": 344064,
+            "w": 95281152
+          }
+        },
+        "calibrationCpuMs": [4.895, 6.962]
+      }
+    }
+  ]
+}

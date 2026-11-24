@@ -710,6 +710,16 @@ TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts
 
 [Read split results](../../../docs/reports/physical-history-read-split-20261124.md).
 
+The scroll studies below use one disposable primary. The browser study uses native Chrome wheel events on long text and tool-heavy timelines. It measures cache misses, per-statement backend CPU, actual index use and two fixture-only variants of dependency joins. The first load profile replays the measured text-page arrival timing, advances eight cursors independently and compares fixed-rate and unlimited API clients. The second uses a real scrolling Chrome tab during projection and also replays eight staggered fast tool-history readers. Run these checks serially.
+
+```sh
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node scripts/run-with-test-postgres.mjs -- node --import tsx scripts/experiments/minimal-session-storage/scroll-demand-study.mjs
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 6 flow-page-cost scroll
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 6 flow-page-cost scroll-tools
+```
+
+[Workload interpretation and measurements](../../../docs/reports/scroll-demand-and-primary-cost-20261124.md).
+
 [Mixed-load results and study boundaries](../../../docs/reports/flow-tree-and-paging-20261123.md).
 
 Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.

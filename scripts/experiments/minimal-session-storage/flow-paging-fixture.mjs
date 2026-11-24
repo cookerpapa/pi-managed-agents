@@ -38,17 +38,22 @@ export async function installPagingProjection(db) {
   return projector;
 }
 
-export async function withPagingFixture(url, tenantId, work) {
+export async function withPagingFixture(url, tenantId, work, { ioTiming = false } = {}) {
   const meta = createDatabase({ connectionString: url, maxConnections: 5 });
   const db = new pg.Pool({
     application_name: "flow-projector",
     connectionString: url,
-    options: "-c search_path=flow_study",
+    options:
+      "-c search_path=flow_study" +
+      (ioTiming ? " -c track_io_timing=on -c track_wal_io_timing=on" : ""),
     max: 12,
   });
   const readDsn = new URL(url);
   readDsn.searchParams.set("application_name", "flow-page");
-  readDsn.searchParams.set("options", "-c search_path=flow_web,flow_study,public");
+  readDsn.searchParams.set(
+    "options",
+    "-c search_path=flow_web,flow_study,public" + (ioTiming ? " -c track_io_timing=on" : ""),
+  );
   let app, web;
   try {
     await runMigrations(meta, "up");
@@ -258,6 +263,15 @@ export async function withPagingFixture(url, tenantId, work) {
         live,
         page,
         scroll,
+        chrome,
+        address,
+        physicalRoot: f,
+        createScrollWindow: async (title) =>
+          (await store.createSession(proj.projectId, proj.workspaceId, title, "elastic")).sessionId,
+        capture: (id, q) => app.capture(token, id, q),
+        dependencyProbe: app.dependencyProbe,
+        flushStats: app.flushStats,
+        sqlCpu: (id, q) => app.sqlCpu(token, id, q),
         browserReads: () => olderResponses,
         errors,
       });
