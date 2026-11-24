@@ -108,11 +108,14 @@ const groups = lanes.map((runs, partition) => {
     }
   return records;
 });
-const own = await testPostgres({});
+const readSplit =
+  process.argv[3] === "flow-page-cost" && ["standby", "standby-control"].includes(process.argv[4]);
+const own = await testPostgres({}, { standby: readSplit });
 try {
   const waitStudy = process.argv[3] === "flow-page-locks";
   const pageCost = process.argv[3] === "flow-page-cost" && (process.argv[4] ?? "main");
-  if (pageCost) assert(["main", "fixed32", "selector"].includes(pageCost));
+  if (pageCost)
+    assert(["main", "fixed32", "selector", "standby", "standby-control"].includes(pageCost));
   if (pageCost === "selector") assert(process.argv[5], "Pass the reference checkout");
   const comparePages = pageCost || waitStudy || process.argv[3] === "flow-pages";
   if (comparePages) {
@@ -126,6 +129,7 @@ try {
       waitStudy ? own.setCpuLimit : undefined,
       pageCost,
       pageCost === "selector" ? process.argv[5] : undefined,
+      own.standbyUrl,
     );
   }
   const compareFlow = process.argv[3] === "flow",

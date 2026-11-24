@@ -81,7 +81,15 @@ export {
   type ControlPlaneStoreErrorCode,
 } from "./control-plane-store-error.ts";
 
+// The router may decline an older page so the ordinary primary reader handles it.
+export type OlderHistoryReader = (
+  tenantId: string,
+  sessionId: string,
+  query: ConversationHistoryQuery & { before: string },
+) => Promise<ConversationDetailResource | undefined>;
+
 export type ControlPlaneStoreOptions = {
+  olderHistoryReader?: OlderHistoryReader;
   database: Kysely<Database>;
   conversationReadDatabase?: Kysely<Database>;
   rootMessageHistory?: boolean;
@@ -280,6 +288,7 @@ function acceptedTurnCancellationResource(
 
 export class ControlPlaneStore {
   readonly #conversations: ConversationReader;
+  readonly #olderHistoryReader: OlderHistoryReader | undefined;
   readonly #delegatedRunHistory: boolean;
   readonly #rootMessageHistory: boolean;
   readonly #database: Kysely<Database>;
@@ -290,6 +299,7 @@ export class ControlPlaneStore {
   readonly #metrics: PiCloudMetrics | undefined;
 
   constructor(options: ControlPlaneStoreOptions) {
+    this.#olderHistoryReader = options.olderHistoryReader;
     this.#conversations = new ConversationReader(
       options.conversationReadDatabase ?? options.database,
       options.tenantId,
@@ -1280,6 +1290,12 @@ export class ControlPlaneStore {
     sessionId: string,
     query?: ConversationHistoryQuery,
   ): Promise<ConversationDetailResource> {
+    if (query?.before && this.#olderHistoryReader) {
+      return this.#olderHistoryReader(this.#tenantId, sessionId, {
+        ...query,
+        before: query.before,
+      }).then((page) => page ?? this.#conversations.getConversation(sessionId, query));
+    }
     return this.#conversations.getConversation(sessionId, query);
   }
   getConversationStatus(sessionId: string) {

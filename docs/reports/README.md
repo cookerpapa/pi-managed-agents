@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Physical PostgreSQL history read splitting](physical-history-read-split-20261124.md) measures older-page routing, replication lag, mixed-load throughput and fallback.
+
 - [Visible Run selection for chat pages](flow-page-selector-20261124.md) compares two actual Session APIs and measures full-page CPU and mixed Kafka projection.
 
 - [Database CPU per page with and without Fork](matched-paging-cpu-20261123.md) compares three matched public read arms, per-statement planning and 42 Kafka projection trials.

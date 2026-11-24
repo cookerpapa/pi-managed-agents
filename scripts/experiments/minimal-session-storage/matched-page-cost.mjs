@@ -11,6 +11,7 @@ import {
 import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import { installPagingProjection } from "./flow-paging-fixture.mjs";
 import { openPageApi } from "./flow-page-api.mjs";
+import { waitForFixtureReplay } from "./replica-study.mjs";
 import { installFlowHistory } from "./flow-history.mjs";
 import { pageCpuSnapshot, pageCpuDelta } from "./page-backend-cpu.mjs";
 
@@ -42,7 +43,14 @@ function visibleContent(page) {
     t.transcript?.items.map((i) => [i.kind, i.text]),
   ]);
 }
-export async function withMatchedPageFixture(url, tenant, work, referenceRoot) {
+export async function withMatchedPageFixture(
+  url,
+  tenant,
+  work,
+  referenceRoot,
+  standbyUrl,
+  frozenStandbyControl = false,
+) {
   const meta = createDatabase({ connectionString: url, maxConnections: 3 });
   const pools = [],
     apps = [],
@@ -152,6 +160,32 @@ export async function withMatchedPageFixture(url, tenant, work, referenceRoot) {
           ),
         };
       }
+      let split;
+      if (flow && standbyUrl) {
+        const replicaDsn = new URL(dsn);
+        replicaDsn.host = new URL(standbyUrl).host;
+        await waitForFixtureReplay(url, standbyUrl);
+        const router = await openPageApi(url, dsn.href, true, undefined, replicaDsn.href);
+        apps.push(router);
+        let frozen;
+        if (frozenStandbyControl) {
+          const raw = await openPageApi(url, replicaDsn.href, true);
+          apps.push(raw);
+          const rawClient = new PiCloudApi(
+            (path, opts) => fetch(new URL(path, raw.origin), opts),
+            auth.credential.token,
+          );
+          frozen = (q, id) => rawClient.getConversation(id, q);
+        }
+        split = {
+          frozen,
+          router,
+          client: new PiCloudApi(
+            (path, opts) => fetch(new URL(path, router.origin), opts),
+            auth.credential.token,
+          ),
+        };
+      }
       for (const name of flow ? ["root", "branch"] : ["direct"]) {
         const id = name === "branch" ? branch : root,
           page = (q, window = id) => client.getConversation(window, q);
@@ -171,6 +205,19 @@ export async function withMatchedPageFixture(url, tenant, work, referenceRoot) {
                 reference: {
                   page: (q, window = id) => old.client.getConversation(window, q),
                   capture: (q, window = id) => old.app.capture(auth.credential.token, window, q),
+                },
+              }
+            : {}),
+          ...(split
+            ? {
+                split: {
+                  page: (q, window = id) => split.client.getConversation(window, q),
+                  ...(split.frozen
+                    ? { frozenPage: (q, window = id) => split.frozen(q, window) }
+                    : {}),
+                  counts: split.router.counts,
+                  liveEvent: split.router.liveEvent,
+                  stream: (opts) => split.client.streamSession(opts),
                 },
               }
             : {}),

@@ -1,0 +1,1259 @@
+{
+  "postgres": "17.6",
+  "containerCpuQuotaEach": 2,
+  "containerMemoryMiBEach": 768,
+  "perTrial": {
+    "partitions": 32,
+    "runs": 128,
+    "kafkaRecords": 23808,
+    "visibleRecords": 5248,
+    "toolResults": 2560,
+    "pgCommits": 11008,
+    "asyncCommits": 5504,
+    "allPrimaryPartitionsAtKafkaEnd": true
+  },
+  "paired": [
+    {
+      "mode": "writer",
+      "layout": "primary",
+      "seconds": 6.87,
+      "visiblePerSecond": 764,
+      "pgCpuSeconds": 13.265,
+      "pgThrottlePeriods": 60,
+      "pages": null,
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 69,
+        "unreplayedBytes": {
+          "n": 69,
+          "p50": 29872,
+          "p95": 64592,
+          "max": 77520
+        },
+        "watermarkCatchUpMs": {
+          "n": 69,
+          "p50": 21.73,
+          "p95": 32.78,
+          "max": 103.3
+        },
+        "censored": 0,
+        "primaryCores": 1.93,
+        "replicaCores": 0.12
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "primary",
+      "seconds": 7.84,
+      "visiblePerSecond": 669,
+      "pgCpuSeconds": 14.577,
+      "pgThrottlePeriods": 68,
+      "pages": {
+        "completed": 251,
+        "rate": 32.019,
+        "p95Ms": 55.382,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 79,
+        "unreplayedBytes": {
+          "n": 79,
+          "p50": 25848,
+          "p95": 64456,
+          "max": 140456
+        },
+        "watermarkCatchUpMs": {
+          "n": 79,
+          "p50": 17.94,
+          "p95": 31.85,
+          "max": 89.92
+        },
+        "censored": 0,
+        "primaryCores": 1.86,
+        "replicaCores": 0.1
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "standby",
+      "seconds": 7.37,
+      "visiblePerSecond": 712,
+      "pgCpuSeconds": 13.662,
+      "pgThrottlePeriods": 62,
+      "pages": {
+        "completed": 235,
+        "rate": 31.874,
+        "p95Ms": 53.973,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 215,
+          "lagFallback": 21,
+          "unavailableFallback": 0,
+          "replayChecks": 1003
+        },
+        "samples": 75,
+        "unreplayedBytes": {
+          "n": 75,
+          "p50": 30120,
+          "p95": 83192,
+          "max": 132536
+        },
+        "watermarkCatchUpMs": {
+          "n": 75,
+          "p50": 19.96,
+          "p95": 30.33,
+          "max": 63.07
+        },
+        "censored": 0,
+        "primaryCores": 1.85,
+        "replicaCores": 0.27
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "standby",
+      "seconds": 8.89,
+      "visiblePerSecond": 590,
+      "pgCpuSeconds": 17.336,
+      "pgThrottlePeriods": 83,
+      "pages": {
+        "completed": 283,
+        "rate": 31.83,
+        "p95Ms": 167.882,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 235,
+          "lagFallback": 50,
+          "unavailableFallback": 0,
+          "replayChecks": 1203
+        },
+        "samples": 85,
+        "unreplayedBytes": {
+          "n": 85,
+          "p50": 31872,
+          "p95": 79296,
+          "max": 126752
+        },
+        "watermarkCatchUpMs": {
+          "n": 85,
+          "p50": 20.95,
+          "p95": 61.64,
+          "max": 112.77
+        },
+        "censored": 0,
+        "primaryCores": 1.96,
+        "replicaCores": 0.39
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "primary",
+      "seconds": 21,
+      "visiblePerSecond": 250,
+      "pgCpuSeconds": 41.234,
+      "pgThrottlePeriods": 202,
+      "pages": {
+        "completed": 651,
+        "rate": 30.993,
+        "p95Ms": 230.178,
+        "skipped": 21
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 194,
+        "unreplayedBytes": {
+          "n": 194,
+          "p50": 18640,
+          "p95": 43144,
+          "max": 55912
+        },
+        "watermarkCatchUpMs": {
+          "n": 194,
+          "p50": 21.86,
+          "p95": 73.14,
+          "max": 187.85
+        },
+        "censored": 0,
+        "primaryCores": 1.96,
+        "replicaCores": 0.11
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "standby",
+      "seconds": 17.21,
+      "visiblePerSecond": 305,
+      "pgCpuSeconds": 34.383,
+      "pgThrottlePeriods": 171,
+      "pages": {
+        "completed": 549,
+        "rate": 31.896,
+        "p95Ms": 156.425,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 394,
+          "lagFallback": 157,
+          "unavailableFallback": 0,
+          "replayChecks": 2275
+        },
+        "samples": 165,
+        "unreplayedBytes": {
+          "n": 165,
+          "p50": 19784,
+          "p95": 40576,
+          "max": 126000
+        },
+        "watermarkCatchUpMs": {
+          "n": 165,
+          "p50": 20.61,
+          "p95": 36.8,
+          "max": 181.3
+        },
+        "censored": 0,
+        "primaryCores": 2,
+        "replicaCores": 0.46
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "primary",
+      "seconds": 17.36,
+      "visiblePerSecond": 302,
+      "pgCpuSeconds": 34.042,
+      "pgThrottlePeriods": 162,
+      "pages": {
+        "completed": 551,
+        "rate": 31.74,
+        "p95Ms": 181.492,
+        "skipped": 4
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 169,
+        "unreplayedBytes": {
+          "n": 169,
+          "p50": 22512,
+          "p95": 61368,
+          "max": 95936
+        },
+        "watermarkCatchUpMs": {
+          "n": 169,
+          "p50": 20.16,
+          "p95": 32.22,
+          "max": 191.06
+        },
+        "censored": 0,
+        "primaryCores": 1.96,
+        "replicaCores": 0.11
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "primary",
+      "seconds": 7.21,
+      "visiblePerSecond": 728,
+      "pgCpuSeconds": 13.52,
+      "pgThrottlePeriods": 60,
+      "pages": {
+        "completed": 231,
+        "rate": 32.036,
+        "p95Ms": 53.266,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 73,
+        "unreplayedBytes": {
+          "n": 73,
+          "p50": 27440,
+          "p95": 70400,
+          "max": 120392
+        },
+        "watermarkCatchUpMs": {
+          "n": 73,
+          "p50": 18.55,
+          "p95": 32.34,
+          "max": 66.36
+        },
+        "censored": 0,
+        "primaryCores": 1.88,
+        "replicaCores": 0.1
+      }
+    },
+    {
+      "mode": 32,
+      "layout": "standby",
+      "seconds": 6.95,
+      "visiblePerSecond": 755,
+      "pgCpuSeconds": 12.86,
+      "pgThrottlePeriods": 55,
+      "pages": {
+        "completed": 222,
+        "rate": 31.931,
+        "p95Ms": 56.375,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 197,
+          "lagFallback": 26,
+          "unavailableFallback": 0,
+          "replayChecks": 967
+        },
+        "samples": 71,
+        "unreplayedBytes": {
+          "n": 71,
+          "p50": 33336,
+          "p95": 66504,
+          "max": 254240
+        },
+        "watermarkCatchUpMs": {
+          "n": 71,
+          "p50": 17.75,
+          "p95": 31.11,
+          "max": 98.79
+        },
+        "censored": 0,
+        "primaryCores": 1.86,
+        "replicaCores": 0.28
+      }
+    },
+    {
+      "mode": "writer",
+      "layout": "primary",
+      "seconds": 6.43,
+      "visiblePerSecond": 817,
+      "pgCpuSeconds": 12.186,
+      "pgThrottlePeriods": 52,
+      "pages": null,
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 66,
+        "unreplayedBytes": {
+          "n": 66,
+          "p50": 33504,
+          "p95": 68752,
+          "max": 83304
+        },
+        "watermarkCatchUpMs": {
+          "n": 66,
+          "p50": 15.62,
+          "p95": 31.79,
+          "max": 69.03
+        },
+        "censored": 0,
+        "primaryCores": 1.9,
+        "replicaCores": 0.1
+      }
+    },
+    {
+      "mode": "writer",
+      "layout": "primary",
+      "seconds": 6.48,
+      "visiblePerSecond": 809,
+      "pgCpuSeconds": 12.291,
+      "pgThrottlePeriods": 58,
+      "pages": null,
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 66,
+        "unreplayedBytes": {
+          "n": 66,
+          "p50": 28560,
+          "p95": 68912,
+          "max": 79656
+        },
+        "watermarkCatchUpMs": {
+          "n": 66,
+          "p50": 20.33,
+          "p95": 27.6,
+          "max": 66.5
+        },
+        "censored": 0,
+        "primaryCores": 1.9,
+        "replicaCores": 0.11
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 15.34,
+      "visiblePerSecond": 342,
+      "pgCpuSeconds": 29.519,
+      "pgThrottlePeriods": 135,
+      "pages": {
+        "completed": 1226,
+        "rate": 79.915,
+        "p95Ms": 221.271,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 148,
+        "unreplayedBytes": {
+          "n": 148,
+          "p50": 26376,
+          "p95": 72416,
+          "max": 142816
+        },
+        "watermarkCatchUpMs": {
+          "n": 148,
+          "p50": 18.32,
+          "p95": 48.77,
+          "max": 104.24
+        },
+        "censored": 0,
+        "primaryCores": 1.92,
+        "replicaCores": 0.1
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 24.14,
+      "visiblePerSecond": 217,
+      "pgCpuSeconds": 47.688,
+      "pgThrottlePeriods": 231,
+      "pages": {
+        "completed": 1220,
+        "rate": 50.532,
+        "p95Ms": 282.996,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 878,
+          "lagFallback": 350,
+          "unavailableFallback": 0,
+          "replayChecks": 3512
+        },
+        "samples": 183,
+        "unreplayedBytes": {
+          "n": 183,
+          "p50": 11704,
+          "p95": 80920,
+          "max": 179496
+        },
+        "watermarkCatchUpMs": {
+          "n": 183,
+          "p50": 30.01,
+          "p95": 93.26,
+          "max": 432.99
+        },
+        "censored": 0,
+        "primaryCores": 1.98,
+        "replicaCores": 0.71
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 23.72,
+      "visiblePerSecond": 221,
+      "pgCpuSeconds": 47.314,
+      "pgThrottlePeriods": 227,
+      "pages": {
+        "completed": 1362,
+        "rate": 57.417,
+        "p95Ms": 223.319,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 1003,
+          "lagFallback": 367,
+          "unavailableFallback": 0,
+          "replayChecks": 4201
+        },
+        "samples": 187,
+        "unreplayedBytes": {
+          "n": 187,
+          "p50": 10400,
+          "p95": 67608,
+          "max": 108976
+        },
+        "watermarkCatchUpMs": {
+          "n": 187,
+          "p50": 25.84,
+          "p95": 90.76,
+          "max": 264.98
+        },
+        "censored": 0,
+        "primaryCores": 2,
+        "replicaCores": 0.74
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 13.7,
+      "visiblePerSecond": 383,
+      "pgCpuSeconds": 27.355,
+      "pgThrottlePeriods": 132,
+      "pages": {
+        "completed": 1459,
+        "rate": 106.512,
+        "p95Ms": 180.74,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 130,
+        "unreplayedBytes": {
+          "n": 130,
+          "p50": 34888,
+          "p95": 79248,
+          "max": 95808
+        },
+        "watermarkCatchUpMs": {
+          "n": 130,
+          "p50": 22.91,
+          "p95": 40.45,
+          "max": 115.2
+        },
+        "censored": 0,
+        "primaryCores": 1.99,
+        "replicaCores": 0.09
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 8.28,
+      "visiblePerSecond": 634,
+      "pgCpuSeconds": 15.547,
+      "pgThrottlePeriods": 73,
+      "pages": {
+        "completed": 1205,
+        "rate": 145.487,
+        "p95Ms": 83.457,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 1103,
+          "lagFallback": 110,
+          "unavailableFallback": 0,
+          "replayChecks": 4862
+        },
+        "samples": 82,
+        "unreplayedBytes": {
+          "n": 82,
+          "p50": 30648,
+          "p95": 81848,
+          "max": 297928
+        },
+        "watermarkCatchUpMs": {
+          "n": 82,
+          "p50": 19.21,
+          "p95": 37.1,
+          "max": 103.54
+        },
+        "censored": 0,
+        "primaryCores": 1.88,
+        "replicaCores": 0.86
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 10.8,
+      "visiblePerSecond": 486,
+      "pgCpuSeconds": 21.49,
+      "pgThrottlePeriods": 101,
+      "pages": {
+        "completed": 1392,
+        "rate": 128.89,
+        "p95Ms": 93.36,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 108,
+        "unreplayedBytes": {
+          "n": 108,
+          "p50": 31728,
+          "p95": 72312,
+          "max": 637584
+        },
+        "watermarkCatchUpMs": {
+          "n": 108,
+          "p50": 18.62,
+          "p95": 35.04,
+          "max": 46.11
+        },
+        "censored": 0,
+        "primaryCores": 1.98,
+        "replicaCores": 0.1
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 10.64,
+      "visiblePerSecond": 493,
+      "pgCpuSeconds": 21.384,
+      "pgThrottlePeriods": 106,
+      "pages": {
+        "completed": 1349,
+        "rate": 126.829,
+        "p95Ms": 91.675,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 106,
+        "unreplayedBytes": {
+          "n": 106,
+          "p50": 33592,
+          "p95": 65104,
+          "max": 101608
+        },
+        "watermarkCatchUpMs": {
+          "n": 106,
+          "p50": 20.01,
+          "p95": 38.27,
+          "max": 46.49
+        },
+        "censored": 0,
+        "primaryCores": 2,
+        "replicaCores": 0.09
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 25.99,
+      "visiblePerSecond": 202,
+      "pgCpuSeconds": 51.34,
+      "pgThrottlePeriods": 244,
+      "pages": {
+        "completed": 1325,
+        "rate": 50.986,
+        "p95Ms": 251.341,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 964,
+          "lagFallback": 369,
+          "unavailableFallback": 0,
+          "replayChecks": 4040
+        },
+        "samples": 186,
+        "unreplayedBytes": {
+          "n": 186,
+          "p50": 11712,
+          "p95": 61568,
+          "max": 90344
+        },
+        "watermarkCatchUpMs": {
+          "n": 186,
+          "p50": 34.99,
+          "p95": 89.74,
+          "max": 493.82
+        },
+        "censored": 0,
+        "primaryCores": 1.97,
+        "replicaCores": 0.75
+      }
+    },
+    {
+      "mode": "writer",
+      "layout": "primary",
+      "seconds": 13.36,
+      "visiblePerSecond": 393,
+      "pgCpuSeconds": 26.268,
+      "pgThrottlePeriods": 129,
+      "pages": null,
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 133,
+        "unreplayedBytes": {
+          "n": 133,
+          "p50": 15312,
+          "p95": 43000,
+          "max": 62832
+        },
+        "watermarkCatchUpMs": {
+          "n": 133,
+          "p50": 21.5,
+          "p95": 31.59,
+          "max": 90.95
+        },
+        "censored": 0,
+        "primaryCores": 1.97,
+        "replicaCores": 0.12
+      }
+    }
+  ],
+  "fixedHistoryControl": [
+    {
+      "mode": "writer",
+      "layout": "primary",
+      "seconds": 12.03,
+      "visiblePerSecond": 436,
+      "pgCpuSeconds": 23.579,
+      "pgThrottlePeriods": 111,
+      "pages": null,
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 121,
+        "unreplayedBytes": {
+          "n": 121,
+          "p50": 17280,
+          "p95": 54624,
+          "max": 246192
+        },
+        "watermarkCatchUpMs": {
+          "n": 121,
+          "p50": 19.1,
+          "p95": 31.56,
+          "max": 94.44
+        },
+        "censored": 0,
+        "primaryCores": 1.95,
+        "replicaCores": 0.14
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 26.11,
+      "visiblePerSecond": 201,
+      "pgCpuSeconds": 52.118,
+      "pgThrottlePeriods": 256,
+      "pages": {
+        "completed": 1155,
+        "rate": 44.239,
+        "p95Ms": 283.562,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 212,
+        "unreplayedBytes": {
+          "n": 212,
+          "p50": 15496,
+          "p95": 43128,
+          "max": 71264
+        },
+        "watermarkCatchUpMs": {
+          "n": 212,
+          "p50": 27.09,
+          "p95": 90.69,
+          "max": 445.67
+        },
+        "censored": 0,
+        "primaryCores": 2,
+        "replicaCores": 0.11
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "frozen",
+      "seconds": 25.02,
+      "visiblePerSecond": 210,
+      "pgCpuSeconds": 48.19,
+      "pgThrottlePeriods": 230,
+      "pages": {
+        "completed": 1596,
+        "rate": 63.784,
+        "p95Ms": 182.101,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 16,
+        "unreplayedBytes": {
+          "n": 16,
+          "p50": 5300344,
+          "p95": 7907184,
+          "max": 7907184
+        },
+        "watermarkCatchUpMs": {
+          "n": 1,
+          "p50": 542.91,
+          "p95": 542.91,
+          "max": 542.91
+        },
+        "censored": 15,
+        "primaryCores": 1.99,
+        "replicaCores": 1.13
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 9.03,
+      "visiblePerSecond": 581,
+      "pgCpuSeconds": 17.008,
+      "pgThrottlePeriods": 80,
+      "pages": {
+        "completed": 1192,
+        "rate": 132.022,
+        "p95Ms": 93.556,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 1052,
+          "lagFallback": 148,
+          "unavailableFallback": 0,
+          "replayChecks": 5048
+        },
+        "samples": 84,
+        "unreplayedBytes": {
+          "n": 84,
+          "p50": 33168,
+          "p95": 89648,
+          "max": 158800
+        },
+        "watermarkCatchUpMs": {
+          "n": 84,
+          "p50": 21.07,
+          "p95": 72.33,
+          "max": 266.31
+        },
+        "censored": 0,
+        "primaryCores": 1.88,
+        "replicaCores": 0.89
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "frozen",
+      "seconds": 7.77,
+      "visiblePerSecond": 675,
+      "pgCpuSeconds": 14.848,
+      "pgThrottlePeriods": 52,
+      "pages": {
+        "completed": 1514,
+        "rate": 194.798,
+        "p95Ms": 52.971,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 6,
+        "unreplayedBytes": {
+          "n": 6,
+          "p50": 1715816,
+          "p95": 6637248,
+          "max": 6637248
+        },
+        "watermarkCatchUpMs": {
+          "n": 3,
+          "p50": 577.7,
+          "p95": 932.76,
+          "max": 932.76
+        },
+        "censored": 3,
+        "primaryCores": 1.94,
+        "replicaCores": 1.17
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 8.39,
+      "visiblePerSecond": 625,
+      "pgCpuSeconds": 15.95,
+      "pgThrottlePeriods": 70,
+      "pages": {
+        "completed": 1228,
+        "rate": 146.303,
+        "p95Ms": 78.829,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 1132,
+          "lagFallback": 104,
+          "unavailableFallback": 0,
+          "replayChecks": 5150
+        },
+        "samples": 82,
+        "unreplayedBytes": {
+          "n": 82,
+          "p50": 34560,
+          "p95": 80232,
+          "max": 253792
+        },
+        "watermarkCatchUpMs": {
+          "n": 82,
+          "p50": 21.27,
+          "p95": 42.53,
+          "max": 96.57
+        },
+        "censored": 0,
+        "primaryCores": 1.91,
+        "replicaCores": 0.88
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 12.24,
+      "visiblePerSecond": 429,
+      "pgCpuSeconds": 24.276,
+      "pgThrottlePeriods": 115,
+      "pages": {
+        "completed": 1504,
+        "rate": 122.857,
+        "p95Ms": 101.783,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 120,
+        "unreplayedBytes": {
+          "n": 120,
+          "p50": 28616,
+          "p95": 73200,
+          "max": 84936
+        },
+        "watermarkCatchUpMs": {
+          "n": 120,
+          "p50": 19.51,
+          "p95": 34.61,
+          "max": 143.44
+        },
+        "censored": 0,
+        "primaryCores": 1.97,
+        "replicaCores": 0.09
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "standby",
+      "seconds": 22.99,
+      "visiblePerSecond": 228,
+      "pgCpuSeconds": 45.563,
+      "pgThrottlePeriods": 219,
+      "pages": {
+        "completed": 1319,
+        "rate": 57.362,
+        "p95Ms": 235.644,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 980,
+          "lagFallback": 348,
+          "unavailableFallback": 0,
+          "replayChecks": 4266
+        },
+        "samples": 170,
+        "unreplayedBytes": {
+          "n": 170,
+          "p50": 11768,
+          "p95": 59352,
+          "max": 179696
+        },
+        "watermarkCatchUpMs": {
+          "n": 170,
+          "p50": 29.84,
+          "p95": 109.79,
+          "max": 271.58
+        },
+        "censored": 0,
+        "primaryCores": 1.98,
+        "replicaCores": 0.73
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "primary",
+      "seconds": 22.89,
+      "visiblePerSecond": 229,
+      "pgCpuSeconds": 45.803,
+      "pgThrottlePeriods": 227,
+      "pages": {
+        "completed": 1159,
+        "rate": 50.628,
+        "p95Ms": 223.659,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 199,
+        "unreplayedBytes": {
+          "n": 199,
+          "p50": 15688,
+          "p95": 46760,
+          "max": 61784
+        },
+        "watermarkCatchUpMs": {
+          "n": 199,
+          "p50": 23.06,
+          "p95": 92.16,
+          "max": 204.95
+        },
+        "censored": 0,
+        "primaryCores": 2,
+        "replicaCores": 0.1
+      }
+    },
+    {
+      "mode": "saturated",
+      "layout": "frozen",
+      "seconds": 19.63,
+      "visiblePerSecond": 267,
+      "pgCpuSeconds": 38.026,
+      "pgThrottlePeriods": 178,
+      "pages": {
+        "completed": 1629,
+        "rate": 82.992,
+        "p95Ms": 147.144,
+        "skipped": 0
+      },
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 12,
+        "unreplayedBytes": {
+          "n": 12,
+          "p50": 4383536,
+          "p95": 8920952,
+          "max": 8920952
+        },
+        "watermarkCatchUpMs": {
+          "n": 2,
+          "p50": 555.53,
+          "p95": 1472.93,
+          "max": 1472.93
+        },
+        "censored": 10,
+        "primaryCores": 2,
+        "replicaCores": 1.04
+      }
+    },
+    {
+      "mode": "writer",
+      "layout": "primary",
+      "seconds": 6.26,
+      "visiblePerSecond": 838,
+      "pgCpuSeconds": 12.171,
+      "pgThrottlePeriods": 57,
+      "pages": null,
+      "replicaEvidence": {
+        "routes": {
+          "replica": 0,
+          "lagFallback": 0,
+          "unavailableFallback": 0,
+          "replayChecks": 0
+        },
+        "samples": 63,
+        "unreplayedBytes": {
+          "n": 63,
+          "p50": 32048,
+          "p95": 66680,
+          "max": 119720
+        },
+        "watermarkCatchUpMs": {
+          "n": 63,
+          "p50": 21.33,
+          "p95": 32.38,
+          "max": 52.64
+        },
+        "censored": 0,
+        "primaryCores": 1.96,
+        "replicaCores": 0.11
+      }
+    }
+  ],
+  "perPageCpu": [
+    {
+      "mode": "cpu-per-page",
+      "route": "primary",
+      "pages": 96,
+      "primaryMs": 14.998,
+      "standbyMs": 0.039,
+      "replicaReads": 0,
+      "ms": 1140.3
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "standby",
+      "pages": 96,
+      "primaryMs": 1.346,
+      "standbyMs": 12.786,
+      "replicaReads": 96,
+      "ms": 1156.5
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "standby",
+      "pages": 96,
+      "primaryMs": 0.933,
+      "standbyMs": 8.84,
+      "replicaReads": 96,
+      "ms": 1017.1
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "primary",
+      "pages": 96,
+      "primaryMs": 9.162,
+      "standbyMs": 0.034,
+      "replicaReads": 0,
+      "ms": 1025.7
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "standby",
+      "pages": 96,
+      "primaryMs": 0.86,
+      "standbyMs": 8.453,
+      "replicaReads": 96,
+      "ms": 956.4
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "primary",
+      "pages": 96,
+      "primaryMs": 8.035,
+      "standbyMs": 0.031,
+      "replicaReads": 0,
+      "ms": 853
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "primary",
+      "pages": 96,
+      "primaryMs": 9.088,
+      "standbyMs": 0.036,
+      "replicaReads": 0,
+      "ms": 944.9
+    },
+    {
+      "mode": "cpu-per-page",
+      "route": "standby",
+      "pages": 96,
+      "primaryMs": 0.798,
+      "standbyMs": 8.12,
+      "replicaReads": 96,
+      "ms": 915.7
+    }
+  ],
+  "recovery": {
+    "mode": "replica-consistency",
+    "asyncCommit": true,
+    "unguardedOldPageVisible": true,
+    "guardedOldCursorStatus": 404,
+    "latestPrimary": true,
+    "ssePrimarySnapshots": 2,
+    "liveSuffixVerified": true,
+    "resumedReplicaVerified": true,
+    "resumeAttempts": 2,
+    "realProjectedMessageAndOffset": true
+  },
+  "offline": {
+    "mode": "standby-offline",
+    "fallbackMs": 38.44,
+    "historyEqual": true,
+    "latestAndRelayedSsePrimary": true
+  }
+}

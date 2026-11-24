@@ -1,12 +1,13 @@
 import type { Database } from "@pi-cloud/database";
 import type { Kysely } from "kysely";
-import { ControlPlaneStore } from "./control-plane-store.ts";
+import { ControlPlaneStore, type OlderHistoryReader } from "./control-plane-store.ts";
 import type { TenantRequestIdentity } from "./tenant-identity.ts";
 import type { PiCloudMetrics } from "@pi-cloud/observability";
 
 export class ControlPlaneStoreFactory {
   readonly #delegatedRunHistory: boolean;
   readonly #database: Kysely<Database>;
+  readonly #olderHistoryReader: OlderHistoryReader | undefined;
   readonly #conversationReadDatabase: Kysely<Database>;
   readonly #rootMessageHistory: boolean;
   readonly #flowRootHistory: boolean;
@@ -17,6 +18,7 @@ export class ControlPlaneStoreFactory {
   constructor(options: {
     database: Kysely<Database>;
     conversationReadDatabase?: Kysely<Database>;
+    olderHistoryReader?: OlderHistoryReader;
     rootMessageHistory?: boolean;
     flowRootHistory?: boolean;
     delegatedRunHistory?: boolean;
@@ -26,6 +28,7 @@ export class ControlPlaneStoreFactory {
   }) {
     this.#delegatedRunHistory = options.delegatedRunHistory ?? false;
     this.#database = options.database;
+    this.#olderHistoryReader = options.olderHistoryReader;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
     this.#flowRootHistory = options.flowRootHistory ?? false;
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
@@ -38,6 +41,7 @@ export class ControlPlaneStoreFactory {
     return new ControlPlaneStore({
       database: this.#database,
       conversationReadDatabase: this.#conversationReadDatabase,
+      ...(this.#olderHistoryReader ? { olderHistoryReader: this.#olderHistoryReader } : {}),
       tenantId: identity.tenantId,
       rootMessageHistory: this.#rootMessageHistory,
       flowRootHistory: this.#flowRootHistory,

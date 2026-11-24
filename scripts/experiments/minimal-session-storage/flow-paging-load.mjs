@@ -13,6 +13,7 @@ import {
   pageCostTrials,
   loadMatchedPages,
 } from "./matched-page-cost.mjs";
+import { studyReplicaConsistency, observeReplay, splitTrials } from "./replica-study.mjs";
 import { withPagingFixture } from "./flow-paging-fixture.mjs";
 
 function latency(ms) {
@@ -69,6 +70,7 @@ export async function studyFlowPaging(
   setCpuLimit,
   pageCost = false,
   referenceRoot,
+  standbyUrl,
 ) {
   const presenters = new Map();
   for (const group of groups)
@@ -86,11 +88,37 @@ export async function studyFlowPaging(
   const live = scopes[0],
     total = groups.reduce((n, g) => n + g.length, 0);
   const fixture = pageCost
-    ? (url, tenant, work) => withMatchedPageFixture(url, tenant, work, referenceRoot)
+    ? (url, tenant, work) =>
+        withMatchedPageFixture(
+          url,
+          tenant,
+          work,
+          referenceRoot,
+          standbyUrl,
+          pageCost === "standby-control",
+        )
     : withPagingFixture;
   await fixture(url, tenant, async (api) => {
     let arms = api.arms;
-    if (pageCost === "selector") {
+    if (standbyUrl) {
+      const primary = arms.branch,
+        standby = { ...primary, page: primary.split.page };
+      const latest = await primary.page({}),
+        older = await primary.page({ before: latest.history.before }),
+        third = await primary.page({ before: older.history.before });
+      const queries = [latest, older, third].map((p) => ({ before: p.history.before }));
+      arms = { primary: { ...primary, queries }, standby: { ...standby, queries } };
+      if (standbyUrl && pageCost === "standby-control")
+        arms.frozen = { ...primary, page: primary.split.frozenPage, queries };
+      for (const q of queries) {
+        const expected = await primary.page(q);
+        assert.deepEqual(await standby.page(q), expected);
+        if (arms.frozen) assert.deepEqual(await arms.frozen.page(q), expected);
+        for (const a of Object.values(arms))
+          await Promise.all(Array.from({ length: 8 }, () => a.page(q)));
+      }
+      await studyReplicaConsistency(url, standbyUrl, tenant, api);
+    } else if (pageCost === "selector") {
       const candidate = arms.branch,
         reference = { ...candidate, page: candidate.reference.page };
       arms = { candidate, reference };
@@ -158,23 +186,25 @@ export async function studyFlowPaging(
           }),
         );
       }
-      const trials = pageCost
-        ? pageCostTrials(pageCost)
-        : setCpuLimit
-          ? [
-              [2, "writer"],
-              [2, "saturated"],
-              [4, "saturated"],
-              [4, "writer"],
-              [4, "writer"],
-              [4, "saturated"],
-              [2, "saturated"],
-              [2, "writer"],
-            ]
-          : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [
-              2,
-              mode,
-            ]);
+      const trials = standbyUrl
+        ? splitTrials(pageCost === "standby-control")
+        : pageCost
+          ? pageCostTrials(pageCost)
+          : setCpuLimit
+            ? [
+                [2, "writer"],
+                [2, "saturated"],
+                [4, "saturated"],
+                [4, "writer"],
+                [4, "writer"],
+                [4, "saturated"],
+                [2, "saturated"],
+                [2, "writer"],
+              ]
+            : ["writer", "paced", "saturated", "saturated", "paced", "writer"].map((mode) => [
+                2,
+                mode,
+              ]);
       for (const [layout, mode] of trials) {
         const arm = pageCost ? arms[layout] : api;
         const { db, projector } = arm;
@@ -264,9 +294,13 @@ export async function studyFlowPaging(
           );
         };
         const chromeBefore = api.browserReads?.();
-        let cpuBefore, cpuAfter, observer;
+        let cpuBefore, cpuAfter, observer, replay, countsBefore;
         try {
           if (setCpuLimit) observer = await observePagingWaits(url, layout);
+          if (standbyUrl) {
+            countsBefore = await api.arms.branch.split.counts();
+            replay = await observeReplay(url, standbyUrl);
+          }
           cpuBefore = await counters();
           await reader.start();
           const limit = performance.now() + 90000;
@@ -301,6 +335,14 @@ export async function studyFlowPaging(
           ).rows;
           for (const [p, h] of ends)
             assert.equal(Number(progress.find((r) => r.partition === p).next_offset), h);
+          let replicaEvidence;
+          if (replay) {
+            const after = await api.arms.branch.split.counts();
+            const routes = Object.fromEntries(
+              Object.keys(after).map((k) => [k, after[k] - countsBefore[k]]),
+            );
+            replicaEvidence = { routes, ...replay.summary(t0, end) };
+          }
           const visible = visiblePerRun * scopes.length;
           console.log(
             JSON.stringify({
@@ -311,6 +353,8 @@ export async function studyFlowPaging(
               visiblePerSecond: Math.round((visible * 1000) / (end - t0)),
               seconds: +((end - t0) / 1000).toFixed(2),
               pgCommits: projector.view.stats.commits,
+              asyncCommits: projector.view.stats.asyncTransactions,
+              ...(replicaEvidence ? { replicaEvidence } : {}),
               ...(observer ? { waitStudy: observer.summary(t0, end) } : {}),
               pgCpuSeconds: +((cpuAfter.usage_usec - cpuBefore.usage_usec) / 1e6).toFixed(3),
               pgThrottlePeriods: cpuAfter.nr_throttled - cpuBefore.nr_throttled,
@@ -328,6 +372,7 @@ export async function studyFlowPaging(
             await reader.close();
           } finally {
             await observer?.stop();
+            await replay?.close();
           }
         }
       }

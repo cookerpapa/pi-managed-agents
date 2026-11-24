@@ -27,6 +27,7 @@ export class SessionLiveService {
       database: Kysely<Database>;
       stream: SessionEventStream;
       rootMessageHistory?: boolean;
+      flowRootHistory?: boolean;
       token: string;
       inputConfirmations?: Pick<SessionEventHub, "watchInput">;
     },
@@ -120,6 +121,7 @@ export class SessionLiveService {
                 this.options.database,
                 tenantId,
                 this.options.rootMessageHistory,
+                this.options.flowRootHistory,
               ).getConversationView(sessionId),
           }),
         );

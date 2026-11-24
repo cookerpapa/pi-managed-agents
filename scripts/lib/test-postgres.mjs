@@ -9,9 +9,12 @@ const IMAGE = "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d745
 
 /** Existing integration URLs are caller-owned test infrastructure. Otherwise
  * use a disposable official PG container, with no host mounts or production data. */
-export async function testPostgres(environment = process.env, { crashable = false } = {}) {
-  if (crashable && environment.PI_CLOUD_POSTGRES_INTEGRATION_URL)
-    throw new Error("A crash test requires its own disposable PostgreSQL instance");
+export async function testPostgres(
+  environment = process.env,
+  { crashable = false, standby = false } = {},
+) {
+  if ((standby || crashable) && environment.PI_CLOUD_POSTGRES_INTEGRATION_URL)
+    throw new Error("This test requires its own disposable PostgreSQL instance");
   if (environment.PI_CLOUD_POSTGRES_INTEGRATION_URL)
     return { url: environment.PI_CLOUD_POSTGRES_INTEGRATION_URL, async close() {} };
   const name = `pi-cloud-test-pg-${randomUUID()}`;
@@ -30,14 +33,22 @@ wal_writer_delay='5s'
 CONF
 gosu postgres pg_ctl -D ${data} -l /tmp/pma-fault-postgres.log -w start >/dev/null
 exec sleep infinity`;
+  let replica;
   let started = false,
     closed = false;
   const close = async () => {
     if (!started || closed) return;
-    await execute("docker", ["stop", "--timeout=10", name], { timeout: 30000 }).catch((error) => {
-      if (!/No such container/i.test(error.stderr ?? "")) throw error;
-    });
-    closed = true;
+    try {
+      if (replica) {
+        await replica.close();
+        replica = undefined;
+      }
+    } finally {
+      await execute("docker", ["stop", "--timeout=10", name], { timeout: 30000 }).catch((error) => {
+        if (!/No such container/i.test(error.stderr ?? "")) throw error;
+      });
+      closed = true;
+    }
   };
   try {
     await execute(
@@ -103,8 +114,13 @@ exec sleep infinity`;
         { timeout: 35000 },
       );
     };
+    if (standby) {
+      const { startTestStandby } = await import("./test-postgres-standby.mjs");
+      replica = await startTestStandby(name, url, IMAGE);
+    }
     return {
       url,
+      ...(replica ? { standbyUrl: replica.url, stopStandby: replica.stop } : {}),
       close,
       async setCpuLimit(cpus) {
         if (!started || closed || !Number.isInteger(cpus) || cpus < 1 || cpus > 4)

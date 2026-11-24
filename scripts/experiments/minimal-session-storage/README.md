@@ -700,6 +700,16 @@ TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts
 
 [Page selector results](../../../docs/reports/flow-page-selector-20261124.md).
 
+To compare read placement on a real PG primary and streaming standby, use the following serial studies. Each owns its database containers, loopback ports and replication network. The tested route requires a fixed primary/standby timeline. The `standby-control` workload also times raw standby reads on deliberately immutable fixture data.
+
+```sh
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 4 flow-page-cost standby
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/check-standby-recovery.mjs
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/model-settlement-rate.mjs 4 flow-page-cost standby-control
+```
+
+[Read split results](../../../docs/reports/physical-history-read-split-20261124.md).
+
 [Mixed-load results and study boundaries](../../../docs/reports/flow-tree-and-paging-20261123.md).
 
 Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.

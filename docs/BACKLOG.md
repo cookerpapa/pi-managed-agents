@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Exercise physical PG read splitting with paired Kafka projection, lagged history, primary SSE recovery and a stopped standby. [Study](reports/physical-history-read-split-20261124.md).
+
 - [x] Compare and simplify the visible-Run page query, verify a scoped plan on the public reader and test early stopping across 128 physical history ranges. [Experiment](reports/flow-page-selector-20261124.md).
 
 - [x] Measure database CPU per complete page and replay the same Kafka workload with direct, ordinary Flow and nested Flow reads. [Matched benchmark](reports/matched-paging-cpu-20261123.md).
