@@ -248,6 +248,7 @@ export function permitsScopedSource(scope, file, runtimeInputs) {
           "scripts/run-skill-market-browser-check.mjs",
           "scripts/run-live-skill-market-browser-check.mjs",
           "scripts/run-live-browser-ui-check.mjs",
+          "scripts/lib/guest-browser-acceptance.mjs",
           "scripts/run-live-queue-input-check.mjs",
           "scripts/run-live-release-acceptance.mjs",
           "scripts/run-live-review-repair-check.mjs",

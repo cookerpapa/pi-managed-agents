@@ -53,21 +53,23 @@ describe("conversation presentation rows", () => {
       retry(2, 5),
       retry(3, 6),
     ]);
-    expect(rows.map((row) => row.kind)).toEqual(["retry", "retry", "activity", "retry"]);
+    expect(rows.map((row) => row.kind)).toEqual(["retry", "retry", "tool", "retry"]);
     expect(
       rows
         .filter((row) => row.kind === "retry")
         .map((row) => row.items.at(-1)!.nextSamplingAttempt),
     ).toEqual([3, 2, 3]);
   });
-  it("keeps real page boundaries and bounded groups while live items continue their page", () => {
+  it("gives every Tool its own stable row across page boundaries", () => {
     const rows = deriveConversationPresentationRows(
       Array.from({ length: 15 }, (_, index) => ({
         ...tool(`bash:${index}`, index),
         pageKey: index === 0 ? "older" : "latest",
       })),
     );
-    expect(rows.map((row) => (row.kind === "activity" ? row.items.length : 0))).toEqual([1, 12, 2]);
+    expect(rows.map((row) => row.key)).toEqual(
+      Array.from({ length: 15 }, (_, i) => `activity:bash:${i}`),
+    );
   });
   it("uses explicit phase before a Tool exists and does not reclassify an explicit final answer", () => {
     expect(
@@ -93,10 +95,10 @@ describe("conversation presentation rows", () => {
     ).toMatchObject([
       { kind: "text", processNarration: true },
       { kind: "text", processNarration: false },
-      { kind: "activity" },
+      { kind: "tool" },
     ]);
   });
-  it("groups only adjacent Tools and preserves every durable key", () => {
+  it("preserves adjacent Tools and narration in order", () => {
     const items: TranscriptItem[] = [
       {
         kind: "text",
@@ -118,12 +120,13 @@ describe("conversation presentation rows", () => {
     const rows = deriveConversationPresentationRows(items);
     expect(rows).toMatchObject([
       { kind: "text", key: "text:1", processNarration: true },
-      { kind: "activity", key: "activity:read:2", items: [{ key: "read:2" }, { key: "bash:3" }] },
+      { kind: "tool", key: "activity:read:2", item: { key: "read:2" } },
+      { kind: "tool", key: "activity:bash:3", item: { key: "bash:3" } },
       { kind: "text", key: "text:4", processNarration: false },
     ]);
   });
 
-  it("keeps lifecycle boundaries outside Tool groups", () => {
+  it("keeps lifecycle events between Tools", () => {
     const rows = deriveConversationPresentationRows([
       tool("read:1", 1),
       {
@@ -137,7 +140,7 @@ describe("conversation presentation rows", () => {
       },
       tool("bash:4", 4),
     ]);
-    expect(rows.map((row) => row.kind)).toEqual(["activity", "item", "activity"]);
+    expect(rows.map((row) => row.kind)).toEqual(["tool", "item", "tool"]);
   });
 });
 
@@ -159,7 +162,7 @@ it("keeps successive human inputs between answers without reclassifying earlier 
   expect(rows).toMatchObject([
     { kind: "text", processNarration: false },
     { kind: "user", item: { text: "Now inspect files" } },
-    { kind: "activity" },
+    { kind: "tool" },
     { kind: "text", processNarration: false },
   ]);
 });

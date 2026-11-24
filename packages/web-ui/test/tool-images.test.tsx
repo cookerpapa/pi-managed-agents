@@ -45,7 +45,7 @@ function turn(items: ToolTranscriptItem[]): TurnView {
   };
 }
 it.each(["show_image", "generate_image"])(
-  "presents %s outside collapsed activities with no duplicate in Tool details",
+  "presents %s immediately after its own row with no duplicate in Tool details",
   (name) => {
     const images = tool("show", name);
     const rows = deriveConversationPresentationRows([
@@ -53,12 +53,13 @@ it.each(["show_image", "generate_image"])(
       images,
       tool("after", "read"),
     ]);
-    expect(rows.map((r) => r.kind)).toEqual(["activity", "images", "activity"]);
+    expect(rows.map((r) => r.kind)).toEqual(["tool", "tool", "images", "tool"]);
     const html = renderToStaticMarkup(
       <ConversationTurn turn={turn([tool("before", "bash"), images, tool("after", "read")])} />,
     );
     expect(html.match(/<img /g)).toHaveLength(1);
-    expect(html).toContain('data-expanded="false"');
+    expect(html).toContain(`data-tool-name="${name}"`);
+    expect(html).not.toContain("<details open");
     expect(html).toContain('class="product-tool-images"');
     expect(html).toContain("页面效果 &lt;script&gt;");
     expect(html).not.toContain("<script>");

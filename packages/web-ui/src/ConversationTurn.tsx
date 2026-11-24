@@ -1,5 +1,5 @@
 import { InitialInputMessage } from "./InitialInputMessage.tsx";
-import { useHistoryDisclosure, HistoryDisclosureContext } from "./history-disclosure.tsx";
+import { HistoryDisclosureContext } from "./history-disclosure.tsx";
 import { CompactStatus } from "./ConversationUsage.tsx";
 import type { ConversationCompactResource } from "@pi-cloud/protocol";
 import { UploadCards } from "./UploadCards.tsx";
@@ -12,14 +12,14 @@ import {
 import { ToolImages } from "./ToolImages.tsx";
 import { Markdown } from "./Markdown.tsx";
 import type { TranscriptItem, TurnView } from "@pi-cloud/session-client";
-import { compactToolSummary, ToolActivity, type ToolTranscriptItem } from "./ToolActivity.tsx";
+import { ToolActivity } from "./ToolActivity.tsx";
 import { useI18n } from "./i18n.tsx";
 import { MessageCopyButton } from "./MessageCopyButton.tsx";
 import { ToolProgressContext } from "./tool-progress.tsx";
 import type { ToolProgressStore } from "./tool-progress-store.ts";
 import { RunStatus } from "./RunStatus.tsx";
 import type { RunObservationStore } from "./run-observation-store.ts";
-import { ChildAgentProgress, ChildAgentProgressContext } from "./ChildAgentProgress.tsx";
+import { ChildAgentProgressContext } from "./ChildAgentProgress.tsx";
 import type { DelegatedSessionSummaryResource } from "@pi-cloud/protocol";
 
 const MAXIMUM_PROGRESSIVE_CHARACTERS_PER_FRAME = 32;
@@ -205,72 +205,6 @@ function AssistantTextItem({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function activitySummary(items: readonly ToolTranscriptItem[]): string {
-  const counts = new Map<string, number>();
-  for (const item of items) counts.set(item.toolName, (counts.get(item.toolName) ?? 0) + 1);
-  return [...counts.entries()]
-    .map(([name, count]) => (count > 1 ? `${name} ×${String(count)}` : name))
-    .join(" · ");
-}
-
-function ToolActivityGroup({ items }: { items: readonly ToolTranscriptItem[] }) {
-  const { t } = useI18n();
-  const running = items.some((item) => item.status === "running");
-  const issue = items.some((item) => item.status === "failed" || item.status === "unknown");
-  const turnId = useContext(ChildAgentProgressContext)?.turnId ?? "";
-  const groupsExpanded = useContext(HistoryDisclosureContext)?.toolGroupsExpanded ?? false;
-  const [expanded, setExpanded] = useHistoryDisclosure(
-    items.map((item) => `${turnId}\0${item.toolCallId}\0activity`),
-    groupsExpanded,
-  );
-  if (items.length === 1) return <ToolActivity item={items[0]!} />;
-  const current =
-    items.reduce<ToolTranscriptItem | undefined>(
-      (candidate, item) => (item.status === "running" ? item : candidate),
-      undefined,
-    ) ?? items.at(-1)!;
-  const summary = running ? compactToolSummary(current) : activitySummary(items);
-  return (
-    <section className="product-activity-group" data-expanded={expanded}>
-      <button
-        aria-expanded={expanded}
-        className="product-activity-group-toggle"
-        onClick={() => setExpanded(!expanded)}
-        type="button"
-      >
-        <span
-          aria-hidden="true"
-          className={`product-activity-chevron ${expanded ? "expanded" : ""}`}
-        >
-          ›
-        </span>
-        <span
-          aria-hidden="true"
-          className={`product-activity-status ${running ? "running" : issue ? "issue" : ""}`}
-        >
-          {running ? "◌" : issue ? "!" : "✓"}
-        </span>
-        <strong>{t("turn.activitySteps", { count: items.length })}</strong>
-        <span title={summary}>{summary}</span>
-      </button>
-      {!expanded ? (
-        <div className="product-activity-results">
-          {items.map((item) => (
-            <ChildAgentProgress key={item.key} toolCallId={item.toolCallId} />
-          ))}
-        </div>
-      ) : null}
-      {expanded ? (
-        <div className="product-activity-group-items">
-          {items.map((item) => (
-            <ToolActivity item={item} key={item.key} />
-          ))}
-        </div>
-      ) : null}
-    </section>
   );
 }
 
@@ -566,8 +500,8 @@ export function ConversationTurn({
                     />
                   );
                 }
-                if (row.kind === "activity") {
-                  return <ToolActivityGroup items={row.items} key={row.key} />;
+                if (row.kind === "tool") {
+                  return <ToolActivity item={row.item} key={row.key} />;
                 }
                 if (row.kind === "hosted_search") {
                   return <HostedSearchGroup items={row.items} key={row.key} />;

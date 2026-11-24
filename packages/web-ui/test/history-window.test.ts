@@ -284,6 +284,7 @@ describe("conversation read windows", () => {
       tools = Array.from({ length: 1200 }, (_, i) => ({
         kind: "tool" as const,
         key: "tool-" + i,
+        historyCursor: "cursor-" + i,
         toolCallId: `task:${i + 2}`,
         toolName: "bash",
         input: { command: "pwd" },
@@ -293,14 +294,10 @@ describe("conversation read windows", () => {
         pageKey: "page-" + Math.floor(i / 64),
       }));
     const rows = virtualConversationRows([{ ...base, items: tools }]);
-    expect(rows.length).toBeGreaterThan(100);
-    expect(
-      rows
-        .filter((r) => r.fragment.rows[0]?.kind === "activity")
-        .every(
-          (r) => r.fragment.rows[0]?.kind === "activity" && r.fragment.rows[0].items.length <= 12,
-        ),
-    ).toBe(true);
+    const toolRows = rows.filter((r) => r.fragment.rows[0]?.kind === "tool");
+    expect(toolRows).toHaveLength(tools.length);
+    expect(new Set(toolRows.map((r) => r.key)).size).toBe(tools.length);
+    expect(toolRows.map((r) => r.cursor)).toEqual(tools.map((t) => t.historyCursor));
   });
   it("keeps an active Tool while evicting settled output and uses its Task for look-back", () => {
     const pending = {

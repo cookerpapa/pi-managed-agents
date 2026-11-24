@@ -368,16 +368,6 @@ function renderContext(item: ToolTranscriptItem, t: Translate): ToolRenderContex
   };
 }
 
-export function compactToolSummary(item: ToolTranscriptItem): string {
-  if (item.toolName === "show_image" || item.toolName === "generate_image") return item.toolName;
-  const input = objectValue(item.input);
-  const path = stringValue(input?.path);
-  const command = stringValue(input?.command);
-  if (item.toolName === "bash" && command !== null) return command.split("\n")[0]!.slice(0, 100);
-  if (path !== null) return path;
-  return item.toolName;
-}
-
 export function ToolActivity({ item }: { item: ToolTranscriptItem }) {
   const { t } = useI18n();
   const context = renderContext(item, t);
