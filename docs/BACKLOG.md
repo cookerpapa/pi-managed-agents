@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Exercise proposal, execute-intent, reply-only and canonical Bash-result boundaries across one or two Worker losses. [Sealed Bash experiment](reports/sealed-bash-unknown-20261125.md).
+
 - [x] Validate exact Entry paging, combine Run updates with matching display coverage, and test partition handoff and memory-only Tool waits. [Candidate page and write measurements](reports/candidate-page-and-write-cost-20261124.md).
 - [ ] Resolve cold-reader and broker-retention requirements before removing durable pending Tool references. The current candidate keeps them.
 

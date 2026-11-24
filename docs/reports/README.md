@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Bash outcome after Worker loss](sealed-bash-unknown-20261125.md) covers the cut between the original reply mailbox and accepted native history.
+
 - [Candidate page and write costs](candidate-page-and-write-cost-20261124.md) covers exact Entry reads, combined Run writes, failure gates and browser-visible result latency.
 
 - [Browser scroll demand and single-primary database cost](scroll-demand-and-primary-cost-20261124.md) distinguishes wheel gestures from history requests, and buffer hits from device reads.

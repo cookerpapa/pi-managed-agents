@@ -242,7 +242,22 @@ export function foldToolReferences(
         original.allocationSpanStart !== undefined &&
         task.state.outcome?.status === "completed" &&
         BigInt(view.confirmedUseSpans?.[original.conversationId] ?? -1) <
-          BigInt(original.allocationSpanStart);
+          BigInt(original.allocationSpanStart) &&
+        // A native result synthesized after Worker loss supplies no observation of the VM.
+        !fact.commit.writes.some(
+          (w) =>
+            w.type === "entry" &&
+            w.value.byTaskId === task.id &&
+            w.value.kind === "pi.tool-result" &&
+            w.value.model?.some(
+              (m) =>
+                m.role === "toolResult" &&
+                m.toolName === "bash" &&
+                m.isError &&
+                m.details?.code === "tool_operation_outcome_unknown" &&
+                m.details?.reason === "worker_replaced",
+            ),
+        );
       frame.ops.push({
         kind: "tool-settled",
         ...(confirmUse ? { confirmUse } : {}),

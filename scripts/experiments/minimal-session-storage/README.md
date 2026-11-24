@@ -736,3 +736,11 @@ The [candidate read/write comparison](../../../docs/reports/candidate-page-and-w
 Select `PI_CLOUD_COMPARE_FLOW_HISTORY=1` with `grants-million-day` for a matched 50 ms comparison on a single fixed tape. The control uses the baseline Run layout. The Flow arm seeds each independent Session at a real predecessor with a distinct public window. Both use the same projection SQL and Kafka keys. The existing benchmark calls its physical stream column `session_id`; the Flow installer maps that column to the prototype's `flow_id`. Admission and window detachment are measured independently from Kafka replay.
 
 For the directory closure path use the existing operator fixture with `--directory-recovery-web` and an unused report path. It stages the matched fixed Guest executable only in its owned disposable VM. Real Chrome receives the returned drafts, selects a real directory and submits the next Run through the Session API. [Evidence](../../../docs/reports/directory-recovery-and-flow-20261123.md).
+
+## Ordinary Bash after Worker loss
+
+Run the [sealed Bash fault matrix](../../../docs/reports/sealed-bash-unknown-20261125.md) with a disposable PostgreSQL, three Kafka brokers and an isolated marker container.
+
+```sh
+TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/bash-loss-study.mjs
+```

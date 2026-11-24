@@ -28,6 +28,7 @@ export type RemoteInvocation = {
   context: Context;
   recovery?: true;
 };
+export type BashWaitLookup = (taskId: number, conversationId: number, callId: string) => boolean;
 export type PreparedRemoteInvocation = {
   command: CandidateToolEffect;
   result(): Promise<ToolExecutionResult>;
@@ -53,6 +54,7 @@ export class DurableRemoteTools {
     readonly options: {
       definitions: readonly Omit<ToolRegistration, "execute">[];
       prepare(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation>;
+      isInterruptedBash?: BashWaitLookup;
       recover?(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation>;
     },
   ) {
@@ -108,6 +110,27 @@ export class DurableRemoteTools {
       replay: definition.replay ?? "unsafe",
       execute: async (args, api, context) => {
         let pending = this.#pending.get(api.taskId);
+        if (
+          !pending &&
+          definition.name === "bash" &&
+          options.isInterruptedBash?.(api.taskId, api.conversationId, api.callId)
+        ) {
+          context.abortSignal?.throwIfAborted();
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: "The previous Worker stopped before this Bash result was recorded. The command may have run. Check its effects or logs before deciding whether to run it again.",
+              },
+            ],
+            details: {
+              code: "tool_operation_outcome_unknown",
+              effect: "unknown",
+              reason: "worker_replaced",
+            },
+          };
+        }
         if (!pending && !this.#names.has(definition.name))
           throw new Error(`tool_unavailable: ${definition.name} was withdrawn before admission`);
         if (!pending && definition.replay === "safe") {

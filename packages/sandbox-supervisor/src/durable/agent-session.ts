@@ -61,6 +61,7 @@ import {
 } from "./scoped-models.ts";
 import {
   DurableRemoteTools,
+  type BashWaitLookup,
   type PreparedRemoteInvocation,
   type RemoteInvocation,
 } from "./remote-tools.ts";
@@ -163,6 +164,7 @@ export class DurableAgentSession {
     readonly storage: Storage,
     options: {
       models: Models;
+      isInterruptedBash?: BashWaitLookup;
       remoteTools: readonly Omit<ToolRegistration, "execute">[];
       infrastructureTools?: readonly ToolRegistration[];
       publicEgress?: () => GuestPublicEgress;
@@ -197,6 +199,7 @@ export class DurableAgentSession {
     });
     this.remote = new DurableRemoteTools({
       definitions: options.remoteTools,
+      ...(options.isInterruptedBash ? { isInterruptedBash: options.isInterruptedBash } : {}),
       prepare: (invocation) => this.#prepareRemote(invocation),
       recover: async (invocation) => {
         const prepared = await this.#prepareRemote(invocation);
@@ -376,6 +379,7 @@ export class DurableAgentSession {
     storage: Storage,
     options: {
       models: Models;
+      isInterruptedBash?: BashWaitLookup;
       remoteTools: readonly Omit<ToolRegistration, "execute">[];
       infrastructureTools?: readonly ToolRegistration[];
       publicEgress?: () => GuestPublicEgress;

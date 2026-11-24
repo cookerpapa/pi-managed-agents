@@ -1,0 +1,5 @@
+# ADR-0359. Settle an interrupted sandbox Bash as unknown in the handoff experiment
+
+In the opt-in #52 sealed-family composition, a successor can turn a still-pending ordinary sandbox Bash execution into a native Tool Result with an unknown outcome. The ordered predecessor seal determines which commits count. A proposal without an admitted execution intent continues through Pi validation. A canonical result in the sealed prefix wins even if the projector had fallen behind at the time of failure. A reply in the old Worker mailbox alone is insufficient. Only newly submitted tools use the successor's normal mailbox.
+
+Use Pi Durable's existing public Tool registration and native settlement. Match the proved task, Conversation and model call; preserve cancellation priority. Other tools keep their original handoff policy. Save the result through the successor writer; a second handoff before or after that commit must not redispatch the command or create another result. This experiment changes neither the serving deployment nor the PG storage layout, and makes no change to ordinary operation deadlines or broker cleanup.

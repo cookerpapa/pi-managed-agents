@@ -128,11 +128,14 @@ type Owner = {
     { operationId: string; activationId: string; writerId: string; target: "cube" | "executor" }
   >;
   recoveredControlTools: Map<number, { toolName: string; conversationId: number }>;
+  interruptedBash: Map<number, { conversationId: number; callId: string }> | undefined;
 };
 export type DurableSessionHandle = {
   binding: DurableRunBinding;
   storage: import("@earendil-works/pi-durable").Storage;
   recordSequence(id: number): Promise<number | undefined>;
+  /** Positive only for this owner's sealed, unresolved sandbox Bash task. */
+  isInterruptedBash?(taskId: number, conversationId: number, callId: string): boolean;
   remoteToolIntent(taskId: number, conversationId: number): Promise<OriginalRemoteToolIntent>;
   committedSequence(): number;
   authority: ActiveExecutionAuthority;
@@ -160,6 +163,8 @@ export class PostgresDurableSessionHost {
       /** Matched candidate composition for reopening a sealed family. The selected
        * native store owns subsequent publications; the host owns lease and mailbox lifetime. */
       sealedRecovery?: {
+        /** ADR-0359 experiment. Other pending Tools still restore their original mailbox. */
+        bashOnWorkerLoss?: "unknown";
         topic: string;
         delegatedRuns?: boolean;
         hydrate(
@@ -692,6 +697,10 @@ export class PostgresDurableSessionHost {
       const readFailed = (error: Error) => interruption.abort(error);
       const runs = new Map<number, DurableSessionOpen>(),
         bindings = new Map<number, DurableRunBinding>();
+      const interruptedBash: Owner["interruptedBash"] =
+        this.options.sealedRecovery?.bashOnWorkerLoss === "unknown" && !input.stopOnResume
+          ? new Map()
+          : undefined;
       const recoveredOperations: Owner["recoveredOperations"] = new Map();
       const recoveredControlTools: Owner["recoveredControlTools"] = new Map();
       const storage = (async () => {
@@ -719,7 +728,10 @@ export class PostgresDurableSessionHost {
             for (const write of commit.writes) {
               if (write.type !== "task") continue;
               const task = durableToolState(write.value);
-              if (task?.terminal && recoveredControlTools.has(task.id))
+              if (
+                task?.terminal &&
+                (recoveredControlTools.has(task.id) || interruptedBash?.has(task.id))
+              )
                 completedRecoveries.push(task.id);
               const original = task && recoveredOperations.get(task.id);
               if (!task || !original) continue;
@@ -798,6 +810,7 @@ export class PostgresDurableSessionHost {
               acknowledged = true;
               preparation?.confirmed();
               for (const id of completedRecoveries) {
+                interruptedBash?.delete(id);
                 recoveredOperations.delete(id);
                 recoveredControlTools.delete(id);
               }
@@ -841,13 +854,20 @@ export class PostgresDurableSessionHost {
           const store = await source.hydrate(family, authority, publish);
           try {
             await authority.assertCurrent();
-            if (!input.stopOnResume && family.intents.length) {
-              if (!this.options.restoreReplies)
-                throw Error("Remote Tool reply recovery is not configured");
-              await this.options.restoreReplies(
-                family.intents.map(({ operationId, reply }) => ({ operationId, reply })),
-                readSignal,
-              );
+            if (!input.stopOnResume) {
+              const waits = family.intents.filter(({ taskId, conversationId, reply }) => {
+                if (!interruptedBash || reply.toolName !== "bash") return true;
+                interruptedBash.set(taskId, { conversationId, callId: reply.toolCallId });
+                return false;
+              });
+              if (waits.length) {
+                if (!this.options.restoreReplies)
+                  throw Error("Remote Tool reply recovery is not configured");
+                await this.options.restoreReplies(
+                  waits.map(({ operationId, reply }) => ({ operationId, reply })),
+                  readSignal,
+                );
+              }
             }
             await authority.assertCurrent();
             return store;
@@ -893,6 +913,7 @@ export class PostgresDurableSessionHost {
         readSignal,
         recoveredOperations,
         recoveredControlTools,
+        interruptedBash,
         display: new Map(),
         publicationTail: Promise.resolve(),
         releaseTail: Promise.resolve(),
@@ -929,12 +950,25 @@ export class PostgresDurableSessionHost {
       return releasing;
     };
     try {
+      const { interruptedBash } = currentOwner;
       const storage = await owner.storage;
       await owner.authority.assertCurrent();
       return {
         binding,
         storage,
         recordSequence: (id) => storage.recordSequence(id),
+        ...(interruptedBash?.size
+          ? {
+              isInterruptedBash: (taskId: number, conversationId: number, callId: string) => {
+                const wait = interruptedBash.get(taskId);
+                if (!wait) return false;
+                currentOwner.authority.assertActive();
+                if (wait.conversationId !== conversationId || wait.callId !== callId)
+                  throw Error("Sealed Bash identity changed");
+                return true;
+              },
+            }
+          : {}),
         remoteToolIntent: (taskId, conversationId) =>
           this.originalRemoteIntent(binding.executionReference, conversationId, taskId),
         committedSequence: () => storage.committedSequence,

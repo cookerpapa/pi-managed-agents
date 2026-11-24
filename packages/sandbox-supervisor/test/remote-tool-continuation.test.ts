@@ -13,9 +13,13 @@ import { androidToolDefinitions, type DurableSessionCommit } from "@pi-cloud/pro
 import { DurableAgentSession } from "../src/durable/agent-session.ts";
 import { fixedRemoteToolDefinitions } from "../src/fixed-remote-tool-definitions.ts";
 
-it.each(["bash", "android_tap"])(
-  "Pi restores the original %s proxy wait without another effect",
-  async (toolName) => {
+it.each([
+  { toolName: "bash", sealed: false },
+  { toolName: "bash", sealed: true },
+  { toolName: "android_tap", sealed: true },
+])(
+  "Pi settles $toolName with sealed Bash policy $sealed without another effect",
+  async ({ toolName, sealed }) => {
     const models = createModels(),
       provider = fauxProvider({ tokensPerSecond: 1_000_000 });
     models.setProvider(provider.provider);
@@ -195,16 +199,36 @@ it.each(["bash", "android_tap"])(
       }
     })();
     for (const writes of prefix) await restored.commit(writes, context);
-    runtime = await DurableAgentSession.open(restored, options as never);
+    const unknown = sealed && toolName === "bash";
+    let matches = 0;
+    runtime = await DurableAgentSession.open(restored, {
+      ...options,
+      ...(sealed
+        ? {
+            isInterruptedBash: (taskId: number, lane: number, callId: string) => {
+              expect(toolName).toBe("bash");
+              const task = prefix
+                .flat()
+                .findLast((w) => w.type === "task" && Number(w.value.id) === taskId);
+              expect(task).toMatchObject({ value: { conversationId: lane, input: { callId } } });
+              matches++;
+              return true;
+            },
+          }
+        : {}),
+    } as never);
     try {
       const root = await runtime.bind(binding as never, "reattach");
       runtime.harness.resume();
       await root.waitForIdle(context);
       const messages = (await root.context(context)).messages;
-      expect(reattached).toBe(1);
+      expect(reattached).toBe(unknown ? 0 : 1);
+      expect(matches).toBe(unknown ? 1 : 0);
       expect(dispatched).toBe(1);
       expect(messages.filter((m) => m.role === "toolResult")).toHaveLength(1);
-      expect(JSON.stringify(messages)).toContain("ORIGINAL RESULT");
+      expect(JSON.stringify(messages)).toContain(
+        unknown ? "tool_operation_outcome_unknown" : "ORIGINAL RESULT",
+      );
       expect(JSON.stringify(messages)).toContain("DONE");
     } finally {
       await runtime.close();

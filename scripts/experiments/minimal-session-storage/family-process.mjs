@@ -10,9 +10,9 @@ export async function until(fn, label, timeout = 60000) {
   } while (Date.now() < end);
   throw Error("Timed out " + label);
 }
-export function familyWorker(options) {
+export function familyWorker(options, workerModule = "./retained-family-worker.mjs") {
   const events = [];
-  const proc = fork(fileURLToPath(new URL("./retained-family-worker.mjs", import.meta.url)), [], {
+  const proc = fork(fileURLToPath(new URL(workerModule, import.meta.url)), [], {
     execArgv: ["--import", "tsx"],
     stdio: ["ignore", "inherit", "inherit", "ipc"],
   });

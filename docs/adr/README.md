@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0359](0359-sealed-bash-unknown.md) defines the candidate Bash handoff experiment.
+
 [ADR-0358](0358-candidate-projection-cost.md) evaluates candidate history reads and projection writes.
 
 [ADR-0357](0357-flow-base-admission-study.md) compares frozen-base and moving-head Run admission in the isolated Flow layouts.

@@ -1,0 +1,88 @@
+[
+  {
+    "scene": "proposal",
+    "workerBoots": 2,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "success",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0
+  },
+  {
+    "scene": "pending",
+    "workerBoots": 2,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "unknown",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0,
+    "beforeOriginalDeadline": true
+  },
+  {
+    "scene": "not-delivered",
+    "workerBoots": 2,
+    "executions": 0,
+    "canonicalResults": 1,
+    "outcome": "unknown",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0,
+    "beforeOriginalDeadline": true
+  },
+  {
+    "scene": "mailbox",
+    "workerBoots": 2,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "unknown",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0,
+    "beforeOriginalDeadline": true
+  },
+  {
+    "scene": "canonical-kafka",
+    "workerBoots": 2,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "success",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0
+  },
+  {
+    "scene": "canonical-pg",
+    "workerBoots": 2,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "success",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0
+  },
+  {
+    "scene": "twice-before",
+    "workerBoots": 3,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "unknown",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0,
+    "beforeOriginalDeadline": true
+  },
+  {
+    "scene": "twice-after",
+    "workerBoots": 3,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "unknown",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0,
+    "beforeOriginalDeadline": true
+  },
+  {
+    "scene": "stop",
+    "workerBoots": 2,
+    "executions": 1,
+    "canonicalResults": 1,
+    "outcome": "aborted",
+    "oldMailboxSubscriptions": 0,
+    "pendingAfterSettlement": 0
+  }
+]

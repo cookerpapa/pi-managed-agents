@@ -14,8 +14,8 @@ export function fixedRemoteToolDefinitions(): Omit<ToolRegistration, "execute">[
   return [createReadTool(), createWriteTool(), createEditTool(), bash].map(
     ({ execute: _execute, replay: _replay, ...tool }) => ({
       ...tool,
-      // Only the cloud proxy is repeatable: recovery reconnects to its original
-      // durable operation and never repeats the underlying shell/file action.
+      // The cloud proxy can settle its original invocation after recovery without
+      // repeating the underlying shell or file action.
       replay: "safe" as const,
       executionMode: tool.name === "read" ? "parallel" : "sequential",
       parameters:

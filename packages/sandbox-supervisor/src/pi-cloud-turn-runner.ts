@@ -486,6 +486,7 @@ export class PiCloudTurnRunner {
               owner.storage,
               {
                 models: registry.models,
+                ...(owner.isInterruptedBash ? { isInterruptedBash: owner.isInterruptedBash } : {}),
                 remoteTools: [
                   ...fixedRemoteToolDefinitions(),
                   ...(options.trustedToolDefinitions?.current() ?? []).filter(
