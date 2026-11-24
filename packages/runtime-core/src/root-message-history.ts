@@ -207,6 +207,11 @@ export async function readRootMessageWindow(
     ) => sql`and (${seq},${ord}) <= (t.through_seq,t.through_ordinal)
         ${cursor ? sql`and (${seq},${ord}) ${compare} (t.seek_seq,t.seek_ordinal)` : sql``}`,
     limit = (input.maxRecords ?? HISTORY_PAGE_RECORDS) + 1;
+  // A native Entry is unique within a physical stream. Locate it before testing
+  // Run membership so a long Run cannot turn each dependency into a range scan.
+  const assistantAt = sql`left join lateral(select a.entry_id,a.run_id,a.content from messages a
+    where p.assistant_id is not null and a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid
+      and a.conversation_id=${lane} and a.entry_id=p.assistant_id::bigint limit 1) a on a.run_id=r.id`;
   const meta = await sql<
     HistoryWindowPoint & { pending: boolean; run_id: string }
   >`select p.*,r.id as run_id,${turnId} as turn_id,s.pi_session_id,${flows ? sql`${input.sessionId}::uuid` : sql`r.session_id`} as origin_session_id,t.turn_index,
@@ -223,7 +228,7 @@ export async function readRootMessageWindow(
         ${bound(sql.raw("(v->>'seq')::bigint"), sql.raw("(v->>'ordinal')::int"))}
       union all select '0',0,0,'{}'::jsonb,${headerBytes},null,null,true,false
         where true ${bound(sql.raw("0"), sql.raw("0"))}
-    ) p left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.conversation_id=${lane} and a.run_id=r.id and a.entry_id=p.assistant_id::bigint
+    ) p ${assistantAt}
     order by t.turn_index,p.seq ${order},p.ordinal ${order} limit ${limit}`.execute(db);
   const { selected, bytes } = selectHistoryPoints(meta.rows, input);
   const picked = meta.rows.slice(0, selected.length).filter((p) => !p.header);
@@ -255,10 +260,10 @@ export async function readRootMessageWindow(
       from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
       join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid ${flows ? sql`` : sql`and r.session_id=${input.sessionId}::uuid`}
       ${sessionJoin}
-      left join messages m on not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid and m.run_id=r.id and m.entry_id=p.id and m.conversation_id=${lane}
-      left join messages a on a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid and a.run_id=r.id and a.entry_id=p.assistant_id and a.conversation_id=${lane}`.execute(
-      db,
-    );
+      left join lateral(select m.run_id,m.content,m.created_at,m.source_input_id from messages m
+        where not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid
+          and m.entry_id=p.id and m.conversation_id=${lane} limit 1) m on m.run_id=r.id
+      ${assistantAt}`.execute(db);
     for (const r of bodies.rows) {
       const entry = r.pending
         ? {

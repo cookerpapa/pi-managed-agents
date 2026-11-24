@@ -1,6 +1,6 @@
 // Each SQL helper executes the original parameterized mutation. The ordered
 // loop and partition checkpoint execute in one synchronous autocommit call.
-export async function installPrefixSql(db, { message, inbox, finishAndRelease }) {
+export async function installPrefixSql(db, { message, presentedMessage, inbox, finishAndRelease }) {
   const replaceUsage = `on conflict(tenant_id,pi_session_id,conversation_id) do update
     set commit_seq=excluded.commit_seq,ordinal=excluded.ordinal,value=excluded.value
     where u.doc_id=excluded.doc_id and (u.commit_seq,u.ordinal)<(excluded.commit_seq,excluded.ordinal)`;
@@ -8,18 +8,26 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
     row,
   ) => `(${row}->>'tenant')::uuid,(${row}->>'session')::uuid,(${row}->>'conversation')::bigint,
     (${row}->>'document')::bigint,(${row}->>'seq')::bigint,(${row}->>'ordinal')::int,${row}->'value'`;
+  const waitAssignment = `projection_tools=case when op->>'kind'='tool'
+                then jsonb_set(projection_tools,array[a->>4],a->5) else projection_tools-(a->>4) end,
+                cancel_positions=case when op->>'kind'='tool-settled' and a->6 is null then cancel_positions-(a#>>'{5,operationId}') else cancel_positions end`;
+  const displayAssignment = `output_first_topic=coalesce(output_first_topic,p_topic),
+    output_first_partition=coalesce(output_first_partition,p_partition),output_first_offset=coalesce(output_first_offset,(frame->>'offset')::bigint),
+    output_display_seq=greatest(output_display_seq,(d->>'through')::bigint),output_display_native_seq=greatest(output_display_native_seq,(d->>'seq')::bigint)`;
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
     alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,add column native_work_handoff jsonb,add column root_compacts jsonb,add column root_input_receipts jsonb,add column root_human_inputs text,add column root_input_seq bigint not null default 0,
       add column cancel_positions jsonb not null default '{}',add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
     create index active_projection_start on runs(projection_partition,projection_first) where state in ('running','cancel_requested') and projection_first is not null;
     create function prefix_message(uuid,uuid,uuid,bigint,text,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${message} $fn$;
+    create function prefix_presented_message(uuid,uuid,uuid,bigint,text,uuid,text,int,bigint,bigint) returns table(accepted boolean,writes int)
+      language plpgsql volatile as $fn$ begin return query ${presentedMessage}; end $fn$;
     create function prefix_inbox(uuid,uuid,bigint,bigint,bigint,int,text,uuid,uuid) returns table(accepted boolean,writes int)
       language sql volatile as $fn$ ${inbox} $fn$;
     create function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${finishAndRelease} $fn$;
     create function project_ready(p_topic text,p_partition int,p_expected bigint,p_next bigint,p_frames jsonb,p_relaxed boolean default false,p_allow_finish boolean default false,p_bulk_usage boolean default false)
     returns text language plpgsql as $body$
-    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; owner_state text; suppress_dispatch boolean := false; snap jsonb; pending_usage jsonb[];
+    declare saved bigint; frame jsonb; op jsonb; a jsonb; ok boolean; n int; applied int; owner_state text; suppress_dispatch boolean := false; snap jsonb; pending_usage jsonb[]; display_written boolean; combine_wait_display boolean; d jsonb;
     begin
       select next_offset into strict saved from accepted_fact_projection_offsets
        where topic=p_topic and partition=p_partition for update;
@@ -29,7 +37,8 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
         if p_relaxed and (coalesce((frame->>'strict')::boolean,false) or
           (jsonb_array_length(frame->'ops')>0 and (frame->>'history')::boolean is distinct from true)) then
           raise exception 'Control boundary in asynchronous transaction'; end if;
-        applied:=0;
+        applied:=0; display_written:=false; d:=frame->'rootDisplay';
+        combine_wait_display:=d is not null and (frame->'ops' @> '[{"kind":"tool"}]' or frame->'ops' @> '[{"kind":"tool-settled"}]');
         for op in select value from jsonb_array_elements(frame->'ops') loop
           a:=op->'args';
           if p_relaxed and ((op->>'kind' not in ('message','tool','inbox','pin','world') and not (op->>'kind'='finish' and p_allow_finish)) or
@@ -81,7 +90,15 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
               where id=(a->>2)::uuid and tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
             ok:=found;n:=1;
           when 'message' then
-            select accepted,writes into strict ok,n from prefix_message((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid);
+            if d is not null and not display_written and not combine_wait_display and d->>'tenant'=a->>0 and d->>'session'=a->>1
+              and d->>'run'=a->>2 and d->>'writer'=a->>5 and (d->>'seq')::bigint=(a->>3)::bigint then
+              select accepted,writes into strict ok,n from prefix_presented_message(
+                (a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid,
+                p_topic,p_partition,(frame->>'offset')::bigint,(d->>'through')::bigint);
+              display_written:=true;
+            else
+              select accepted,writes into strict ok,n from prefix_message((a->>0)::uuid,(a->>1)::uuid,(a->>2)::uuid,(a->>3)::bigint,a->>4,(a->>5)::uuid);
+            end if;
           when 'inbox' then
             select accepted,writes into strict ok,n from prefix_inbox((a->>0)::uuid,(a->>1)::uuid,(a->>2)::bigint,(a->>3)::bigint,(a->>4)::bigint,(a->>5)::int,a->>6,(a->>7)::uuid,(a->>8)::uuid);
           when 'finish' then
@@ -114,9 +131,13 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
                 on conflict(tenant_id,pi_session_id,conversation_id) do update set state=excluded.state,seen_offset=excluded.seen_offset
                   where (w.seen_offset is null or w.seen_offset<=excluded.seen_offset) and w.state#>>'{sandbox,continuityId}' is distinct from excluded.state#>>'{sandbox,continuityId}';
               end if;
-              update runs set projection_tools=case when op->>'kind'='tool'
-                then jsonb_set(projection_tools,array[a->>4],a->5) else projection_tools-(a->>4) end,
-                cancel_positions=case when op->>'kind'='tool-settled' and a->6 is null then cancel_positions-(a#>>'{5,operationId}') else cancel_positions end where id=(a->>2)::uuid;
+              if combine_wait_display and not display_written and d->>'tenant'=a->>0 and d->>'session'=a->>1
+                and d->>'run'=a->>2 and d->>'writer'=a->>3 then
+                update runs set ${waitAssignment}, ${displayAssignment} where id=(a->>2)::uuid;
+                display_written:=true;
+              else
+                update runs set ${waitAssignment} where id=(a->>2)::uuid;
+              end if;
               n:=1;
             end if;
           when 'cancel' then
@@ -178,12 +199,9 @@ export async function installPrefixSql(db, { message, inbox, finishAndRelease })
             if not found then raise exception 'Child display scope changed' using errcode='40001'; end if;
           end loop;
         end if;
-        if frame?'rootDisplay' then
-          a:=frame->'rootDisplay';
-          update runs set output_first_topic=coalesce(output_first_topic,p_topic),
-            output_first_partition=coalesce(output_first_partition,p_partition),output_first_offset=coalesce(output_first_offset,(frame->>'offset')::bigint),
-            output_display_seq=greatest(output_display_seq,(a->>'through')::bigint),output_display_native_seq=greatest(output_display_native_seq,(a->>'seq')::bigint)
-            where id=(a->>'run')::uuid and tenant_id=(a->>'tenant')::uuid and session_id=(a->>'session')::uuid and lease_id=(a->>'writer')::uuid and state in ('running','cancel_requested');
+        if d is not null and not display_written then
+          update runs set ${displayAssignment}
+            where id=(d->>'run')::uuid and tenant_id=(d->>'tenant')::uuid and session_id=(d->>'session')::uuid and lease_id=(d->>'writer')::uuid and state in ('running','cancel_requested');
           if not found then raise exception 'Root display owner changed' using errcode='40001'; end if;
         end if;
         if frame?'snapshot' then

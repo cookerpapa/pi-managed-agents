@@ -132,6 +132,28 @@ it("pages a Tool across proposal and result, and restores original input and com
       seq: "8",
       ordinal: 0,
     });
+    // The physical Entry is globally addressable in the stream, but membership
+    // in this exact Run and lane still gates access to its Tool arguments.
+    const unrelated = randomUUID();
+    await pgClient.query(
+      "insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state) values($1,$2,$3,2,$1,'other','fake','completed')",
+      [unrelated, tenant, session],
+    );
+    for (const [sourceRun, lane] of [
+      [unrelated, 1],
+      [run, 2],
+    ]) {
+      await pgClient.query("update messages set run_id=$1,conversation_id=$2 where entry_id=3", [
+        sourceRun,
+        lane,
+      ]);
+      await expect(latest()).rejects.toThrow("Tool assistant dependency is missing");
+    }
+    await pgClient.query("update messages set run_id=$1,conversation_id=1 where entry_id=3", [run]);
+    await pgClient.query("update messages set assistant_entry_id=999 where entry_id=8");
+    await expect(latest()).rejects.toThrow("Tool assistant dependency is missing");
+    await pgClient.query("update messages set assistant_entry_id=3 where entry_id=8");
+    await pgClient.query("delete from runs where id=$1", [unrelated]);
     const cursor = (await readRootMessageWindow(db, input)).positions[0];
     expect(
       (await readRootMessageWindow(db, { ...input, position: cursor })).positions[0].sequence,

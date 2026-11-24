@@ -655,3 +655,97 @@ it.skipIf(!url)(
     });
   },
 );
+
+it.skipIf(!url)(
+  "keeps message, pending Tool and display coverage atomic in the combined Run update",
+  async () => {
+    await fixture(async ({ db, scope, topic, cursor }) => {
+      await db.query(
+        "alter table runs add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint default 0,add output_display_native_seq bigint default 0",
+      );
+      const { tenantId, piSessionId, runId, writerId } = scope;
+      const identity = [tenantId, piSessionId, runId, writerId];
+      const original = {
+        taskId: 11,
+        conversationId: 1,
+        operationId: randomUUID(),
+        reply: { topic: "original", offset: "42" },
+      };
+      const wait = (kind) => ({ kind, count: 1, args: [...identity, 11, original] });
+      const frame = (pos, seq, ops, through) => ({
+        offset: String(pos),
+        ops,
+        rootDisplay: {
+          tenant: tenantId,
+          session: piSessionId,
+          run: runId,
+          writer: writerId,
+          seq,
+          through,
+        },
+      });
+      const entry = (seq, body) => ({
+        kind: "message",
+        count: 1,
+        args: [
+          tenantId,
+          piSessionId,
+          runId,
+          seq,
+          JSON.stringify([
+            { id: seq, conversation: 1, role: "assistant", content: body, ordinal: 0 },
+          ]),
+          writerId,
+        ],
+      });
+      const apply = async (f) =>
+        (
+          await db.query("select project_ready($1,0,$2,$3,$4) outcome", [
+            topic,
+            Number(f.offset),
+            Number(f.offset) + 1,
+            JSON.stringify([f]),
+          ])
+        ).rows[0].outcome;
+      const state = async () =>
+        (
+          await db.query(
+            "select output_first_offset,output_display_seq,output_display_native_seq,projection_tools from runs where id=$1",
+            [runId],
+          )
+        ).rows[0];
+      expect(await apply(frame(0, 1, [entry(1, "call")], 1))).toBe("applied");
+      expect(await apply(frame(1, 2, [wait("tool")], 2))).toBe("applied");
+      expect(await state()).toEqual({
+        output_first_offset: "0",
+        output_display_seq: "2",
+        output_display_native_seq: "2",
+        projection_tools: { 11: original },
+      });
+      const conflict = frame(2, 3, [wait("tool-settled"), entry(1, "conflict")], 3);
+      await expect(apply(conflict)).rejects.toMatchObject({ code: "PZ002" });
+      expect((await state()).projection_tools).toEqual({ 11: original });
+      expect(await cursor()).toBe(2n);
+      expect((await state()).output_display_seq).toBe("2");
+      // The real native result writes the Entry before retiring the Task.
+      const result = frame(2, 3, [entry(3, "result"), wait("tool-settled")], 3);
+      expect(await apply(result)).toBe("applied");
+      expect(await apply(result)).toBe("covered");
+      expect(await state()).toEqual({
+        output_first_offset: "0",
+        output_display_seq: "3",
+        output_display_native_seq: "3",
+        projection_tools: {},
+      });
+      const stale = frame(3, 4, [entry(4, "late")], 4);
+      stale.rootDisplay.writer = stale.ops[0].args[5] = randomUUID();
+      expect(await apply(stale)).toBe("obsolete");
+      expect((await state()).output_display_seq).toBe("3");
+      expect(
+        (await db.query("select content from messages order by commit_seq")).rows.map(
+          (r) => r.content,
+        ),
+      ).toEqual(["call", "result"]);
+    });
+  },
+);

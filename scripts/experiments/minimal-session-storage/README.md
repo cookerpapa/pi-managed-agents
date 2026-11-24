@@ -727,6 +727,8 @@ TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node scripts/run-with-tes
 
 On a Run with 1,024 completed Bash calls, a 115 px upward wheel from the latest page generated zero older-page requests during the gesture and the following 12 seconds. Moving to 200 px from the loaded top fetched one older page; earlier history remained available. The same fixture with the previous collapsed Web bundle fetched 32 older pages following one notch. This measures browser demand on the primary, independently of the cost of each SQL query.
 
+The [candidate read/write comparison](../../../docs/reports/candidate-page-and-write-cost-20261124.md) contains the matched mixed-load and failure commands.
+
 [Workload interpretation and measurements](../../../docs/reports/scroll-demand-and-primary-cost-20261124.md).
 
 [Mixed-load results and study boundaries](../../../docs/reports/flow-tree-and-paging-20261123.md).

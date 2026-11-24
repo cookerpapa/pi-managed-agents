@@ -13,11 +13,28 @@ const inboxSql = (
  where inboxes.doc_id=excluded.doc_id and (inboxes.commit_seq,inboxes.ordinal)<(excluded.commit_seq,excluded.ordinal) returning doc_id`;
 const insertMessages = messageSql(false),
   upsertInbox = inboxSql(false);
-function singleSql(mutation, run, lease) {
-  return `with owner as materialized (select id from runs where tenant_id=$1 and session_id=$2 and id=${run} and lease_id=${lease} and state in ('running','cancel_requested') for share), changed as (${mutation}) select exists(select 1 from owner) as accepted, (select count(*)::int from changed) as writes`;
+const ownerWhere = (run, lease) =>
+  `where tenant_id=$1 and session_id=$2 and id=${run} and lease_id=${lease} and state in ('running','cancel_requested')`;
+function guardedMutation(owner, mutation) {
+  return `with owner as materialized (${owner}), changed as (${mutation}) select exists(select 1 from owner) as accepted, (select count(*)::int from changed) as writes`;
 }
-const oneMessage = singleSql(messageSql(true), "$3", "$6"),
-  oneInbox = singleSql(inboxSql(true), "$8", "$9");
+const oneMessage = guardedMutation(
+  `select id from runs ${ownerWhere("$3", "$6")} for share`,
+  messageSql(true),
+);
+const oneInbox = guardedMutation(
+  `select id from runs ${ownerWhere("$8", "$9")} for share`,
+  inboxSql(true),
+);
+// This frame already needs to advance its Run's display coverage. The admitted
+// UPDATE locks the writer and supplies the input row for the immutable INSERT.
+const presentedMessage = guardedMutation(
+  `update runs set output_first_topic=coalesce(output_first_topic,$7),
+  output_first_partition=coalesce(output_first_partition,$8),output_first_offset=coalesce(output_first_offset,$9),
+  output_display_seq=greatest(output_display_seq,$10),output_display_native_seq=greatest(output_display_native_seq,$4)
+  ${ownerWhere("$3", "$6")} returning id`,
+  messageSql(true),
+);
 // Recount a compacted root inside the same transaction that retires the Run.
 const settledHead = `case when $5::jsonb ? 'recount' then ($5::jsonb - 'recount') ||
   (select jsonb_build_object('count',count(*),'bytes',coalesce(sum(octet_length(m.content)),0))
@@ -33,6 +50,7 @@ export const finishStatement = (
 
 export const projectionTemplates = {
   message: oneMessage,
+  presentedMessage,
   inbox: oneInbox,
   finish: finishStatement(true),
   finishAndRelease: finishStatement(true, true),

@@ -134,7 +134,9 @@ export class DelegatedHistoryReader {
         select c.id as run_id,m.entry_id,m.commit_seq,m.ordinal,m.role,m.created_at,m.source_input_id,m.tool_task_id,
         a.entry_id as assistant_id,octet_length(m.content)+coalesce(octet_length(a.content),0) as entry_bytes
         from runs c join message_entries m on m.tenant_id=c.tenant_id and m.pi_session_id=c.session_id and m.run_id=c.root_run_id and m.conversation_id=c.native_lane
-        left join message_entries a on a.tenant_id=m.tenant_id and a.pi_session_id=m.pi_session_id and a.run_id=m.run_id and a.conversation_id=m.conversation_id and a.entry_id=m.assistant_entry_id
+        left join lateral(select x.entry_id,x.content,x.run_id from message_entries x
+          where m.assistant_entry_id is not null and x.tenant_id=m.tenant_id and x.pi_session_id=m.pi_session_id
+            and x.conversation_id=m.conversation_id and x.entry_id=m.assistant_entry_id limit 1) a on a.run_id=m.run_id
         where c.tenant_id=${tenant}::uuid and c.session_id=${root}::uuid and c.agent_id=${agent}::uuid
         and m.role in ('user','assistant','toolResult','pi.compaction')
         ${before ? sql`and (m.commit_seq,m.ordinal)<(${seq}::bigint,${ordinal}::int)` : sql``}

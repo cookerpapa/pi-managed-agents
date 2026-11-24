@@ -38,14 +38,20 @@ export async function installPagingProjection(db) {
   return projector;
 }
 
-export async function withPagingFixture(url, tenantId, work, { ioTiming = false } = {}) {
+export async function withPagingFixture(
+  url,
+  tenantId,
+  work,
+  { ioTiming = false, liveStream = false } = {},
+) {
   const meta = createDatabase({ connectionString: url, maxConnections: 5 });
   const db = new pg.Pool({
     application_name: "flow-projector",
     connectionString: url,
     options:
       "-c search_path=flow_study" +
-      (ioTiming ? " -c track_io_timing=on -c track_wal_io_timing=on" : ""),
+      (ioTiming ? " -c track_io_timing=on -c track_wal_io_timing=on" : "") +
+      (liveStream ? " -c track_functions=all" : ""),
     max: 12,
   });
   const readDsn = new URL(url);
@@ -130,7 +136,7 @@ export async function withPagingFixture(url, tenantId, work, { ioTiming = false 
       .where("id", "=", root)
       .execute();
     await db.query("analyze runs;analyze sessions;analyze messages");
-    app = await openPageApi(url, readDsn.href);
+    app = await openPageApi(url, readDsn.href, true, undefined, undefined, liveStream);
     const { origin } = app;
     const token = tenant.credential.token;
     const api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), token);
@@ -269,6 +275,8 @@ export async function withPagingFixture(url, tenantId, work, { ioTiming = false 
         createScrollWindow: async (title) =>
           (await store.createSession(proj.projectId, proj.workspaceId, title, "elastic")).sessionId,
         capture: (id, q) => app.capture(token, id, q),
+        publishFrame: app.publishFrame,
+        resetTail: app.resetTail,
         dependencyProbe: app.dependencyProbe,
         flushStats: app.flushStats,
         sqlCpu: (id, q) => app.sqlCpu(token, id, q),

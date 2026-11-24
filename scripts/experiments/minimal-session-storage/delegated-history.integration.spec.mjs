@@ -68,6 +68,54 @@ it.skipIf(!source)(
         ),
         /cursor/,
       );
+      // The continuation's result can refer to a proposal outside this page.
+      const call = {
+        id: 1001,
+        kind: "pi.assistant",
+        model: [
+          {
+            role: "assistant",
+            stopReason: "toolUse",
+            content: [{ type: "toolCall", id: "one", name: "bash", arguments: { command: "pwd" } }],
+          },
+        ],
+      };
+      const result = {
+        id: 1003,
+        kind: "pi.tool-result",
+        byTaskId: 1002,
+        model: [
+          {
+            role: "toolResult",
+            toolCallId: "one",
+            toolName: "bash",
+            content: [{ type: "text", text: "done" }],
+          },
+        ],
+      };
+      await pool.query(
+        `insert into messages(tenant_id,pi_session_id,run_id,conversation_id,entry_id,commit_seq,ordinal,role,content,assistant_entry_id,tool_task_id)
+        values($1,$2,$3,32,1001,1,99,'assistant',$4,null,null),($1,$2,$3,32,1003,1003,0,'toolResult',$5,1001,1002)`,
+        [tenant, root, r2, JSON.stringify(call), JSON.stringify(result)],
+      );
+      const resultInput = async () => {
+        const entries = (await reader.history(tenant, root, a)).entries;
+        assert(!entries.some((e) => e.entryId === 1001));
+        const item = entries.at(-1).items.find((i) => i.kind === "tool");
+        assert(item);
+        return item.input;
+      };
+      assert.deepEqual(await resultInput(), { command: "pwd" });
+      for (const [whichRun, lane] of [
+        [r1, 32],
+        [r2, 4],
+      ]) {
+        await pool.query("update messages set run_id=$1,conversation_id=$2 where entry_id=1001", [
+          whichRun,
+          lane,
+        ]);
+        assert.equal(await resultInput(), null);
+      }
     } finally {
       await db.destroy();
       await pool.query("drop schema if exists " + schema + " cascade");

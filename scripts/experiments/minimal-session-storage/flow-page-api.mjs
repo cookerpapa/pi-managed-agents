@@ -9,7 +9,14 @@ import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import pg from "pg";
 import { capturePageQueries, profilePage, tracePageCpu } from "./flow-page-profile.mjs";
 
-export async function openPageApi(url, readUrl, flowRootHistory = true, referenceRoot, standbyUrl) {
+export async function openPageApi(
+  url,
+  readUrl,
+  flowRootHistory = true,
+  referenceRoot,
+  standbyUrl,
+  liveStream = false,
+) {
   const proc = fork(fileURLToPath(import.meta.url), [], {
     execArgv: ["--import", "tsx"],
     ...(referenceRoot
@@ -43,13 +50,31 @@ export async function openPageApi(url, readUrl, flowRootHistory = true, referenc
     await exited;
   }
   try {
-    const { origin } = await ask({ url, readUrl, flowRootHistory, referenceRoot, standbyUrl });
+    const { origin } = await ask({
+      url,
+      readUrl,
+      flowRootHistory,
+      referenceRoot,
+      standbyUrl,
+      liveStream,
+    });
     return {
       origin,
       counts: () => ask({ op: "counts" }),
+      publishFrame: (tenant, events, covers) => ask({ op: "frame", tenant, events, covers }),
+      resetTail: () => ask({ op: "resetTail" }),
       liveEvent: (tenant, event) => ask({ op: "event", tenant, event }),
       dependencyProbe: (enabled) =>
-        ask({ op: enabled === "exact" ? "depsExact" : enabled ? "depsOn" : "depsOff" }),
+        ask({
+          op:
+            enabled === "original"
+              ? "depsOriginal"
+              : enabled === "exact"
+                ? "depsExact"
+                : enabled
+                  ? "depsOn"
+                  : "depsOff",
+        }),
       flushStats: () => ask({ op: "flushStats" }),
       sqlCpu: (token, id, query) => ask({ op: "sqlCpu", token, id, query }),
       capture: (token, id, query) => ask({ token, id, query }),
@@ -62,7 +87,7 @@ export async function openPageApi(url, readUrl, flowRootHistory = true, referenc
   }
 }
 if (import.meta.main) {
-  const [{ url, readUrl, flowRootHistory, referenceRoot, standbyUrl }] = await once(
+  const [{ url, readUrl, flowRootHistory, referenceRoot, standbyUrl, liveStream }] = await once(
     process,
     "message",
   );
@@ -84,11 +109,12 @@ if (import.meta.main) {
   const guard = standbyUrl
     ? (await import("./replica-history-reader.mjs")).guardedOlderPages(readUrl, standbyUrl)
     : undefined;
-  const live = guard
-    ? new (await import("../../../packages/runtime-core/src/session-live-view.ts")).SessionLiveView(
-        async () => {},
-      )
-    : undefined;
+  const live =
+    guard || liveStream
+      ? new (
+          await import("../../../packages/runtime-core/src/session-live-view.ts")
+        ).SessionLiveView(async () => {})
+      : undefined;
   let app, liveServer, remote, restoreProbe;
 
   try {
@@ -126,14 +152,15 @@ if (import.meta.main) {
     });
     await app.listen(0, "127.0.0.1");
     const origin = await app.getUrl();
-    process.on("message", async ({ id, token, before, cpuLabel, query, op, tenant, event }) => {
+    process.on("message", async (request) => {
+      const { id, token, before, cpuLabel, query, op, tenant, event, events, covers } = request;
       try {
-        if (op === "depsExact" || op === "depsOn" || op === "depsOff") {
+        if (op === "depsOriginal" || op === "depsExact" || op === "depsOn" || op === "depsOff") {
           const previous = restoreProbe?.();
           restoreProbe = undefined;
           if (op !== "depsOff")
             restoreProbe = (await import("./scroll-dependency-probe.mjs")).applyDependencyProbe(
-              op === "depsExact",
+              op === "depsOriginal" ? "original" : op === "depsExact" ? "exact" : "gated",
             );
           process.send({ ok: true, previous });
           return;
@@ -161,6 +188,15 @@ if (import.meta.main) {
         }
         if (op === "counts") {
           process.send(guard.counts());
+          return;
+        }
+        if (op === "frame" || op === "resetTail") {
+          if (op === "resetTail") live.reset();
+          else {
+            for (const item of events) live.accept(tenant, item);
+            for (const ref of covers) live.cover(tenant, ref.sessionId, ref.through);
+          }
+          process.send({ ok: true });
           return;
         }
         if (op === "event") {

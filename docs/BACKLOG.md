@@ -2,6 +2,9 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Validate exact Entry paging, combine Run updates with matching display coverage, and test partition handoff and memory-only Tool waits. [Candidate page and write measurements](reports/candidate-page-and-write-cost-20261124.md).
+- [ ] Resolve cold-reader and broker-retention requirements before removing durable pending Tool references. The current candidate keeps them.
+
 - [x] Audit single-primary history load using actual Chrome wheel events, indexed page plans, separate backend CPU counters and a controlled projector replay. [Scroll and IO evidence](reports/scroll-demand-and-primary-cost-20261124.md).
 
 - [x] Exercise physical PG read splitting with paired Kafka projection, lagged history, primary SSE recovery and a stopped standby. [Study](reports/physical-history-read-split-20261124.md).

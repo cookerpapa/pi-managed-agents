@@ -325,7 +325,7 @@ async function compareFullPages(api, id, q, shape, exact = false) {
     n = exact ? 16 : 64;
   try {
     for (const gated of [false, true, true, false, true, false, false, true]) {
-      await api.dependencyProbe(gated && exact ? "exact" : gated);
+      await api.dependencyProbe(!gated ? "original" : exact ? "exact" : true);
       await Promise.all(Array.from({ length: 8 }, () => api.page(id, q)));
       await api.flushStats();
       const a = await pageCpuSnapshot(api.db);
@@ -439,6 +439,28 @@ async function toolsWindow(api, tenant) {
 async function longRunStudy(api, tenant, plansOnly = false) {
   const id = await api.createScrollWindow("One long tool run");
   await seedToolsWindow(api, tenant, undefined, { id, runs: 1, toolCount: 1024 });
+  const branch = await api.createScrollWindow("Inherited tool history");
+  await api.db.query("select flow_fork($1,$2,fixture_run($2,1),$3,$4)", [
+    tenant,
+    id,
+    branch,
+    randomUUID(),
+  ]);
+  for (const window of [id, branch]) {
+    const newest = await api.page(window, {});
+    const before = newest.history.before;
+    const expected = await api.page(window, { before });
+    const tools = expected.turns.flatMap((turn) =>
+      turn.transcript.items.filter((item) => item.kind === "tool"),
+    );
+    assert(tools.length > 0 && tools.every((tool) => tool.input.command === "npm test"));
+    try {
+      await api.dependencyProbe("original");
+      assert.deepEqual(await api.page(window, { before }), expected);
+    } finally {
+      await api.dependencyProbe(false);
+    }
+  }
   if (!plansOnly)
     await measureWheelDemand(api, { id, marker: "tool-final-1", shape: "one-long-run" });
   const latest = await api.page(id, {}),

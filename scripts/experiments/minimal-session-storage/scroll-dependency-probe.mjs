@@ -2,45 +2,28 @@
 // a dependency lookup to execute only for a non-null assistant Entry pointer.
 import assert from "node:assert/strict";
 import pg from "pg";
-function probeSql(text, exact = false) {
-  const begin = text.lastIndexOf("left join messages a on ");
-  if (begin < 0) return;
-  const order = text.indexOf("order by t.turn_index", begin);
-  const end = order < 0 ? text.length : order;
-  const pred = text.slice(begin + "left join messages a on ".length, end).trim();
-  assert(pred.includes("p.assistant_id"));
-  let gated =
-    text.slice(0, begin) +
-    "left join lateral (select a.entry_id, a.content from messages a where p.assistant_id is not null and " +
-    pred +
-    " limit 1) a on true " +
-    text.slice(end);
-  if (exact) {
-    // Entry IDs are unique within their tenant and physical Pi stream. Look
-    // up that ID first, then validate run membership on the joined row.
-    assert(gated.includes("and a.run_id=r.id "));
-    gated = gated
-      .replace("select a.entry_id, a.content from", "select a.entry_id, a.content, a.run_id from")
-      .replace("and a.run_id=r.id ", "")
-      .replace("limit 1) a on true", "limit 1) a on a.run_id=r.id");
-    const main = /left join messages m on (not p.pending and [^\n]+)\s+left join lateral/;
-    if (order < 0) {
-      assert(main.test(gated));
-      gated = gated.replace(main, (_, condition) => {
-        assert(condition.includes("and m.run_id=r.id "));
-        return (
-          "left join lateral(select m.* from messages m where " +
-          condition.replace("and m.run_id=r.id ", "") +
-          " limit 1) m on m.run_id=r.id left join lateral"
-        );
-      });
-    }
-  }
-  return gated;
+// The normal reader supplies the exact-Entry form. Derive the earlier controls
+// from its predicates to retain the real tenant, lane, bindings and page shape.
+function probeSql(text, mode) {
+  const assistant =
+    /left join lateral\(select a\.entry_id,a\.run_id,a\.content from messages a\s+where p\.assistant_id is not null and ([^;]+?) limit 1\) a on a\.run_id=r\.id/;
+  if (!assistant.test(text)) return;
+  if (mode === "exact") return text;
+  const main =
+    /left join lateral\(select m\.run_id,m\.content,m\.created_at,m\.source_input_id from messages m\s+where ([^;]+?) limit 1\) m on m\.run_id=r\.id/;
+  return text
+    .replace(main, (_, pred) => "left join messages m on m.run_id=r.id and " + pred)
+    .replace(assistant, (_, pred) =>
+      mode === "original"
+        ? "left join messages a on a.run_id=r.id and " + pred
+        : "left join lateral(select a.entry_id,a.content from messages a where p.assistant_id is not null and a.run_id=r.id and " +
+          pred +
+          " limit 1) a on true",
+    );
 }
 // Fixture child only. Change just the two page SELECTs and use separate named
 // plans so the ordinary Kysely reader and response validation stay in circuit.
-export function applyDependencyProbe(exact = false) {
+export function applyDependencyProbe(mode) {
   const original = pg.Client.prototype.query;
   const counts = { locate: 0, bodies: 0 };
   pg.Client.prototype.query = function (...args) {
@@ -51,7 +34,7 @@ export function applyDependencyProbe(exact = false) {
       /^\s*select\b/i.test(text) &&
       this.connectionParameters.options?.includes("flow_web")
     ) {
-      const revised = probeSql(text, exact);
+      const revised = probeSql(text, mode);
       if (revised) counts[text.includes("order by t.turn_index") ? "locate" : "bodies"]++;
       if (revised)
         args[0] =
@@ -60,7 +43,7 @@ export function applyDependencyProbe(exact = false) {
             : {
                 ...cfg,
                 text: revised,
-                ...(cfg.name ? { name: cfg.name + (exact ? "_exact_dep" : "_dep") } : {}),
+                ...(cfg.name ? { name: cfg.name + ("_dep_" + mode) } : {}),
               };
     }
     return original.apply(this, args);
@@ -77,10 +60,10 @@ export async function profileDependencyJoins(diag, statements, shape, repeats = 
         .t,
     );
   for (const [idx, s] of statements.entries()) {
-    const gated = probeSql(s.text);
+    const gated = probeSql(s.text, "gated");
     if (!gated) continue;
     const metadata = s.text.includes("order by t.turn_index");
-    const prepared = [s.text, gated, probeSql(s.text, true)].map((text, i) => ({
+    const prepared = [probeSql(s.text, "original"), gated, s.text].map((text, i) => ({
       text,
       name: "dep_" + idx + "_" + i,
       values: s.values,
