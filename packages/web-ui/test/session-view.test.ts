@@ -154,7 +154,7 @@ describe("session transcript reducer", () => {
     expect(activeTurn(late)).toBeUndefined();
   });
 
-  it("continues the snapshot's Tool group through preparing/start/completion and reload", () => {
+  it("keeps individual Tool rows in order through preparing, settlement and reload", () => {
     const conversation: ConversationDetailResource = {
       project,
       session: { ...session, state: "running", updatedAt: CREATED_AT, lastActiveAt: CREATED_AT },
@@ -204,15 +204,12 @@ describe("session transcript reducer", () => {
       for (const event of calls.slice(boundary))
         state = sessionViewReducer(state, { type: "stream.event", event });
       const rows = deriveConversationPresentationRows(state.turns[0]!.items);
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        kind: "activity",
-        items: [
-          { toolName: "bash", status: "completed" },
-          { toolName: "edit", status: "completed" },
-          { toolName: "bash", status: "completed" },
-        ],
-      });
+      expect(rows).toMatchObject(
+        ["bash", "edit", "bash"].map((toolName, i) => ({
+          kind: "tool",
+          item: { toolName, toolCallId: `task:${i}`, status: "completed" },
+        })),
+      );
       const reloaded = sessionViewReducer(createInitialSessionView(), {
         type: "conversation.loaded",
         conversation: materialize(conversation, calls),

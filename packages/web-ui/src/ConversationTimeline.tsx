@@ -80,7 +80,6 @@ export type TimelineControl = {
   event(event: PiCloudEvent): void;
   latest(): void;
   search(): void;
-  resetToolGroups(): void;
 };
 
 /** Browsing owns a bounded read window. The live reducer remains independent so
@@ -94,7 +93,6 @@ export function ConversationTimeline({
   onJumpSettled,
   renderRow,
   inherited,
-  toolGroupsExpanded = false,
   submission = null,
 }: {
   api: PiCloudApi;
@@ -105,7 +103,6 @@ export function ConversationTimeline({
   onJumpSettled(): void;
   renderRow(row: VirtualConversationRow): ReactNode;
   inherited?: ReactNode;
-  toolGroupsExpanded?: boolean | undefined;
   submission?: ComposerSubmissionView | null;
 }) {
   const { t } = useI18n();
@@ -331,10 +328,7 @@ export function ConversationTimeline({
             const matches = next.turns.flatMap((turn) =>
               turn.items.flatMap((item) =>
                 item.kind === "tool" && item.historyCursor === target.cursor
-                  ? [
-                      `${turn.turnId}\0${item.toolCallId}\0activity`,
-                      `${turn.turnId}\0${item.toolCallId}\0details`,
-                    ]
+                  ? [`${turn.turnId}\0${item.toolCallId}\0details`]
                   : [],
               ),
             );
@@ -432,17 +426,6 @@ export function ConversationTimeline({
   useEffect(() => {
     controlRef.current = {
       latest,
-      resetToolGroups() {
-        pauseReading(true);
-        capture();
-        // Only group overrides follow the toolbar mode. Individual Tool details
-        // and text previews keep the user's existing choices.
-        setDisclosures((previous) =>
-          Object.fromEntries(
-            Object.entries(previous).filter(([key]) => !key.endsWith("\0activity")),
-          ),
-        );
-      },
       search() {
         setSearchOpen((value) => !value);
         requestAnimationFrame(() => searchInput.current?.focus());
@@ -457,7 +440,7 @@ export function ConversationTimeline({
     return () => {
       controlRef.current = null;
     };
-  }, [latest, capture, controlRef]);
+  }, [latest, controlRef]);
 
   const search = async (before?: string) => {
     const id = sessionRef.current,
@@ -662,7 +645,6 @@ export function ConversationTimeline({
   const disclosureState = useMemo(
     () => ({
       values: disclosures,
-      toolGroupsExpanded,
       selectionActive: selection.active,
       isSelecting: selection.isActive,
       reading: ownedPages !== null,
@@ -670,14 +652,7 @@ export function ConversationTimeline({
         // details emits toggle on mount too. Only a changed disclosure is a
         // reading gesture; otherwise mounting rows would pause live following.
         const previous = disclosureRef.current;
-        if (
-          !keys.some(
-            (key) =>
-              (previous[key] ??
-                (key.endsWith("\0activity") ? (toolGroupsExpanded ?? false) : false)) !== value,
-          )
-        )
-          return;
+        if (!keys.some((key) => (previous[key] ?? false) !== value)) return;
         pauseReading(true);
         capture();
         setDisclosures((previous) => {
@@ -688,7 +663,7 @@ export function ConversationTimeline({
         });
       },
     }),
-    [disclosures, toolGroupsExpanded, selection.active, ownedPages, capture],
+    [disclosures, selection.active, ownedPages, capture],
   );
   useEffect(() => {
     if (busy.current) return;

@@ -342,7 +342,7 @@ revision-based edits and periodic resets; the guest interprets terminal output
 before producing the view. Completion replaces the preview with the canonical
 result and wins over late updates. Missing previews never prove execution failure.
 
-Tool grouping is a display preference. Image presentation comes from canonical
+Each Tool call has its own virtual timeline row. Large inputs and results can be opened on that row. Image presentation comes from canonical
 attachment parts. Preview navigation uses the Agent's named answer link; the Web
 does not parse answers to invent missing links or add a second application card.
 

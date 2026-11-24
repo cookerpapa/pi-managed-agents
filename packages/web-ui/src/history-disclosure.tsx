@@ -2,7 +2,6 @@ import { createContext, useContext, useState } from "react";
 
 export const HistoryDisclosureContext = createContext<{
   values: Readonly<Record<string, boolean>>;
-  toolGroupsExpanded?: boolean;
   selectionActive?: boolean;
   isSelecting?: () => boolean;
   reading?: boolean;

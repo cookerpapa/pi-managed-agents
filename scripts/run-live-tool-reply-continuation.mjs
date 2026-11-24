@@ -405,9 +405,6 @@ try {
         await page.waitFor(
           "document.querySelector('.product-conversation-row.active > button:first-child')?.disabled===false && document.querySelector('.product-history-search-toggle')?.disabled===false && Number(document.querySelector('[data-history-rows]')?.dataset.historyRows)>0",
         );
-        await page.evaluate(
-          "(()=>{const b=document.querySelector('.product-tool-group-display-toggle');if(b.getAttribute('aria-pressed')!=='true')b.click()})()",
-        );
         // Search jumps use the actual history cursor. Blind scrollTop changes can
         // be undone by tail following or evict the very row being inspected.
         for (const expected of unknownTurns) {

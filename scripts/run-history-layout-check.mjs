@@ -19,7 +19,7 @@ const entry = `
 import React,{useState,useRef} from 'react';import{createRoot}from'react-dom/client';
 import{ConversationTimeline}from'${root}/src/ConversationTimeline.tsx';
 import{ConversationTurn}from'${root}/src/ConversationTurn.tsx';
-import{createInitialSessionView,sessionViewReducer}from'${root}/src/session-view.ts';
+import{createInitialSessionView,sessionViewReducer}from'@pi-cloud/session-client';
 import{I18nProvider}from'${root}/src/i18n.tsx';import'${root}/src/product.css';
 const paragraph='A coding conversation mixes short progress notes, longer explanations and completed tool calls. 中文文本会随着容器宽度变化重新换行。 ';
 function turn(i,session='one'){const id=session+'-turn-'+i;return {turnId:id,runId:id,mailboxPosition:i+1,prompt:'Review request '+i,acceptedAt:null,status:'completed',startedSequence:i*10+1,terminalSequence:i*10+9,stopReason:'stop',failure:null,cancellation:null,items:[
@@ -35,14 +35,14 @@ addEventListener('error',e=>layoutErrors.push(e.message));addEventListener('unha
 window.geometry=()=>{const p=document.querySelector('.product-chat-scroll');if(!p)return null;const box=p.getBoundingClientRect();const rows=[...p.querySelectorAll('[data-history-row-key]')].map(n=>({i:Number(n.dataset.index),key:n.dataset.historyRowKey,top:n.getBoundingClientRect().top,bottom:n.getBoundingClientRect().bottom,height:n.getBoundingClientRect().height}));let gap=0,overlap=0;for(let i=1;i<rows.length;i++){const a=rows[i-1],b=rows[i];if(b.i===a.i+1&&b.top>box.top&&a.bottom<box.bottom){gap=Math.max(gap,b.top-a.bottom);overlap=Math.max(overlap,a.bottom-b.top);}}return {gap,overlap,rows:rows.length,scroll:p.scrollTop,total:p.scrollHeight,end:p.scrollHeight-p.scrollTop-p.clientHeight,key:rows.find(n=>n.bottom>box.top+2)?.key,offset:(rows.find(n=>n.bottom>box.top+2)?.top??box.top)-box.top};};
 window.watchLayout=()=>{const p=document.querySelector('.product-chat-scroll');const observed=new WeakSet();const ro=new ResizeObserver(()=>{const g=geometry();if(g)resizeSamples.push({label:layoutLabel,t:performance.now(),...g});});const watch=()=>{for(const n of p.querySelectorAll('[data-history-row-key]'))if(!observed.has(n)){observed.add(n);ro.observe(n);}};watch();new MutationObserver(watch).observe(p,{childList:true,subtree:true});};
 function sample(){requestAnimationFrame(()=>setTimeout(()=>{const g=geometry();if(g){if(g.rows&&!firstRowsAt)window.firstRowsAt=performance.now();layoutSamples.push({label:layoutLabel,t:performance.now(),...g});if(layoutSamples.length>10000)layoutSamples.shift();}sample();},0));}sample();
-function Fixture(){const[live,setLive]=useState(()=>state()),[width,setWidth]=useState(940),[toolGroupsExpanded,setToolGroupsExpanded]=useState();const scroll=useRef(null),control=useRef(null);window.inspectLive=()=>live;window.showToolGroups=value=>{control.current?.resetToolGroups();setToolGroupsExpanded(value)};window.narrow=()=>setWidth(580);window.wide=()=>setWidth(940);window.latest=()=>control.current?.latest();window.swap=()=>setLive(state('two'));window.trim=()=>setLive(s=>({...s,turns:s.turns.slice(20)}));window.reset=()=>setLive(state());window.grow=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,items:t.items.map((x,j)=>j!==t.items.length-1?x:{...x,text:x.text+'\\n\\n'+paragraph.repeat(3)})})}));
-window.longToolGroup=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,status:'running',terminalSequence:null,items:[{...t.items[0],text:'Progress before the tools.'},...Array.from({length:12},(_,j)=>({...t.items[1],key:t.turnId+'-large-'+j,toolCallId:'task:large-'+j,toolName:'bash',input:{command:'echo '+j},status:j===11?'running':'completed',output:j===11?undefined:t.items[1].output})),{...t.items.at(-1),messageId:'live:fixture',text:'SELECTABLE alpha beta gamma delta epsilon. This text should stay still while reading.'}]})}));
+function Fixture(){const[live,setLive]=useState(()=>state()),[width,setWidth]=useState(940);const scroll=useRef(null),control=useRef(null);window.inspectLive=()=>live;window.narrow=()=>setWidth(580);window.wide=()=>setWidth(940);window.latest=()=>control.current?.latest();window.swap=()=>setLive(state('two'));window.trim=()=>setLive(s=>({...s,turns:s.turns.slice(20)}));window.reset=()=>setLive(state());window.grow=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,items:t.items.map((x,j)=>j!==t.items.length-1?x:{...x,text:x.text+'\\n\\n'+paragraph.repeat(3)})})}));
+window.longToolList=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,status:'running',terminalSequence:null,items:[{...t.items[0],text:'Progress before the tools.'},...Array.from({length:12},(_,j)=>({...t.items[1],key:t.turnId+'-large-'+j,toolCallId:'task:large-'+j,toolName:'bash',input:{command:'echo '+j},status:j===11?'running':'completed',output:j===11?undefined:t.items[1].output})),{...t.items.at(-1),messageId:'live:fixture',text:'SELECTABLE alpha beta gamma delta epsilon. This text should stay still while reading.'}]})}));
 window.growInline=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,items:t.items.map((x,j)=>j!==t.items.length-1?x:{...x,text:x.text+' More streamed words.'})})}));
 window.missedStream=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,items:t.items.map((x,j)=>j!==t.items.length-1?x:{...x,recoveredTextLength:0,text:x.text+' Unseen streamed text.'.repeat(1800)+' MISSED_STREAM_TAIL'})})}));
 window.codeFixture=()=>setLive(s=>({...s,turns:s.turns.map((t,i)=>i!==s.turns.length-1?t:{...t,status:'completed',items:[{...t.items[1],key:t.turnId+'-code',toolCallId:'task:code',toolName:'read',input:{path:'/workspace/example.txt'},output:{content:[{type:'text',text:Array.from({length:1100},(_,j)=>'CODE_LINE_'+String(j).padStart(4,'0')+' stable selectable source text.').join('\\n')}]}}]})}));
 const sequence=useRef(100000);window.emit=(type,payload,notify=true)=>{const event={schemaVersion:1,eventId:'40000000-0000-4000-8000-000000000001',sessionId:live.session.sessionId,turnId:live.turns.at(-1).turnId,agentId:'root',occurredAt:new Date().toISOString(),seq:++sequence.current,type,payload};setLive(s=>sessionViewReducer(s,{type:'stream.event',event}));if(notify)control.current?.event(event);};
 window.appendPagedTurn=()=>{const t=turn(80);historyResponses.push({turns:[{...t,state:t.status,transcript:{items:t.items,startedSequence:t.startedSequence,terminalSequence:t.terminalSequence,stopReason:t.stopReason,failure:null,cancellation:null}}],history:{before:'following-page',after:'following-tail',hasBefore:true,hasAfter:false}});setLive(s=>({...s,turns:[...s.turns,t]}));};
-return React.createElement('div',{style:{display:'grid',height:700,width,maxWidth:'100vw',margin:'20px auto'}},React.createElement(ConversationTimeline,{api,live,toolGroupsExpanded,scrollerRef:scroll,controlRef:control,jump:null,onJumpSettled:()=>{},renderRow:row=>React.createElement(ConversationTurn,{turn:row.turn,fragment:row.fragment})}));}
+return React.createElement('div',{style:{display:'grid',height:700,width,maxWidth:'100vw',margin:'20px auto'}},React.createElement(ConversationTimeline,{api,live,scrollerRef:scroll,controlRef:control,jump:null,onJumpSettled:()=>{},renderRow:row=>React.createElement(ConversationTurn,{turn:row.turn,fragment:row.fragment})}));}
 createRoot(document.getElementById('root')).render(React.createElement(I18nProvider,null,React.createElement(Fixture)));
 `;
 let server, failure;
@@ -163,46 +163,19 @@ try {
     await check("read-history", async () => {
       await page.evaluate("document.querySelector('.product-chat-scroll').scrollTop-=1800");
     });
-    const toolAnchor = await page.evaluate("geometry()");
-    await check("expand-tool-groups", async () => {
-      await page.evaluate("showToolGroups(true)");
-    });
-    const expandedAnchor = await page.evaluate("geometry()");
-    assert.equal(expandedAnchor.key, toolAnchor.key, "Global expansion lost the reading row");
-    assert(
-      Math.abs(expandedAnchor.offset - toolAnchor.offset) < 4,
-      "Global expansion moved the reader",
-    );
-    await check("collapse-tool-groups", async () => {
-      await page.evaluate("showToolGroups(false)");
-    });
-    await page.evaluate("showToolGroups(undefined)");
-    await page.wait(350);
     await check("narrow", async () => {
       await page.evaluate("narrow()");
     });
     await check("widen", async () => {
       await page.evaluate("wide()");
     });
-    await check("expand-tool", async () => {
-      await page.evaluate(
-        `(()=>{const p=document.querySelector('.product-chat-scroll'),r=p.getBoundingClientRect();const b=[...p.querySelectorAll('.product-activity-group-toggle')].find(n=>{const box=n.getBoundingClientRect();return box.top>r.top&&box.bottom<r.bottom});if(!b)throw Error('No visible group to expand');b.click();})()`,
-      );
-    });
     await check("expand-details", async () => {
       await page.evaluate(
-        "document.querySelector('.product-activity-group[data-expanded=true] details summary').click()",
+        `(()=>{const p=document.querySelector('.product-chat-scroll'),r=p.getBoundingClientRect();const b=[...p.querySelectorAll('.product-tool details summary')].find(n=>{const box=n.getBoundingClientRect();return box.top>r.top&&box.bottom<r.bottom});if(!b)throw Error('No visible Tool details');b.click();})()`,
       );
     });
     await check("collapse-details", async () => {
-      await page.evaluate(
-        "document.querySelector('.product-activity-group[data-expanded=true] details[open] summary').click()",
-      );
-    });
-    await check("collapse-tool", async () => {
-      await page.evaluate(
-        "document.querySelector('.product-activity-group-toggle[aria-expanded=true]').click()",
-      );
+      await page.evaluate("document.querySelector('.product-tool details[open] summary').click()");
     });
     await page.evaluate("latest()");
     await page.wait(600);
@@ -333,14 +306,14 @@ try {
     });
     // A small wheel gesture must win against end following, including just
     // after a manual disclosure. Large wheel deltas alone miss this failure.
-    await page.evaluate("longToolGroup();showToolGroups(false);latest()");
+    await page.evaluate("longToolList();latest()");
     await page.wait(700);
-    const groupBefore = await page.evaluate(
-      `(()=>{const p=document.querySelector('.product-chat-scroll'),r=p.getBoundingClientRect();const button=[...p.querySelectorAll('.product-activity-group-toggle')].findLast(n=>{const b=n.getBoundingClientRect();return b.top>r.top&&b.bottom<r.bottom});if(!button)throw Error('No visible collapsed tool group');window.readerGroup=button;return button.getBoundingClientRect().top;})()`,
+    const toolBefore = await page.evaluate(
+      `(()=>{const p=document.querySelector('.product-chat-scroll'),r=p.getBoundingClientRect();const button=[...p.querySelectorAll('.product-tool-text button')].findLast(n=>{const b=n.getBoundingClientRect();return b.top>r.top&&b.bottom<r.bottom});if(!button)throw Error('No visible Tool output disclosure');window.readerButton=button;window.readerTool=button.closest('.product-tool');return readerTool.getBoundingClientRect().top;})()`,
     );
-    await page.evaluate("readerGroup.click()");
+    await page.evaluate("readerButton.click()");
     await page.wait(450);
-    const groupAfter = await page.evaluate("readerGroup.getBoundingClientRect().top");
+    const toolAfter = await page.evaluate("readerTool.getBoundingClientRect().top");
     await page.evaluate(
       "emit('tool.completed',{toolCallId:'task:large-11',outcome:'completed',output:{content:[{type:'text',text:'TOOL_SETTLED_WHILE_READING'}]}})",
     );
@@ -348,8 +321,8 @@ try {
     report.toolUpdatesAfterDisclosure = await page.evaluate(
       "document.querySelector('.product-chat-scroll').textContent.includes('TOOL_SETTLED_WHILE_READING')",
     );
-    report.groupMovedAfterToolUpdate =
-      (await page.evaluate("readerGroup.getBoundingClientRect().top")) - groupBefore;
+    report.toolMovedAfterToolUpdate =
+      (await page.evaluate("readerTool.getBoundingClientRect().top")) - toolBefore;
     for (let i = 0; i < 5; i++) {
       await page.send("Input.dispatchMouseEvent", {
         type: "mouseWheel",
@@ -364,10 +337,10 @@ try {
     const reader = await page.evaluate(
       "({geometry:geometry(),reading:!!document.querySelector('.product-return-to-latest')})",
     );
-    report.disclosureReading = { groupMovedPixels: groupAfter - groupBefore, ...reader };
+    report.disclosureReading = { toolMovedPixels: toolAfter - toolBefore, ...reader };
     // Native mouse selection, not a programmatically supplied Range, also
     // needs to survive append and moving its origin outside normal overscan.
-    await page.evaluate("showToolGroups(false);latest()");
+    await page.evaluate("latest()");
     await page.wait(700);
     await page.send("Input.dispatchMouseEvent", {
       type: "mouseWheel",
@@ -539,8 +512,8 @@ try {
       "The expanded Tool must still receive its final result",
     );
     assert(
-      Math.abs(report.groupMovedAfterToolUpdate) < 4,
-      "Live trimming must not move the opened group",
+      Math.abs(report.toolMovedAfterToolUpdate) < 4,
+      "Live trimming must not move the opened tool",
     );
     assert(
       report.smallWheel.reading,
@@ -558,8 +531,8 @@ try {
     );
     assert(report.codeSelection.releasedLines < 60, "Large code selection pins must be released");
     assert(
-      Math.abs(groupAfter - groupBefore) < 4,
-      "Manual expansion must keep the clicked group in place",
+      Math.abs(toolAfter - toolBefore) < 4,
+      "Manual expansion must keep the clicked tool in place",
     );
     assert(
       reader.reading && reader.geometry.end > 80,
@@ -605,7 +578,7 @@ try {
       );
     report.readingTerminals = [];
     for (const status of ["completed", "failed", "cancelled"]) {
-      await page.evaluate("getSelection()?.removeAllRanges();reset();longToolGroup();latest()");
+      await page.evaluate("getSelection()?.removeAllRanges();reset();longToolList();latest()");
       await page.wait(650);
       const center = await page.evaluate(
         "(()=>{const r=document.querySelector('.product-chat-scroll').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()",

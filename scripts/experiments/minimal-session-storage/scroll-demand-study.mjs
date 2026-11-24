@@ -10,7 +10,7 @@ const round = (n) => +n.toFixed(3);
 
 export async function measureWheelDemand(
   api,
-  { id = api.windows[1], marker = "root:99970", shape = "text" } = {},
+  { id = api.windows[1], marker = "root:99970", shape = "text", checkToolRows = false } = {},
 ) {
   const { chrome } = api,
     u = new URL(api.address);
@@ -84,6 +84,9 @@ export async function measureWheelDemand(
             { name: "idle", count: 0, wait: 4000 },
             { name: "one-notch", count: 1, step: 0.17, interval: 100, wait: 1500 },
             { name: "no-further-input", count: 0, wait: 12000 },
+            ...(checkToolRows
+              ? [{ name: "reach-older-edge", count: 1, step: 1, interval: 100, wait: 3500 }]
+              : []),
           ]
         : [
             { name: "idle", count: 0, wait: 5000 },
@@ -97,6 +100,10 @@ export async function measureWheelDemand(
     for (const profile of profiles) {
       await chrome.evaluate("window.__olderPositions=[]");
       const startGeo = await geo();
+      const delta =
+        profile.name === "reach-older-edge"
+          ? startGeo.top - 200
+          : Math.round(initial.height * (profile.step ?? 0));
       phaseStart = performance.now();
       current = {
         name: profile.name,
@@ -112,7 +119,7 @@ export async function measureWheelDemand(
           x: initial.x,
           y: initial.y,
           deltaX: 0,
-          deltaY: -Math.round(initial.height * profile.step),
+          deltaY: -delta,
         });
         await delay(Math.max(0, phaseStart + (i + 1) * profile.interval - performance.now()));
       }
@@ -122,7 +129,7 @@ export async function measureWheelDemand(
       phases.push({
         name: current.name,
         gestures: profile.count,
-        nominalGesturePx: profile.count ? Math.round(initial.height * profile.step) : 0,
+        nominalGesturePx: delta,
         seconds: round(ms / 1000),
         olderPages: current.before,
         olderPerSecond: round((1000 * current.before) / ms),
@@ -157,6 +164,13 @@ export async function measureWheelDemand(
         phases,
       }),
     );
+    if (checkToolRows) {
+      assert.deepEqual(
+        phases.map((p) => p.olderPages),
+        [0, 0, 0, 1],
+      );
+      assert(last.history.hasBefore, "The edge gesture must leave older pages available");
+    }
     return { id, phases };
   } finally {
     off();
@@ -453,6 +467,17 @@ if (import.meta.main) {
     url,
     tenant,
     async (api) => {
+      if (process.argv.includes("--tool-rows")) {
+        const id = await api.createScrollWindow("One long tool run");
+        await seedToolsWindow(api, tenant, undefined, { id, runs: 1, toolCount: 1024 });
+        await measureWheelDemand(api, {
+          id,
+          marker: "tool-final-1",
+          shape: "one-long-run",
+          checkToolRows: true,
+        });
+        return;
+      }
       if (!process.argv.includes("--tools-only")) {
         if (process.argv.includes("--long-only") || process.argv.includes("--long-plans")) {
           await longRunStudy(api, tenant, process.argv.includes("--long-plans"));
