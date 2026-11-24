@@ -364,12 +364,6 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const [billingOpen, setBillingOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
-  const [toolGroupDisplay, setToolGroupDisplay] = useState<{
-    sessionId: string;
-    expanded: boolean;
-  } | null>(null);
-  const toolGroupsExpanded =
-    toolGroupDisplay?.sessionId === state.session?.sessionId && toolGroupDisplay?.expanded === true;
   const initialResourceTab =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("resource") === "source-control"
@@ -2194,22 +2188,6 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
               ⌕
             </button>
             <button
-              className="product-tool-group-display-toggle"
-              type="button"
-              disabled={state.session === null}
-              aria-pressed={toolGroupsExpanded === true}
-              onClick={() => {
-                if (!state.session) return;
-                timelineControl.current?.resetToolGroups();
-                setToolGroupDisplay({
-                  sessionId: state.session.sessionId,
-                  expanded: toolGroupsExpanded !== true,
-                });
-              }}
-            >
-              {t(toolGroupsExpanded ? "chat.collapseToolGroups" : "chat.expandToolGroups")}
-            </button>
-            <button
               className="product-workspace-button"
               disabled={
                 state.session === null ||
@@ -2691,7 +2669,6 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
           >
             <div className={`product-content ${inspectorOpen ? "with-inspector" : ""}`}>
               <ConversationTimeline
-                toolGroupsExpanded={toolGroupsExpanded}
                 key={state.session?.sessionId ?? "empty"}
                 api={api}
                 live={state}

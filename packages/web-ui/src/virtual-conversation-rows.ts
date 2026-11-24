@@ -72,18 +72,13 @@ export function virtualConversationRows(
         ? footerCandidate
         : undefined;
     for (const row of rows) {
-      const item =
-        row.kind === "activity" || row.kind === "hosted_search" || row.kind === "retry"
-          ? row.items[0]!
-          : row.item;
+      const item = row.kind === "hosted_search" || row.kind === "retry" ? row.items[0]! : row.item;
       const entryId =
         item.kind === "text" || item.kind === "user"
           ? /^entry:([0-9]+)(?::|$)/.exec(item.messageId ?? "")?.[1]
           : undefined;
       const cursors = (
-        row.kind === "activity" || row.kind === "hosted_search" || row.kind === "retry"
-          ? row.items
-          : [item]
+        row.kind === "hosted_search" || row.kind === "retry" ? row.items : [item]
       ).flatMap((i) => (i.historyCursor ? [i.historyCursor] : []));
       const base = {
         turn,

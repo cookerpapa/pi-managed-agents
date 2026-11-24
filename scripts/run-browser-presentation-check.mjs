@@ -9,7 +9,7 @@ async function withChromePage(options, operation) {
   if (process.env.PI_CLOUD_BROWSER_SCOPE === "fork-workspace" && !options.forkWorkspace) return;
   if (process.env.PI_CLOUD_BROWSER_SCOPE === "peer-forks" && !options.peerForks) return;
   if (process.env.PI_CLOUD_BROWSER_SCOPE === "commands" && !options.commands) return;
-  if (process.env.PI_CLOUD_BROWSER_SCOPE === "tool-groups" && !options.toolGroups) return;
+  if (process.env.PI_CLOUD_BROWSER_SCOPE === "tool-rows" && !options.toolRows) return;
   if (process.env.PI_CLOUD_BROWSER_SCOPE === "message-actions" && !options.messageActions) return;
   if (process.env.PI_CLOUD_BROWSER_SCOPE === "attachments" && !options.attachments) return;
   if (process.env.PI_CLOUD_BROWSER_SCOPE === "workspace-transfers" && !options.workspaceTransfers)
@@ -1290,7 +1290,7 @@ try {
       1,
     );
   });
-  await withChromePage({ toolGroups: true }, async (page) => {
+  await withChromePage({ toolRows: true }, async (page) => {
     await page.navigate(`http://127.0.0.1:${port}/review.html`);
     await page.waitFor("window.fixtureReady");
     for (const [status, result] of [
@@ -1299,10 +1299,6 @@ try {
       ["unknown", "Execution outcome is unknown"],
     ]) {
       await page.evaluate("renderToolSettlement()");
-      await page.waitFor("document.querySelector('.product-activity-group-toggle')");
-      await page.evaluate(
-        "if(document.querySelector('.product-activity-group-toggle').getAttribute('aria-expanded')==='false')document.querySelector('.product-activity-group-toggle').click()",
-      );
       await page.waitFor("document.querySelector('.product-tool-progress button')");
       await page.evaluate(
         "document.querySelector('.product-tool-progress button').click();emitToolPreview('TEMPORARY_ONLY')",
@@ -1329,19 +1325,15 @@ try {
         ),
         false,
       );
-      const borders = await page.evaluate(
-        `(()=>{const g=document.querySelector('.product-activity-group');return{group:getComputedStyle(g).borderLeftColor,tools:[...g.querySelectorAll('.product-tool')].map(t=>({failed:t.classList.contains('product-tool-failed'),marker:getComputedStyle(t,'::before').backgroundColor}))}})()`,
+      const tools = await page.evaluate(
+        `[...document.querySelectorAll('.product-tool')].map(t=>({failed:t.classList.contains('product-tool-failed'),marker:getComputedStyle(t,'::before').backgroundColor}))`,
       );
+      assert.equal(tools.length, 3);
       assert.equal(
-        borders.group,
-        "rgb(53, 53, 53)",
-        "A failed Tool must not color the whole group border",
-      );
-      assert.equal(
-        borders.tools.filter((tool) => tool.marker === "rgb(103, 70, 70)").length,
+        tools.filter((tool) => tool.marker === "rgb(103, 70, 70)").length,
         status === "failed" ? 1 : 0,
       );
-      assert(borders.tools.every((tool) => tool.marker !== "rgb(103, 70, 70)" || tool.failed));
+      assert(tools.every((tool) => tool.marker !== "rgb(103, 70, 70)" || tool.failed));
     }
     await page.evaluate("renderToolSettlement('failed','Command exited with code 7',true)");
     await page.waitFor("document.querySelectorAll('.product-tool').length===1");
@@ -1352,7 +1344,7 @@ try {
       "rgb(103, 70, 70)",
     );
   });
-  await withChromePage({ toolGroups: true }, async (page) => {
+  await withChromePage({ toolRows: true }, async (page) => {
     await page.navigate(`http://127.0.0.1:${port}/review.html`);
     await page.evaluate(
       "history.replaceState(null,'','/review.html?session=10000000-0000-4000-8000-000000000001')",
@@ -1361,22 +1353,12 @@ try {
     await page.evaluate(`window.fixtureToolHistory=[
       {kind:'tool',toolCallId:'task:1',toolName:'bash',input:{command:'INPUT_START'+String.fromCharCode(10)+'line'+(String.fromCharCode(10)+'line').repeat(20)+String.fromCharCode(10)+'INPUT_END'},output:{content:[{type:'text',text:'RESULT_START'+String.fromCharCode(10)+'line'+(String.fromCharCode(10)+'line').repeat(25)+String.fromCharCode(10)+'WIDTH_'+ 'W'.repeat(8000)+String.fromCharCode(10)+'RESULT_END'}]},status:'completed',firstSequence:1,lastSequence:2,startedAt:'2026-10-27T00:00:00Z',completedAt:'2026-10-27T00:00:01Z'},
       {kind:'tool',toolCallId:'task:2',toolName:'preview',input:{port:8080},output:{content:[{type:'text',text:'PREVIEW_DETAIL_'+ 'W'.repeat(8000)}]},status:'completed',firstSequence:1,lastSequence:2,startedAt:'2026-10-27T00:00:00Z',completedAt:'2026-10-27T00:00:01Z'}];renderChat('running',true,true)`);
-    await page.waitFor(
-      "document.querySelector('.product-activity-group-toggle') && document.querySelector('.product-tool-group-display-toggle')?.disabled===false",
-    );
-    await page.evaluate("document.querySelector('.product-activity-group-toggle').click()");
-    await page.waitFor("document.querySelector('.product-tool[data-tool-name=bash]')");
-    const originalBash = await page.evaluate(
-      "document.querySelector('.product-tool[data-tool-name=bash]').innerHTML",
-    );
-    await page.evaluate("document.querySelector('.product-tool-group-display-toggle').click()");
-    await page.waitFor(
-      "document.querySelector('.product-tool-group-display-toggle').getAttribute('aria-pressed')==='true'",
-    );
-    assert.equal(
-      await page.evaluate("document.querySelector('.product-tool[data-tool-name=bash]').innerHTML"),
-      originalBash,
-      "The toolbar must only change group defaults",
+    await page.waitFor("document.querySelectorAll('.product-tool').length===2");
+    assert.deepEqual(
+      await page.evaluate(
+        "[...document.querySelectorAll('.product-tool')].map(t=>t.dataset.toolName)",
+      ),
+      ["bash", "preview"],
     );
     assert.equal(
       await page.evaluate(
@@ -1411,20 +1393,12 @@ try {
     await page.waitFor(
       "document.querySelector('.product-chat-scroll').textContent.includes('INPUT_END')",
     );
-    await page.evaluate("document.querySelector('.product-tool-group-display-toggle').click()");
-    await page.waitFor("document.querySelectorAll('.product-tool').length===0");
-    await page.evaluate("document.querySelector('.product-tool-group-display-toggle').click()");
-    await page.waitFor(
-      "document.querySelector('.product-tool[data-tool-name=preview] details[open]') && document.querySelector('.product-chat-scroll').textContent.includes('INPUT_END')",
-    );
     assert(
       !(await page.evaluate(
         "document.querySelector('.product-chat-scroll').textContent.includes('RESULT_START')",
       )),
-      "Group mode must not expand result text",
+      "Expanding the input must preserve the result display",
     );
-    await page.evaluate("document.querySelector('.product-activity-group-toggle').click()");
-    await page.waitFor("document.querySelectorAll('.product-tool').length===0");
     await page.evaluate(
       `emitFixtureEvent({schemaVersion:1,eventId:crypto.randomUUID(),sessionId:'10000000-0000-4000-8000-000000000001',turnId:'50000000-0000-4000-8000-000000000011',agentId:'root',seq:3,occurredAt:new Date().toISOString(),type:'tool.started',payload:{toolCallId:'task:3',toolName:'bash',input:{command:'NEXT_INPUT'}}});emitFixtureEvent({schemaVersion:1,eventId:crypto.randomUUID(),sessionId:'10000000-0000-4000-8000-000000000001',turnId:'50000000-0000-4000-8000-000000000011',agentId:'root',seq:4,occurredAt:new Date().toISOString(),type:'tool.completed',payload:{toolCallId:'task:3',outcome:'completed',output:{content:[{type:'text',text:'NEXT_RESULT'}]}}})`,
     );
@@ -1432,12 +1406,7 @@ try {
     // Reading holds the old window; returning to live must retain its overrides.
     await page.evaluate("document.querySelector('.product-return-to-latest')?.click()");
     await page.wait(100);
-    assert.equal(
-      await page.evaluate("document.querySelectorAll('.product-tool').length"),
-      0,
-      "New results must respect an explicitly closed group",
-    );
-    await page.evaluate("document.querySelector('.product-activity-group-toggle').click()");
+    await page.waitFor("document.querySelectorAll('.product-tool').length===3");
     await page.waitFor(
       "document.querySelector('.product-chat-scroll').textContent.includes('NEXT_RESULT')",
     );
@@ -2828,12 +2797,7 @@ try {
         "document.querySelector('.product-markdown a')?.getAttribute('href')===previewFixturePath",
       );
       assert.equal(await page.evaluate("document.querySelectorAll('a').length"), 1);
-      assert.equal(
-        await page.evaluate("document.querySelector('.product-activity-group').dataset.expanded"),
-        "false",
-      );
       assert.equal(await page.evaluate("document.body.innerText.includes('5173')"), false);
-      await page.evaluate("document.querySelector('.product-activity-group-toggle').click()");
       await page.waitFor("document.querySelector('[data-tool-name=preview] details')");
       assert.equal(
         await page.evaluate("document.querySelector('[data-tool-name=preview] details').open"),
@@ -2897,12 +2861,6 @@ try {
           null,
         );
         assert.equal(
-          await page.evaluate(
-            "document.querySelector('.product-activity-group-toggle').getAttribute('aria-expanded')",
-          ),
-          "false",
-        );
-        assert.equal(
           await page.evaluate("document.body.innerText.includes('/workspace/screenshot.png')"),
           false,
         );
@@ -2917,7 +2875,6 @@ try {
           ),
           "_blank",
         );
-        await page.evaluate("document.querySelector('.product-activity-group-toggle').click()");
         await page.waitFor(`document.querySelector('[data-tool-name=${toolName}] details')`);
         assert.equal(
           await page.evaluate(
@@ -3110,11 +3067,11 @@ try {
                     deletedSourceLabel: true,
                     boundedViewport: true,
                   }
-                : process.env.PI_CLOUD_BROWSER_SCOPE === "tool-groups"
+                : process.env.PI_CLOUD_BROWSER_SCOPE === "tool-rows"
                   ? {
                       accepted: true,
-                      scope: "tool-groups",
-                      groupingOnly: true,
+                      scope: "tool-rows",
+                      individualToolRows: true,
                       individualDetailsPreserved: true,
                       boundedWidth: true,
                       previewReplacedByFinalResult: true,

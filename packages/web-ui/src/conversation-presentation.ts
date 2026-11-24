@@ -11,11 +11,7 @@ export type ConversationPresentationRow =
       item: Extract<TranscriptItem, { kind: "text" }>;
       processNarration: boolean;
     }
-  | {
-      kind: "activity";
-      key: string;
-      items: readonly ToolTranscriptItem[];
-    }
+  | { kind: "tool"; key: string; item: ToolTranscriptItem }
   | {
       kind: "hosted_search";
       key: string;
@@ -34,8 +30,7 @@ export type ConversationPresentationRow =
 
 /**
  * Derives stable presentation rows from the canonical transcript. Transport,
- * reducer and rendering concerns stay separate: adjacent Tools can be folded
- * without changing their Pi ordering or durable identities.
+ * reducer and rendering share the same order and per-Tool identity.
  */
 export function deriveConversationPresentationRows(
   items: readonly TranscriptItem[],
@@ -86,26 +81,10 @@ export function deriveConversationPresentationRows(
       continue;
     }
     if (item.kind === "tool") {
-      const tools: ToolTranscriptItem[] = [item];
-      index += 1;
-      while (
-        !inlineToolImages(tools.at(-1)!).length &&
-        tools.length < 12 &&
-        index < items.length &&
-        items[index]?.kind === "tool" &&
-        items[index]?.pageKey === item.pageKey
-      ) {
-        tools.push(items[index] as ToolTranscriptItem);
-        index += 1;
-      }
-      rows.push({
-        kind: "activity",
-        key: `activity:${tools[0]!.key}`,
-        items: tools,
-      });
-      const last = tools.at(-1)!;
-      if (inlineToolImages(last).length)
-        rows.push({ kind: "images", key: `images:${last.key}`, item: last });
+      rows.push({ kind: "tool", key: `activity:${item.key}`, item });
+      if (inlineToolImages(item).length)
+        rows.push({ kind: "images", key: `images:${item.key}`, item });
+      index++;
       continue;
     }
     if (item.kind === "hosted_search") {

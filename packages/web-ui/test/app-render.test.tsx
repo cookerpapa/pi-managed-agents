@@ -744,7 +744,7 @@ describe("product chat experience", () => {
     },
   );
 
-  it("folds adjacent completed Tools into one stable activity row", () => {
+  it("shows adjacent completed Tools individually in call order", () => {
     const groupedTurn: TurnView = {
       ...turn("10000000-0000-4000-8000-000000000040", "检查并修改"),
       items: [
@@ -777,9 +777,10 @@ describe("product chat experience", () => {
       ],
     };
     const markup = renderToStaticMarkup(<ConversationTurn turn={groupedTurn} />);
-    expect(markup).toContain("2 个步骤");
-    expect(markup).toContain("read · write");
-    expect(markup).toContain('aria-expanded="false"');
+    expect([...markup.matchAll(/data-tool-name="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      "read",
+      "write",
+    ]);
     expect(markup).not.toContain("Successfully wrote");
   });
 

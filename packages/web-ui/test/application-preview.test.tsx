@@ -71,7 +71,8 @@ it("renders the answer link once with Tool steps collapsed for live and cold res
     { content: [{ type: "text", text: "Published" }], details },
   ]) {
     const markup = rendered(output);
-    expect(markup).toContain('data-expanded="false"');
+    expect(markup).toContain('data-tool-name="preview"');
+    expect(markup).not.toContain("<details open");
     expect(markup).toContain(path);
     expect(markup).toContain("进入示例应用");
     expect(markup.match(/<a /g)).toHaveLength(1);

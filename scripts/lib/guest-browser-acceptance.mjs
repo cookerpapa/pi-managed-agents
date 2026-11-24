@@ -102,12 +102,6 @@ console.log('GUEST_BROWSER_INTERACTION_OK');
         await page.evaluate("document.querySelector('.product-tool-images a').target"),
         "_blank",
       );
-      assert.equal(
-        await page.evaluate(
-          "document.querySelector('.product-activity-group-toggle').getAttribute('aria-expanded')",
-        ),
-        "false",
-      );
     };
     await assertInlineImage();
     await page.evaluate(

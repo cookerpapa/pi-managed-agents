@@ -973,6 +973,10 @@ confirms one failed Tool among 22 cards receives the only red marker, with no
 settled preview remaining; backend/Workspace identities are retained.
 [Evidence](reports/tool-settlement-presentation-20261028.md).
 
+## Individual Tool rows
+
+- [x] Render adjacent calls as separate virtual rows, preserving their order, per-Tool details, live result updates and inline images.
+
 ## Tool group display correction — completed
 
 Correct the toolbar to control only outer Tool-group expansion. Restore individual
