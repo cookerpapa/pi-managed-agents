@@ -26,6 +26,10 @@ and routing use the same admitted partition callback. The isolated prototype sel
 the deployed decoder still accepts only its original protocol. Production Workflow, upload and readiness API
 migration remain separate. [Scope and fault evidence](../reports/workspace-operation-routing-20261121.md).
 
+## Stop routing on an active partition
+
+For a fresh cancellation the partition owner can use its already-admitted pending task and cached binding at the task's original dispatch offset. Match the operation, task, Conversation, writer and routing scope before using it. A replay, an incomplete view or an owner change keeps the durable lookup, including the same-commit cancellation locator. The public Stop receipt, cancellation projection and dispatch admission retain their existing ordering. Both paths target the original Guest operation.
+
 ## Batched history and continuation controls
 
 In the isolated candidate, immediately available stable Entries from the same partition may share

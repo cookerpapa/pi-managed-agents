@@ -14,7 +14,50 @@ export class WorkspaceOperationRouter {
     Object.assign(this, { pool, view, env, select, resolve, onToolStart });
     this.spans = new WorkspaceRouteSpans(pool);
   }
+  #cachedCancellation(scope, op, position) {
+    const next = this.view.next.get(position.partition);
+    // During replay PG may already have settled this task or retired its writer.
+    if (
+      position.topic !== this.view.topic ||
+      typeof position.offset !== "bigint" ||
+      next === undefined ||
+      position.offset < next
+    )
+      return;
+    const run = this.view.sessions.get(scope.runId);
+    const pending = run?.pendingTools?.[op.taskId];
+    if (
+      !pending ||
+      run.writer !== scope.writerId ||
+      pending.taskId !== op.taskId ||
+      pending.operationId !== op.operationId ||
+      pending.conversationId !== op.conversationId
+    )
+      return;
+    const offset = BigInt(pending.offset);
+    if (offset >= position.offset) return;
+    const span = this.spans.cachedAt(scope, pending.conversationId, {
+      topic: position.topic,
+      partition: position.partition,
+      offset,
+    });
+    if (
+      span?.writerId === scope.writerId &&
+      span.sessionId === op.scope.sessionId &&
+      span.turnId === op.scope.turnId
+    )
+      return {
+        ...span,
+        taskId: pending.taskId,
+        conversationId: pending.conversationId,
+        offset: pending.offset,
+      };
+  }
   async original(scope, op, position) {
+    if (op.action === "cancel" && op.scope && !op.reply) {
+      const route = this.#cachedCancellation(scope, op, position);
+      if (route) return route;
+    }
     const waiter = this.view.bashLog
       ? "coalesce(projection_tools->$5::text,bash_wait_refs(tenant_id,session_id,id,$5::text::bigint)->$5::text)"
       : "projection_tools->$5";

@@ -34,6 +34,15 @@ try {
     taskId = 9;
   const attempted = [],
     cancelled = [];
+  // Count only router reads. Native cancellation projection uses its normal transaction.
+  const routeReads = [];
+  const routingPool = {
+    query(statement, args) {
+      routeReads.push(statement);
+      return pool.query(statement, args);
+    },
+    connect: () => pool.connect(),
+  };
   const build = (view = new ReadyProjection(pool, topic, new Map(), projectionTemplates)) => {
     const env = {
       pool,
@@ -48,7 +57,7 @@ try {
     return {
       view,
       router: new WorkspaceOperationRouter({
-        pool,
+        pool: routingPool,
         view,
         env,
         select: () => {
@@ -58,8 +67,8 @@ try {
           submit() {
             attempted.push(id);
           },
-          cancel() {
-            cancelled.push(id);
+          cancel(record, request) {
+            cancelled.push({ guest: id, cancelOffset: record.offset, ...request });
             throw Error("Lost Guest cancellation acknowledgement");
           },
         }),
@@ -183,23 +192,53 @@ try {
   abort.commit.writes[0].value.abortRequested = true;
   abort.commit.writes[0].value.state = { status: "terminal", outcome: { status: "aborted" } };
   abort.workspaceOperations = [{ action: "cancel", operationId, taskId }];
-  await router.consume(
-    { ...p(60), fact: decodeWorkspaceFact(encodeWorkspaceFact(abort)).fact },
-    () => true,
-    async () => {
-      throw Error("Cancel acquired a new command grant");
-    },
-  );
-  assert.deepEqual(cancelled, [ids[0]]);
-  router = build(view).router;
-  assert.equal(
-    (await router.original(s, op, p(60))).bindingId,
-    ids[0],
-    "Same-batch settlement removed the original cancel address",
-  );
+  const cancelRecord = { ...p(60), fact: decodeWorkspaceFact(encodeWorkspaceFact(abort)).fact };
+  const noGrant = () => assert.fail("Cancel acquired a new command grant");
+  const cancel = { ...op, action: "cancel" };
 
+  // Both operations are pending under the same writer. The newer one used a different Guest.
+  for (const invalid of [
+    { ...cancel, operationId: newer.workspaceOperations[0].operationId },
+    { ...cancel, conversationId: 2 },
+    { ...cancel, scope: { ...s, turnId: randomUUID() } },
+  ])
+    assert.equal(await router.original(s, invalid, p(60)), undefined);
+  routeReads.length = 0;
+  // Even with the task and spans in memory, a rewind checks the stored operation.
+  const rewound = await router.original(s, cancel, p(52));
+  assert.equal(rewound.bindingId, ids[0]);
+  assert.equal(routeReads.length, 1);
+  routeReads.length = 0;
+  await router.consume(cancelRecord, () => true, noGrant);
+  const expectedCancel = {
+    guest: ids[0],
+    cancelOffset: 60n,
+    operationId,
+    activationId: ids[0],
+    originalWriterId: s.writerId,
+  };
+  assert.deepEqual(cancelled, [expectedCancel]);
+  assert.equal(routeReads.length, 0, "Warm cancellation read its locator or route from PG");
+
+  // Redelivery of the cancel/terminal commit uses the durable cancellation locator.
+  router = build(view).router;
+  await router.consume(cancelRecord, () => true, noGrant);
+  assert.deepEqual(cancelled, [expectedCancel, expectedCancel]);
+  assert.equal(routeReads.filter((q) => q.includes("as waiter")).length, 1);
+  routeReads.length = 0;
+
+  // Revoke the assignment and lose both views. Settlement in the same native commit
+  // removed the pending task; the durable cancel locator must still identify the old Guest.
+  view.revoke();
+  router.spans.reset();
+  const cold = await router.original(s, cancel, p(60));
+  assert.equal(cold.bindingId, ids[0]);
+  assert.equal(cold.writerId, s.writerId);
+  assert.equal(cold.offset, "20");
+  assert.equal(routeReads.filter((q) => q.includes("as waiter")).length, 1);
+  assert.equal(routeReads.filter((q) => q.includes("from workspace_route_spans")).length, 1);
   console.log(
-    "PG restart, source-position replay, withheld dispatch, original target, scope isolation and Worker wire checks passed.",
+    "Warm cancel: 0 routing reads; cold cancel: 1 locator + 1 binding read. Both selected the original Guest. PG restart, replay and scope checks passed.",
   );
 } finally {
   try {

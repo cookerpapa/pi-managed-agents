@@ -56,8 +56,22 @@ try {
           );
           const sent = [],
             cancelled = [];
+          let routeReads = 0;
           const p = normalRootProjection(
-            db,
+            {
+              connect: () => db.connect(),
+              get waitingCount() {
+                return db.waitingCount;
+              },
+              query(statement, values) {
+                if (
+                  statement.includes("as waiter, cancel_positions") ||
+                  statement.includes("from workspace_route_spans where")
+                )
+                  routeReads++;
+                return db.query(statement, values);
+              },
+            },
             topic,
             () => ({ bindingId: binding, allocationId: binding }),
             (id) => ({
@@ -101,6 +115,7 @@ try {
               offset: BigInt(i),
               fact: decodeWorkspaceFact(Buffer.from(encodeWorkspaceFact(f))).fact,
             };
+            const previousReads = routeReads;
             const view = await p.nativeStore.projection.project(record.fact, record, () => true);
             assert(view.admitted);
             display.confirmed();
@@ -183,6 +198,11 @@ try {
                 assert.equal(await locator.original(scope, original, record), undefined);
                 if (stop) {
                   assert.deepEqual(cancelled, [binding]);
+                  assert.equal(
+                    routeReads - previousReads,
+                    0,
+                    "Warm Stop performed a PG route lookup",
+                  );
                   const delayed = await locator.original(
                     scope,
                     { action: "cancel", operationId: operation, taskId: task },

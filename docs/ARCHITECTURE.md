@@ -189,6 +189,8 @@ exposed. Physical observations remain disposable and separate from this read.
 
 In the ADR-0356 candidate, an absent user-selected Guest directory returns a typed, pre-execution failure. The Worker ends the native Run after confirming the result on the Session writer. The ordered terminal marks the Session for reselection, holds queued work and exposes unconsumed input for return. Idle rebinding updates the public window. The isolated Flow experiment gives each window a writable flow and a head Run and keeps predecessor edges on Runs. [Decision and scope](adr/0356-run-flow-head-and-directory-stop.md).
 
+In the #52 prototype the Projector routes a live Stop from its admitted pending operation and the cached Guest binding at that operation's original offset. Cache misses and replay use the durable operation lookup. [Stop routing](adr/0344-execution-owned-operation-routing-study.md#stop-routing-on-an-active-partition)
+
 On the #52 candidate, the model sees an interrupted Bash wait with an unconfirmed remote outcome. Kafka retains mailbox records for seven days. The daily collector checks retirement and empty broker bounds. The projector no longer calculates a database retention floor for replies. [Decision](adr/0361-stop-context-and-mailbox-retention.md)
 
 The [ADR-0360 append-layout experiment](adr/0360-bash-intent-log-study.md) derives outstanding ordinary Bash operations by pairing immutable intents and canonical results. It tests root display coverage on the same records, an indexed window for history reads, and the existing checkpoint as an admission proof. [Experiment and scope](reports/bash-intent-log-20261125.md).

@@ -13,6 +13,10 @@ export async function installWorkspaceRoutes(db) {
   )`);
 }
 
+function atOffset(spans, offset) {
+  return spans?.findLast((row) => BigInt(row.from) <= offset);
+}
+
 export class WorkspaceRouteSpans {
   #cache = new Map();
   #generation = 0;
@@ -40,6 +44,10 @@ export class WorkspaceRouteSpans {
       )
       .then((r) => r.rows);
   }
+  cachedAt(s, lane, { topic, partition, offset }) {
+    const spans = this.#cache.get(s.runId)?.get(this.#key(s, lane, topic, partition));
+    return atOffset(spans, offset);
+  }
   async at(s, lane, position) {
     const { topic, partition, offset } = position,
       key = this.#key(s, lane, topic, partition);
@@ -50,7 +58,7 @@ export class WorkspaceRouteSpans {
       spans = cache.get(key) ?? loaded;
       cache.set(key, spans);
     }
-    return spans.findLast((row) => BigInt(row.from) <= offset);
+    return atOffset(spans, offset);
   }
   async activate(s, lane, position, selected, current) {
     const bindingId = typeof selected === "string" ? selected : selected.bindingId;

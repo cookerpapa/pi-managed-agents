@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Reuse the admitted operation and its cached binding for live Stop. The [PG routing check](../scripts/experiments/minimal-session-storage/workspace-routing-recovery.mjs) observed zero routing reads on a warm Stop and recovered the same Guest with one locator and one binding read after revocation.
+
 - [x] Explain remote Bash Stop in subsequent model context and give reply records a seven-day broker retention window. Verify truncated, missing and still-readable mailboxes. [ADR-0361](adr/0361-stop-context-and-mailbox-retention.md).
 
 - [x] Compare immutable Bash intent, derived waits and record-local root display coverage on the candidate primary. [Write, read and recovery study](reports/bash-intent-log-20261125.md).
