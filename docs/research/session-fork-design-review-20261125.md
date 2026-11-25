@@ -4,7 +4,7 @@
 
 **建议拍板的模型**：每个逻辑 Agent 有一个可独立领取的 Session，一个 Session 可以先后执行多个 Turn；同一份已提交历史可以被多个 Session 只读引用。参考 Temporal，为每个分支存一份短的祖先区间清单。正文长期只保留在其原物理流上。网页 Fork 和工具 Fork 共用冻结历史的原语，分别创建空闲 Session 和带首任务的 Session。
 
-第一次审校建议读第 1 节、下方“两个实际差异”和末尾三个决定。需要追问“打开页面要查什么”时看第 5 节，需要判断“可不可以上线”时看第 7、8 节。
+第一次审校已确认工具 Fork 的冻结点与网页 Fork 的第一版入口。父 Turn 的 Stop 是否传播给本轮子 Turn 待定，详见末节。需要追问“打开页面要查什么”时看第 5 节，需要判断“可不可以上线”时看第 7、8 节。
 
 ## 1. 先用一个例子定语义
 
@@ -104,7 +104,7 @@ LIMIT $remaining;
 - **新建与恢复。** 创建子 Session 时挂只读继承历史和小型启动基线；使用现有跨 Session 导入/Storage 适配器作为语义对照。Pi 的 ID 可用于 context edit、摘要保留点、工具配对和文档引用，不能简单重编所有消息号。为新 Session 固定分配高水位和版本命名空间，先验证继承祖先再二次 Fork 时也没有碰撞。旧源流的写入凭证、活动 Task、Inbox、进行中的 Bash、模型连接和回包等待都属于原 Agent。重新接手**已有**子 Session 时，恢复其自己的活动 Turn、Inbox、任务和未结算操作。现有新原型普通 Bash 在故障封口后补 unknown；其他工具按各自的恢复政策处理，回包的七天窗口沿用已讨论的规则。[Bash 接手](../adr/0359-sealed-bash-unknown.md) · [回包保留](../adr/0361-stop-context-and-mailbox-retention.md)
 - **配置与能力。** 对 `pi.agent` 采用锚点的原子提交版本；对标为 `current` 的文档，冻结发起 Fork 的 Conversation 在本次切面上的版本；`initial` 走新 Conversation 初始化。子会话获得自己的运行状态。冻结的历史配置不能扩大当前模型、工具、Workspace 权限。保留文件目录/共享或临时计算资源的产品选项和续聊授权交集；不复制 Workspace 文件、不按历史地址路由新工具，不继承旧 VM 的运行承诺。第一轮拿当前资源管理结果形成环境提示。两个独立 Worker 同时用同一 Workspace 时，分别记录和撤销各自的绑定，仅取消本 Session 的操作；要把“两个 Session 共用一台 Guest”的跨分区路由、保活和停止纳入测试。[文档 Fork](../adr/0345-ordered-agent-configuration.md) · [计算代际](../adr/0347-conversation-compute-continuity.md) · [授权交集](../adr/0351-serving-delegated-history.md)
 - **会话互通。** `list/status/wait/send/cancel` 按管理父子关系和租户权限查稳定 Session，`send` 向已授权的当前 Turn 投 steer/follow-up；已错过的投递返回明确结果。显式继续已完成的孩子，在同一子 Session 创建下一 Turn。历史上看到以前的子 Agent 名字不会让网页 Fork 获得它的管理权。子结果已经成为父 Tool Result 时，该结果属于父历史，可随父路径继承。附件、粘贴原件和图片通过可见 Entry 的持久对象引用保留，下载走当前会话鉴权。继承历史进入 `/status` 估算；`/usage` 按实际产生请求的 Session 统计，重复 Fork 不会重复计费。[用量口径](../adr/0342-context-status-and-gateway-usage.md)
-- **父等待与停止，建议维持产品语义。** 父 Turn 正常收尾继续等它所管理、仍未结束的本轮委派；只等待时可以停驻。用户 Stop 父 Turn，记录停止意图，并按委派关系向这些子 Turn 发幂等 Stop；若未来放开嵌套则逐层传播。父 Stop 和迟到创建通过同一管理侧关闭状态串行化，已创建者纳入取消，尚未准入者拒绝。递送可以重试；某一 Guest 失联不阻塞用户永久等待，也不能宣称物理进程退出。父 Worker 故障时，在另一台 Worker 上执行的子 Session 继续；若父子恰好在同一故障机器上，各自封口并按自己的 Session 恢复。对单个子 Turn 按 Stop 只停止该项并向等待方报告。网页 Fork 为平级，父 Stop 不影响它。父自然结束先关闭本轮新增委派的准入，再确认已登记的受管子 Turn 均已收尾，避免“检查为空”和晚到创建竞态。是否允许有意脱离父 Turn 的后台子任务是另一个产品决定。Temporal 也把父执行关闭后的子行为建模为单独策略。[Temporal Parent Close Policy](https://docs.temporal.io/parent-close-policy) · [现有原型的关闭检查](../../scripts/experiments/minimal-session-storage/delegated-runs.sql)
+- **父等待与停止：原提案中的级联选项，待审。** 父 Turn 正常收尾继续等它所管理、仍未结束的本轮委派；只等待时可以停驻。用户 Stop 父 Turn，记录停止意图，并按委派关系向这些子 Turn 发幂等 Stop；若未来放开嵌套则逐层传播。父 Stop 和迟到创建通过同一管理侧关闭状态串行化，已创建者纳入取消，尚未准入者拒绝。递送可以重试；某一 Guest 失联不阻塞用户永久等待，也不能宣称物理进程退出。父 Worker 故障时，在另一台 Worker 上执行的子 Session 继续；若父子恰好在同一故障机器上，各自封口并按自己的 Session 恢复。对单个子 Turn 按 Stop 只停止该项并向等待方报告。网页 Fork 为平级，父 Stop 不影响它。父自然结束先关闭本轮新增委派的准入，再确认已登记的受管子 Turn 均已收尾，避免“检查为空”和晚到创建竞态。是否允许有意脱离父 Turn 的后台子任务是另一个产品决定。Temporal 也把父执行关闭后的子行为建模为单独策略。[Temporal Parent Close Policy](https://docs.temporal.io/parent-close-policy) · [现有原型的关闭检查](../../scripts/experiments/minimal-session-storage/delegated-runs.sql)
 - **保留历史与回收字节。** 用户删除窗口或裁剪后续，要求该目标 Session 满足既有静默/封口前置条件，并验证期望视图版本。裁剪保留同一网页地址，切到新可写 Flow 和裁剪点的段清单，不原地改共享正文。删除/裁剪事务同步更新可见根、撤掉旧写入资格、登记后台清理；按既有策略保留必要的审计和去重。GC 按来源 Flow 的反向引用，保护仍被其他 Session、冻结文档、附件、活跃读取或正在恢复的任务引用的区间。删除 P 后，R 可以继续读 C；无人引用的 D、E 以后分批回收。删 R 后再释放原公共区间。在同一 Flow 内允许保守延迟回收，长期目标是独有后缀最终释放。不要为一次删除同步扫描整棵家族，也不要给普通消息追加逐分支计数。
 - **防止创建和 GC 交错。** Fork、裁剪按确定顺序锁目标窗口/源 Flow 的保护行，在事务内复查锚点可见性和版本，插入全部区间引用及附件/文档保留凭据；多个合法读者可持共享锁。GC 对准备回收的 Flow 取冲突锁，在拿锁后的有效快照**重新**查根和反向区间引用，分批处理。FK 防止删除仍被引用的 Flow；删除其中一些消息行还必须检查区间覆盖。GC 先赢则过时请求失败并可重新选点；Fork 先赢则 GC 保护新引用。把 PG 内行清理与对象存储物理删除分开，复用现有对象删除确认。历史链接可以指向已删除的来源说明或墓碑，不能依赖仍可打开父窗口。建议“删除父 Session”默认只删所选窗口，独立孩子的会话仍受自己的 ACL 约束；批量删除整棵委派树应是显式操作。
 
@@ -149,10 +149,12 @@ LIMIT $remaining;
 - 会话读取：[Session API](../../packages/control-plane/src/conversation-reader.ts)、[正文与工具配对](../../packages/runtime-core/src/root-message-history.ts)、[上下文读取](../../packages/control-plane/src/projected-context.ts)。
 - 调度、委派与执行：[租约协调](../../packages/runtime-core/src/session-lease-coordinator.ts)、[子 Agent 登记](../../packages/control-plane/src/named-subagent-store.ts)、[执行与交付](../../packages/control-plane/src/named-subagent-executor.ts)、[Worker Session host](../../packages/pi-session-postgres/src/durable/session-host.ts)、[Worker 冻结调用参数](../../packages/supervisor-host/src/tools/worker-tool-runtime.ts)。沿用执行侧取消原操作与沙箱路由，独立 Agent 也不持有沙箱管理凭据。
 
-### 请先审校的三个决定
+### 第一次审校结果
 
-1. **工具 Fork 冻结到哪里？** 建议选择“本轮中发起委派的那次模型请求，进入模型时已有的稳定历史”。例如父亲先拿到 `npm test` 的正式失败结果，下一次请求决定分工：孩子看得到本轮用户输入和测试失败，看不到这次尚未成对的委派调用，也不接管同批其他工具。冻结该次请求的原生范围边界，不能把 HTTP 重试、父补充消息或晚到的结果带进来。对照选项为延续目前的“本轮输入前”；两种模式用父/子实际请求内容审校。
-2. **网页如何选点？** 建议第一阶段沿用原型的入口限制，只允许在可见且已完成封口的普通 Turn 末尾点击（源会话后来正在运行另一轮也可以选更早的已封口点）；允许选主会话或有权访问的子会话，Fork 得到平级 Agent。底层从第一天就用消息锚点，保留已纳入该 Turn 的 steer/follow-up。以后若开放 Turn 内单条已提交消息，要另定未配对工具、可见头部和网页按钮语义；这不阻碍工具从活跃父亲的稳定位置 Fork。
-3. **父子怎样收尾？** 建议独立调度及独立故障恢复；保留本轮受管委派的正常收尾约束，显式 Stop 传播到这些孩子。停止一个孩子不会封口父 Session。已结束后删除某个窗口只影响该窗口，受权的其他会话和共享历史能继续读。可选的后台脱离任务后续再议。
+1. **已确认：工具 Fork 的冻结点。** 选择“本轮中发起委派的那次模型请求，进入模型时已有的稳定历史”。例如父亲先拿到 `npm test` 的正式失败结果，下一次请求决定分工：孩子看得到本轮用户输入和测试失败，看不到这次尚未成对的委派调用，也不接管同批其他工具。冻结该次请求的原生范围边界，不能把 HTTP 重试、父补充消息或晚到的结果带进来。验收时与目前的“本轮输入前”对照，检查父/子实际请求内容。
+2. **已确认：网页 Fork 的入口。** 第一阶段沿用原型的入口限制，只允许在可见且已完成封口的普通 Turn 末尾点击（源会话后来正在运行另一轮也可以选更早的已封口点）；允许选主会话或有权访问的子会话，Fork 得到平级 Agent。底层从第一天就用消息锚点，保留已纳入该 Turn 的 steer/follow-up。以后若开放 Turn 内单条已提交消息，要另定未配对工具、可见头部和网页按钮语义；这不阻碍工具从活跃父亲的稳定位置 Fork。
+3. **待审：父 Turn 的 Stop 范围。** 选项一只打断当前父 Turn 及其等待，已启动的子 Turn 继续。选项二同时向本轮仍在运行的受管子 Turn 发送 Stop（第 6 节原提案）。两者都须防止迟到结果改写已中断的父 Turn。父 Turn 自然完成、Worker 故障和删除会话各自有独立语义。
 
-审校顺序建议先看第 1 项的真实对话示例，再确认第 3 项能否接受等待停驻的成本，最后定网页边界和分阶段验收。当前只提交此评审稿。
+Codex CLI 普通 Esc 的源码对照：终端为当前 thread 和 turn 发出中断请求，Core 取出该 Session 的 active turn 做取消，V2 的 wait_agent 订阅活动通知。整棵运行时的挂起/关闭另有入口。[终端路由](https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/tui/src/app/thread_routing.rs#L789-L812) · [Core 中断](https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/core/src/tasks/mod.rs#L679-L731) · [等待工具](https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/core/src/tools/handlers/multi_agents_v2/wait.rs#L68-L97)。
+
+隔离复验使用真实 Codex CLI 0.167.1、0.172.0 的 App Server，各跑一次。用本地模拟模型触发父线程调用 `spawn_agent`，让子线程的原始模型请求保持打开。确认父线程已开始 `wait_agent` 后，向父线程及其 Turn ID 发送终端 Esc 使用的 `turn/interrupt`。两个版本均先报告父 Turn `interrupted`；之后才放行孩子的响应，原子 Turn 提交了最终回答并报告 `completed`。键盘映射查源码，运行时行为走实际 RPC。此项核对覆盖已启动的普通多 Agent V2 子线程。
