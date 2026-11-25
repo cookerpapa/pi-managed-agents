@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [ ] Deferred — evaluate independent Session scheduling under slot exhaustion. Reproduce parents occupying all execution slots while their children are ready. Check how a child can run and the original parent Tool call can receive its result, including completion racing with the wait or Stop. Choose a scheduling strategy when revisiting this item. The current [Fork study](research/session-fork-design-review-20261125.md) assumes sufficient execution slots.
+
 - [x] Reuse the admitted operation and its cached binding for live Stop. The [PG routing check](../scripts/experiments/minimal-session-storage/workspace-routing-recovery.mjs) observed zero routing reads on a warm Stop and recovered the same Guest with one locator and one binding read after revocation.
 
 - [x] Explain remote Bash Stop in subsequent model context and give reply records a seven-day broker retention window. Verify truncated, missing and still-readable mailboxes. [ADR-0361](adr/0361-stop-context-and-mailbox-retention.md).
