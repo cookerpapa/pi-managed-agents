@@ -1,5 +1,6 @@
 // Ownership adapter for the #52 segmented Run queue. Public Worker identities,
 // renewable leases and the on-disk epoch are the same ones the serving coordinator uses.
+import { connectSegmentWorker } from "./segment-wake.mjs";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { readFile } from "node:fs/promises";
@@ -19,6 +20,8 @@ export class SegmentWorker {
   #active = new Map();
   #pending = 0;
   #closed = false;
+  #stop = new AbortController();
+  #serving = false;
   #timer;
   #renewing;
   constructor({ database, workerId, bootId, capacity, leaseDurationMs }) {
@@ -143,35 +146,37 @@ export class SegmentWorker {
     }, this.#coordinator.heartbeatIntervalMs);
     this.#timer.unref?.();
   }
-  // wake can be the existing directed Worker management wake. Its notification
-  // only prompts a fresh PG claim. Slot accounting includes pending admissions.
-  async serve({ wake, signal, execute, onError }) {
-    const running = new Set();
-    let failure;
+  async serve({ scheduler, signal, execute, onError }) {
+    if (this.#serving) throw Error("Worker already serving");
+    const until = AbortSignal.any([signal, this.#stop.signal]);
+    if (until.aborted) return;
+    const finished = Promise.withResolvers();
+    const stop = () => finished.resolve();
+    const client = connectSegmentWorker({
+      scheduler,
+      id: this.workerId + "/" + this.bootId,
+      slots: this.capacity,
+      claim: () => this.claimNext(),
+      execute: async (job) => {
+        try {
+          await execute(job);
+        } catch (error) {
+          if (!onError) throw error;
+          await onError(error);
+        } finally {
+          await job.release();
+        }
+      },
+      fail: (error) => finished.reject(error),
+    });
+    this.#serving = true;
+    until.addEventListener("abort", stop, { once: true });
     try {
-      while (!this.#closed && !signal.aborted) {
-        if (failure) throw failure;
-        const generation = wake.generation;
-        wake.refresh?.();
-        const job = await this.claimNext();
-        if (job) {
-          const task = Promise.resolve()
-            .then(() => execute(job))
-            .catch(onError)
-            .finally(async () => {
-              await job.release();
-              running.delete(task);
-              wake.notify();
-            });
-          task.catch((error) => {
-            failure = error;
-            wake.notify();
-          });
-          running.add(task);
-        } else await wake.wait(generation, 1000, signal);
-      }
+      await finished.promise;
     } finally {
-      await Promise.allSettled(running);
+      until.removeEventListener("abort", stop);
+      await client.close();
+      this.#serving = false;
     }
   }
   async renew() {
@@ -198,6 +203,7 @@ export class SegmentWorker {
   }
   async close() {
     this.#closed = true;
+    this.#stop.abort();
     clearTimeout(this.#timer);
     await this.#renewing;
     await this.#observer.close();

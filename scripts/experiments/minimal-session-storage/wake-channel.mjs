@@ -1,16 +1,36 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { WebSocket, WebSocketServer } from "ws";
 
-// Only live transports and one outstanding arrival hint survive between events.
-// The router neither reads runs nor decides who owns one.
-export async function openWakeRouter(host, path, fail, port = 0) {
-  const server = new WebSocketServer({ host, port, perMessageDeflate: false, maxPayload: 256 });
+// Live connections advertise capacity. Undelivered hints occupy one bounded
+// counter; PostgreSQL remains the authority on which Turns can be claimed.
+export async function openWakeRouter(host, path, fail, port = 0, token) {
+  const digest = (value) => createHash("sha256").update(value).digest();
+  const expected = token === undefined ? undefined : digest("Bearer " + token);
+  const server = new WebSocketServer({
+    host,
+    port,
+    path,
+    perMessageDeflate: false,
+    maxPayload: 256,
+    ...(expected
+      ? {
+          verifyClient: ({ req }) =>
+            timingSafeEqual(expected, digest(req.headers.authorization ?? "")),
+        }
+      : {}),
+  });
   await once(server, "listening");
   server.on("error", fail);
   const connections = new Map(),
     waiting = new Set(),
-    directory = new Map();
-  let stage, timer, pendingHint, armedFault, stats;
+    directory = new Map(),
+    probes = new WeakSet();
+  let stage,
+    timer,
+    pendingWakes = 0,
+    armedFault,
+    stats;
   function drop(fault) {
     if (armedFault !== fault) return false;
     armedFault = undefined;
@@ -21,6 +41,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
     waiting.delete(socket);
     if (reason === "arrival" && drop("disconnect")) return socket.terminate();
     if (reason === "arrival" && drop("lost-wake")) return;
+    if (stage.perTurn && reason === "tick") probes.add(socket);
     stats[reason]++;
     socket.send(hint ? JSON.stringify(hint) : reason);
   }
@@ -50,6 +71,12 @@ export async function openWakeRouter(host, path, fail, port = 0) {
       for (const socket of connections.values()) signal(socket, "arrival");
       return;
     }
+    if (stage.perTurn) {
+      // Keep only a bounded count for Workers that are busy or reconnecting.
+      const demand = pendingWakes + count;
+      pendingWakes = Math.min(1024, demand - signalWaiting(demand, "arrival"));
+      return;
+    }
     const needed = Math.ceil(count / stage.batch);
     let targeted = 0;
     if (stage.cacheMode === "prefer")
@@ -67,7 +94,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
         targeted++;
       }
     const remaining = Math.max(0, needed - targeted);
-    pendingHint = remaining > 0 && signalWaiting(remaining, "arrival") < remaining;
+    pendingWakes = remaining > 0 && signalWaiting(remaining, "arrival") < remaining ? 1 : 0;
   }
   server.on("connection", (socket, request) => {
     const url = new URL(request.url, "http://localhost");
@@ -109,12 +136,18 @@ export async function openWakeRouter(host, path, fail, port = 0) {
         });
         return;
       }
+      // A reconciliation probe found real work. Pass the probe to one ready
+      // connection to catch up after a listener/router outage.
+      if (stage.perTurn && frame === "found") {
+        if (probes.delete(socket)) signalWaiting(1, "tick");
+        return;
+      }
       if (frame !== "ready") return;
       stats.offers++;
       if (drop("lost-ready")) return;
       waiting.add(socket);
-      if (pendingHint && stage.wakeMode === "directed") {
-        pendingHint = false;
+      if (pendingWakes && stage.wakeMode === "directed") {
+        pendingWakes--;
         signalWaiting(1, "arrival");
       }
     });
@@ -126,7 +159,7 @@ export async function openWakeRouter(host, path, fail, port = 0) {
     connections.clear();
     waiting.clear();
     directory.clear();
-    pendingHint = false;
+    pendingWakes = 0;
     stage = undefined;
   }
   function startTimer() {
@@ -163,7 +196,17 @@ export async function openWakeRouter(host, path, fail, port = 0) {
 
 // One pending PG claim reserves its complete batch. Committed rows finish even
 // if the management socket disappears while the SQL request is in flight.
-export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail, onRegistered }) {
+export function connectClaimWorker({
+  url,
+  id,
+  stage,
+  slots,
+  claim,
+  execute,
+  fail,
+  onRegistered,
+  token,
+}) {
   const address = new URL(url);
   address.searchParams.set("stage", stage.label);
   address.searchParams.set("id", id);
@@ -182,6 +225,10 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
     hintedClaims: 0,
     targetedRows: 0,
   };
+  const drained = Promise.withResolvers();
+  function finishDrain() {
+    if (stopped && !checking && !running) drained.resolve();
+  }
   let socket,
     reconnect,
     renew,
@@ -190,7 +237,8 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
     checking = false,
     checkingAgain,
     offered = false,
-    running = 0;
+    running = 0,
+    reconnectMs = 100;
   function offer() {
     if (!online || stopped || checking || running >= slots) return;
     offered = true;
@@ -230,23 +278,42 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
           .finally(() => {
             const wasFull = running === slots;
             running--;
-            if (wasFull && !offered) request("freed-slot");
+            if (wasFull && !offered) {
+              if (stage.perTurn) offer();
+              else request("freed-slot");
+            }
+            finishDrain();
           });
       }
       checking = false;
-      if (checkingAgain || rows.length === limit)
+      if (checkingAgain || (!stage.perTurn && rows.length === limit))
         request(checkingAgain?.reason ?? "drain", checkingAgain?.hint);
       else offer();
+      if (stage.perTurn && reason === "tick" && rows.length && online && !stopped)
+        socket.send("found");
+      finishDrain();
     })().catch((error) => {
       checking = false;
       fail(error);
+      finishDrain();
     });
   }
   function connect() {
     if (stopped) return;
-    const current = new WebSocket(address, { perMessageDeflate: false, handshakeTimeout: 5000 });
+    const current = new WebSocket(address, {
+      perMessageDeflate: false,
+      handshakeTimeout: 5000,
+      ...(token ? { headers: { authorization: "Bearer " + token } } : {}),
+    });
     socket = current;
     current.on("error", () => current.terminate());
+    if (token)
+      current.on("unexpected-response", (_request, response) => {
+        response.resume();
+        if (!stopped && [401, 403].includes(response.statusCode))
+          fail(new Error("Worker wake authentication failed"));
+        current.terminate();
+      });
     current.on("message", (raw) => {
       if (stopped || socket !== current) return;
       const frame = raw.toString(),
@@ -254,8 +321,13 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
       const message = hint ? "arrival" : frame;
       if (message === "registered") {
         online = true;
+        reconnectMs = 100;
         onRegistered?.();
         stats.registrations++;
+        if (stage.perTurn) {
+          offer();
+          return;
+        }
         stats.bootstrap++;
       } else if (message === "arrival" || message === "tick") {
         stats[message]++;
@@ -268,7 +340,10 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
       online = false;
       offered = false;
       clearTimeout(renew);
-      if (!stopped) reconnect = setTimeout(connect, 50 + Math.random() * 50);
+      if (!stopped) {
+        reconnect = setTimeout(connect, reconnectMs * (0.5 + 0.5 * Math.random()));
+        reconnectMs = Math.min(4000, reconnectMs * 2);
+      }
     });
   }
   connect();
@@ -289,6 +364,8 @@ export function connectClaimWorker({ url, id, stage, slots, claim, execute, fail
       clearTimeout(renew);
       clearTimeout(reconnect);
       socket?.terminate();
+      finishDrain();
+      return drained.promise;
     },
   };
 }

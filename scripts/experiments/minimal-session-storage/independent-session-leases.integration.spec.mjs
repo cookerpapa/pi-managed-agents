@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { it } from "vitest";
 import pg from "pg";
 import { sql } from "kysely";
-import { PostgresNotificationWake, createDatabase, runMigrations } from "@pi-cloud/database";
+import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { createPrivateTenant } from "../../../packages/control-plane/src/tenant-administration.ts";
 import { registerTestWorker } from "../../../packages/control-plane/test/fixtures/registered-worker.ts";
 import { ForkStorage, installForkTables, setForkLayout } from "./fork-storage.mjs";
@@ -266,7 +266,7 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
     }).admin();
     const writer = new KafkaWorkerProducer({ brokers, topic, clientId: topic });
     const replies = new KafkaToolReplyPublisher(brokers, topic + "-returns");
-    let returns;
+    let returns, scheduler;
     const token = randomUUID() + randomUUID();
     const actors = [];
     let reader, parent, nativeParent, failed, reconciliation;
@@ -370,6 +370,11 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         mode === "parent-handoff" ? "branch" : mode,
         "review",
       );
+      scheduler = await rt.serveScheduler({ connectionString: url.href, token, tickMs: 60000 });
+      const directed = { topic, brokers, scheduler: { url: scheduler.url, token } };
+      const one = await actor(db, url.href, 1, directed);
+      actors.push(one);
+      await until(() => scheduler.snapshot().waiting === 1);
       for (const f of nativeParent.prefix) await send(f);
       const child = await until(
         async () =>
@@ -380,9 +385,7 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
             )
           ).rows[0],
       );
-      const one = await actor(db, url.href, 1, { topic, brokers });
-      actors.push(one);
-      const first = (await one.ask({ op: "claim" })).scope;
+      const first = (await one.ask({ op: "claimed" })).scope;
       assert.equal(first.sessionId, child.id);
       if (mode === "parent-handoff") {
         // The child is already running on one. Stop the actual parent harness and
@@ -494,19 +497,10 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         await reader.waitForPartition(0);
       }
       await one.kill();
-      await until(() => publishedSeals.get(first.writerId));
-      await until(
-        async () =>
-          (
-            await pool.query(
-              "select 1 from runs where id=$1 and state='queued' and native_work_handoff is not null",
-              [child.turn],
-            )
-          ).rowCount,
-      );
-      const two = await actor(db, url.href, 1, { topic, brokers });
+      const two = await actor(db, url.href, 1, directed);
       actors.push(two);
-      const second = (await two.ask({ op: "claim" })).scope;
+      await until(() => publishedSeals.get(first.writerId));
+      const second = (await two.ask({ op: "claimed" })).scope;
       assert.equal(second.runId, first.runId);
       assert.equal(second.fencingToken, first.fencingToken + 1);
       // The old boot can still put bytes into Kafka. Its receipt cannot append
@@ -545,9 +539,9 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
             (await pool.query("select 1 from runs where id=$1 and state='queued'", [child.turn]))
               .rowCount,
         );
-        successor = await actor(db, url.href, 1, { topic, brokers });
+        successor = await actor(db, url.href, 1, directed);
         actors.push(successor);
-        const third = (await successor.ask({ op: "claim" })).scope;
+        const third = (await successor.ask({ op: "claimed" })).scope;
         assert.equal(third.runId, first.runId);
         assert.equal(third.fencingToken, second.fencingToken + 1);
       }
@@ -608,6 +602,7 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
       );
     } finally {
       await Promise.allSettled(actors.map((w) => w.kill()));
+      await scheduler?.close();
       stopControl.abort();
       await reconciliation;
       await parent?.close();
@@ -643,8 +638,9 @@ it.skipIf(!endpoint)(
     const workerId = randomUUID(),
       bootId = randomUUID();
     const worker = runtime.worker({ workerId, bootId, capacity: 2, leaseDurationMs: 6000 });
-    const wake = new PostgresNotificationWake(url.href, "pi_cloud_run_queue"),
+    const token = randomUUID() + randomUUID(),
       abort = new AbortController();
+    let scheduler;
     const jobs = [],
       releases = [],
       finished = [];
@@ -720,8 +716,9 @@ it.skipIf(!endpoint)(
         );
         return id;
       }
+      scheduler = await runtime.serveScheduler({ connectionString: url.href, token });
       server = worker.serve({
-        wake,
+        scheduler: { url: scheduler.url, token },
         signal: abort.signal,
         onError: (e) => {
           finished.push(e);
@@ -788,7 +785,7 @@ it.skipIf(!endpoint)(
       for (const r of releases) r.resolve();
       await server;
       await worker.close();
-      await wake.close();
+      await scheduler?.close();
       await pool.query("drop schema if exists " + schema + " cascade");
       await store.db.destroy();
       await db.destroy();

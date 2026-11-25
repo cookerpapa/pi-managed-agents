@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Wire the directed readiness router into independent Session claiming and measure PG selection attempts with 1,000 management sockets. [Acceptance](reports/segment-worker-wake-20261126.md).
+
 - [x] Give independently scheduled child Sessions their own Worker leases on the segmented candidate. Verify competing claims, parent/child loss, ordered sealing, cold Pi continuation and result delivery. [Acceptance](reports/independent-child-leases-20261126.md).
 
 - [x] Implement and measure frozen segment Forks, clipped public paging, attachment retention, and guarded collection on the candidate. [Results](reports/segmented-session-forks-20261125.md).

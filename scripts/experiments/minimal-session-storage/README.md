@@ -755,3 +755,5 @@ The [segment study](../../../docs/reports/segmented-session-forks-20261125.md) r
 ### Independent child Worker leases
 
 The [ownership acceptance](../../../docs/reports/independent-child-leases-20261126.md) exercises the segmented candidate with independent Session claims, shared PG lease authority and the existing named Kafka return dispatcher. Run `npm run test:transport` for RF3 coverage.
+
+The [directed wake acceptance](../../../docs/reports/segment-worker-wake-20261126.md) connects the independent Worker loop to the Session runtime scheduler. It includes the 1,000-socket queue-selection measurement and listener/router recovery.

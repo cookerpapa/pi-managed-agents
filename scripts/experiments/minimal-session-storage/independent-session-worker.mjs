@@ -28,11 +28,31 @@ async function publish(fact) {
     value: encodeWorkspaceFact(fact),
   });
 }
+// In directed mode the test driver observes the next acquired lease. It
+// cannot cause the queue lookup. Manual claims remain available for lock races.
+const stopServing = new AbortController();
+let acquired = Promise.withResolvers(),
+  releaseScheduled;
+const serving = cfg.scheduler
+  ? worker.serve({
+      scheduler: cfg.scheduler,
+      signal: stopServing.signal,
+      execute: async (claimed) => {
+        releaseScheduled = Promise.withResolvers();
+        acquired.resolve(claimed);
+        await releaseScheduled.promise;
+      },
+    })
+  : undefined;
+serving?.catch((e) => process.send?.({ kind: "error", message: e.stack }));
 process.on("message", async (msg) => {
   try {
     if (msg.op === "claim") {
       job = await worker.claimNext();
       process.send({ kind: "claim", scope: job?.scope ?? null, flow: job?.flow_id ?? null });
+    } else if (msg.op === "claimed") {
+      job = await acquired.promise;
+      process.send({ kind: "claimed", scope: job.scope });
     } else if (msg.op === "execute") {
       const scope = job.scope;
       let sequence = 0;
@@ -123,11 +143,18 @@ process.on("message", async (msg) => {
     } else if (msg.op === "release") {
       await native?.close(ctx);
       native = undefined;
-      await job?.release();
+      if (releaseScheduled) {
+        acquired = Promise.withResolvers();
+        releaseScheduled.resolve();
+        releaseScheduled = undefined;
+      } else await job?.release();
       job = undefined;
       process.send({ kind: "released" });
     } else if (msg.op === "exit") {
       await native?.close(ctx);
+      stopServing.abort();
+      releaseScheduled?.resolve();
+      await serving;
       await worker.close();
       await producer?.close();
       await storage.db.destroy();

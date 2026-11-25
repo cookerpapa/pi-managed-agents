@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The segmented queue now uses directed Worker wakes for root, child and recovery Turns. [Fan-out and reconnection measurements](reports/segment-worker-wake-20261126.md).
+
 The segmented candidate schedules child Sessions through the same Worker queue as roots and fences each writer independently. [Acceptance](reports/independent-child-leases-20261126.md).
 
 The #52 candidate shares message prefixes across Web Forks and named child Session registrations. The [storage acceptance and load results](reports/segmented-session-forks-20261125.md) precede the independent scheduling milestone.

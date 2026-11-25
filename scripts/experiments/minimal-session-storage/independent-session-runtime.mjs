@@ -23,6 +23,7 @@ import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { NamedSubagentExecutor } from "../../../packages/control-plane/src/named-subagent-executor.ts";
 import { operationsFor, decodeWorkspaceFact } from "./workspace-operations.mjs";
 import { ChildNameConflict, ForkStorage } from "./fork-storage.mjs";
+import { serveSegmentScheduler } from "./segment-wake.mjs";
 import { SegmentLeaseProjection, SegmentWorker } from "./independent-session-leases.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { settledFamilyBase } from "./settled-family-base.mjs";
@@ -104,6 +105,9 @@ export class IndependentSessionRuntime {
         }
       },
     });
+  }
+  serveScheduler(options) {
+    return serveSegmentScheduler(this.store.pool, options);
   }
   worker(registration) {
     return new SegmentWorker({ database: this.store.db, ...registration });

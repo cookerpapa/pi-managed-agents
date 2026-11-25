@@ -25,10 +25,22 @@ end $$;
 create trigger independent_turn_owner before insert or update of state,lease_id,fencing_token on runs
   for each row execute function guard_segment_owner();
 
-create function notify_segment_work() returns trigger language plpgsql as $$
-begin perform pg_notify('pi_cloud_run_queue',''); return null; end $$;
+-- NOTIFY folds identical payloads within one transaction. Distinct Session
+-- flows represent independently claimable work. Private schemas have separate
+-- channels, including when the candidate shares PG with the serving layout.
+create function notify_segment_work() returns trigger language plpgsql set search_path from current as $$
+begin
+  if new.state='queued' or exists(select from runs r where r.tenant_id=new.tenant_id and r.session_id=new.session_id
+      and r.mailbox_position>new.mailbox_position and r.state='queued') then
+    perform pg_notify('pma_segment_ready_'||md5(tg_table_schema),new.session_id::text);
+  end if;
+  return null;
+end $$;
 create trigger independent_turn_ready after insert or update of state on runs for each row
   when(new.state='queued') execute function notify_segment_work();
+create trigger independent_successor_ready after update of state on runs for each row
+  when(old.state is distinct from new.state and new.state in ('completed','failed','cancelled','timed_out'))
+  execute function notify_segment_work();
 
 -- Wake parked tool waiters only when their exact child Turn settles. Closing
 -- a parent retires its callbacks and does not send a cancellation to children.

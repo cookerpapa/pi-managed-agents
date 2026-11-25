@@ -112,3 +112,67 @@ test("only an available connection with the advertised scoped version gets a pre
   assert.equal(String((await evicted)[0]), "arrival");
   assert.equal(router.snapshot().preferred, 1);
 });
+
+test("a dropped directed wake is recovered by one central probe after readiness is reannounced", async (t) => {
+  const router = await openWakeRouter("127.0.0.1", "/work", assert.fail);
+  const perTurn = {
+    ...stage,
+    batch: 1,
+    perTurn: true,
+    tickMs: 10,
+    reofferMs: 20,
+    fault: "lost-wake",
+  };
+  router.configure(perTurn);
+  let checks = 0;
+  const gate = Promise.withResolvers();
+  const worker = connectClaimWorker({
+    url: "ws://127.0.0.1:" + router.port + "/work",
+    id: "reader",
+    stage: perTurn,
+    slots: 1,
+    claim: async () => {
+      checks++;
+      return [{ id: 1 }];
+    },
+    execute: () => gate.promise,
+    fail: assert.fail,
+  });
+  t.after(async () => {
+    gate.resolve();
+    await worker.close();
+    await router.close();
+  });
+  await waitFor(() => router.snapshot().waiting === 1);
+  router.notify(perTurn.label, 1);
+  await waitFor(() => router.snapshot().faults === 1 && router.snapshot().waiting === 1);
+  assert.equal(checks, 0);
+  router.startTimer();
+  await waitFor(() => worker.stats.rows === 1);
+  assert.equal(checks, 1);
+  assert.equal(router.snapshot().tick, 1);
+  assert.equal(router.snapshot().waiting, 0);
+});
+
+test("a rejected internal wake credential does not issue a claim", async (t) => {
+  const token = "a".repeat(32),
+    router = await openWakeRouter("127.0.0.1", "/work", assert.fail, 0, token);
+  router.configure(stage);
+  const failed = Promise.withResolvers();
+  const worker = connectClaimWorker({
+    url: "ws://127.0.0.1:" + router.port + "/work",
+    id: "reader",
+    stage,
+    slots: 1,
+    token: "b".repeat(32),
+    claim: assert.fail,
+    execute: assert.fail,
+    fail: failed.resolve,
+  });
+  t.after(async () => {
+    await worker.close();
+    await router.close();
+  });
+  assert.match((await failed.promise).message, /authentication/);
+  assert.equal(router.snapshot().online, 0);
+});
