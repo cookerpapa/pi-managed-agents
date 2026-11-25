@@ -19,6 +19,8 @@ import { nativeDelegationIntent } from "./task-delegation.ts";
 import { AcceptedFamilyCheckpoint, type SealedNativeState } from "./accepted-family-checkpoint.ts";
 
 type FamilyScope = {
+  /** Stable lease owner when a retained history Flow has another ID. */
+  leaseSessionId?: string;
   tenantId: string;
   piSessionId: string;
   sessionId: string;
@@ -152,7 +154,7 @@ function predecessor(scope: FamilyScope) {
         and old.released_at is not null and old.writer_seal_offset=(r.native_work_handoff->>'offset')::bigint
       where r.id=${scope.runId}::uuid and r.tenant_id=${scope.tenantId}::uuid and r.session_id=${scope.sessionId}::uuid
         and r.turn_id=${scope.turnId}::uuid
-        and active.pi_session_id=${scope.piSessionId} and active.lease_id=${scope.writerId}::uuid
+        and active.pi_session_id=${scope.leaseSessionId ?? scope.piSessionId} and active.lease_id=${scope.writerId}::uuid
         and r.fencing_token=active.fencing_token and active.fencing_token=${scope.fencingToken}`;
 }
 
@@ -200,31 +202,37 @@ export function readSealedDelegationIntent(
         ({ write }) => write.type === "task" && write.value.id === taskId,
       );
       if (task?.write.type !== "task") throw Error("Delegation task absent from predecessor seal");
-      return nativeDelegationIntent(scope, conversationId, taskId, task.write.value, {
-        sequence: async () => task.seq,
-        assistant: async (id) => {
-          const {
-            rows: [entry],
-          } = await sql<{
-            content: string;
-          }>`select content from messages where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}
+      return nativeDelegationIntent(
+        { ...scope, piSessionId: scope.leaseSessionId ?? scope.piSessionId },
+        conversationId,
+        taskId,
+        task.write.value,
+        {
+          sequence: async () => task.seq,
+          assistant: async (id) => {
+            const {
+              rows: [entry],
+            } = await sql<{
+              content: string;
+            }>`select content from messages where tenant_id=${scope.tenantId}::uuid and pi_session_id=${scope.piSessionId}
           and entry_id=${id} and conversation_id=${conversationId} and run_id=${scope.runId}::uuid and commit_seq<=${task.seq}`.execute(
-            tx,
-          );
-          return entry ? (JSON.parse(entry.content) as EntryRecord) : undefined;
+              tx,
+            );
+            return entry ? (JSON.parse(entry.content) as EntryRecord) : undefined;
+          },
+          frozenRun: async () => {
+            for (const { write } of state.records)
+              if (
+                write.type === "document.create" &&
+                write.record.kind === "pi-cloud.run" &&
+                write.record.scope.kind === "conversation" &&
+                write.record.scope.conversationId === conversationId &&
+                write.content.kind === "base"
+              )
+                return write.content.value;
+          },
         },
-        frozenRun: async () => {
-          for (const { write } of state.records)
-            if (
-              write.type === "document.create" &&
-              write.record.kind === "pi-cloud.run" &&
-              write.record.scope.kind === "conversation" &&
-              write.record.scope.conversationId === conversationId &&
-              write.content.kind === "base"
-            )
-              return write.content.value;
-        },
-      });
+      );
     });
 }
 

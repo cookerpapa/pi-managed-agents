@@ -28,7 +28,6 @@ type Delivery = {
 };
 type Handle = { job: "place" | "reply"; id: string; token: string };
 type Route = { lease_id: string; fencing_token: string; management_base_url: string };
-const running = (state: string) => state === "running" || state === "preparing";
 const text = (body: string) => ({ content: [{ type: "text" as const, text: body }] });
 
 /** Durable claims expire after process loss. Native placement and each mailbox delivery
@@ -42,9 +41,11 @@ export class NamedSubagentExecutor {
     readonly options: {
       db: Kysely<Database>;
       connectionString: string;
-      token: string;
+
       publish: (topic: string, reply: ToolReply) => Promise<void>;
-    },
+    } & (
+      { independentSessions: true; token?: never } | { independentSessions?: false; token: string }
+    ),
   ) {
     this.#wake = new PostgresNotificationWake(options.connectionString, "pma_named_children");
   }
@@ -89,8 +90,12 @@ export class NamedSubagentExecutor {
           const next = (
             await sql<{ ms: string | null }>`select extract(epoch from (least(
             (select due_at from subagent_deliveries where not sent and due_at is not null order by due_at limit 1),
-            (select c.placement_due from runs c join runs r on r.id=c.root_run_id and r.state='running'
-             where c.state='preparing' and c.placement_due is not null order by c.placement_due limit 1)
+            ${
+              this.options.independentSessions
+                ? sql`null::timestamptz`
+                : sql`(select c.placement_due from runs c join runs r on r.id=c.root_run_id and r.state='running'
+             where c.state='preparing' and c.placement_due is not null order by c.placement_due limit 1)`
+            }
           ) - clock_timestamp()))*1000 as ms`.execute(this.options.db)
           ).rows[0]?.ms;
           delay = next == null ? 30000 : Math.max(25, Math.min(30000, Math.ceil(Number(next))));
@@ -105,13 +110,15 @@ export class NamedSubagentExecutor {
     const db = this.options.db,
       token = randomUUID();
     // Reserve capacity for callbacks while slow Worker endpoints are unavailable.
-    const { rows: a } = await sql<{
-      id: string;
-    }>`with pick as(select c.id from runs c join runs r on r.id=c.root_run_id and r.state='running'
+    const { rows: a } = this.options.independentSessions
+      ? { rows: [] }
+      : await sql<{
+          id: string;
+        }>`with pick as(select c.id from runs c join runs r on r.id=c.root_run_id and r.state='running'
       where c.state='preparing' and c.placement_due<=now() order by c.placement_due,c.id limit ${Math.ceil(max / 2)} for update of c skip locked)
       update runs c set placement_claim=${token}::uuid,placement_due=now()+interval '30 seconds' from pick where c.id=pick.id returning c.id`.execute(
-      db,
-    );
+          db,
+        );
     const { rows: b } = await sql<{
       id: string;
     }>`with pick as(select operation_id from subagent_deliveries where not sent and due_at<=now()
@@ -143,6 +150,8 @@ export class NamedSubagentExecutor {
     ).rows[0];
   }
   #rpc(route: Route, request: SubagentHostRequest) {
+    if (this.options.independentSessions)
+      throw Error("Independent children use their own Session worker");
     return new HttpSupervisorManagementClient({
       baseUrl: route.management_base_url,
       managementToken: this.options.token,
@@ -206,6 +215,11 @@ export class NamedSubagentExecutor {
     }
   }
   async #deliver(j: Handle) {
+    const running = (state: string) =>
+      state === "preparing" ||
+      state === "running" ||
+      (this.options.independentSessions &&
+        ["queued", "settling", "cancel_requested"].includes(state));
     const db = this.options.db;
     const d = (
       await sql<
@@ -235,8 +249,15 @@ export class NamedSubagentExecutor {
               | "native_answer_id"
               | "agent_name"
             >
-          >`select c.id,c.state,c.tenant_id,c.session_id,c.root_run_id,c.agent_id,c.native_lane,c.native_answer_id,a.agent_name
-          from runs c join runs a on a.id=c.agent_id where c.id=${d.child_id}::uuid`.execute(db)
+          >`${
+            this.options.independentSessions
+              ? sql`select c.id,c.state,c.tenant_id,c.session_id,c.id as root_run_id,${String(d.value.executionId)}::uuid as agent_id,
+              1::bigint as native_lane,(select m.entry_id from message_entries m where m.tenant_id=c.tenant_id and m.pi_session_id=c.session_id
+              and m.run_id=c.id and m.conversation_id=1 and m.role='assistant' and m.content::json #>> '{model,0,stopReason}' in ('stop','length') order by m.entry_id desc limit 1) as native_answer_id,${String(d.value.name)}::text as agent_name
+              from runs c where c.id=${d.child_id}::uuid`
+              : sql`select c.id,c.state,c.tenant_id,c.session_id,c.root_run_id,c.agent_id,c.native_lane,c.native_answer_id,a.agent_name
+          from runs c join runs a on a.id=c.agent_id where c.id=${d.child_id}::uuid`
+          }`.execute(db)
         ).rows[0]
       : undefined;
     let value = d.value,

@@ -283,6 +283,13 @@ export class ReadyProjection {
       await process(r, draft);
       const view = draft.views.get(f.scope.runId);
       const opened = !previous && view;
+      if (r.openingIndependentWriter && view && !covered && !draft.frame.rejected)
+        draft.frame.writerStart = [
+          f.scope.tenantId,
+          f.scope.piSessionId,
+          f.scope.runId,
+          f.scope.writerId,
+        ];
       if (opened && !covered) {
         // Remember even a memory-only first fact before another Run can advance
         // this partition's checkpoint beyond it.
@@ -310,7 +317,7 @@ export class ReadyProjection {
           if (r.rootPresentation) {
             foldRootPresentation(view, f, draft.frame);
           }
-          if (r.rootPresentation || this.delegatedRuns)
+          if (!this.independentSessions && (r.rootPresentation || this.delegatedRuns))
             projectChildOutcomes(
               view,
               f,

@@ -19,7 +19,7 @@ for (const children of [1, 100, 500]) {
     bodyStart = 3 * children + 10;
   try {
     await pool.query("create schema " + schema);
-    for (const f of ["schema.sql", "delegated-runs.sql"])
+    for (const f of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
       await pool.query(await readFile(new URL(f, import.meta.url), "utf8"));
     await pool.query("insert into sessions values($1,$2)", [session, tenant]);
     await pool.query(

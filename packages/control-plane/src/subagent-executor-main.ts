@@ -1,12 +1,11 @@
 import Fastify from "fastify";
-import { createHash, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createDatabase } from "@pi-cloud/database";
 import { ACCEPTED_FACT_TOPIC, KafkaToolReplyPublisher } from "@pi-cloud/event-log";
 import { sql } from "kysely";
 import { NamedSubagentExecutor } from "./named-subagent-executor.ts";
-import { namedExecutorPath, parseSubagentOffer } from "./named-subagent-client.ts";
-import { registerSubagent, SubagentAdmissionRefused } from "./named-subagent-store.ts";
+import { installNamedSubagentEndpoint } from "./named-subagent-endpoint.ts";
+import { registerSubagent } from "./named-subagent-store.ts";
 
 async function setting(key: string) {
   const file = process.env[key + "_FILE"];
@@ -35,29 +34,17 @@ async function main() {
     publish: (t, r) => publisher.publish(t, r),
   });
   const api = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
-  const digest = (s: string) => createHash("sha256").update(s).digest(),
-    auth = digest("Bearer " + token);
   let ready = false;
   api.get("/health/ready", (_req, res) => res.code(ready ? 200 : 503).send({ ready }));
-  api.post(namedExecutorPath, async (req, res) => {
-    if (!ready) return res.code(503).send();
-    if (!timingSafeEqual(auth, digest(req.headers.authorization ?? "")))
-      return res.code(401).send();
-    let offer;
-    try {
-      offer = parseSubagentOffer(req.body);
-    } catch {
-      return res.code(400).send();
-    }
-    try {
+  installNamedSubagentEndpoint(
+    api,
+    token,
+    () => ready,
+    async (offer) => {
       await registerSubagent(db, topic, offer);
       service.wake();
-      return res.code(202).send();
-    } catch (error) {
-      console.warn("subagent.executor.admission_unconfirmed");
-      return res.code(error instanceof SubagentAdmissionRefused ? 409 : 503).send();
-    }
-  });
+    },
+  );
   const stop = Promise.withResolvers<void>();
   process.once("SIGTERM", stop.resolve);
   process.once("SIGINT", stop.resolve);

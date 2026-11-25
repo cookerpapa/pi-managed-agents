@@ -86,7 +86,7 @@ export class AcceptedFamilyCheckpoint {
       f.commit.nextId < this.#nextId
     )
       throw Error("Incomplete admitted family prefix");
-    const changes = new Map<number, FoldedRecord>();
+    const changes = new Map<number, FoldedRecord | null>();
     const heads: SealedNativeState["heads"] = [];
     for (const w of f.commit.writes as unknown as readonly StorageWrite[]) {
       switch (w.type) {
@@ -110,7 +110,7 @@ export class AcceptedFamilyCheckpoint {
           );
           break;
         case "document.change": {
-          const row = changes.get(w.id) ?? this.#records.get(w.id);
+          const row = changes.has(w.id) ? changes.get(w.id) : this.#records.get(w.id);
           if (row === "inbox") break;
           if (row?.write.type !== "document.create")
             throw Error("Missing original native document");
@@ -125,12 +125,28 @@ export class AcceptedFamilyCheckpoint {
           changes.set(w.id, { seq: row.seq, write: { ...row.write, content } });
           break;
         }
+        case "document.retire": {
+          // Pi retires the task-scoped return route when the recovered Tool settles.
+          const row = changes.has(w.id) ? changes.get(w.id) : this.#records.get(w.id);
+          if (
+            !row ||
+            row === "inbox" ||
+            row.write.type !== "document.create" ||
+            row.write.record.scope.kind !== "task"
+          )
+            throw Error("Retired native document has no matching task scope");
+          changes.set(w.id, null);
+          break;
+        }
         default:
           throw Error("Unsupported native document lifecycle in cold handoff: " + w.type);
       }
     }
     this.#heads.push(...heads);
-    for (const [id, value] of changes) this.#records.set(id, value);
+    for (const [id, value] of changes) {
+      if (value === null) this.#records.delete(id);
+      else this.#records.set(id, value);
+    }
     for (const d of f.display)
       this.#sequences.set(
         d.scope.sessionId,

@@ -238,7 +238,7 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each([
         const db = createDatabase({ connectionString: url.href, maxConnections: 2 });
         try {
           await pool.query("create schema " + schema);
-          for (const f of ["schema.sql", "delegated-runs.sql"])
+          for (const f of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
             await pool.query(await readFile(new URL(f, import.meta.url), "utf8"));
           // Columns normally supplied by the shared control schema.
           await pool.query(`alter table runs add turn_id uuid,add fencing_token bigint,add output_seal_id uuid,add recovery_requested_at timestamptz,add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint not null default 0,add output_display_native_seq bigint not null default 0;

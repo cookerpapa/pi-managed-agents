@@ -75,7 +75,7 @@ begin
       and (m.pi_session_id=src or g.segment_no is not null)
       and (kind='request' or (r.state='completed' and (r.output_seal_id is null or r.output_sealed_at is not null) and r.history_head is not null and m.role='assistant'
         and m.content::json#>>'{model,0,stopReason}' in ('stop','length')));
-  if not found or (request_ceiling is not null and request_ceiling<target.commit_seq) then return false; end if;
+  if not found or (target.pi_session_id=src and request_ceiling is not null and request_ceiling<target.commit_seq) then return false; end if;
   last_id:=target.entry_id;
   ceiling:=target.through_seq;
   if kind='web' then
@@ -94,7 +94,8 @@ begin
     if exists(select from messages m where m.tenant_id=t and m.run_id=target_run and m.pi_session_id=target.pi_session_id
       and m.conversation_id=lane and m.role='assistant' and m.entry_id>anchor and m.entry_id<=last_id
       and m.commit_seq<=ceiling and m.content::json#>>'{model,0,stopReason}' in ('stop','length')) then return false; end if;
-  elsif kind='request' then ceiling:=least(ceiling,coalesce(request_ceiling,target.commit_seq));
+  elsif kind='request' then
+    if target.pi_session_id=src then ceiling:=coalesce(request_ceiling,target.commit_seq); end if;
   elsif ceiling is null then
     select m.commit_seq into strict ceiling from messages m where m.tenant_id=t and m.pi_session_id=target.pi_session_id
       order by m.commit_seq desc,m.ordinal desc limit 1;
@@ -227,11 +228,12 @@ $$;
 
 -- Inspect at most 512 message keys per transaction, including those kept by a
 -- peer. A detach resets the cursor on each source whose reachability changed.
+create function flow_delivery_allows_gc(t uuid, physical uuid) returns boolean language sql stable as $$ select true $$;
 create function collect_flow_batch(t uuid) returns boolean language plpgsql set search_path from current as $$
 declare work fork_gc%rowtype; last_seq bigint; last_ord int; chunk int; base uuid;
 begin
   perform pg_advisory_xact_lock(hashtextextended(t::text,17));
-  select * into work from fork_gc where tenant_id=t order by flow_id limit 1 for update;
+  select * into work from fork_gc where tenant_id=t and flow_delivery_allows_gc(t,flow_id) order by flow_id limit 1 for update;
   if not found then return false; end if;
   if exists(select from sessions where tenant_id=t and flow_id=work.flow_id) then
     delete from fork_gc where tenant_id=t and flow_id=work.flow_id;

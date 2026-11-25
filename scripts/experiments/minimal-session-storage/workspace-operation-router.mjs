@@ -116,7 +116,7 @@ export class WorkspaceOperationRouter {
   }
   async #routeOperation(record, current, warmOnly = false) {
     const f = record.fact,
-      ops = operationsFor(f);
+      ops = record.decodedOperations ?? operationsFor(f);
     const covered = record.offset < this.view.next.get(record.partition);
     const tools = [],
       cancels = [],

@@ -1,5 +1,7 @@
 # Subagents
 
+The [segmented candidate](reports/independent-child-leases-20261126.md) runs each child under its own Worker lease. The following shared-family placement description applies to the serving runtime.
+
 Pi Managed Agents provides `subagent` to delegate a task and `subagent_control`
 to find and manage children. Users can request delegation in ordinary language.
 

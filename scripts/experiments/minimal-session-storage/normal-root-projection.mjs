@@ -21,6 +21,7 @@ export function normalRootProjection(
   validateChild,
   {
     delegatedRuns = false,
+    independentSessions = false,
     partitions = 1,
     bashLog = false,
     namedExecutor = Boolean(process.env.PI_CLOUD_SUBAGENT_EXECUTOR_URL),
@@ -40,6 +41,7 @@ export function normalRootProjection(
     };
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
   view.delegatedRuns = delegatedRuns;
+  view.independentSessions = independentSessions;
   view.bashLog = bashLog;
   view.namedExecutor = namedExecutor;
   view.configure(16, "recorded-history");
@@ -94,7 +96,14 @@ export function normalRootProjection(
       async replay() {
         /* Rejected writer; no candidate state or physical effect. */
       },
-      async project(fact, position, current) {
+      async project(
+        fact,
+        position,
+        current,
+        physicalOwner,
+        openingIndependentWriter = false,
+        decodedOperations,
+      ) {
         assert.equal(fact.scope.sessionId, fact.scope.piSessionId);
         assert(
           (fact.inputQueueSessions ?? []).every((id) => id === fact.scope.sessionId),
@@ -134,12 +143,20 @@ export function normalRootProjection(
               !!validateChild,
               delegatedRuns,
               bashLog,
+              physicalOwner,
             );
           if (!current()) return { admitted: false, events: [], covers: [] };
           if (previous) view.sessions.set(scope.runId, previous);
         }
         const before = previous?.rootInputDoc;
-        const r = { ...position, fact, openingRow },
+        const r = {
+            ...position,
+            fact,
+            openingRow,
+            decodedOperations,
+            openingIndependentWriter,
+            partitionKey: physicalOwner,
+          },
           plan = await router.projectOperation(r, current);
         const session = view.sessions.get(fact.scope.runId);
         const admitted =
@@ -205,7 +222,7 @@ export function normalRootProjection(
         f.kind === "work_finished" &&
           (["turn.completed", "turn.cancelled"].includes(f.terminal.type) ||
             (f.terminal.type === "turn.failed" &&
-              f.terminal.payload.code === "workspace_directory_missing")),
+              (independentSessions || f.terminal.payload.code === "workspace_directory_missing"))),
       );
       const state =
         f.terminal.type === "turn.completed"

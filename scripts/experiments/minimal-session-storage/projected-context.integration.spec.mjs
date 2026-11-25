@@ -53,7 +53,7 @@ it.skipIf(!uri)(
     });
     try {
       await pool.query("create schema " + schema);
-      for (const f of ["schema.sql", "delegated-runs.sql"])
+      for (const f of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
         await pool.query(await readFile(new URL(f, import.meta.url), "utf8"));
       await pool.query(
         "alter table runs add pruned_at timestamptz,add recovery_requested_at timestamptz,add output_seal_id uuid,add output_sealed_at timestamptz",

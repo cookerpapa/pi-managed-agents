@@ -14,6 +14,7 @@ export async function reopenRootProjection(
   withChildren = false,
   delegatedRuns = false,
   bashLog = false,
+  physicalOwner = scope.piSessionId,
 ) {
   const {
     rows: [r],
@@ -26,8 +27,15 @@ export async function reopenRootProjection(
     left join session_leases old on old.tenant_id=r.tenant_id and old.pi_session_id=active.pi_session_id
       and old.lease_id=(r.native_work_handoff#>>'{scope,writerId}')::uuid and old.released_at is not null
     where r.id=$1 and r.session_id=$2 and r.tenant_id=$3 and r.lease_id=$4 and r.fencing_token=$5
-      and active.fencing_token=r.fencing_token and active.pi_session_id=$2::uuid::text`,
-    [scope.runId, scope.piSessionId, scope.tenantId, scope.writerId, scope.fencingToken],
+      and active.fencing_token=r.fencing_token and active.pi_session_id=$6::text`,
+    [
+      scope.runId,
+      scope.piSessionId,
+      scope.tenantId,
+      scope.writerId,
+      scope.fencingToken,
+      physicalOwner,
+    ],
   );
   assert(r?.h, "No sealed root projection for the admitted writer");
   const h = r.h,

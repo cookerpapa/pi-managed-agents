@@ -167,6 +167,7 @@ export class PostgresDurableSessionHost {
         bashOnWorkerLoss?: "unknown" | "unknown-from-log";
         topic: string;
         delegatedRuns?: boolean;
+        independentSessions?: boolean;
         hydrate(
           family: SealedFamilyRead,
           authority: ActiveExecutionAuthority,
@@ -256,7 +257,10 @@ export class PostgresDurableSessionHost {
     await owner.authority.assertCurrent();
     return nativeRead(
       async () => {
-        if (this.options.sealedRecovery?.delegatedRuns) {
+        if (
+          this.options.sealedRecovery?.delegatedRuns ||
+          this.options.sealedRecovery?.independentSessions
+        ) {
           const source = await restoredDelegationIntent(
             await owner.storage,
             binding,

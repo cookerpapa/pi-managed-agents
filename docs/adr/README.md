@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0363](0363-independent-agent-session-leases.md) assigns each delegated Session an independent Worker lease on the segmented candidate.
+
 [ADR-0362](0362-flat-session-fork-segments.md) adopts ordered ancestor ranges for candidate Fork storage.
 
 [ADR-0361](0361-stop-context-and-mailbox-retention.md) defines model-facing Stop and Kafka reply expiry in the candidate.

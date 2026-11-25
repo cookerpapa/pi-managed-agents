@@ -221,6 +221,13 @@ export async function installPrefixSql(db, { message, presentedMessage, inbox, f
             where id=(d->>'run')::uuid and tenant_id=(d->>'tenant')::uuid and session_id=(d->>'session')::uuid and lease_id=(d->>'writer')::uuid and state in ('running','cancel_requested');
           if not found then raise exception 'Root display owner changed' using errcode='40001'; end if;
         end if;
+        if frame?'writerStart' then
+          a:=frame->'writerStart';
+          update runs set output_first_topic=coalesce(output_first_topic,p_topic),output_first_partition=coalesce(output_first_partition,p_partition),
+            output_first_offset=coalesce(output_first_offset,(frame->>'offset')::bigint)
+            where tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and id=(a->>2)::uuid and lease_id=(a->>3)::uuid;
+          if not found then raise exception 'Independent writer changed' using errcode='40001'; end if;
+        end if;
         if frame?'snapshot' then
           snap:=frame->'snapshot';
           update runs set projection_first=(frame->>'offset')::bigint+1,projection_partition=p_partition,projection_pin=null,

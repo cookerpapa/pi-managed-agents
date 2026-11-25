@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { prepareNamedSubagentArguments, subagentName } from "@pi-cloud/protocol";
+import { TOOL_REPLY_TOPIC_PATTERN } from "@pi-cloud/event-log";
 import { childWorkspaceGrant } from "@pi-cloud/subagent-control/delegated-workspace-grant";
 import { restoreForkPrefix } from "./session-prefix.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -85,6 +86,12 @@ export async function setForkLayout(pool, enabled, cover = true) {
   }
 }
 
+export class ChildNameConflict extends Error {
+  constructor(id) {
+    super("Existing child has different creation arguments");
+    this.childId = id;
+  }
+}
 export class ForkStorage {
   constructor(pool) {
     this.db = new Kysely({ dialect: new PostgresDialect({ pool }) });
@@ -156,7 +163,7 @@ export class ForkStorage {
   async fork(t, source, point, key = randomUUID()) {
     return this.createBranch(t, source, point, key, null);
   }
-  async delegate(t, source, point, key, name, task, model, caller, workspace) {
+  async delegate(t, source, point, key, name, task, model, caller, workspace, returnRoute) {
     const normalized = subagentName(name);
     assert(
       normalized !== "root" && task.trim() && model && caller?.run && caller?.writer,
@@ -178,11 +185,19 @@ export class ForkStorage {
       model,
       caller,
       workspace: requested,
+      returnRoute,
     });
   }
   // Input has already passed the native call/checkpoint matching in
   // nativeDelegationIntent. Only the candidate storage consumes this adapter.
-  async delegateFromIntent(t, source, caller, intent, model) {
+  async delegateFromIntent(t, source, caller, intent, model, delivery) {
+    if (
+      delivery &&
+      (!TOOL_REPLY_TOPIC_PATTERN.test(delivery.topic) ||
+        !delivery.operationId ||
+        !Number.isSafeInteger(intent.taskId))
+    )
+      throw Error("Invalid subagent completion route");
     assert(intent.toolName === "subagent" && intent.nativeCallId && intent.operationId);
     const args = prepareNamedSubagentArguments(intent.arguments);
     const branch = args.context === "branch";
@@ -205,115 +220,163 @@ export class ForkStorage {
             through: intent.contextThrough,
           }
         : null,
-      intent.operationId,
+      delivery?.operationId ?? intent.operationId,
       args.name,
       args.task,
       model,
       caller,
       args.workspace,
+      delivery
+        ? {
+            topic: delivery.topic,
+            task: intent.taskId,
+            call: intent.nativeCallId,
+            lane: intent.conversationId,
+            source: intent.operationId,
+          }
+        : undefined,
     );
   }
   async createBranch(t, source, point, key, child) {
     return this.db.transaction().execute(async (tx) => {
-      await this.lock(tx, t);
-      await sql`select pg_advisory_xact_lock(hashtextextended(${t + source + key},23))`.execute(tx);
-      const fingerprint = createHash("sha256")
-        .update(
-          JSON.stringify([
-            point?.run,
-            point?.lane,
-            point?.entry,
-            point?.through,
-            child?.name,
-            child?.task,
-            child?.model,
-            child?.caller.run,
-            child?.workspace === undefined ? "inherit" : child.workspace,
-          ]),
-        )
-        .digest("hex");
-      const {
-        rows: [old],
-      } = await sql`select target_id, fingerprint=${fingerprint} as matches
-        from fork_requests where tenant_id=${t}::uuid and source_id=${source}::uuid and request_key=${key}`.execute(
-        tx,
-      );
-      if (old) {
-        assert(old.matches, "Fork request changed");
-        assert(await this.session(tx, t, old.target_id), "Fork destination was deleted");
-        return old.target_id;
-      }
-      const parent = await this.session(tx, t, source);
-      assert(parent, "Unknown Fork source");
-      let creation = null;
-      let inheritedGrant = null;
-      if (child) {
-        const caller =
-          await sql`select id,workspace_grant from runs where tenant_id=${t}::uuid and id=${child.caller.run}::uuid and session_id=${parent.flow_id}::uuid
-          and lease_id=${child.caller.writer}::uuid and state='running' for share`.execute(tx);
-        assert(caller.rows.length, "Calling Turn is no longer active");
-        inheritedGrant = caller.rows[0].workspace_grant;
-        creation = createHash("sha256")
+      const target = await this.registerBranch(tx, t, source, point, key, child);
+      const route = child?.returnRoute;
+      if (route) {
+        const {
+          rows: [receipt],
+        } =
+          await sql`select id from runs where tenant_id=${t}::uuid and id=${child.caller.run}::uuid and session_id=(select flow_id from sessions where tenant_id=${t}::uuid and id=${source}::uuid)
+          and lease_id=${child.caller.writer}::uuid and state='running' and output_seal_id is null for share`.execute(
+            tx,
+          );
+        assert(receipt, "Calling Turn is no longer active");
+        const fingerprint = createHash("sha256")
           .update(
             JSON.stringify([
-              child.name,
-              child.task,
-              child.model,
-              point ? "branch" : "fresh",
-              child.workspace === undefined ? "inherit" : child.workspace,
+              t,
+              source,
+              child.caller.run,
+              child.caller.writer,
+              target,
+              route.source,
+              route.topic,
+              route.call,
+              route.task,
+              route.lane,
             ]),
           )
           .digest("hex");
-        await sql`select pg_advisory_xact_lock(hashtextextended(${t + source + child.name},37))`.execute(
-          tx,
-        );
-        const {
-          rows: [named],
-        } =
-          await sql`select id,creation_hash from sessions where tenant_id=${t}::uuid and parent_session_id=${source}::uuid and agent_name=${child.name}`.execute(
+        const ack =
+          await sql`insert into subagent_deliveries(operation_id,root_id,writer,caller_task,caller_lane,operation_hash,destination,call_id,tool,child_id,kind,value,due_at)
+          select ${key}::uuid,${child.caller.run}::uuid,${child.caller.writer}::uuid,${route.task},${route.lane},${fingerprint},${route.topic},${route.call}, 'subagent',r.id,'watch',jsonb_build_object('name',${child.name}::text,'executionId',${target}::uuid),clock_timestamp()
+          from runs r where r.tenant_id=${t}::uuid and r.session_id=${target}::uuid and r.mailbox_position=1
+          on conflict(operation_id) do update set operation_hash=excluded.operation_hash where subagent_deliveries.operation_hash=excluded.operation_hash returning operation_id`.execute(
             tx,
           );
-        if (named) {
-          assert(
-            named.creation_hash === creation,
-            "Existing child has different creation arguments",
-          );
-          await sql`insert into fork_requests values(${t}::uuid,${source}::uuid,${key},${named.id}::uuid,${fingerprint})`.execute(
-            tx,
-          );
-          return named.id;
-        }
+        assert.equal(ack.rows.length, 1, "Original child Turn or delivery identity changed");
+        await sql`select pg_notify('pma_named_children','')`.execute(tx);
       }
-      const target = randomUUID();
-      const grant = child ? childWorkspaceGrant(inheritedGrant, child.workspace, target) : null;
-      if (point) await this.freeze(tx, t, parent, target, point, !!child);
-      else {
-        assert(child, "Missing Fork anchor");
-        await sql`insert into flows(tenant_id,flow_id) values(${t}::uuid,${target}::uuid)`.execute(
-          tx,
-        );
-      }
-      if (
-        !child ||
-        (grant &&
-          grant.computeSessionId === inheritedGrant?.computeSessionId &&
-          grant.cwd === inheritedGrant.cwd)
-      )
-        await this.copyWorld(tx, t, parent.flow_id, point?.lane ?? 1, target);
-      await sql`insert into sessions(tenant_id,id,flow_id,family_id,parent_session_id,agent_name,creation_hash)
-        values(${t}::uuid,${target}::uuid,${target}::uuid,${child ? parent.family_id : target}::uuid,
-          ${child ? source : null}::uuid,${child?.name ?? "root"},${creation})`.execute(tx);
-      if (child) {
-        await sql`insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,workspace_grant)
-          values(${randomUUID()}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},${child.model},'queued',${grant ? JSON.stringify(grant) : null}::jsonb)`.execute(
-          tx,
-        );
-      }
-      await sql`insert into fork_requests values(${t}::uuid,${source}::uuid,${key},${target}::uuid,${fingerprint})`.execute(
-        tx,
-      );
       return target;
     });
+  }
+  async registerBranch(tx, t, source, point, key, child) {
+    await this.lock(tx, t);
+    await sql`select pg_advisory_xact_lock(hashtextextended(${t + source + key},23))`.execute(tx);
+    const fingerprint = createHash("sha256")
+      .update(
+        JSON.stringify([
+          point?.run,
+          point?.lane,
+          point?.entry,
+          point?.through,
+          child?.name,
+          child?.task,
+          child?.model,
+          child?.caller.run,
+          child?.workspace === undefined ? "inherit" : child.workspace,
+        ]),
+      )
+      .digest("hex");
+    const {
+      rows: [old],
+    } = await sql`select target_id, fingerprint=${fingerprint} as matches
+        from fork_requests where tenant_id=${t}::uuid and source_id=${source}::uuid and request_key=${key}`.execute(
+      tx,
+    );
+    if (old) {
+      assert(old.matches, "Fork request changed");
+      assert(await this.session(tx, t, old.target_id), "Fork destination was deleted");
+      return old.target_id;
+    }
+    const parent = await this.session(tx, t, source);
+    assert(parent, "Unknown Fork source");
+    let creation = null;
+    let inheritedGrant = null;
+    if (child) {
+      const caller =
+        await sql`select id,workspace_grant from runs where tenant_id=${t}::uuid and id=${child.caller.run}::uuid and session_id=${parent.flow_id}::uuid
+          and lease_id=${child.caller.writer}::uuid and state='running' and output_seal_id is null for share`.execute(
+          tx,
+        );
+      assert(caller.rows.length, "Calling Turn is no longer active");
+      inheritedGrant = caller.rows[0].workspace_grant;
+      creation = createHash("sha256")
+        .update(
+          JSON.stringify([
+            child.name,
+            child.task,
+            child.model,
+            point ? "branch" : "fresh",
+            child.workspace === undefined ? "inherit" : child.workspace,
+          ]),
+        )
+        .digest("hex");
+      await sql`select pg_advisory_xact_lock(hashtextextended(${t + source + child.name},37))`.execute(
+        tx,
+      );
+      const {
+        rows: [named],
+      } =
+        await sql`select id,creation_hash from sessions where tenant_id=${t}::uuid and parent_session_id=${source}::uuid and agent_name=${child.name}`.execute(
+          tx,
+        );
+      if (named) {
+        if (named.creation_hash !== creation) throw new ChildNameConflict(named.id);
+        await sql`insert into fork_requests values(${t}::uuid,${source}::uuid,${key},${named.id}::uuid,${fingerprint})`.execute(
+          tx,
+        );
+        return named.id;
+      }
+    }
+    const target = randomUUID();
+    const grant = child ? childWorkspaceGrant(inheritedGrant, child.workspace, target) : null;
+    if (point) await this.freeze(tx, t, parent, target, point, !!child);
+    else {
+      assert(child, "Missing Fork anchor");
+      await sql`insert into flows(tenant_id,flow_id) values(${t}::uuid,${target}::uuid)`.execute(
+        tx,
+      );
+    }
+    if (
+      !child ||
+      (grant &&
+        grant.computeSessionId === inheritedGrant?.computeSessionId &&
+        grant.cwd === inheritedGrant.cwd)
+    )
+      await this.copyWorld(tx, t, parent.flow_id, point?.lane ?? 1, target);
+    await sql`insert into sessions(tenant_id,id,flow_id,family_id,parent_session_id,agent_name,creation_hash)
+        values(${t}::uuid,${target}::uuid,${target}::uuid,${child ? parent.family_id : target}::uuid,
+          ${child ? source : null}::uuid,${child?.name ?? "root"},${creation})`.execute(tx);
+    if (child) {
+      await sql`insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,workspace_grant)
+          values(${randomUUID()}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},${child.model},'queued',${grant ? JSON.stringify(grant) : null}::jsonb)`.execute(
+        tx,
+      );
+    }
+    await sql`insert into fork_requests values(${t}::uuid,${source}::uuid,${key},${target}::uuid,${fingerprint})`.execute(
+      tx,
+    );
+    return target;
   }
   async agentConfiguration(t, id) {
     const {
@@ -377,9 +440,9 @@ export class ForkStorage {
     const rows = await this.pageWithCursor(t, id, limit);
     return rows.map(({ cursor, ...row }) => row);
   }
-  async coldRecords(tx, t, s) {
+  async coldRecords(tx, t, s, inheritedOnly = false) {
     const records = [];
-    let cursor = null,
+    let cursor = inheritedOnly ? { flow: s.flow_id, segment: 2147483646 } : null,
       floor = 1,
       head = false;
     for (;;) {
@@ -399,14 +462,14 @@ export class ForkStorage {
     }
     return records.reverse();
   }
-  async contextPrefix(t, id) {
+  async contextPrefix(t, id, inheritedOnly = false) {
     return this.db
       .transaction()
       .setIsolationLevel("repeatable read")
       .execute(async (tx) => {
         const s = await this.session(tx, t, id);
         assert(s, "Unknown Fork session");
-        return this.coldRecords(tx, t, s);
+        return this.coldRecords(tx, t, s, inheritedOnly);
       });
   }
   async hydrate(t, id, store) {

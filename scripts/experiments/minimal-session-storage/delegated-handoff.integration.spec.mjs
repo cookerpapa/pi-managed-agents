@@ -123,7 +123,7 @@ it.skipIf(!source).each([false, true])(
     }
     try {
       await pool.query("create schema " + schema);
-      for (const f of ["schema.sql", "delegated-runs.sql"])
+      for (const f of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
         await pool.query(await readFile(new URL(f, import.meta.url), "utf8"));
       await pool.query(`alter table runs add turn_id uuid,add fencing_token bigint,add recovery_requested_at timestamptz,add output_seal_id uuid,add output_first_topic text,add output_first_partition int,add output_first_offset bigint;
       create table session_leases(tenant_id uuid,pi_session_id text,lease_id uuid,fencing_token bigint,writer_sealed_at timestamptz,writer_seal_offset bigint,released_at timestamptz,writer_failed_at timestamptz)`);

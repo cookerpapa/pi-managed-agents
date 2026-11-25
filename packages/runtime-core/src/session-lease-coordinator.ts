@@ -298,7 +298,31 @@ export class SessionLeaseCoordinator implements TurnExecutionAuthority {
         true,
       );
     mark("lease_session_lock");
-    const physical = facts.physical;
+    const lease = await this.grantLockedPhysicalSession(
+      tx,
+      request.tenantId,
+      request.piSessionId,
+      facts.physical.leaseEpoch,
+      mark,
+    );
+    return {
+      executionReference: createExecutionReference(
+        lease.lease_id,
+        request.runId,
+        Number(lease.fencing_token),
+      ),
+    };
+  }
+
+  /** Caller owns the locked physical Session row and admits the Turn in this
+   * transaction. Shared by the normal Run executor and the segmented candidate. */
+  async grantLockedPhysicalSession(
+    tx: Transaction<Database>,
+    tenantId: string,
+    piSessionId: string,
+    leaseEpoch: string | number,
+    mark: (stage: string) => void = () => {},
+  ) {
     const worker = await tx
       .selectFrom("workers")
       .selectAll()
@@ -308,55 +332,44 @@ export class SessionLeaseCoordinator implements TurnExecutionAuthority {
     if (!worker || worker.state !== "ready")
       throw new SessionLeaseCoordinatorError("sandbox_unavailable", "Worker is unavailable", true);
     mark("lease_worker_lock");
-    let lease = await tx
+    const existing = await tx
       .selectFrom("session_leases")
       .selectAll()
-      .where("tenant_id", "=", request.tenantId)
-      .where("pi_session_id", "=", request.piSessionId)
+      .where("tenant_id", "=", tenantId)
+      .where("pi_session_id", "=", piSessionId)
       .where("released_at", "is", null)
       .forNoKeyUpdate()
       .executeTakeFirst();
-    if (lease)
+    if (existing)
       throw new SessionLeaseCoordinatorError(
         "session_lease_conflict",
         "Previous Session owner must finish closure before takeover",
         true,
       );
-    // One physical Session admits one root work item. Child Conversations do
-    // not enter this cloud claim transaction at all.
-    // Run's final conditional UPDATE checks clock_timestamp() after every lock;
-    // an earlier SELECT timestamp would not authorize a later execution anyway.
+
     mark("lease_read");
-    if (!lease) {
-      const epoch = Number(physical.leaseEpoch) + 1;
-      if (!Number.isSafeInteger(epoch)) throw new Error("Session execution epoch exhausted");
-      const created = await sql<Selectable<Database["session_leases"]>>`with advanced_epoch as (
+    const epoch = Number(leaseEpoch) + 1;
+    if (!Number.isSafeInteger(epoch)) throw new Error("Session execution epoch exhausted");
+    const created = await sql<Selectable<Database["session_leases"]>>`with advanced_epoch as (
         update pi_sessions set lease_epoch=${epoch}
-          where tenant_id=${request.tenantId}::uuid and id=${request.piSessionId}
-            and lease_epoch=${physical.leaseEpoch}::bigint returning id
+          where tenant_id=${tenantId}::uuid and id=${piSessionId}
+            and lease_epoch=${leaseEpoch}::bigint returning id
       ) insert into session_leases(tenant_id,pi_session_id,lease_id,worker_id,
           fencing_token,valid_until,acquired_at,renewed_at)
-        select ${request.tenantId}::uuid,id,${this.#idGenerator()}::uuid,${worker.id}::uuid,
+        select ${tenantId}::uuid,id,${this.#idGenerator()}::uuid,${worker.id}::uuid,
           ${epoch},
           clock_timestamp()+${this.#leaseDurationMs}*interval '1 millisecond',
           clock_timestamp(),clock_timestamp() from advanced_epoch
         returning *`.execute(tx);
-      lease = created.rows[0];
-      if (!lease)
-        throw new SessionLeaseCoordinatorError(
-          "session_lease_invariant",
-          "Locked Session epoch changed during admission",
-          false,
-        );
-    }
+    const lease = created.rows[0];
+    if (!lease)
+      throw new SessionLeaseCoordinatorError(
+        "session_lease_invariant",
+        "Locked Session epoch changed during admission",
+        false,
+      );
     mark("lease_write");
-    return {
-      executionReference: createExecutionReference(
-        lease.lease_id,
-        request.runId,
-        Number(lease.fencing_token),
-      ),
-    };
+    return lease;
   }
 
   async assertCurrent(

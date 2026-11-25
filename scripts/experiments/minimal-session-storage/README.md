@@ -751,3 +751,7 @@ The [append-layout study](../../../docs/reports/bash-intent-log-20261125.md) inc
 ### Frozen message-range Forks
 
 The [segment study](../../../docs/reports/segmented-session-forks-20261125.md) runs the opt-in Session API against a candidate schema. `measure-segment-forks.mjs` measures paired Fork creation, pagination, cold Pi import, branch depth, fan-out and the ordinary PG append path. `write-load.mjs --segments` feeds the same 20-tool recording to the RF3 Projector with Chrome following a live Turn and an optional reader paging a fork. Both commands allocate disposable infrastructure. Independent child Worker placement is tracked separately.
+
+### Independent child Worker leases
+
+The [ownership acceptance](../../../docs/reports/independent-child-leases-20261126.md) exercises the segmented candidate with independent Session claims, shared PG lease authority and the existing named Kafka return dispatcher. Run `npm run test:transport` for RF3 coverage.

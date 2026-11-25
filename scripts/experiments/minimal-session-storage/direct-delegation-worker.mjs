@@ -344,6 +344,7 @@ export async function resumeParent(
   previousTopic,
   childId,
   interruptAtWait = false,
+  independentPublish,
 ) {
   let runtime, dispatcher;
   const provider = fauxProvider({
@@ -354,7 +355,7 @@ export async function resumeParent(
     models = createModels();
   models.setProvider(provider.provider);
   provider.setResponses([
-    fauxAssistantMessage("Child checked the tests"),
+    ...(independentPublish ? [] : [fauxAssistantMessage("Child checked the tests")]),
     fauxAssistantMessage("Parent finished"),
   ]);
   const boot = await bootMailbox(),
@@ -398,10 +399,12 @@ export async function resumeParent(
           }),
         ),
       ).fact;
+      if (independentPublish) await independentPublish(fact);
       const seq = p.apply();
       ready?.confirmed();
       if (interruptAtWait) accepted.push(fact);
-      await dispatcher.consume({ topic, partition: 0, offset: BigInt(seq), fact }, () => true);
+      if (!independentPublish)
+        await dispatcher.consume({ topic, partition: 0, offset: BigInt(seq), fact }, () => true);
       return seq;
     }
   }
@@ -410,7 +413,8 @@ export async function resumeParent(
     database,
     sealedRecovery: {
       topic,
-      delegatedRuns: true,
+      delegatedRuns: !independentPublish,
+      independentSessions: Boolean(independentPublish),
       hydrate: async (rows) => {
         assert.equal(rows.handoff.sealId, family.handoff.sealId);
         const positions = await hydrateSealedFamily(rows, store);
@@ -425,25 +429,26 @@ export async function resumeParent(
     topic,
     initialReplayComplete: () => true,
   });
-  dispatcher = new ControlToolDispatcher({
-    database,
-    partitions: 1,
-    ownsPartition: () => true,
-    directDelegations,
-    execute: async (c, current) => {
-      calls.push(c);
-      if (interruptAtWait) {
-        waiting.resolve();
-        return { waiting: true };
-      }
-      return executeChild(pool, c, runtime, provider, current);
-    },
-    publish: async (t, r) => {
-      assert.equal(t, replyTopic);
-      replies.push(r);
-      await boot.publish(t, r);
-    },
-  });
+  if (!independentPublish)
+    dispatcher = new ControlToolDispatcher({
+      database,
+      partitions: 1,
+      ownsPartition: () => true,
+      directDelegations,
+      execute: async (c, current) => {
+        calls.push(c);
+        if (interruptAtWait) {
+          waiting.resolve();
+          return { waiting: true };
+        }
+        return executeChild(pool, c, runtime, provider, current);
+      },
+      publish: async (t, r) => {
+        assert.equal(t, replyTopic);
+        replies.push(r);
+        await boot.publish(t, r);
+      },
+    });
   try {
     const handle = await sessionHost.open({
       binding: {
@@ -458,11 +463,20 @@ export async function resumeParent(
       publish: () =>
         assert.fail("The candidate Store publishes through its matched test transport"),
     });
-    const tool = await workerDelegationTool(scope, mailbox, sessionHost);
+    const tool = await workerDelegationTool(
+      scope,
+      mailbox,
+      sessionHost,
+      Boolean(independentPublish),
+    );
     runtime = await handle.runtime(() =>
       DurableAgentSession.open(handle.storage, {
         models,
-        remoteTools: [infrastructureToolDefinitions().find((d) => d.name === "subagent")],
+        remoteTools: [
+          infrastructureToolDefinitions(Boolean(independentPublish)).find(
+            (d) => d.name === "subagent",
+          ),
+        ],
         settings: { compaction: { enabled: false } },
       }),
     );
@@ -503,14 +517,15 @@ export async function resumeParent(
     const messages = (await root.context(ctx)).messages;
     const results = messages.filter((m) => m.role === "toolResult" && m.toolName === "subagent");
     assert.equal(results.length, 1);
-    assert(JSON.stringify(results).includes(childId));
+    assert(JSON.stringify(results).includes(childId), JSON.stringify(results));
     assert(JSON.stringify(messages.at(-1)).includes("Parent finished"));
+    if (independentPublish) return { results, sequence: store.nextSeq - 1 };
     assert.equal(calls.length, 1);
     assert.equal(replies.length, 1);
     assert.equal(replies[0].operationId, calls[0].operationId);
     assert.equal(calls[0].recovery.operationId, childId);
   } finally {
-    await dispatcher.close();
+    await dispatcher?.close();
     try {
       await sessionHost.close();
     } finally {

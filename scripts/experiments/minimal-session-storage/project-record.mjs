@@ -22,7 +22,7 @@ import {
 import { batchHash } from "./moving-checkpoint.mjs";
 
 export async function projectRecord(
-  { fact: f, partition, offset, openingRow },
+  { fact: f, partition, offset, openingRow, partitionKey },
   draft,
   environment,
 ) {
@@ -41,7 +41,7 @@ export async function projectRecord(
   const t = performance.now(),
     wireMs = Date.now() - Date.parse(f.occurredAt),
     { tenantId, piSessionId, runId, writerId } = f.scope;
-  assert.equal(kafkaProducerLane(piSessionId, partitions), partition);
+  assert.equal(kafkaProducerLane(partitionKey ?? piSessionId, partitions), partition);
   const views = draft?.views ?? sessions;
   const publish = (fn) => (draft ? draft.after.push(fn) : fn());
   const borrow = () =>

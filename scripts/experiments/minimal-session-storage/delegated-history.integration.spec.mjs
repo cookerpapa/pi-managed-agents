@@ -16,7 +16,7 @@ it.skipIf(!source)(
       db = createDatabase({ connectionString: url.href, maxConnections: 2 });
     try {
       await pool.query("create schema " + schema);
-      for (const f of ["schema.sql", "delegated-runs.sql"])
+      for (const f of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
         await pool.query(await readFile(new URL(f, import.meta.url), "utf8"));
       const [tenant, root, r1, r2] = Array.from({ length: 4 }, () => randomUUID());
       await pool.query("insert into sessions values($1,$2)", [root, tenant]);

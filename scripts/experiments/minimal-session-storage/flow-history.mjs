@@ -8,7 +8,8 @@ export async function installFlowHistory(
 ) {
   if (!["head", "base"].includes(anchor)) throw new Error("Unknown Flow anchor");
   if (withDelegates) {
-    await db.query(await readFile(new URL("./delegated-runs.sql", import.meta.url), "utf8"));
+    for (const file of ["subagent-deliveries.sql", "delegated-runs.sql"])
+      await db.query(await readFile(new URL(file, import.meta.url), "utf8"));
     await db.query("alter table runs drop constraint runs_tenant_id_session_id_fkey");
   }
   if (!projection && !withDelegates)

@@ -177,7 +177,7 @@ it.skipIf(!url || !brokers)(
     }
     try {
       await pool.query("create schema " + schema);
-      for (const file of ["schema.sql", "delegated-runs.sql"])
+      for (const file of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
         await pool.query(await readFile(new URL(file, import.meta.url), "utf8"));
       await pool.query(`alter table runs add worker_id uuid, add fencing_token bigint,add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint default 0,add output_display_native_seq bigint default 0;
      create table workers(id uuid,supervisor_id uuid);create table supervisor_hosts(supervisor_id uuid,management_base_url text);`);

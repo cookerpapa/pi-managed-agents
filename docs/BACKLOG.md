@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Give independently scheduled child Sessions their own Worker leases on the segmented candidate. Verify competing claims, parent/child loss, ordered sealing, cold Pi continuation and result delivery. [Acceptance](reports/independent-child-leases-20261126.md).
+
 - [x] Implement and measure frozen segment Forks, clipped public paging, attachment retention, and guarded collection on the candidate. [Results](reports/segmented-session-forks-20261125.md).
 
 - [ ] Deferred — evaluate independent Session scheduling under slot exhaustion. Reproduce parents occupying all execution slots while their children are ready. Check how a child can run and the original parent Tool call can receive its result, including completion racing with the wait or Stop. Choose a scheduling strategy when revisiting this item. The current [Fork study](research/session-fork-design-review-20261125.md) assumes sufficient execution slots.

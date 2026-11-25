@@ -421,7 +421,7 @@ it.skipIf(!url).each([true, false])(
     }
     try {
       await pool.query("create schema " + schema);
-      for (const file of ["schema.sql", "delegated-runs.sql"])
+      for (const file of ["schema.sql", "subagent-deliveries.sql", "delegated-runs.sql"])
         await pool.query(await readFile(new URL(file, import.meta.url), "utf8"));
       await projector.install();
       await projector.reset(new Map([[0, 0n]]), 16, "recorded-history");
