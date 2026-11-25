@@ -32,7 +32,7 @@ subagent({ task: "Check the collision logic", context: "branch", workspace: { co
 
 `fresh` starts from the task. `branch` inherits the frozen history before the
 current parent prompt, not intermediate reasoning or Tool results produced
-during that Run; pass any such findings explicitly in the child task.
+during that Run; pass any such findings explicitly in the child task. The ADR-0362 source candidate instead freezes the native request cutoff of the generation which issued the delegation. It includes settled findings from this parent Turn and excludes the outstanding delegation itself.
 `workspace: { compute: "shared" }` uses the parent's compute environment; `"ephemeral"` uses a
 separate temporary Cube with the **same persistent Volume**. Optional absolute
 `cwd` selects an existing directory and otherwise inherits the parent's frozen

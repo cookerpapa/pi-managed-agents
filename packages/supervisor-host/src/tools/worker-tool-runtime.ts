@@ -50,6 +50,7 @@ export class WorkerToolRuntime {
           reference: string,
           inherit: boolean,
           conversationId: number,
+          nativeCallId: string,
         ): Promise<string | null>;
         conversationDepth(reference: string, conversationId: number): Promise<number>;
         originalControlIntent(
@@ -305,6 +306,7 @@ export class WorkerToolRuntime {
                 scope.executionReference,
                 definition.inheritedContext?.(args) ?? false,
                 scope.piSession.conversationId,
+                nativeCallId,
               );
         const waiting = new AbortController();
         const namedWait = this.options.namedSubagents && isControlToolName(definition.name);

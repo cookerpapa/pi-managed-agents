@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import pg from "pg";
 import { it } from "vitest";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
-import { ForkStorage, setForkLayout } from "./fork-storage.mjs";
+import { ForkStorage, installForkTables, setForkLayout } from "./fork-storage.mjs";
 import { projectWorld, worldBaseWrite } from "./conversation-world.mjs";
 import { installPrefixSql } from "./ready-projection-sql.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -73,7 +73,7 @@ it("copies a lane's current observation once and preserves independent forks thr
     await pool.query("create schema " + schema);
     await pool.query(await read("./schema.sql"));
     await installPrefixSql(pool, projectionTemplates);
-    await pool.query(await read("./fork-layout.sql"));
+    await installForkTables(pool);
     await setForkLayout(pool, true, false);
     await installWorkspaceRoutes(pool);
     await pool.query("insert into accepted_fact_projection_offsets values('world',0,0)");

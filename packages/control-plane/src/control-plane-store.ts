@@ -288,6 +288,7 @@ function acceptedTurnCancellationResource(
 
 export class ControlPlaneStore {
   readonly #conversations: ConversationReader;
+  readonly #conversationReadDatabase: Kysely<Database>;
   readonly #olderHistoryReader: OlderHistoryReader | undefined;
   readonly #delegatedRunHistory: boolean;
   readonly #rootMessageHistory: boolean;
@@ -300,8 +301,9 @@ export class ControlPlaneStore {
 
   constructor(options: ControlPlaneStoreOptions) {
     this.#olderHistoryReader = options.olderHistoryReader;
+    this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
     this.#conversations = new ConversationReader(
-      options.conversationReadDatabase ?? options.database,
+      this.#conversationReadDatabase,
       options.tenantId,
       options.rootMessageHistory,
       options.flowRootHistory,
@@ -1299,7 +1301,7 @@ export class ControlPlaneStore {
     return this.#conversations.getConversation(sessionId, query);
   }
   getConversationStatus(sessionId: string) {
-    return readConversationStatus(this.#database, this.#tenantId, sessionId, {
+    return readConversationStatus(this.#conversationReadDatabase, this.#tenantId, sessionId, {
       messages: this.#rootMessageHistory || this.#delegatedRunHistory,
       delegated: this.#delegatedRunHistory,
     });

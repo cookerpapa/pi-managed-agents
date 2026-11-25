@@ -746,3 +746,8 @@ TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts
 ```
 
 The [append-layout study](../../../docs/reports/bash-intent-log-20261125.md) includes the corresponding fault, browser and load commands. Select it explicitly in the isolated worker and projection fixtures.
+
+
+### Frozen message-range Forks
+
+The [segment study](../../../docs/reports/segmented-session-forks-20261125.md) runs the opt-in Session API against a candidate schema. `measure-segment-forks.mjs` measures paired Fork creation, pagination, cold Pi import, branch depth, fan-out and the ordinary PG append path. `write-load.mjs --segments` feeds the same 20-tool recording to the RF3 Projector with Chrome following a live Turn and an optional reader paging a fork. Both commands allocate disposable infrastructure. Independent child Worker placement is tracked separately.

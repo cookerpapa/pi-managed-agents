@@ -1,9 +1,9 @@
 const messageSql = (
   guarded,
   coverage = false,
-) => `insert into messages(tenant_id,pi_session_id,entry_id,conversation_id,run_id,role,content,source_input_id,commit_seq,ordinal,assistant_entry_id,tool_task_id,navigation_caption,document_id${coverage ? ",display_through" : ""})
- select $1,$2,v.id,v.conversation,$3,v.role,v.content,v.input,$4,v.ordinal,v.assistant,v.task,v.caption,v.document${coverage ? ",case when v.ordinal=$7 then $8::bigint end" : ""} from
- jsonb_to_recordset($5::jsonb) v(id bigint,conversation bigint,role text,content text,input text,ordinal int,assistant bigint,task bigint,caption text,document bigint) ${guarded ? "cross join owner" : ""}
+) => `insert into messages(tenant_id,pi_session_id,entry_id,conversation_id,run_id,role,content,source_input_id,commit_seq,ordinal,assistant_entry_id,tool_task_id,navigation_caption,document_id,attachment_refs${coverage ? ",display_through" : ""})
+ select $1,$2,v.id,v.conversation,$3,v.role,v.content,v.input,$4,v.ordinal,v.assistant,v.task,v.caption,v.document,v.refs${coverage ? ",case when v.ordinal=$7 then $8::bigint end" : ""} from
+ jsonb_to_recordset($5::jsonb) v(id bigint,conversation bigint,role text,content text,input text,ordinal int,assistant bigint,task bigint,caption text,document bigint,refs jsonb) ${guarded ? "cross join owner" : ""}
  on conflict(tenant_id,pi_session_id,commit_seq,ordinal) do update set ordinal=excluded.ordinal
  where (messages.entry_id,messages.document_id,messages.run_id,messages.conversation_id,messages.commit_seq,messages.ordinal,messages.role,messages.content,messages.source_input_id,messages.assistant_entry_id,messages.tool_task_id,messages.navigation_caption)
  is not distinct from (excluded.entry_id,excluded.document_id,excluded.run_id,excluded.conversation_id,excluded.commit_seq,excluded.ordinal,excluded.role,excluded.content,excluded.source_input_id,excluded.assistant_entry_id,excluded.tool_task_id,excluded.navigation_caption) ${coverage ? "and messages.display_through is not distinct from excluded.display_through" : ""} returning entry_id`;

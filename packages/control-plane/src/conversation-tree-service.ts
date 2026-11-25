@@ -1,4 +1,5 @@
 import {
+  flowRootMessageTurns,
   rootMessageNavigation,
   rootMessageTurns,
 } from "@pi-cloud/runtime-core/root-message-history";
@@ -254,7 +255,29 @@ function conversationLeaves(
   return new Map([...entries].map(([id, rows]) => [id, rows.at(-1)?.id ?? null]));
 }
 
+/** The matched message store installs history and pins inside the public Fork transaction. */
+export type MessageHistoryMutations = {
+  readonly schema: string;
+  fork(
+    tx: Transaction<Database>,
+    tenant: string,
+    source: string,
+    target: string,
+    request: CreateConversationForkRequest,
+    key: string,
+    fingerprint: string,
+  ): Promise<boolean>;
+  prune(
+    tx: Transaction<Database>,
+    tenant: string,
+    source: string,
+    request: CreateConversationPruneRequest,
+  ): Promise<number>;
+  retire(tx: Transaction<Database>, tenant: string, source: string): Promise<string[]>;
+};
+
 export class ConversationTreeService {
+  readonly #messageHistory: MessageHistoryMutations | undefined;
   readonly #database: Kysely<Database>;
   readonly #readDatabase: Kysely<Database>;
   readonly #rootMessageHistory: boolean;
@@ -266,9 +289,11 @@ export class ConversationTreeService {
     database: Kysely<Database>;
     readDatabase?: Kysely<Database>;
     rootMessageHistory?: boolean;
+    messageHistoryMutations?: MessageHistoryMutations;
     idGenerator?: () => string;
     onForkTiming?: (stage: "native" | "presentation" | "images", milliseconds: number) => void;
   }) {
+    this.#messageHistory = options.messageHistoryMutations;
     this.#database = options.database;
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#readDatabase = options.readDatabase ?? options.database;
@@ -434,10 +459,15 @@ export class ConversationTreeService {
       ]
         .filter((id): id is string => id !== null && id !== undefined)
         .map(Number);
-      const source =
-        this.#rootMessageHistory &&
-        Number(binding.piConversationId) === 1 &&
-        humanSessions.some((s) => s.id === binding.productSessionId && s.parentSessionId === null)
+      const segmentView =
+        this.#messageHistory && humanSessions.some((s) => s.id === binding.productSessionId);
+      const source = segmentView
+        ? rootMessageNavigation
+        : this.#rootMessageHistory &&
+            Number(binding.piConversationId) === 1 &&
+            humanSessions.some(
+              (s) => s.id === binding.productSessionId && s.parentSessionId === null,
+            )
           ? rootMessageNavigation
           : readNavigationEntries;
       const page = await source(database, {
@@ -445,6 +475,7 @@ export class ConversationTreeService {
         sessionId: binding.piSessionId,
         conversationId: Number(binding.piConversationId),
         limit: wanted ? 80 : 8,
+        ...(segmentView ? { windowId: binding.productSessionId } : {}),
         ...(view === "focus" ||
         binding.productSessionId === humanRootSessionId ||
         binding.productSessionId === selectedDelegated?.sessionId
@@ -498,10 +529,19 @@ export class ConversationTreeService {
       !historyDelegates.length &&
       humanSessions.every((s) => s.parentSessionId === null) &&
       !selectedDelegated;
+    const turnSource =
+      this.#messageHistory && humanSessions.length
+        ? sql`(${sql.join(
+            humanSessions.map((s) => sql`select * from ${flowRootMessageTurns(tenantId, s.id)}`),
+            sql` union all `,
+          )}) scoped_turns`
+        : rootOnly
+          ? rootMessageTurns
+          : sql`pi_history_turns`;
     const turnRows = visibleTurnIds.length
       ? (
           await sql<CompletedTurnRow>`select session_id as "sessionId",turn_id as "turnId",mailbox_position::text as "mailboxPosition"
-      from ${rootOnly ? rootMessageTurns : sql`pi_history_turns`} where tenant_id=${tenantId}::uuid and session_id=any(${uniqueSessionIds}::uuid[])
+      from ${turnSource} where tenant_id=${tenantId}::uuid and session_id=any(${uniqueSessionIds}::uuid[])
         and turn_id=any(${visibleTurnIds}::uuid[]) and state='completed' and not waiting_for_seal`.execute(
             database,
           )
@@ -858,6 +898,45 @@ export class ConversationTreeService {
           );
         }
 
+        if (this.#messageHistory) {
+          await sql`set local synchronous_commit=on`.execute(transaction);
+          const count = await this.#messageHistory.prune(transaction, tenantId, sessionId, request);
+          const now = new Date();
+          await transaction
+            .updateTable("sessions")
+            .set({
+              state: "idle",
+              updated_at: now,
+              last_active_at: now,
+              next_mailbox_position: "1",
+            })
+            .where("tenant_id", "=", tenantId)
+            .where("id", "=", sessionId)
+            .executeTakeFirstOrThrow();
+          await transaction
+            .insertInto("conversation_prune_operations")
+            .values({
+              tenant_id: tenantId,
+              session_id: sessionId,
+              idempotency_key: idempotencyKey,
+              request_sha256: requestSha256,
+              anchor_turn_id: request.turnId,
+              anchor_entry_id: request.entryId,
+              pruned_turn_count: count,
+              pruned_session_count: 0,
+              created_at: now,
+            })
+            .executeTakeFirstOrThrow();
+          return {
+            sessionId,
+            anchorTurnId: request.turnId,
+            anchorEntryId: request.entryId,
+            prunedTurnCount: count,
+            prunedSessionCount: 0,
+            replayed: false,
+            createdAt: now.toISOString(),
+          };
+        }
         const bindings = await sessionBindings(transaction, tenantId, [sessionId]);
         const pendingNative =
           await sql`select 1 from pi_durable_records where tenant_id=${tenantId}::uuid and session_id=${bindings[0]?.piSessionId ?? ""}
@@ -1164,14 +1243,27 @@ export class ConversationTreeService {
             );
           }
         }
-        const bindings = await sessionBindings(transaction, tenantId, [sourceSessionId]);
-        const target = await completedNavigationTarget(transaction, tenantId, bindings[0], request);
-        if (!target)
+        const childSessionId = this.#idGenerator();
+        if (this.#messageHistory) await sql`set local synchronous_commit=on`.execute(transaction);
+        const bindings = this.#messageHistory
+          ? undefined
+          : await sessionBindings(transaction, tenantId, [sourceSessionId]);
+        const valid = bindings
+          ? await completedNavigationTarget(transaction, tenantId, bindings[0], request)
+          : await this.#messageHistory!.fork(
+              transaction,
+              tenantId,
+              sourceSessionId,
+              childSessionId,
+              request,
+              idempotencyKey,
+              requestSha256,
+            );
+        if (!valid)
           throw new ControlPlaneStoreError(
             "invalid_request",
             "Fork target is not a completed final assistant response on the selected path",
           );
-        const childSessionId = this.#idGenerator();
         const suffix = " · 分支";
         const title =
           request.title ??
@@ -1212,37 +1304,39 @@ export class ConversationTreeService {
             id: childSessionId,
           })
           .executeTakeFirstOrThrow();
-        const imported = await this.#measureFork("native", () =>
-          importForkHistory(
-            transaction,
-            { tenantId, sessionId: childSessionId },
-            {
+        if (bindings) {
+          const imported = await this.#measureFork("native", () =>
+            importForkHistory(
+              transaction,
+              { tenantId, sessionId: childSessionId },
+              {
+                tenantId,
+                sessionId: bindings[0]!.piSessionId,
+                sourceProductSessionId: sourceSessionId,
+                conversationId: Number(bindings[0]!.piConversationId),
+                through: Number(request.entryId),
+              },
+            ),
+          );
+          const inheritedPosition = await this.#measureFork("presentation", () =>
+            freezeForkHistory(transaction, {
               tenantId,
-              sessionId: bindings[0]!.piSessionId,
-              sourceProductSessionId: sourceSessionId,
-              conversationId: Number(bindings[0]!.piConversationId),
-              through: Number(request.entryId),
-            },
-          ),
-        );
-        const inheritedPosition = await this.#measureFork("presentation", () =>
-          freezeForkHistory(transaction, {
-            tenantId,
-            sourceSessionId,
-            targetSessionId: childSessionId,
-            throughTurnId: request.turnId,
-            throughEntryId: request.entryId,
-          }),
-        );
-        await transaction
-          .updateTable("sessions")
-          .set({
-            pi_conversation_id: String(imported.conversationId),
-            next_mailbox_position: String(inheritedPosition + 1),
-          })
-          .where("tenant_id", "=", tenantId)
-          .where("id", "=", childSessionId)
-          .executeTakeFirstOrThrow();
+              sourceSessionId,
+              targetSessionId: childSessionId,
+              throughTurnId: request.turnId,
+              throughEntryId: request.entryId,
+            }),
+          );
+          await transaction
+            .updateTable("sessions")
+            .set({
+              pi_conversation_id: String(imported.conversationId),
+              next_mailbox_position: String(inheritedPosition + 1),
+            })
+            .where("tenant_id", "=", tenantId)
+            .where("id", "=", childSessionId)
+            .executeTakeFirstOrThrow();
+        }
         await transaction
           .insertInto("conversation_fork_operations")
           .values({

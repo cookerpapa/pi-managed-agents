@@ -4,6 +4,7 @@ export type NativeHistoryPosition = { sequence: number; ordinal: number };
 export type HistoryPosition = NativeHistoryPosition & {
   version: 2;
   storageId: string;
+  flowId?: string;
   sessionId: string;
   originSessionId: string;
   turnId: string;
@@ -21,6 +22,7 @@ export function decodeHistoryPosition(value: string, sessionId: string): History
     typeof p.storageId !== "string" ||
     p.storageId.length < 1 ||
     p.storageId.length > 256 ||
+    (p.flowId !== undefined && !uuid.test(p.flowId)) ||
     !uuid.test(p.originSessionId) ||
     !uuid.test(p.turnId) ||
     !Number.isSafeInteger(p.sequence) ||

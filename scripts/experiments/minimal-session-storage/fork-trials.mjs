@@ -31,12 +31,6 @@ async function seed(pool, storage, t, n, bytes, register = true, stride = 1, lan
     select r,$1,$2,i,r,'seed','fixture','completed','{}'::jsonb from unnest($3::uuid[]) with ordinality u(r,i)`,
     [t, session, runs],
   );
-  if (register)
-    await pool.query("insert into fork_completed_runs select $1,$2,r from unnest($3::uuid[]) r", [
-      t,
-      session,
-      runs,
-    ]);
   for (let first = 0; first < n; first += 128) {
     const slice = positions.slice(first, first + 128);
     const contents = slice.map((x) =>
@@ -113,14 +107,14 @@ export async function forkStudy(pool, profile, owners, token) {
       const frozen = await storage.fork(t, source.session, source.first);
       const {
         rows: [r],
-      } = await pool.query("select root_id from fork_sessions where tenant_id=$1 and id=$2", [
+      } = await pool.query("select flow_id from sessions where tenant_id=$1 and id=$2", [
         t,
         frozen,
       ]);
       await storage.register(
         t,
         owners.map((o) => o.sessionId),
-        r.root_id,
+        r.flow_id,
       );
       if (["fanout", "busy"].includes(layout)) {
         for (const o of owners)
@@ -443,15 +437,7 @@ async function verifyForkOwnership(pool, storage, t) {
   );
   for (const id of [nested, side]) await storage.retire(t, id);
   await storage.collect(t);
-  for (const table of [
-    "messages",
-    "runs",
-    "pi_history_nodes",
-    "pi_history_streams",
-    "fork_completed_runs",
-    "fork_requests",
-    "fork_sessions",
-  ]) {
+  for (const table of ["messages", "runs", "flow_segments", "flows", "sessions"]) {
     assert.equal(
       (await pool.query("select count(*)::int n from " + table + " where tenant_id=$1", [t]))
         .rows[0].n,
@@ -463,7 +449,7 @@ async function verifyForkOwnership(pool, storage, t) {
   let fork, retire;
   try {
     await blocker.query("begin");
-    await blocker.query("select id from fork_sessions where tenant_id=$1 and id=$2 for update", [
+    await blocker.query("select id from sessions where tenant_id=$1 and id=$2 for update", [
       t,
       race.session,
     ]);

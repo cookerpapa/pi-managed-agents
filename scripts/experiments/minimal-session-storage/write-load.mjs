@@ -25,8 +25,9 @@ import { writeTrialFunctions } from "./write-trial-sql.mjs";
 
 const visibleRecord = (writes) =>
   Object.values(visibleOutput(writes)).some((count) => count > 0) ? 1 : 0;
+const segmentStudy = process.argv.includes("--segments");
 const sqlStudy = process.argv.includes("--intent-sql");
-const appendStudy = sqlStudy || process.argv.includes("--intent-log");
+const appendStudy = segmentStudy || sqlStudy || process.argv.includes("--intent-log");
 const partitions = 32,
   tools = 20,
   runs = 64,
@@ -544,11 +545,17 @@ try {
       }
       if (process.argv.includes("--faults-only")) return;
       const observed = api.live;
-      await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$1)", [
-        observed,
-        tenant,
-      ]);
+      if (!api.directory)
+        await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$1)", [
+          observed,
+          tenant,
+        ]);
       const data = await makeTape(observed);
+      if (api.directory)
+        await api.directory.register(
+          tenant,
+          owners.map(({ s }) => s.sessionId),
+        );
       let pageWindow;
       if (appendStudy && process.argv.includes("--confirm")) {
         const long = await seedActiveBashHistory(api, tenant);
@@ -558,6 +565,29 @@ try {
       } else {
         pageWindow = await api.createScrollWindow("History reader under projection");
         await seedToolsWindow(api, tenant, undefined, { id: pageWindow, runs: 1, toolCount: 1024 });
+      }
+      if (api.directory) {
+        const dst = await api.createScrollWindow("Read shared tool history");
+        const {
+          rows: [last],
+        } = await db.query(
+          "select run_id,entry_id from messages where pi_session_id=$1 and role='assistant' order by entry_id desc limit 1",
+          [pageWindow],
+        );
+        assert(
+          (
+            await db.query("select fork_web_window($1,$2,$3,$4,$5,$6,$7) ok", [
+              tenant,
+              pageWindow,
+              last.run_id,
+              last.entry_id,
+              dst,
+              randomUUID(),
+              "tools",
+            ])
+          ).rows[0].ok,
+        );
+        pageWindow = dst;
       }
       data.pageWindow = pageWindow;
       data.cursors = [];
@@ -592,13 +622,15 @@ try {
           return;
         }
         for (const offered of [475, 1200]) {
-          const order = appendStudy
-            ? process.argv.includes("--confirm")
-              ? ["combined", "intent-folded", "combined-page", "folded-page"]
-              : ["combined", "intent-log", "intent-coverage", "intent-folded"]
-            : process.argv.includes("--confirm")
-              ? ["baseline", "combined", "old-page", "exact-page"]
-              : ["baseline", "fused", "combined", "cursor", "memory"];
+          const order = segmentStudy
+            ? ["intent-folded", "folded-page"]
+            : appendStudy
+              ? process.argv.includes("--confirm")
+                ? ["combined", "intent-folded", "combined-page", "folded-page"]
+                : ["combined", "intent-log", "intent-coverage", "intent-folded"]
+              : process.argv.includes("--confirm")
+                ? ["baseline", "combined", "old-page", "exact-page"]
+                : ["baseline", "fused", "combined", "cursor", "memory"];
           if (offered === 1200) order.reverse();
           for (const mode of [...order, ...order.reverse()])
             await trial(api, install, mode, connection, data, offered);
@@ -608,7 +640,7 @@ try {
         await kafka.close();
       }
     },
-    { liveStream: true, ioTiming: true, bashLogStudy: appendStudy },
+    { liveStream: true, ioTiming: true, bashLogStudy: appendStudy, segments: segmentStudy },
   );
 } finally {
   await database.close();

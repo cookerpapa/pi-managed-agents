@@ -12,6 +12,7 @@ create table messages (
   tenant_id uuid not null, pi_session_id uuid not null, entry_id bigint, document_id bigint,
   conversation_id bigint not null, run_id uuid not null references runs(id),
   navigation_caption text, assistant_entry_id bigint, tool_task_id bigint, role text not null, content text not null, source_input_id text, commit_seq bigint not null,
+  attachment_refs jsonb,
   ordinal integer not null, created_at timestamptz not null default clock_timestamp(),
   primary key (tenant_id,pi_session_id,commit_seq,ordinal),
   constraint message_record_shape check ((entry_id is not null and document_id is null) or

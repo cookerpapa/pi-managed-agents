@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The #52 candidate shares message prefixes across Web Forks and named child Session registrations. The [storage acceptance and load results](reports/segmented-session-forks-20261125.md) precede the independent scheduling milestone.
+
 The candidate exposes direct subagent delegation and management. [ADR-0352](adr/0352-retire-workflow-tool.md) removes the guest-script orchestration path.
 
 A [matched Bash storage study](reports/bash-intent-log-20261125.md) measures an appended execute intent and record-local root display coverage under tool-heavy load.

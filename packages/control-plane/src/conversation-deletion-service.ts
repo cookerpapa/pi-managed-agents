@@ -1,4 +1,5 @@
 import { unbindSessionTargets } from "./unbind-session-targets.ts";
+import type { MessageHistoryMutations } from "./conversation-tree-service.ts";
 import type { Database } from "@pi-cloud/database";
 import {
   deletePostgresPiSessionsInTransaction,
@@ -15,7 +16,12 @@ export class ConversationDeletionError extends Error {
 }
 
 export class ConversationDeletionService {
-  constructor(readonly options: { database: Kysely<Database> }) {}
+  constructor(
+    readonly options: {
+      database: Kysely<Database>;
+      messageHistoryMutations?: MessageHistoryMutations;
+    },
+  ) {}
 
   async delete(tenantId: string, sessionId: string): Promise<void> {
     try {
@@ -28,12 +34,15 @@ export class ConversationDeletionService {
           .forUpdate()
           .executeTakeFirst();
         if (!root) return;
-        if (root.session_kind !== "conversation")
+        if (!this.options.messageHistoryMutations && root.session_kind !== "conversation")
           throw new ConversationDeletionError(
             "Delegated conversations are deleted with their parent",
           );
-        const original = await this.#family(transaction, tenantId, sessionId);
-        const ids = original.map((row) => row.id);
+        const segmented = this.options.messageHistoryMutations;
+        if (segmented) await sql`set local synchronous_commit=on`.execute(transaction);
+        const ids = segmented
+          ? await segmented.retire(transaction, tenantId, sessionId)
+          : (await this.#family(transaction, tenantId, sessionId)).map((r) => r.id);
         const locked = await transaction
           .selectFrom("sessions")
           .select(["id", "state", "pi_session_id"])
@@ -43,12 +52,14 @@ export class ConversationDeletionService {
           .forUpdate()
           .noWait()
           .execute();
-        const current = await this.#family(transaction, tenantId, sessionId);
-        const lockedIds = new Set(locked.map((row) => row.id));
-        if (current.length !== lockedIds.size || current.some((row) => !lockedIds.has(row.id)))
-          throw new ConversationDeletionError(
-            "Conversation family changed during deletion; retry the request",
-          );
+        if (!segmented) {
+          const current = await this.#family(transaction, tenantId, sessionId);
+          const lockedIds = new Set(locked.map((row) => row.id));
+          if (current.length !== lockedIds.size || current.some((row) => !lockedIds.has(row.id)))
+            throw new ConversationDeletionError(
+              "Conversation family changed during deletion; retry the request",
+            );
+        }
         if (locked.some((row) => !["cold", "idle", "failed"].includes(row.state)))
           throw new ConversationDeletionError("An active conversation cannot be deleted");
         const unsettled = await transaction

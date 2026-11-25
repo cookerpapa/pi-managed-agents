@@ -132,7 +132,8 @@ export async function waitingDelegation(scope, mode, name) {
     scope,
     mailbox,
     {
-      childAnchor: async (_ref, inherit) => (inherit ? String(await runtime.childAnchor(1)) : null),
+      childAnchor: async (_ref, inherit, lane, callId) =>
+        inherit ? String(await runtime.childAnchor(lane, callId)) : null,
     },
     Boolean(name),
   );
@@ -214,7 +215,7 @@ export async function waitingDelegation(scope, mode, name) {
         (tx) =>
           tx.appendEntry(root.id, {
             kind: "pi.assistant",
-            model: [fauxAssistantMessage("After the frozen branch point")],
+            model: [fauxAssistantMessage("Retained test output before delegation")],
           }),
         ctx,
       );
@@ -313,10 +314,22 @@ export async function executeChild(pool, command, runtime, provider, current) {
   const input = await child.submit({ type: "input", requestId: row.id, content: row.task }, ctx);
   assert.equal((await input.wait(ctx)).status, "done");
   const transcript = JSON.stringify((await child.context(ctx)).messages);
-  assert.equal(transcript.includes("Earlier context"), args.context === "branch");
+  const inherited = args.context === "branch";
+  assert(!transcript.includes("Earlier context"), "Superseded by compaction");
+  assert.equal(transcript.includes("New parent summary"), inherited);
+  assert.equal(transcript.includes("Retained test output before delegation"), inherited);
+  assert.equal(
+    (await child.context(ctx)).messages.some(
+      (m) => m.role === "user" && JSON.stringify(m.content).includes('"Delegate"'),
+    ),
+    inherited,
+  );
   assert(
-    !transcript.includes("New parent summary") &&
-      !transcript.includes("After the frozen branch point"),
+    !(await child.context(ctx)).messages.some(
+      (m) =>
+        m.role === "assistant" &&
+        m.content.some((b) => b.type === "toolCall" && b.name === "subagent"),
+    ),
   );
   assert(transcript.includes("Child checked the tests"));
   return { result: { content: [{ type: "text", text: "Child checked the tests: " + row.id }] } };

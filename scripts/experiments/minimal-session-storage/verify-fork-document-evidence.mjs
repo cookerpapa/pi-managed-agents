@@ -21,9 +21,8 @@ import { fixedRemoteToolDefinitions } from "../../../packages/sandbox-supervisor
 import { FamilyPresentation } from "./family-presentation.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
-import { ForkStorage, setForkLayout } from "./fork-storage.mjs";
+import { ForkStorage, installForkTables, setForkLayout } from "./fork-storage.mjs";
 import { worldToken } from "./conversation-world.mjs";
-import { restoreForkPrefix } from "./session-prefix.mjs";
 
 const now = "2026-11-22T00:00:00.000Z";
 class RecordingStorage extends MemoryStorage {
@@ -190,7 +189,7 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
     );
     await view.install();
     await view.reset(new Map([[0, 0n]]), 16, "recorded-history");
-    await pool.query(await readFile(new URL("./fork-layout.sql", import.meta.url), "utf8"));
+    await installForkTables(pool);
     await setForkLayout(pool, true, false);
     await installWorkspaceRoutes(pool);
     await forks.register(scope.tenantId, [scope.piSessionId]);
@@ -248,9 +247,6 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
       await sql`update accepted_fact_projection_offsets set next_offset=${String(offset + 1n)}::bigint where topic=${topic} and partition=0`.execute(
         tx,
       );
-      await sql`insert into fork_completed_runs values(${scope.tenantId}::uuid,${scope.piSessionId}::uuid,${scope.runId}::uuid)`.execute(
-        tx,
-      );
     });
     nativeStore.projection.releaseSettled(scope);
     assert.equal(view.sessions.size, 0);
@@ -291,14 +287,7 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
     // Observe the newly forked branch before changing or collecting the source.
     if (sampleFork) {
       const memory = new MemoryStorage();
-      restoreForkPrefix(
-        memory,
-        page.toReversed().map((r) => ({
-          entry: JSON.parse(r.content),
-          seq: Number(r.commit_seq),
-        })),
-        await forks.agentConfiguration(scope.tenantId, dest),
-      );
+      await forks.hydrate(scope.tenantId, dest, memory);
       return { retained, page, firstRequest: await sampleFork({ memory, pool, dest }) };
     }
     const point = { lane: 1, run: scope.runId, entry: trace.anchor },
@@ -332,11 +321,8 @@ async function pgHistory(base, admin, scope, trace, ids, sampleFork) {
       visible = await forks.page(scope.tenantId, nested);
     assert.deepEqual(visible, page);
     assert.deepEqual(config.value, trace.forkDocument);
-    const memory = new MemoryStorage(),
-      records = visible
-        .toReversed()
-        .map((r) => ({ entry: JSON.parse(r.content), seq: Number(r.commit_seq) }));
-    restoreForkPrefix(memory, records, config, await forks.rootWorld(scope.tenantId, nested));
+    const memory = new MemoryStorage();
+    await forks.hydrate(scope.tenantId, nested, memory);
     const cold = await Harness.open(
       memory,
       { models: createModels(), registry: createRegistry() },

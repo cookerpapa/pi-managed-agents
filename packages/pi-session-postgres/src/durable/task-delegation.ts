@@ -82,18 +82,30 @@ export async function nativeDelegationIntent(
   )
     throw Error("Delegation does not match its native assistant call");
   const frozen = (await read.frozenRun()) as
-    { runId?: string; baseEntry?: number | null } | undefined;
+    | {
+        runId?: string;
+        delegationRequest?: {
+          through?: number;
+          at?: number;
+          generation?: number;
+          calls?: string[];
+        };
+      }
+    | undefined;
   if (!frozen || frozen.runId !== scope.runId)
     throw Error("Native delegation belongs to a different Run");
   let contextAnchor: number | null = null;
   if (task.intent.arguments.context === "branch") {
-    const anchor = frozen.baseEntry;
+    const request = frozen.delegationRequest;
     if (
-      anchor !== null &&
-      (typeof anchor !== "number" || !Number.isSafeInteger(anchor) || anchor < 1)
+      !request ||
+      request.generation !== entry.byTaskId ||
+      !request.calls?.includes(callId) ||
+      !Number.isSafeInteger(request.at) ||
+      request.at! < 1
     )
-      throw Error("Delegation has no matching frozen parent context");
-    contextAnchor = anchor;
+      throw Error("Native delegation has no matching model request cutoff");
+    contextAnchor = request.at!;
   }
   const sequence = await read.sequence();
   if (!sequence || !Number.isSafeInteger(sequence) || sequence < 1)
@@ -107,5 +119,8 @@ export async function nativeDelegationIntent(
     nativeCallId: task.intent.callId,
     arguments: task.intent.arguments,
     contextAnchor,
+    ...(contextAnchor !== null && frozen.delegationRequest?.through !== undefined
+      ? { contextThrough: frozen.delegationRequest.through }
+      : {}),
   };
 }

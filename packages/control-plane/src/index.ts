@@ -21,6 +21,7 @@ export {
 
 export { ControlPlaneStoreFactory } from "./control-plane-store-factory.ts";
 export { ConversationTreeService } from "./conversation-tree-service.ts";
+export { segmentHistoryTransactions } from "./segment-history-transactions.ts";
 export {
   DevelopmentEnvironmentService,
   type DevelopmentEnvironmentServiceOptions,

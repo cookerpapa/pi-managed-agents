@@ -15,6 +15,7 @@ try {
     "scripts/experiments/minimal-session-storage/ready-projection.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/root-message-history.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/bash-intent.integration.spec.mjs",
+    "scripts/experiments/minimal-session-storage/segment-fork.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/agent-configuration.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/admission-retention.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/conversation-world.integration.spec.mjs",

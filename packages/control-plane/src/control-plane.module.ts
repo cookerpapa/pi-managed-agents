@@ -52,7 +52,10 @@ import { PlatformRuntimeSettingsService } from "./platform-runtime-settings.ts";
 import { QueuedInputService } from "./queued-input-service.ts";
 import type { NativeInputBackendFactory } from "./queued-input-service.ts";
 import type { InputConfirmationPort } from "./input-confirmation-client.ts";
-import { ConversationTreeService } from "./conversation-tree-service.ts";
+import {
+  ConversationTreeService,
+  type MessageHistoryMutations,
+} from "./conversation-tree-service.ts";
 import { DevelopmentEnvironmentService } from "./development-environment-service.ts";
 import { SshAccessTicketService } from "./ssh-access-ticket-service.ts";
 import { SourceControlService } from "./source-control-service.ts";
@@ -62,6 +65,7 @@ export type ControlPlaneModuleOptions = Omit<
   ControlPlaneStoreOptions,
   "tenantId" | "defaultModelProfileId"
 > & {
+  messageHistoryMutations?: MessageHistoryMutations;
   delegatedRunHistory?: boolean;
   mcp?: McpConnectionService;
   executionTargets?: ExecutionTargetService;
@@ -97,7 +101,12 @@ export type ControlPlaneEventRuntime = {
 export class ControlPlaneModule {
   static register(options: ControlPlaneModuleOptions): DynamicModule {
     const { eventHub, eventStore } = options.eventRuntime;
-    const conversationDeletion = new ConversationDeletionService({ database: options.database });
+    const conversationDeletion = new ConversationDeletionService({
+      database: options.database,
+      ...(options.messageHistoryMutations
+        ? { messageHistoryMutations: options.messageHistoryMutations }
+        : {}),
+    });
     const workspaceBrowser = new WorkspaceBrowserService({
       database: options.database,
       browser: options.workspaceBrowser ?? {
@@ -207,7 +216,11 @@ export class ControlPlaneModule {
         },
         {
           provide: SessionAttachmentReader,
-          useValue: new SessionAttachmentReader(options.database, options.imageAttachmentStore),
+          useValue: new SessionAttachmentReader(
+            options.database,
+            options.imageAttachmentStore,
+            options.messageHistoryMutations?.schema,
+          ),
         },
         {
           provide: WorkspaceUploadService,
@@ -298,6 +311,9 @@ export class ControlPlaneModule {
         {
           provide: ConversationTreeService,
           useValue: new ConversationTreeService({
+            ...(options.messageHistoryMutations
+              ? { messageHistoryMutations: options.messageHistoryMutations }
+              : {}),
             rootMessageHistory: options.rootMessageHistory ?? false,
             database: options.database,
             ...(options.conversationReadDatabase

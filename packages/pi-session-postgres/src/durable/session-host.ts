@@ -76,7 +76,7 @@ export type ManagedNativeRuntime = {
   activeConversationViews?(
     runId: string,
   ): Promise<Array<{ conversationId: number; view: ConversationWorkView }>>;
-  childAnchor?(conversationId: number): Promise<number | undefined>;
+  childAnchor?(conversationId: number, nativeCallId?: string): Promise<number | undefined>;
   createConversation?(input: {
     requestId: string;
     ownerTaskId: number;
@@ -210,6 +210,7 @@ export class PostgresDurableSessionHost {
     reference: string,
     inherit: boolean,
     conversationId: number,
+    nativeCallId: string,
   ): Promise<string | null> {
     const owner = this.#executions.get(reference),
       binding = owner?.runs.get(conversationId)?.binding;
@@ -217,7 +218,9 @@ export class PostgresDurableSessionHost {
     await owner.authority.assertCurrent();
     const runtime = await owner.runtime;
     if (!runtime?.childAnchor) throw new Error("Parent native conversation is unavailable");
-    const tail = inherit ? await runtime.childAnchor(binding.conversationId) : undefined;
+    const tail = inherit
+      ? await runtime.childAnchor(binding.conversationId, nativeCallId)
+      : undefined;
     return tail === undefined ? null : String(tail);
   }
   async conversationDepth(reference: string, conversationId: number): Promise<number> {

@@ -1,5 +1,9 @@
 // The isolated actor runs in a pinned operator image. Bundle its matching pure caption code.
 import { nativeNavigation } from "../../../packages/pi-session-postgres/src/durable/types.ts";
+import {
+  retainedAttachmentReferences,
+  retainedUploadReferences,
+} from "../../../packages/session-attachments/src/retain.ts";
 import { reopenWorld, worldRoutes } from "./conversation-world.mjs";
 import { agentLane, agentVersion } from "./agent-configuration.mjs";
 import assert from "node:assert/strict";
@@ -246,13 +250,24 @@ export async function projectRecord(
                   v.value.kind === "pi.tool",
               )?.value.input.assistant ?? s.pendingTools?.[w.value.byTaskId]?.assistantEntryId)
             : undefined;
+        const content = JSON.stringify(w.value);
+        const attachments =
+          content.includes("pi_cloud_") || Array.isArray(w.value.uploads)
+            ? [
+                ...retainedAttachmentReferences(w.value),
+                ...retainedUploadReferences(Array.isArray(w.value.uploads) ? w.value.uploads : []),
+              ]
+            : [];
         messages.push({
           id: w.value.id,
+          ...(attachments.length
+            ? { refs: Object.fromEntries(attachments.map((ref) => [ref.id, ref])) }
+            : {}),
           conversation: w.value.conversationId,
           role: role ?? w.value.kind,
           ...(assistant != null ? { task: w.value.byTaskId, assistant } : {}),
           ...(stage?.rootPresentation ? { caption: nativeNavigation(w.value).preview } : {}),
-          content: JSON.stringify(w.value),
+          content,
           input: inputs.get(w.value.id) ?? null,
           ordinal,
         });

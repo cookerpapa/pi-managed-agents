@@ -27,6 +27,7 @@ export type HistoryTurnSource = {
   operationKind: "chat" | "compact";
   frozen?: boolean;
   through?: { sequence: number; ordinal: number };
+  flowRange?: { lo: string; hi: string; lane: string; partialCoverage?: string | null };
 };
 export type HistoryWindowPoint = {
   id: string;
@@ -55,6 +56,7 @@ export type CanonicalHistoryWindow = {
 /** Indexed seeks limit positions before body fetches. Tool intent is fetched by
  * native Task identity, including when its assistant is outside this page. */
 export type HistoryWindowInput = {
+  flowId?: string;
   tenantId: string;
   sessionId: string;
   turns: readonly HistoryTurnSource[];
@@ -359,6 +361,7 @@ export function renderHistoryPoints(
     const position: HistoryPosition = {
       version: 2,
       storageId: p.pi_session_id,
+      ...(input.flowId ? { flowId: input.flowId } : {}),
       sessionId: input.sessionId,
       originSessionId: p.origin_session_id,
       turnId: p.turn_id,

@@ -25,6 +25,11 @@ export type HistoryHeader = {
   terminal?: { seq: string; type: string; payload: Record<string, unknown>; occurred_at: string };
 };
 export type HistoryTurnRow = {
+  flow_lo?: string | null;
+  flow_hi?: string | null;
+  flow_seq?: string | null;
+  flow_lane?: string | null;
+  partial_coverage?: string | null;
   tenant_id: string;
   session_id: string;
   origin_session_id: string;

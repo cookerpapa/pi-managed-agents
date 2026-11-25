@@ -25,6 +25,8 @@ export type OriginalControlToolIntent = ControlToolRecoverySource &
     conversationId: number;
     toolName: string;
     nativeCallId: string;
+    /** Publication ceiling of the model request that produced the delegation. */
+    contextThrough?: number;
     arguments: Record<string, unknown>;
     contextAnchor: number | null;
   }>;

@@ -276,9 +276,9 @@ export function restoreSettled(store, row, head, records) {
 
 // Import the retained single path selected by the Fork directory into fresh
 // native storage. Inbox and AgentDoc receive independent destination IDs.
-export function restoreForkPrefix(store, records, agent, world) {
+export function restoreForkPrefix(store, records, agent, world, idFloor = 2) {
   assert(records.length > 0);
-  let maximumId = 1,
+  let maximumId = idFloor - 1,
     maximumSeq = 0;
   for (const r of records) {
     maximumId = Math.max(maximumId, r.entry.id);

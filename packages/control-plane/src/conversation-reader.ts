@@ -54,6 +54,7 @@ type ConversationHistoryRow = {
   piSessionId: string;
   coverage: string;
   through?: { sequence: number; ordinal: number };
+  flowRange?: { lo: string; hi: string; lane: string; partialCoverage?: string | null };
   operationKind: "chat" | "compact";
   frozen: boolean;
   stopReason: string | null;
@@ -422,7 +423,12 @@ export class ConversationReader {
     } catch {
       throw new ControlPlaneStoreError("invalid_request", "Invalid conversation history cursor");
     }
-    if (!flows && position?.storageId && position.storageId !== conversation.piSessionId)
+    if (
+      position &&
+      (flows
+        ? position.flowId !== conversation.piSessionId
+        : position.storageId !== conversation.piSessionId)
+    )
       throw new ControlPlaneStoreError(
         "not_found",
         "History storage changed; refresh the history window",
@@ -444,6 +450,7 @@ export class ConversationReader {
         version: 2,
         sessionId,
         storageId: flows ? anchor.pi_session_id : conversation.piSessionId,
+        ...(flows ? { flowId: conversation.piSessionId } : {}),
         originSessionId: anchor.origin_session_id,
         turnId: query.turnId,
         sequence: 0,
@@ -521,6 +528,17 @@ export class ConversationReader {
     const rows = conversation.emptyHistory ? [] : (await pageQuery.execute(this.#database)).rows;
     const lineageTurnRows: ConversationHistoryRow[] = rows.map((r) => ({
       piSessionId: r.pi_session_id,
+      ...(r.flow_seq != null && r.flow_lo != null && r.flow_hi != null && r.flow_lane != null
+        ? {
+            through: { sequence: Number(r.flow_seq), ordinal: 2147483647 },
+            flowRange: {
+              lo: r.flow_lo,
+              hi: r.flow_hi,
+              lane: r.flow_lane,
+              partialCoverage: r.partial_coverage ?? null,
+            },
+          }
+        : {}),
       coverage: r.output_display_seq,
       operationKind: r.operation_kind,
       stopReason: r.stop_reason,
@@ -540,6 +558,7 @@ export class ConversationReader {
       tenantId: this.#tenantId,
       sessionId,
       turns: sources as HistoryTurnSource[],
+      ...(flows ? { flowId: conversation.piSessionId } : {}),
       direction,
       ...(position ? { position } : {}),
       inclusive,

@@ -367,10 +367,11 @@ export async function seedToolsWindow(
 ) {
   const { db } = api,
     stride = toolCount * 3 + 4;
-  await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$1)", [id, tenant]);
+  if (api.directory) await api.directory.register(tenant, [id]);
+  else await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$1)", [id, tenant]);
   await db.query(
-    `insert into runs(id,tenant_id,session_id,prev_run_id,mailbox_position,initial_input,model_ref,idempotency_key,state,history_head,output_display_seq)
- select fixture_run($1,n),$2,$1,case when n>1 then fixture_run($1,n-1) end,n,'Review tests '||n,'fixture',fixture_run($1,n),'completed','{}',$4::int*n
+    `insert into runs(id,tenant_id,session_id,${api.directory ? "" : "prev_run_id,"}mailbox_position,initial_input,model_ref,idempotency_key,state,history_head,output_display_seq)
+ select fixture_run($1,n),$2,$1,${api.directory ? "" : "case when n>1 then fixture_run($1,n-1) end,"}n,'Review tests '||n,'fixture',fixture_run($1,n),'completed','{}',$4::int*n
  from generate_series(1,$3::int)n`,
     [id, tenant, runs, stride],
   );

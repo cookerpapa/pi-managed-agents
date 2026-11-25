@@ -157,6 +157,7 @@ export class DurableAgentSession {
       recovery: NonNullable<CandidateControlToolCommand["recovery"]>;
     }
   >();
+  #publishedSequence = 0;
   readonly #models: ScopedDurableModels;
   readonly remote: DurableRemoteTools;
   #harness!: Harness;
@@ -249,10 +250,20 @@ export class DurableAgentSession {
         ],
         hooks: [
           hook(GenerationTask, {
-            beforeRequest: (request, api) => {
+            beforeRequest: async (request, api, context) => {
               const run = this.#bindings.get(api.conversationId);
               if (!run) return;
               const offered = new Set(run.remoteTools());
+              // Pin publication as the prepared model view leaves the Harness. An
+              // earlier reserved Entry can commit after the newest Entry in that view.
+              // Keep it across a deferred provider response and a Worker handoff.
+              if (offered.has("subagent") && this.#publishedSequence > 0) {
+                const through = this.#publishedSequence;
+                await this.#harness.commit(async (tx) => {
+                  const doc = await tx.doc(CloudRunDocument, api.conversationId);
+                  doc.delegationPreparation = { generation: api.taskId, through };
+                }, context);
+              }
               // Pi 1.0 resolves recovered ToolTask executions against agent.tools.
               // The public request hook hides reply-only MCP registrations without
               // changing native tasks, result history or committed storage batches.
@@ -279,6 +290,40 @@ export class DurableAgentSession {
                       },
                 ),
               };
+            },
+            afterResponse: async (message, api, context) => {
+              if (message.stopReason !== "toolUse") return;
+              const calls = message.content.flatMap((block) =>
+                block.type === "toolCall" &&
+                block.name === "subagent" &&
+                block.arguments.context === "branch"
+                  ? [block.id]
+                  : [],
+              );
+              if (!calls.length) return;
+              const task = await this.storage.task(api.taskId, context);
+              const checkpoint = task?.state.checkpoint as
+                { phase?: string; cutoff?: number } | undefined;
+              if (
+                !checkpoint ||
+                !["request", "poll"].includes(checkpoint.phase ?? "") ||
+                !Number.isSafeInteger(checkpoint.cutoff)
+              )
+                throw Error("Missing delegation model request cutoff");
+              const at = checkpoint.cutoff!;
+              await this.#harness.commit(async (tx) => {
+                const run = await tx.doc(CloudRunDocument, api.conversationId);
+                const prep = run.delegationPreparation as
+                  { generation?: number; through?: number } | undefined;
+                run.delegationRequest = {
+                  generation: api.taskId,
+                  calls,
+                  at,
+                  ...(prep?.generation === api.taskId && typeof prep.through === "number"
+                    ? { through: prep.through }
+                    : {}),
+                };
+              }, context);
             },
             onYield: async (answer, api) => {
               const run = this.#bindings.get(api.conversationId);
@@ -537,6 +582,12 @@ export class DurableAgentSession {
       Object.assign(state, run.context, {
         runId: run.runId,
         baseEntry,
+        ...(previous?.runId === run.runId && previous.delegationPreparation
+          ? { delegationPreparation: previous.delegationPreparation }
+          : {}),
+        ...(previous?.runId === run.runId && previous.delegationRequest
+          ? { delegationRequest: previous.delegationRequest }
+          : {}),
         model: JSON.parse(JSON.stringify(modelDescriptor)),
       });
       await configure(tx, conversation.id, {
@@ -697,12 +748,18 @@ export class DurableAgentSession {
     }
     return result;
   }
-  async childAnchor(conversationId: number): Promise<number | undefined> {
+  async childAnchor(conversationId: number, nativeCallId?: string): Promise<number | undefined> {
     const state = await this.#harness.snapshot(
       CloudRunDocument,
       conversationId as ConversationId,
       BACKGROUND_CONTEXT,
     );
+    if (nativeCallId !== undefined) {
+      const request = state?.delegationRequest as { at?: number; calls?: string[] } | undefined;
+      if (!request?.calls?.includes(nativeCallId) || !Number.isSafeInteger(request.at))
+        throw Error("No frozen model request for this delegation");
+      return request.at;
+    }
     return typeof state?.baseEntry === "number" ? state.baseEntry : undefined;
   }
   preparePublication(commit: DurableSessionCommit) {
@@ -735,14 +792,11 @@ export class DurableAgentSession {
     return {
       ...prepared,
       tools,
-      ...(afterCommit
-        ? {
-            confirmed: () => {
-              prepared.confirmed();
-              for (const notify of afterCommit) notify();
-            },
-          }
-        : {}),
+      confirmed: () => {
+        prepared.confirmed();
+        this.#publishedSequence = commit.seq;
+        for (const notify of afterCommit ?? []) notify();
+      },
     };
   }
   async #publishRecovery(

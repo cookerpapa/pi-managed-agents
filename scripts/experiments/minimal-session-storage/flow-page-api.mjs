@@ -16,6 +16,7 @@ export async function openPageApi(
   referenceRoot,
   standbyUrl,
   liveStream = false,
+  segmentedForks = false,
 ) {
   const proc = fork(fileURLToPath(import.meta.url), [], {
     execArgv: ["--import", "tsx"],
@@ -57,6 +58,7 @@ export async function openPageApi(
       referenceRoot,
       standbyUrl,
       liveStream,
+      segmentedForks,
     });
     return {
       origin,
@@ -87,10 +89,8 @@ export async function openPageApi(
   }
 }
 if (import.meta.main) {
-  const [{ url, readUrl, flowRootHistory, referenceRoot, standbyUrl, liveStream }] = await once(
-    process,
-    "message",
-  );
+  const [{ url, readUrl, flowRootHistory, referenceRoot, standbyUrl, liveStream, segmentedForks }] =
+    await once(process, "message");
   assert(new URL(url).hostname === "127.0.0.1" && new URL(readUrl).hostname === "127.0.0.1");
   const controlDsn = new URL(url);
   controlDsn.searchParams.set("application_name", "flow-control");
@@ -137,7 +137,13 @@ if (import.meta.main) {
       }).install(liveServer);
       remote = { baseUrl: await liveServer.listen({ port: 0, host: "127.0.0.1" }), token };
     }
+    const mutations = segmentedForks
+      ? (
+          await import(moduleUrl("packages/control-plane/src/segment-history-transactions.ts"))
+        ).segmentHistoryTransactions(segmentedForks)
+      : undefined;
     app = await createControlPlaneApplication({
+      ...(mutations ? { messageHistoryMutations: mutations } : {}),
       database,
       conversationReadDatabase: reads,
       rootMessageHistory: true,

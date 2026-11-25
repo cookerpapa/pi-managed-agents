@@ -45,6 +45,7 @@ export class PostgresAttachmentStore implements ImageAttachmentStore, ImageAttac
     readonly database: Kysely<Database>,
     readonly blobs: AttachmentBlobStore,
     readonly readDatabase: Kysely<Database> = database,
+    readonly messageHistorySchema?: string,
   ) {}
   async #writeCompleted(tenantId: string, id: string, ready = true): Promise<boolean> {
     const { rows } = await sql<{ state: string }>`update session_attachment_objects set
@@ -286,6 +287,11 @@ export class PostgresAttachmentStore implements ImageAttachmentStore, ImageAttac
     if (!Number.isSafeInteger(graceMs) || graceMs < 0)
       throw new Error("Invalid attachment cleanup grace");
     signal?.throwIfAborted();
+    const unpinned = this.messageHistorySchema
+      ? sql`and not exists(select from ${sql.id(this.messageHistorySchema, "messages")} m
+      where m.tenant_id=o.tenant_id and m.attachment_refs is not null and m.attachment_refs ? o.id::text)
+      and not exists(select from ${sql.id(this.messageHistorySchema, "flow_input_assets")} a where a.tenant_id=o.tenant_id and a.attachment_id=o.id)`
+      : sql``;
     // Draft claims expire independently of Runs; accepted user input is retained
     // with its native Session even before Worker consumption/projection.
     await sql`delete from session_uploads where id in (
@@ -301,6 +307,7 @@ export class PostgresAttachmentStore implements ImageAttachmentStore, ImageAttac
           and cleanup_available_at <= clock_timestamp()
           and not exists(select 1 from session_attachment_references r where r.tenant_id=o.tenant_id and r.attachment_id=o.id)
           and not exists(select 1 from pi_history_record_attachments r where r.tenant_id=o.tenant_id and r.attachment_id=o.id)
+          ${unpinned}
           and not exists(select 1 from pi_history_header_attachments r where r.tenant_id=o.tenant_id and r.attachment_id=o.id)
           and not exists(select 1 from session_uploads u where u.tenant_id=o.tenant_id and u.attachment_id=o.id)
           and not exists(select 1 from runs where id=o.source_run_id and output_sealed_at is null)
@@ -318,6 +325,7 @@ export class PostgresAttachmentStore implements ImageAttachmentStore, ImageAttac
         where (tenant_id,id) in (${sql.join(candidates.map((r) => sql`(${r.tenant_id}::uuid,${r.id}::uuid)`))})
           and not exists(select 1 from session_attachment_references r where r.tenant_id=o.tenant_id and r.attachment_id=o.id)
           and not exists(select 1 from pi_history_record_attachments r where r.tenant_id=o.tenant_id and r.attachment_id=o.id)
+          ${unpinned}
           and not exists(select 1 from pi_history_header_attachments r where r.tenant_id=o.tenant_id and r.attachment_id=o.id)
           and not exists(select 1 from session_uploads u where u.tenant_id=o.tenant_id and u.attachment_id=o.id)
           and not exists(select 1 from runs where id=o.source_run_id and output_sealed_at is null)

@@ -12,6 +12,12 @@ import {
 import { openPageApi } from "./flow-page-api.mjs";
 import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import { withChromePage } from "../../lib/chrome-cdp.mjs";
+import {
+  ForkStorage,
+  installForkTables,
+  installForkAttachmentChecks,
+  setForkLayout,
+} from "./fork-storage.mjs";
 import { installFlowHistory } from "./flow-history.mjs";
 import { installBashIntentLog, setBashLogReader } from "./bash-intent-log.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
@@ -43,7 +49,7 @@ export async function withPagingFixture(
   url,
   tenantId,
   work,
-  { ioTiming = false, liveStream = false, bashLogStudy = false } = {},
+  { ioTiming = false, liveStream = false, bashLogStudy = false, segments = false } = {},
 ) {
   const meta = createDatabase({ connectionString: url, maxConnections: 5 });
   const db = new pg.Pool({
@@ -90,58 +96,97 @@ export async function withPagingFixture(
     const projector = await installPagingProjection(db);
     const topic = "flow-pages";
     await db.query("create view flow_web.sessions as select * from public.sessions");
-    await installFlowHistory(db, true, false, "base");
+    const directory = segments ? new ForkStorage(db) : null;
+    if (directory) {
+      await installForkTables(db);
+      await setForkLayout(db, true, false);
+      await installForkAttachmentChecks(db);
+    } else await installFlowHistory(db, true, false, "base");
     if (bashLogStudy) {
       await installBashIntentLog(db);
       await setBashLogReader(db, false);
     }
-    const f = randomUUID(),
-      lf = randomUUID(),
-      rf = randomUUID();
-    await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$3)", [
-      root,
-      tenantId,
-      f,
-    ]);
-    async function seed(flow, length, base, label) {
+    const f = segments ? root : randomUUID(),
+      lf = segments ? left : randomUUID(),
+      rf = segments ? right : randomUUID();
+    if (directory) await directory.register(tenantId, [root]);
+    else
+      await db.query("insert into sessions(id,tenant_id,flow_id) values($1,$2,$3)", [
+        root,
+        tenantId,
+        f,
+      ]);
+    async function seed(flow, length, base, label, entryOffset = 0) {
       await db.query(
-        `insert into runs(id,tenant_id,session_id,prev_run_id,mailbox_position,initial_input,model_ref,idempotency_key,state,history_head,output_display_seq)
-    select fixture_run($1::uuid,n),$2::uuid,$1::uuid,case when n=1 then $4::uuid else fixture_run($1::uuid,n-1) end,n,$5::text||':'||n,'fixture',fixture_run($1::uuid,n),'completed','{"floor":1,"nextId":2}',n
+        `insert into runs(id,tenant_id,session_id,${segments ? "" : "prev_run_id,"}mailbox_position,initial_input,model_ref,idempotency_key,state,history_head,output_display_seq)
+    select fixture_run($1::uuid,n),$2::uuid,$1::uuid,${segments ? "" : "case when n=1 then $5::uuid else fixture_run($1::uuid,n-1) end,"}n,$4::text||':'||n,'fixture',fixture_run($1::uuid,n),'completed','{"floor":1,"nextId":2}',n
     from generate_series(1,$3::int)n`,
-        [flow, tenantId, length, base, label],
+        [flow, tenantId, length, label, ...(segments ? [] : [base])],
       );
       await db.query(
         `insert into messages(tenant_id,pi_session_id,entry_id,conversation_id,run_id,role,content,commit_seq,ordinal)
-    select $1::uuid,$2::uuid,n,1,fixture_run($2::uuid,n),'assistant',
-    json_build_object('id',n,'kind','pi.assistant','model',json_build_array(json_build_object('role','assistant','content',json_build_array(json_build_object('type','text','text',$4::text||':'||n||' '||repeat('abcd',256))),'stopReason','stop','timestamp',1)))::text,n,0
+    select $1::uuid,$2::uuid,n+$5::int,1,fixture_run($2::uuid,n),'assistant',
+    json_build_object('id',n+$5::int,'kind','pi.assistant','model',json_build_array(json_build_object('role','assistant','content',json_build_array(json_build_object('type','text','text',$4::text||':'||n||' '||repeat('abcd',256))),'stopReason','stop','timestamp',1)))::text,n,0
     from generate_series(1,$3::int)n`,
-        [tenantId, flow, length, label],
+        [tenantId, flow, length, label, entryOffset],
       );
     }
     async function at(flow, n) {
       return (await db.query("select fixture_run($1::uuid,$2::int) id", [flow, n])).rows[0].id;
     }
     async function fork(s, at, dest, flow) {
+      if (directory) {
+        const target = (
+          await db.query("select entry_id from messages where run_id=$1 and role='assistant'", [at])
+        ).rows[0].entry_id;
+        assert(
+          (
+            await db.query("select fork_web_window($1,$2,$3,$4,$5,$6,$7) ok", [
+              tenantId,
+              s,
+              at,
+              target,
+              dest,
+              randomUUID(),
+              "fixture",
+            ])
+          ).rows[0].ok,
+        );
+        return;
+      }
       await db.query("select flow_fork($1,$2,$3,$4,$5)", [tenantId, s, at, dest, flow]);
     }
     await seed(f, 100000, null, "root");
     const b = await at(f, 99980);
     await fork(root, b, left, lf);
-    await seed(lf, 12, b, "left");
+    await seed(lf, 12, b, "left", segments ? 100000 : 0);
     const c = await at(lf, 4);
     await fork(left, c, right, rf);
-    await seed(rf, 4, c, "right");
+    await seed(rf, 4, c, "right", segments ? 100100 : 0);
     await fork(left, b, empty, randomUUID());
-    const job = (await db.query("select flow_detach($1,$2,$3,null) job", [tenantId, root, f]))
-      .rows[0].job;
-    assert.equal((await db.query("select flow_collect($1,256) n", [job])).rows[0].n, 20);
+    if (directory) {
+      await directory.retire(tenantId, root);
+      await directory.collect(tenantId);
+    } else {
+      const job = (await db.query("select flow_detach($1,$2,$3,null) job", [tenantId, root, f]))
+        .rows[0].job;
+      assert.equal((await db.query("select flow_collect($1,256) n", [job])).rows[0].n, 20);
+    }
     await meta
       .updateTable("sessions")
       .set({ pruned_at: new Date() })
       .where("id", "=", root)
       .execute();
     await db.query("analyze runs;analyze sessions;analyze messages");
-    app = await openPageApi(url, readDsn.href, true, undefined, undefined, liveStream);
+    app = await openPageApi(
+      url,
+      readDsn.href,
+      true,
+      undefined,
+      undefined,
+      liveStream,
+      segments ? "flow_study" : false,
+    );
     const { origin } = app;
     const token = tenant.credential.token;
     const api = new PiCloudApi((path, opts) => fetch(new URL(path, origin), opts), token);
@@ -195,7 +240,9 @@ export async function withPagingFixture(
     );
     const beforeCut = latest.history.after,
       nextBase = await at(f, 99970);
-    await db.query("select flow_detach($1,$2,$3,$4)", [tenantId, right, rf, nextBase]);
+    if (directory)
+      await directory.retire(tenantId, right, { run: nextBase, entry: 99970, lane: 1 });
+    else await db.query("select flow_detach($1,$2,$3,$4)", [tenantId, right, rf, nextBase]);
     assert.equal(await status(right, { before: beforeCut }), 404);
     assert.equal((await page(right)).turns.at(-1).prompt, "root:99970");
     console.log(
@@ -268,6 +315,7 @@ export async function withPagingFixture(
       assert(olderResponses > 0);
       await work({
         db,
+        directory,
         projector,
         topic,
         windows: [left, right, empty],

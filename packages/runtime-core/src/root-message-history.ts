@@ -27,8 +27,12 @@ export const rootMessageTurns = sql<HistoryTurnRow>`(select r.tenant_id,r.sessio
 export const flowRootMessageTurns = (tenant: string, session: string) =>
   sql<HistoryTurnRow>`(select r.tenant_id,${session}::uuid as session_id,${session}::uuid as origin_session_id,
     r.id as turn_id,r.id as run_id,r.session_id::text as pi_session_id,
-    (f.prior_positions+r.mailbox_position) as mailbox_position,r.operation_kind,r.state,r.stop_reason,
-    r.output_display_seq,r.output_display_native_seq,(r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
+    f.entry_lo as flow_lo,f.entry_hi as flow_hi,f.cut_seq as flow_seq,f.source_lane as flow_lane,case when r.mailbox_position=f.through_position then f.tail_coverage end as partial_coverage,
+    (f.prior_positions+r.mailbox_position) as mailbox_position,r.operation_kind,
+    case when f.tail_coverage is not null and r.mailbox_position=f.through_position then 'running' else r.state end as state,
+    case when f.tail_coverage is null or r.mailbox_position<>f.through_position then r.stop_reason end as stop_reason,
+    coalesce(case when r.mailbox_position=f.through_position then f.tail_coverage end,r.output_display_seq) as output_display_seq,
+    least(r.output_display_native_seq,f.cut_seq) as output_display_native_seq,(r.output_seal_id is not null and r.output_sealed_at is null) as waiting_for_seal,r.created_at,false as frozen
     from flow_read_ranges(${tenant}::uuid,${session}::uuid) f
     cross join lateral(select * from runs r where r.tenant_id=${tenant}::uuid and r.session_id=f.physical and r.mailbox_position<=f.through_position and r.mailbox_position is not null
     and r.pruned_at is null and (r.state<>'queued' or r.started_at is not null or r.operation_kind='compact')
@@ -146,13 +150,14 @@ export async function rootMessagePosition(
     ? sql`(select s.pi_conversation_id from sessions s join subagent_conversations e
     on e.tenant_id=s.tenant_id and e.child_session_id=s.id and e.child_turn_id=${turn.turn_id}::uuid and e.root_run_id=${turn.run_id}::uuid
     where s.tenant_id=${tenant}::uuid and s.id=${turn.origin_session_id}::uuid and s.pi_session_id=${turn.pi_session_id} and s.pruned_at is null)`
-    : sql`1`;
+    : sql`${turn.flow_lane ?? "1"}::bigint`;
   return (
     await sql<{ seq: string; ordinal: number }>`select * from (
     select commit_seq as seq,ordinal from messages where tenant_id=${tenant}::uuid and run_id=${turn.run_id}::uuid and pi_session_id=${turn.pi_session_id} and conversation_id=${lane}
+      ${turn.flow_seq != null ? sql`and commit_seq<=${turn.flow_seq}::bigint and entry_id between ${turn.flow_lo}::bigint and ${turn.flow_hi}::bigint` : sql``}
       and ${kind === "entry" ? sql`entry_id` : sql`tool_task_id`}=${id}::bigint
     ${
-      kind === "task"
+      kind === "task" && turn.flow_seq == null
         ? sql`union all select (v->>'seq')::bigint,(v->>'ordinal')::int from runs r cross join lateral jsonb_each(r.projection_tools) t(k,v)
       where r.id=${turn.run_id}::uuid and r.tenant_id=${tenant}::uuid and k=${id} and v->>'conversationId'=(${lane})::text`
         : sql``
@@ -178,8 +183,9 @@ export async function readRootMessageWindow(
       bytes: 0,
       lastContinues: false,
     };
+  const clipped = flows && input.turns.some((t) => t.flowRange !== undefined);
   const runSource = child ? childMessageRuns : sql`runs`,
-    lane = child ? sql`s.pi_conversation_id` : sql`1`;
+    lane = child ? sql`s.pi_conversation_id` : clipped ? sql`t.source_lane` : sql`1`;
   const headerBytes = child
     ? sql`coalesce((select octet_length(m.content) from messages m where ${placedChildInput}),0)`
     : sql`octet_length(r.input_text)+octet_length(r.input_uploads::text)`;
@@ -200,7 +206,11 @@ export async function readRootMessageWindow(
     sessionJoin = flows
       ? sql`cross join lateral (select r.session_id::text as pi_session_id) s`
       : sql`join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id and s.pruned_at is null`,
-    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]${flows ? sql`,${input.turns.map((t) => t.piSessionId)}::uuid[]` : sql``}${seek}) with ordinality t(turn_id,through_seq,through_ordinal${flows ? sql`,physical` : sql``}${cursor ? sql`,seek_seq,seek_ordinal` : sql``},turn_index)
+    rangeArrays = clipped
+      ? sql`,${input.turns.map((t) => t.flowRange?.lo ?? "1")}::bigint[],${input.turns.map((t) => t.flowRange?.hi ?? "9007199254740991")}::bigint[],${input.turns.map((t) => t.flowRange?.lane ?? "1")}::bigint[],${input.turns.map((t) => !!t.flowRange)}::boolean[],${input.turns.map((t) => t.flowRange?.partialCoverage ?? null)}::bigint[]`
+      : sql``,
+    rangeNames = clipped ? sql` ,lo,hi,source_lane,inherited,partial_coverage` : sql``,
+    scope = sql`unnest(${input.turns.map((t) => t.turnId)}::uuid[],${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[],${input.turns.map((t) => t.through?.ordinal ?? 2147483647)}::int[]${flows ? sql`,${input.turns.map((t) => t.piSessionId)}::uuid[]` : sql``}${rangeArrays}${seek}) with ordinality t(turn_id,through_seq,through_ordinal${flows ? sql`,physical` : sql``}${rangeNames}${cursor ? sql`,seek_seq,seek_ordinal` : sql``},turn_index)
       join ${runSource} r on r.tenant_id=${input.tenantId}::uuid and r.session_id=${flows ? sql`t.physical` : sql`${input.sessionId}::uuid`} and ${turnId}=t.turn_id and r.pruned_at is null
       ${sessionJoin}`,
     bound = (
@@ -213,7 +223,8 @@ export async function readRootMessageWindow(
   // Run membership so a long Run cannot turn each dependency into a range scan.
   const assistantAt = sql`left join lateral(select a.entry_id,a.run_id,a.content from messages a
     where p.assistant_id is not null and a.tenant_id=r.tenant_id and a.pi_session_id=s.pi_session_id::uuid
-      and a.conversation_id=${lane} and a.entry_id=p.assistant_id::bigint limit 1) a on a.run_id=r.id`;
+      and a.conversation_id=${lane} and a.entry_id=p.assistant_id::bigint
+      ${clipped ? sql`and a.entry_id between t.lo and t.hi and a.commit_seq<=t.through_seq` : sql``} limit 1) a on a.run_id=r.id`;
   const meta = await sql<
     HistoryWindowPoint & { pending: boolean; run_id: string }
   >`select p.*,r.id as run_id,${turnId} as turn_id,s.pi_session_id,${flows ? sql`${input.sessionId}::uuid` : sql`r.session_id`} as origin_session_id,t.turn_index,
@@ -223,7 +234,7 @@ export async function readRootMessageWindow(
         flowPoints
           ? sql`select m.id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
         m.body_bytes,m.assistant_entry_id::text as assistant_id,case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,m.pending
-        from flow_transcript_points m where m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=${lane}`
+        from flow_transcript_points m where ${clipped ? sql`m.id between t.lo and t.hi and (not t.inherited or not m.pending) and` : sql``} m.tenant_id=r.tenant_id and m.run_id=r.id and m.pi_session_id=s.pi_session_id::uuid and m.conversation_id=${lane}`
           : sql`select m.entry_id::text as id,m.commit_seq as seq,m.ordinal,jsonb_build_object('role',m.role) as fields,
         octet_length(m.content) as body_bytes,m.assistant_entry_id::text as assistant_id,
         case when m.tool_task_id is not null then '"pi.tool"' end as task_kind,false as header,false as pending
@@ -232,7 +243,7 @@ export async function readRootMessageWindow(
           ${bound(sql.raw("m.commit_seq"), sql.raw("m.ordinal"))}
         order by m.commit_seq ${order},m.ordinal ${order} limit ${limit})
       union all select k,(v->>'seq')::bigint,(v->>'ordinal')::int,'{}'::jsonb,octet_length(v::text),v->>'assistantEntryId','"pi.tool"',false,true
-        from jsonb_each(r.projection_tools) q(k,v) where v->>'conversationId'=(${lane})::text
+        from jsonb_each(r.projection_tools) q(k,v) where ${clipped ? sql`not t.inherited and` : sql``} v->>'conversationId'=(${lane})::text
         ${bound(sql.raw("(v->>'seq')::bigint"), sql.raw("(v->>'ordinal')::int"))}
       union all select '0',0,0,'{}'::jsonb,${headerBytes},null,null,true,false
         where true ${bound(sql.raw("0"), sql.raw("0"))}
@@ -273,6 +284,7 @@ export async function readRootMessageWindow(
       from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
       join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid ${flows ? sql`` : sql`and r.session_id=${input.sessionId}::uuid`}
       ${sessionJoin}
+      ${clipped ? sql`join unnest(${input.turns.map((t) => t.turnId)}::uuid[]${rangeArrays},${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[]) t(turn_id ,lo,hi,source_lane,inherited,partial_coverage,through_seq) on t.turn_id=p.run_id` : sql``}
       left join lateral(select m.run_id,m.content,m.created_at,m.source_input_id from messages m
         where not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid
           and m.entry_id=p.id and m.conversation_id=${lane} limit 1) m on m.run_id=r.id
@@ -339,8 +351,8 @@ export async function readRootMessageWindow(
     type: string;
     payload: Record<string, unknown>;
     occurred_at: Date;
-  }>`select ${turnId} as turn_id,r.output_display_seq as coverage,r.created_at,e.seq,e.type,e.payload,e.occurred_at from ${scope}
-      left join lateral(select seq,type,payload,occurred_at from session_terminal_events where tenant_id=r.tenant_id and session_id=r.session_id and turn_id=${turnId} order by seq desc limit 1)e on true`.execute(
+  }>`select ${turnId} as turn_id,${clipped ? sql`coalesce(t.partial_coverage,r.output_display_seq)` : sql`r.output_display_seq`} as coverage,r.created_at,e.seq,e.type,e.payload,e.occurred_at from ${scope}
+      left join lateral(select seq,type,payload,occurred_at from session_terminal_events where ${clipped ? sql`t.partial_coverage is null and` : sql``} tenant_id=r.tenant_id and session_id=r.session_id and turn_id=${turnId} order by seq desc limit 1)e on true`.execute(
     db,
   );
   const byTurn = new Map(metadata.rows.map((r) => [r.turn_id, r]));
@@ -378,10 +390,35 @@ export async function rootMessageNavigation(
     from?: number;
     through?: number;
     includeIds?: readonly number[];
+    windowId?: string;
   },
 ) {
   const eligible = sql`m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=${input.sessionId}::uuid and m.conversation_id=${input.conversationId}
     and m.navigation_caption is not null`;
+  const rangeQuery = input.windowId
+    ? sql`with bounds as materialized (
+      select * from flow_read_ranges(${input.tenantId}::uuid,${input.windowId}::uuid)
+    ), candidates as (
+      select p.* from bounds f cross join lateral (
+        (select m.entry_id,false as forced,m.commit_seq,m.role,m.created_at,m.run_id,m.navigation_caption
+          from messages m where m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=f.physical and m.conversation_id=f.source_lane
+            and m.navigation_caption is not null and m.entry_id between greatest(f.entry_lo,${input.from ?? 0}::bigint) and least(f.entry_hi,${input.through ?? Number.MAX_SAFE_INTEGER}::bigint)
+            and (f.cut_seq is null or m.commit_seq<=f.cut_seq) order by m.entry_id desc limit ${input.limit + 1})
+        union all (select m.entry_id,true,m.commit_seq,m.role,m.created_at,m.run_id,m.navigation_caption from messages m
+          where m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=f.physical and m.conversation_id=f.source_lane
+            and m.navigation_caption is not null and m.entry_id=any(${[...(input.includeIds ?? [])]}::bigint[])
+            and m.entry_id between coalesce(f.entry_lo,1) and coalesce(f.entry_hi,9223372036854775807)
+            and (f.cut_seq is null or m.commit_seq<=f.cut_seq))
+      ) p
+    ) select c.entry_id as id,c.commit_seq as seq,c.role,c.created_at,c.run_id as turn_id,c.forced,c.navigation_caption as preview
+      from candidates c order by c.entry_id desc`
+    : sql`with bounded as(
+    (select entry_id,false as forced from messages m where ${eligible} and entry_id between ${input.from ?? 0}::bigint and ${input.through ?? Number.MAX_SAFE_INTEGER}::bigint order by entry_id desc limit ${input.limit + 1})
+    union all (select entry_id,true from messages m where ${eligible} and entry_id=any(${[...(input.includeIds ?? [])]}::bigint[])))
+    select m.entry_id as id,m.commit_seq as seq,m.role,m.created_at,r.turn_id,b.forced,
+      m.navigation_caption as preview
+      from bounded b join messages m on m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=${input.sessionId}::uuid and m.entry_id=b.entry_id
+      join runs r on r.id=m.run_id and r.tenant_id=m.tenant_id and r.pruned_at is null order by m.entry_id desc`;
   const { rows } = await sql<{
     id: string;
     seq: string;
@@ -390,15 +427,7 @@ export async function rootMessageNavigation(
     preview: string;
     created_at: Date;
     forced: boolean;
-  }>`with bounded as(
-    (select entry_id,false as forced from messages m where ${eligible} and entry_id between ${input.from ?? 0}::bigint and ${input.through ?? Number.MAX_SAFE_INTEGER}::bigint order by entry_id desc limit ${input.limit + 1})
-    union all (select entry_id,true from messages m where ${eligible} and entry_id=any(${[...(input.includeIds ?? [])]}::bigint[])))
-    select m.entry_id as id,m.commit_seq as seq,m.role,m.created_at,r.turn_id,b.forced,
-      m.navigation_caption as preview
-      from bounded b join messages m on m.tenant_id=${input.tenantId}::uuid and m.pi_session_id=${input.sessionId}::uuid and m.entry_id=b.entry_id
-      join runs r on r.id=m.run_id and r.tenant_id=m.tenant_id and r.pruned_at is null order by m.entry_id desc`.execute(
-    db,
-  );
+  }>`${rangeQuery}`.execute(db);
   const directional = rows.filter((r) => !r.forced),
     page = directional.slice(0, input.limit);
   const entries = [

@@ -19,11 +19,78 @@ import { registerSubagent } from "../../../packages/control-plane/src/named-suba
 import { toolReplyTopic } from "@pi-cloud/event-log";
 import { delegatedRunId, namedAgentId } from "@pi-cloud/protocol/delegation-identity";
 import { ControlToolDispatcher } from "../../../packages/control-plane/src/control-tool-dispatcher.ts";
+import { ForkStorage, installForkTables, setForkLayout } from "./fork-storage.mjs";
+import { installPagingProjection } from "./flow-paging-fixture.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { delegatedControl } from "./delegated-runs.mjs";
 import { encodeWorkspaceFact, decodeWorkspaceFact } from "./workspace-operations.mjs";
 import { readRetainedPrefix } from "./retained-control-prefix.mjs";
 import { waitingDelegation, executeChild, resumeParent } from "./direct-delegation-worker.mjs";
+
+// Replay the same admitted native prefix into the segment schema. The successor
+// supplies its actual recovered operation, including the original request view.
+async function verifySegmentRegistration(scope, topic, records, intent) {
+  const schema = "child_fork_" + randomUUID().replaceAll("-", "");
+  const db = new pg.Pool({
+    connectionString: process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL,
+    options: "-c search_path=" + schema,
+  });
+  const storage = new ForkStorage(db),
+    t = scope.tenantId,
+    s = scope.sessionId;
+  try {
+    await db.query("create schema " + schema);
+    await installPagingProjection(db);
+    const projection = normalRootProjection(
+      db,
+      topic,
+      () => assert.fail(),
+      () => assert.fail(),
+      undefined,
+      { namedExecutor: true },
+    );
+    await installForkTables(db);
+    await setForkLayout(db, true, false);
+    await storage.register(t, [s]);
+    const original = records[0].scope;
+    await db.query(
+      "insert into runs(id,tenant_id,session_id,lease_id,mailbox_position,idempotency_key,initial_input,model_ref,state) values($1,$2,$3,$4,1,$1,'Delegate','fixture','running')",
+      [scope.runId, t, s, original.writerId],
+    );
+    await projection.view.reset(new Map([[0, 0n]]), 16, "recorded-history");
+    for (const [i, fact] of records.entries()) {
+      const accepted = await projection.nativeStore.projection.project(
+        fact,
+        { topic, partition: 0, offset: BigInt(i) },
+        () => true,
+      );
+      assert(accepted.admitted);
+    }
+    await db.query("update runs set lease_id=$2 where id=$1", [scope.runId, scope.writerId]);
+    const caller = { run: scope.runId, writer: scope.writerId };
+    const id = await storage.delegateFromIntent(t, s, caller, intent, "fixture");
+    assert.equal(await storage.delegateFromIntent(t, s, caller, intent, "fixture"), id);
+    const text = JSON.stringify(await storage.contextPrefix(t, id));
+    assert(
+      text.includes("New parent summary") &&
+        text.includes("Delegate") &&
+        !text.includes("delegate-once") &&
+        !text.includes("Earlier context"),
+      text,
+    );
+    assert.equal(
+      (await db.query("select count(*)::int n from messages where pi_session_id=$1", [id])).rows[0]
+        .n,
+      0,
+    );
+  } finally {
+    try {
+      await db.query("drop schema if exists " + schema + " cascade");
+    } finally {
+      await storage.db.destroy();
+    }
+  }
+}
 
 async function replayToOriginalWorker(pool, db, topic, records, projection, old, childId) {
   let reader;
@@ -339,6 +406,7 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each([
           if (named) {
             assert.equal(cold.arguments.name, name);
             assert.equal(cold.contextAnchor, ref.contextAnchor);
+            if (!alreadyAdmitted) await verifySegmentRegistration(successor, topic, records, cold);
             const newTopic = toolReplyTopic(randomUUID());
             await assert.rejects(registerSubagent(db, topic, offer), /Root writer closed/);
             await registerSubagent(db, topic, {
@@ -369,8 +437,12 @@ it.skipIf(!process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL).each([
           assert.equal(cold.operationId, childId);
           assert.equal(cold.sequence, source.commit.seq);
           assert.equal(cold.contextAnchor, ref.contextAnchor);
-          if (mode === "branch")
+          if (mode === "branch") {
+            assert(
+              Number.isSafeInteger(cold.contextThrough) && cold.contextThrough < cold.sequence,
+            );
             assert(cold.contextAnchor > 0 && cold.contextAnchor < task.write.value.input.assistant);
+          }
           await assert.rejects(delegatedControl(pool, scope).start(request), /no longer active/);
           const coldRequest = {
             callerLane: cold.conversationId,
