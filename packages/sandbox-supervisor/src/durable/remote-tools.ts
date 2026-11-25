@@ -37,6 +37,7 @@ export type PreparedRemoteInvocation = {
   completed(): boolean;
 };
 type Pending = {
+  toolName: string;
   prepared: PreparedRemoteInvocation;
   dispatched: boolean;
   cancelled: boolean;
@@ -55,6 +56,7 @@ export class DurableRemoteTools {
       definitions: readonly Omit<ToolRegistration, "execute">[];
       prepare(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation>;
       isInterruptedBash?: BashWaitLookup;
+      onBashCancelCommitted?(conversationId: number, taskId: number): void;
       recover?(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation>;
     },
   ) {
@@ -93,7 +95,12 @@ export class DurableRemoteTools {
           prepared.dispose();
           throw new Error("Remote invocation was prepared twice");
         }
-        this.#pending.set(api.taskId, { prepared, dispatched: false, cancelled: false });
+        this.#pending.set(api.taskId, {
+          toolName: call.name,
+          prepared,
+          dispatched: false,
+          cancelled: false,
+        });
         return undefined;
       },
     });
@@ -147,7 +154,7 @@ export class DurableRemoteTools {
             prepared.dispose();
             context.abortSignal.throwIfAborted();
           }
-          pending = { prepared, dispatched: true, cancelled: false };
+          pending = { toolName: definition.name, prepared, dispatched: true, cancelled: false };
           this.#pending.set(api.taskId, pending);
         }
         if (!pending?.dispatched || !pending.prepared.result)
@@ -164,7 +171,7 @@ export class DurableRemoteTools {
     const tools: { taskId: number; command: CandidateToolEffect }[] = [];
     const cancellations: CandidateToolCancellation[] = [];
     const terminal: number[] = [];
-    const cancelling: Pending[] = [];
+    const cancelling: { pending: Pending; taskId: number; conversationId: number }[] = [];
     const index = new DurableCommitIndex(commit);
     for (const write of commit.writes) {
       if (write.type !== "task") continue;
@@ -196,7 +203,7 @@ export class DurableRemoteTools {
             operationId: command.request.operationId,
             ...(command.originalWriterId ? { originalWriterId: command.originalWriterId } : {}),
           });
-        cancelling.push(pending);
+        cancelling.push({ pending, taskId: task.id, conversationId: task.conversationId });
       }
       if (task.intent && !pending.dispatched) {
         const intent = durableToolIntent(commit, task.id, index),
@@ -221,7 +228,11 @@ export class DurableRemoteTools {
       cancellations,
       confirmed: () => {
         for (const { taskId } of tools) this.#pending.get(taskId)!.dispatched = true;
-        for (const pending of cancelling) pending.cancelled = true;
+        for (const { pending, taskId, conversationId } of cancelling) {
+          pending.cancelled = true;
+          if (pending.toolName === "bash")
+            this.options.onBashCancelCommitted?.(conversationId, taskId);
+        }
         for (const taskId of terminal) {
           this.#pending.get(taskId)?.prepared.dispose();
           this.#pending.delete(taskId);

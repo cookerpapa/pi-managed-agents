@@ -1,4 +1,4 @@
-// Check the existing public readers, replay and retention at a suspended Bash,
+// Check the existing public readers and replay at a suspended Bash,
 // before writing any seal-time snapshot. All data and truncation bounds are synthetic.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -87,15 +87,11 @@ export async function checkMemoryWait(api, tenant, install) {
         .flatMap((c) => c.writes)
         .find((w) => w.type === "entry" && w.value.kind === "pi.assistant").value.id,
     );
-    const protectedReply = async () =>
-      (await p.nativeStore.brokerTimedRetention.replyFloors(reader, [replyTopic])).rows;
     const pendingPage = async () =>
       (await api.page(session, {})).turns
         .flatMap((t) => t.transcript?.items ?? [])
         .filter((i) => i.kind === "tool" && i.status === "running");
-    const floor = await protectedReply(),
-      pending = await pendingPage();
-    assert.equal(floor.length, mode === "memory" ? 0 : 1);
+    const pending = await pendingPage();
     assert.equal(pending.length, mode === "memory" ? 0 : 1);
     p.view.revoke();
     p = fresh();
@@ -114,7 +110,7 @@ export async function checkMemoryWait(api, tenant, install) {
     assert.deepEqual(wait.reply, original.reply);
     assert.equal(wait.operationId, original.operationId);
     // A handoff can publish the recovered references with the native current
-    // values. Exercise abort and commit, and use the existing PG page/floor readers.
+    // values. Exercise abort and commit, and use the existing PG page reader.
     async function handoff(tx, abort) {
       const ready = await sql`update runs set projection_tools=${JSON.stringify(restored)}::jsonb
         where id=${run}::uuid and lease_id=${scope.writerId}::uuid and state='running' returning id`.execute(
@@ -132,13 +128,11 @@ export async function checkMemoryWait(api, tenant, install) {
       reader.transaction().execute((tx) => handoff(tx, true)),
       /abort fixture/,
     );
-    assert.equal((await protectedReply()).length, floor.length);
     // Once the necessary Kafka offset is gone, a new Projector must refuse the rewind.
     const missing = (await fresh().view.recover([{ ...bounds, low: high }])).get(partition);
     assert(missing instanceof Error);
     await reader.transaction().execute((tx) => handoff(tx, false));
     assert.equal((await pendingPage()).length, 1);
-    assert.equal((await protectedReply())[0].floor, original.reply.offset);
     const sealed = (
       await db.query("select projection_tools,native_work_handoff from runs where id=$1", [run])
     ).rows[0];
@@ -167,7 +161,6 @@ export async function checkMemoryWait(api, tenant, install) {
         kind: "wait-fault",
         mode,
         pendingPageBeforeSeal: pending.length,
-        replyFloorsBeforeSeal: floor.length,
         originalWaitAfterReplay: true,
         exactResourceReference: wait.allocationSpanStart === original.allocationSpanStart,
         originalDeadlineAfterHandoff: true,

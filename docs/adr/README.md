@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0361](0361-stop-context-and-mailbox-retention.md) defines model-facing Stop and Kafka reply expiry in the candidate.
+
 [ADR-0360](0360-bash-intent-log-study.md) evaluates immutable Bash intent and display records.
 
 [ADR-0359](0359-sealed-bash-unknown.md) defines the candidate Bash handoff experiment.

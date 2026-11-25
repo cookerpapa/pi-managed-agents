@@ -543,6 +543,7 @@ export class PiCloudTurnRunner {
         if (!freshRootPrompt) await world.capture();
         return world;
       });
+      const userCancelledBash = new Set<number>();
       let sampling = new DurableSampling();
       const samplingScope = new AsyncLocalStorage<{
         sampling: DurableSampling;
@@ -653,6 +654,14 @@ export class PiCloudTurnRunner {
                 cwd: p.workingDirectory,
                 thinkingLevel: resolveAgentProfile(p.model.thinkingLevel).thinkingLevel,
               },
+        onBashCancelCommitted: (taskId: number) => {
+          if (
+            combined.aborted &&
+            cancellationReason(combined) === "user_request" &&
+            combined.reason !== missingDirectory
+          )
+            userCancelledBash.add(taskId);
+        },
         remoteTools: () =>
           tools.tools.filter((tool) => tool.prepareExecution).map((tool) => tool.name),
         recoveryTools: () =>
@@ -1139,6 +1148,7 @@ export class PiCloudTurnRunner {
       }
       await aborting;
       const final = await preserveInterruptedText({
+        userCancelledBash,
         conversation,
         context: BACKGROUND_CONTEXT,
         assertCurrent: () => owner.authority.assertCurrent(),

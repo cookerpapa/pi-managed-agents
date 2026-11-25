@@ -1,4 +1,5 @@
-import type { StorageWrite, Seq } from "@earendil-works/pi-durable";
+import { createModels } from "@earendil-works/pi-ai/models";
+import { Harness, createRegistry, type StorageWrite, type Seq } from "@earendil-works/pi-durable";
 import { fixture } from "./fixtures/native-runner.ts";
 import { createServer } from "node:http";
 import { expect, it, vi } from "vitest";
@@ -210,6 +211,39 @@ it("co-commits native Stop with operation cancellation without waiting for an un
     f.stop();
     await expect(running).rejects.toMatchObject({ code: "turn_cancelled" });
     expect(f.cancellations).toEqual([f.commands[0]!.request.operationId]);
+    const entries = (
+      await f.storage.scanEntries(
+        { conversationId: 1 as import("@earendil-works/pi-durable").ConversationId },
+        100,
+        undefined,
+        BACKGROUND_CONTEXT,
+      )
+    ).items;
+    const results = entries.filter((e) => e.kind === "pi.tool-result");
+    expect(results).toHaveLength(1);
+    const native = results[0]!.model?.[0];
+    if (native?.role !== "toolResult") throw new Error("Missing native Bash result");
+    expect(JSON.stringify(native.content)).toContain("Tool bash was aborted");
+    const cold = await Harness.open(
+      f.storage,
+      { models: createModels(), registry: createRegistry() },
+      BACKGROUND_CONTEXT,
+    );
+    try {
+      const root = await cold.root(BACKGROUND_CONTEXT);
+      const { messages } = await root.context(BACKGROUND_CONTEXT);
+      const modelResults = messages.filter(
+        (m) => m.role === "toolResult" && m.toolCallId === native.toolCallId,
+      );
+      expect(modelResults).toHaveLength(1);
+      expect(JSON.stringify(modelResults)).toContain(
+        "The user pressed Stop. Cancellation of this Bash command was requested.",
+      );
+      expect(JSON.stringify(modelResults)).toContain("No final execution result was confirmed.");
+      expect(JSON.stringify(modelResults)).not.toContain("Tool bash was aborted");
+    } finally {
+      await cold.close(BACKGROUND_CONTEXT);
+    }
     expect(f.server.observations).toHaveLength(1);
   } finally {
     f.release();

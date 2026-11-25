@@ -66,22 +66,6 @@ export function normalRootProjection(
   const deliveries = new WeakMap(),
     childDisplays = new Map();
   const nativeStore = {
-    brokerTimedRetention: {
-      replyFloors(database, topics) {
-        if (bashLog)
-          return sql`select topic,min(floor)::text floor from (
-           select p.v#>>'{reply,topic}' as topic,(p.v#>>'{reply,offset}')::bigint as floor
-           from runs r cross join lateral jsonb_each(r.projection_tools) p(k,v) where p.v#>>'{reply,topic}'=any(${topics}::text[])
-           union all select i.bash_reply_topic,i.bash_reply_floor
-           from pending_bash_intents i where i.bash_reply_topic=any(${topics}::text[])) waits group by topic`.execute(
-            database,
-          );
-        return sql`select p.v#>>'{reply,topic}' as topic,min((p.v#>>'{reply,offset}')::bigint)::text as floor
-        from runs r cross join lateral jsonb_each(r.projection_tools) p(k,v) where p.v#>>'{reply,topic}'=any(${topics}::text[]) group by p.v#>>'{reply,topic}'`.execute(
-          database,
-        );
-      },
-    },
     controlProjected(pos) {
       const next = pos.offset + 1n;
       if (next > view.next.get(pos.partition)) view.next.set(pos.partition, next);

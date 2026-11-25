@@ -445,7 +445,7 @@ export class SessionProjector {
       ...options,
       topic,
       graceMs: options.retentionMs,
-      ...(options.nativeStore ? { brokerTimed: options.nativeStore.brokerTimedRetention } : {}),
+      brokerTimed: options.nativeStore !== undefined,
     });
     this.eventStore.owner = (tenant, session) => this.owner(tenant, session);
   }

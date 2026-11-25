@@ -398,7 +398,7 @@ export function createTrustedRemoteAgentTools(
       "## PiCloud execution context",
       `All file and command tools operate inside the selected machine directory ${runtime.workingDirectory}.`,
       "Large tool results are bounded in model context; omitted output is not archived.",
-      "Stopping the conversation requests cancellation of unfinished Tools. Completed background services keep running. If a Tool outcome is unknown, inspect its effects before repeating it.",
+      "Stopping ends the agent’s wait and requests cancellation of unfinished tools. A remote process may still be running. Check unknown outcomes before repeating a command. Completed background services keep running.",
       "GitLab/GitHub authentication is already configured through Git's credential helper when the user connects a Code Host.",
       "Always use credential-free HTTPS clone and remote URLs. Never read .git-credentials or embed a token in a command, URL, output, file, or Git remote.",
     ].join("\n");

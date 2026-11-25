@@ -29,7 +29,7 @@ export const TOOL_REPLY_TOPIC_PATTERN =
   /^pi-cloud\.tool-replies\.v4\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Transport redelivery starts when a result is published, not when the Tool
 // begins. A multi-hour native child wait has no Bash execution timeout.
-export const TOOL_REPLY_RETENTION_MS = 2 * 60 * 60_000 + 60_000;
+export const TOOL_REPLY_RETENTION_MS = 7 * 24 * 60 * 60_000;
 export function toolReplyTopic(bootId: string): string {
   if (!TOOL_REPLY_TOPIC_PATTERN.test(`${PREFIX}${bootId}`))
     throw new Error("Invalid Worker boot identity");
@@ -269,6 +269,30 @@ export class ToolReplyMailbox {
       }
     }
   }
+  protected expireReply(id: string): void {
+    const pending = this.#pending.get(id);
+    if (!pending) return; // A retained matching result wins.
+    this.#pending.delete(id);
+    pending.cleanup();
+    pending.resolve({
+      toolCallId: pending.toolCallId,
+      toolName: pending.toolName,
+      isError: true,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: "The original reply window expired. No final result was confirmed. Check the operation before repeating it.",
+          },
+        ],
+        details: {
+          code: "tool_operation_outcome_unknown",
+          effect: "unknown",
+          reason: "reply_expired",
+        },
+      },
+    });
+  }
   #finish(id: string, pending: Pending, error: unknown) {
     this.#pending.delete(id);
     pending.cleanup();
@@ -358,7 +382,7 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
       }
     };
     signal.addEventListener("abort", releaseScope, { once: true });
-    const grouped = new Map<string, { floor: bigint; operations: string[] }>();
+    const grouped = new Map<string, { floor: bigint; operations: Map<string, bigint> }>();
     for (const original of references) {
       signal.throwIfAborted();
       const reference = parseToolReplyRecovery(original.reply);
@@ -391,10 +415,10 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
       // committed to Kafka wins over a timer that elapsed while no Worker ran.
       const group = grouped.get(reference.topic) ?? {
         floor: BigInt(reference.offset),
-        operations: [],
+        operations: new Map<string, bigint>(),
       };
       if (BigInt(reference.offset) < group.floor) group.floor = BigInt(reference.offset);
-      group.operations.push(original.operationId);
+      group.operations.set(original.operationId, BigInt(reference.offset));
       grouped.set(reference.topic, group);
       this.#restored.set(original.operationId, {
         reference,
@@ -422,8 +446,9 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
       });
     }
     for (const [topic, group] of grouped) {
-      const ids = new Set(group.operations);
+      signal.throwIfAborted();
       const groupId = `tool-restore-${this.options.bootId}-${createHash("sha256").update(topic).digest("hex").slice(0, 16)}-${randomUUID()}`;
+      let low = 0n;
       const consumer = new KafkaLogConsumer<WorkerReply>({
         brokers: this.options.brokers,
         clientId: `tool-restore-${this.options.bootId}`,
@@ -431,17 +456,19 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
         topic,
         commitMessages: false,
         replayOffsets: async (bounds) =>
-          new Map(
-            bounds.map((b) => [
-              b.partition,
-              b.partition !== 0 || group.floor < b.low || group.floor > b.high
-                ? new Error("Required Tool replies are outside Kafka retention")
-                : group.floor,
-            ]),
+          new Map<number, bigint | Error>(
+            bounds.map((b) => {
+              low = b.low;
+              if (b.partition !== 0 || group.floor > b.high)
+                return [b.partition, new Error("Invalid original reply partition bounds")] as const;
+              return [b.partition, group.floor < low ? low : group.floor] as const;
+            }),
           ),
         decode: parseWorkerReply,
-        handler: async ({ fact }) => {
-          if ("operationId" in fact && ids.has(fact.operationId)) await this.accept(fact);
+        handler: async ({ fact, offset }) => {
+          if (!("operationId" in fact)) return;
+          const floor = group.operations.get(fact.operationId);
+          if (floor !== undefined && offset >= floor) await this.accept(fact);
         },
       });
       this.#replayConsumers.add(consumer);
@@ -458,16 +485,34 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
       };
       signal.addEventListener("abort", close, { once: true });
       try {
+        // DescribeTopics does not auto-create a retired mailbox.
+        await this.#admin.fetchTopicMetadata({ topics: [topic] });
+        signal.throwIfAborted();
         await consumer.start();
         await consumer.waitForPartition(0);
-        for (const id of ids) this.#restored.get(id)?.startDeadline();
-        const waits = group.operations.map((id) => this.#restored.get(id)?.wait.result);
+        for (const id of group.operations.keys()) {
+          const pending = this.#restored.get(id);
+          if (!pending) continue;
+          if (BigInt(pending.reference.offset) < low) this.expireReply(id);
+          else pending.startDeadline();
+        }
+        const waits = Array.from(
+          group.operations.keys(),
+          (id) => this.#restored.get(id)?.wait.result,
+        );
         void Promise.allSettled(waits).then(() => {
           signal.removeEventListener("abort", close);
           close();
         });
       } catch (cause) {
-        for (const id of ids)
+        for (const id of group.operations.keys()) {
+          if (
+            (cause as { code?: number })?.code ===
+            kafkaNative.CODES.ERRORS.ERR_UNKNOWN_TOPIC_OR_PART
+          ) {
+            this.expireReply(id);
+            continue;
+          }
           this.#restored.get(id)?.controller.abort(
             new ToolExecutionFailure(
               {
@@ -479,6 +524,7 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
               { cause },
             ),
           );
+        }
         signal.removeEventListener("abort", close);
         close();
       }
@@ -515,9 +561,8 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
           numPartitions: 1,
           replicationFactor: this.options.replicas,
           configEntries: [
-            // PG native-task references and the existing safe-retention worker
-            // own deletion; broker age alone cannot discard pending results.
-            { name: "retention.ms", value: "-1" },
+            { name: "retention.ms", value: String(TOOL_REPLY_RETENTION_MS) },
+            { name: "message.timestamp.type", value: "LogAppendTime" },
             { name: "retention.bytes", value: "-1" },
             { name: "min.insync.replicas", value: String(Math.max(1, this.options.replicas - 1)) },
             { name: "cleanup.policy", value: "delete" },
@@ -541,8 +586,7 @@ export class KafkaToolReplyMailbox extends ToolReplyMailbox {
     super.close();
     await this.#consumer.close();
     try {
-      // A replacement may still need this boot's results. The PG-backed
-      // retention pass deletes it after all canonical waits have settled.
+      // Other boots may still read this mailbox during the retention window.
       const groups = await this.#admin.listGroups();
       const groupId = `tool-reply-${this.options.bootId}`;
       if (groups.groups.some((group) => group.groupId === groupId))

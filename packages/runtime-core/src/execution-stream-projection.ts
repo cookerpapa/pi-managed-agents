@@ -37,7 +37,6 @@ export type RecoverySealCheckpoint = (
 ) => Promise<void>;
 
 export type SessionNativeStore = {
-  brokerTimedRetention: import("./kafka-safe-retention.ts").BrokerTimedSessionRetention;
   controlProjected(position: FactPosition): void;
   projection: Pick<
     PostgresDurableCommitProjector,

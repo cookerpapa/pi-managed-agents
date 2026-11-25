@@ -21,10 +21,6 @@ const indexes = [
     "index bash_result_task on messages(run_id,tool_task_id) where role='toolResult' and tool_task_id is not null",
   ],
   [
-    "bash_reply_topic",
-    "index bash_reply_topic on messages(bash_reply_topic) where role='pma.bash-intent'",
-  ],
-  [
     "message_display_cover",
     "index message_display_cover on messages(run_id,display_through desc,commit_seq desc) where display_through is not null",
   ],

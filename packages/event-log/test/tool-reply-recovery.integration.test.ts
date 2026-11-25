@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { expect, it, vi } from "vitest";
 import { KafkaLogConsumer } from "../src/kafka-log-consumer.ts";
-import { Admin } from "@platformatic/kafka";
+import { Admin, ConfigResourceTypes } from "@platformatic/kafka";
 import {
   KafkaToolReplyMailbox,
   KafkaToolReplyPublisher,
+  TOOL_REPLY_RETENTION_MS,
+  toolReplyTopic,
   type ToolReply,
 } from "../src/tool-replies.ts";
 
@@ -36,6 +38,19 @@ it.skipIf(!brokers)(
       await b.start();
       await c.start();
       await publisher.start();
+      const [config] = await admin.describeConfigs({
+        resources: [
+          {
+            resourceType: ConfigResourceTypes.TOPIC,
+            resourceName: a.topic,
+            configurationKeys: ["retention.ms", "message.timestamp.type"],
+          },
+        ],
+      });
+      expect(Object.fromEntries(config!.configs.map((c) => [c.name, c.value]))).toMatchObject({
+        "retention.ms": String(TOOL_REPLY_RETENTION_MS),
+        "message.timestamp.type": "LogAppendTime",
+      });
       const start = await a.replyPosition();
       const refs = ["completed", "running"].map((operationId) => ({
         operationId,
@@ -77,7 +92,48 @@ it.skipIf(!brokers)(
         (await c.resumeWait("running", refs[1]!.reply, authority.signal).result).result.content,
       ).toEqual([{ type: "text", text: "original:running" }]);
       expect(c.size).toBe(0);
-      // Kafka retention follows native settlement, not consumption by either boot.
+      // Move the low watermark as segment expiry would; restore both retained and lost replies.
+      const rows = await admin.listOffsets({
+        topics: [{ name: a.topic, partitions: [{ partitionIndex: 0, timestamp: -1n }] }],
+      });
+      const retained = rows[0]!.partitions[0]!.offset.toString();
+      await publisher.publish(a.topic, reply("still-present"));
+      await admin.deleteRecords({
+        topics: [{ name: a.topic, partitions: [{ partition: 0, offset: BigInt(retained) }] }],
+      });
+      const refs2 = ["expired", "still-present", "newer"].map((operationId, i) => ({
+        operationId,
+        reply: {
+          ...start,
+          offset: i === 2 ? retained : start.offset,
+          toolName: "bash",
+          toolCallId: operationId,
+          deadlineAt: Date.now() + 60_000,
+        },
+      }));
+      await c.restore(refs2, authority.signal);
+      const results = refs2.map((r) => c.resumeWait(r.operationId, r.reply, authority.signal));
+      expect(await results[0]!.result).toMatchObject({
+        isError: true,
+        result: { details: { reason: "reply_expired", effect: "unknown" } },
+      });
+      expect(results[0]!.executionSettled()).toBe(false);
+      expect(await results[1]!.result).toMatchObject({
+        isError: false,
+        toolCallId: "still-present",
+      });
+      await publisher.publish(a.topic, reply("newer"));
+      expect(await results[2]!.result).toMatchObject({ isError: false, toolCallId: "newer" });
+      const gone = {
+        operationId: "gone",
+        reply: { ...refs2[0]!.reply, toolCallId: "gone", topic: toolReplyTopic(randomUUID()) },
+      };
+      await c.restore([gone], authority.signal);
+      expect(await c.resumeWait("gone", gone.reply, authority.signal).result).toMatchObject({
+        isError: true,
+        result: { details: { effect: "unknown", reason: "reply_expired" } },
+      });
+      expect(await admin.listTopics()).not.toContain(gone.reply.topic);
       expect((await admin.listTopics()).includes(a.topic)).toBe(true);
     } finally {
       authority.abort();

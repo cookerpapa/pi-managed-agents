@@ -46,14 +46,8 @@ export async function acceptedFactRetentionFloors(
   return new Map(result.rows.map((r) => [r.partition, r.floor === null ? null : BigInt(r.floor)]));
 }
 
-export type BrokerTimedSessionRetention = {
-  replyFloors(
-    database: Kysely<Database>,
-    topics: string[],
-  ): Promise<{ rows: { topic: string; floor: string }[] }>;
-};
-/** The deployed Session log uses PG recovery floors. A broker-timed Session
- * log delegates segment expiry to Kafka. Both policies protect pending replies. */
+const DAY_MS = 24 * 60 * 60_000;
+
 export class KafkaSafeRetention {
   readonly #admin: Pick<
     Admin,
@@ -66,7 +60,8 @@ export class KafkaSafeRetention {
     | "close"
   >;
   readonly #database: Kysely<Database>;
-  readonly #brokerTimed: BrokerTimedSessionRetention | undefined;
+  readonly #brokerTimed: boolean;
+  #nextMailboxSweep = 0;
   readonly #topic: string;
   readonly #graceMs: number;
   #partitions: number[] = [];
@@ -79,7 +74,7 @@ export class KafkaSafeRetention {
     topic: string;
     clientId: string;
     graceMs: number;
-    brokerTimed?: BrokerTimedSessionRetention;
+    brokerTimed?: boolean;
     admin?: Pick<
       Admin,
       | "listOffsets"
@@ -92,7 +87,7 @@ export class KafkaSafeRetention {
     >;
   }) {
     this.#database = options.database;
-    this.#brokerTimed = options.brokerTimed;
+    this.#brokerTimed = options.brokerTimed === true;
     this.#topic = options.topic;
     this.#graceMs = options.graceMs;
     this.#admin =
@@ -155,53 +150,16 @@ export class KafkaSafeRetention {
   }
   async sweep(now = Date.now()) {
     if (!this.#brokerTimed) await this.#trimSession(now);
+    if (now < this.#nextMailboxSweep) return;
+    await this.#reapMailboxes(now);
+    this.#nextMailboxSweep = now + DAY_MS;
+  }
+  async #reapMailboxes(now: number) {
     // Only positively retired Worker boots are eligible; neither a missed
     // heartbeat nor the absence of a consumer is evidence that a mailbox is dead.
     const replyTopics = (await this.#admin.listTopics()).filter((name) =>
       TOOL_REPLY_TOPIC_PATTERN.test(name),
     );
-    const replyOffsets = (timestamp: bigint) =>
-      replyTopics.length
-        ? this.#admin.listOffsets({
-            topics: replyTopics.map((name) => ({
-              name,
-              partitions: [{ partitionIndex: 0, timestamp }],
-            })),
-          })
-        : Promise.resolve([]);
-    // Capture both cuts before the PG snapshot, exactly as for the Session log.
-    const [replyEnds, replyAges] = await Promise.all([
-      replyOffsets(-1n),
-      replyOffsets(BigInt(now - TOOL_REPLY_RETENTION_MS)),
-    ]);
-    const replyHigh = new Map(replyEnds.map((t) => [t.name, t.partitions[0]?.offset]));
-    const pendingReplies = replyTopics.length
-      ? this.#brokerTimed
-        ? await this.#brokerTimed.replyFloors(this.#database, replyTopics)
-        : await sql<{ topic: string; floor: string }>`
-      select fields->>'replyTopic' as topic,min((fields->>'replyOffset')::bigint)::text as floor
-      from pi_durable_owned_records
-      where kind='task' and fields ? 'replyTopic' and fields->>'status'<>'terminal'
-        and fields->>'replyTopic'=any(${replyTopics}::text[])
-      group by fields->>'replyTopic'`.execute(this.#database)
-      : { rows: [] };
-    const replyFloors = new Map(pendingReplies.rows.map((r) => [r.topic, BigInt(r.floor)]));
-    // Result age alone is not enough: a callback can have reached Kafka before
-    // the current Worker commits Pi's canonical result.
-    if (replyTopics.length) {
-      for (const topic of replyAges) {
-        const position = topic.partitions.find((p) => p.partitionIndex === 0)?.offset;
-        const end = replyHigh.get(topic.name);
-        if (position === undefined || end === undefined) continue;
-        const limit = position < 0n || position > end ? end : position;
-        const floor = replyFloors.get(topic.name);
-        const before = floor === undefined || limit < floor ? limit : floor;
-        if (before > 0n)
-          await this.#admin.deleteRecords({
-            topics: [{ name: topic.name, partitions: [{ partition: 0, offset: before }] }],
-          });
-      }
-    }
     const groups = await this.#admin.listGroups();
     const retiredCandidates = new Set(
       replyTopics.map((name) => name.slice(TOOL_REPLY_TOPIC_PREFIX.length)),
@@ -220,23 +178,40 @@ export class KafkaSafeRetention {
       )
         retiredCandidates.add(id.slice(11));
     }
-    if (retiredCandidates.size) {
+    const candidates = [...retiredCandidates];
+    const existingTopics = new Set(replyTopics);
+    for (let start = 0; start < candidates.length; start += 64) {
       const retired = await this.#database
         .selectFrom("worker_retirements")
         .select("boot_id")
-        .where("boot_id", "in", [...retiredCandidates])
+        .where("boot_id", "in", candidates.slice(start, start + 64))
         .where("state", "=", "completed")
         .where("completed_at", "<", new Date(now - TOOL_REPLY_RETENTION_MS))
-        .limit(64)
         .execute();
+      const topics = retired
+        .map((row) => toolReplyTopic(row.boot_id))
+        .filter((t) => existingTopics.has(t));
+      const offsets = async (timestamp: bigint) => {
+        if (!topics.length) return new Map<string, bigint>();
+        const rows = await this.#admin.listOffsets({
+          topics: topics.map((name) => ({ name, partitions: [{ partitionIndex: 0, timestamp }] })),
+        });
+        return new Map(
+          rows.map((row) => [row.name, row.partitions.find((p) => p.partitionIndex === 0)?.offset]),
+        );
+      };
+      const lows = await offsets(-2n);
+      const highs = await offsets(-1n);
       for (const row of retired) {
-        for (const restored of restoredGroups.get(row.boot_id) ?? [])
-          await deleteIfPresent(() => this.#admin.deleteGroups({ groups: [restored] }), 69);
         const topic = toolReplyTopic(row.boot_id),
           group = `tool-reply-${row.boot_id}`;
-        if (replyFloors.has(topic)) continue;
-        if (replyTopics.includes(topic))
+        if (existingTopics.has(topic)) {
+          const low = lows.get(topic);
+          if (low === undefined || low < 0n || low !== highs.get(topic)) continue;
           await deleteIfPresent(() => this.#admin.deleteTopics({ topics: [topic] }), 3);
+        }
+        for (const restored of restoredGroups.get(row.boot_id) ?? [])
+          await deleteIfPresent(() => this.#admin.deleteGroups({ groups: [restored] }), 69);
         if (groups.has(group))
           await deleteIfPresent(() => this.#admin.deleteGroups({ groups: [group] }), 69);
       }

@@ -2,12 +2,14 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Explain remote Bash Stop in subsequent model context and give reply records a seven-day broker retention window. Verify truncated, missing and still-readable mailboxes. [ADR-0361](adr/0361-stop-context-and-mailbox-retention.md).
+
 - [x] Compare immutable Bash intent, derived waits and record-local root display coverage on the candidate primary. [Write, read and recovery study](reports/bash-intent-log-20261125.md).
 
 - [x] Exercise proposal, execute-intent, reply-only and canonical Bash-result boundaries across one or two Worker losses. [Sealed Bash experiment](reports/sealed-bash-unknown-20261125.md).
 
 - [x] Validate exact Entry paging, combine Run updates with matching display coverage, and test partition handoff and memory-only Tool waits. [Candidate page and write measurements](reports/candidate-page-and-write-cost-20261124.md).
-- [ ] Decide on the matched storage cutover after fleet-representative peak tests. The Bash log experiment supplies a cold pending reader and a healthy-boot retention floor. Other tool kinds and the default layout still use durable Run references.
+- [ ] Decide on the matched storage cutover after fleet-representative peak tests. The Bash log experiment supplies a cold pending reader. The candidate broker now owns reply record expiry. Other tool kinds and the default layout still use durable Run references.
 
 - [x] Audit single-primary history load using actual Chrome wheel events, indexed page plans, separate backend CPU counters and a controlled projector replay. [Scroll and IO evidence](reports/scroll-demand-and-primary-cost-20261124.md).
 

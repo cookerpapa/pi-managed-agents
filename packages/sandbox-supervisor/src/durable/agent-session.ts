@@ -126,6 +126,7 @@ export type DurableRunConfiguration = {
   tools: readonly ToolRegistration[];
   assertCurrent(): Promise<void>;
   beforeEffect?(signal?: AbortSignal): Promise<void>;
+  onBashCancelCommitted?(taskId: number): void;
   onDirectoryFailure?(failure: PiTurnError): void;
   prepareRemote(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation>;
   openModel(
@@ -199,6 +200,8 @@ export class DurableAgentSession {
     });
     this.remote = new DurableRemoteTools({
       definitions: options.remoteTools,
+      onBashCancelCommitted: (lane, task) =>
+        this.#bindings.get(lane)?.onBashCancelCommitted?.(task),
       ...(options.isInterruptedBash ? { isInterruptedBash: options.isInterruptedBash } : {}),
       prepare: (invocation) => this.#prepareRemote(invocation),
       recover: async (invocation) => {

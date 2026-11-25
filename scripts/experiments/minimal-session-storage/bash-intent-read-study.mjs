@@ -2,7 +2,6 @@
 // input between them. No model provider, live user data or Guest is involved.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { Kysely, PostgresDialect } from "kysely";
 import { testPostgres } from "../../lib/test-postgres.mjs";
 import { withPagingFixture } from "./flow-paging-fixture.mjs";
 import { nativeBashTrace, nativeBashFact } from "./native-bash-trace.mjs";
@@ -22,8 +21,7 @@ try {
     database.url,
     tenant,
     async (api) => {
-      const { db } = api,
-        readerDb = new Kysely({ dialect: new PostgresDialect({ pool: db }) });
+      const { db } = api;
       await installWorkspaceRoutes(db);
       for (const stop of [false, true]) {
         const expected = [];
@@ -135,18 +133,13 @@ try {
                 tools: tools.map((x) => [x.toolCallId, x.status, x.input, x.output?.content]),
               });
               assert.equal(tx.throughSequence, lastThrough);
-              const floors = await p.nativeStore.brokerTimedRetention.replyFloors(readerDb, [
-                replyTopic,
-              ]);
               if (proposal) {
                 assert.equal(tools.length, 0);
-                assert.equal(floors.rows.length, 0);
               }
               if (intent) {
                 assert.equal(tools.length, 1);
                 assert.equal(tools[0].status, "running");
                 assert.deepEqual(tools[0].input, { command: "true", timeout: 10 });
-                assert.equal(floors.rows[0].floor, intent.reply.offset);
                 const where = await locator.original(scope, intent, record);
                 assert.equal(where.bindingId, binding);
                 assert.equal(
@@ -187,7 +180,6 @@ try {
               if (result) {
                 assert.equal(tools.length, 1);
                 assert.equal(tools[0].status, stop ? "failed" : "completed");
-                assert.equal(floors.rows.length, 0);
                 assert.equal(await locator.original(scope, original, record), undefined);
                 if (stop) {
                   assert.deepEqual(cancelled, [binding]);
@@ -247,7 +239,7 @@ try {
               checkpoints: checkpoints.length,
               oneEffect: true,
               publicPage: true,
-              pendingFloor: true,
+              originalRouteVerified: true,
               reopen: true,
             }),
           );

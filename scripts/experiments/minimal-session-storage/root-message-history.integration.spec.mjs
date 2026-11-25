@@ -4,7 +4,6 @@ import { reopenRootProjection } from "./root-projection-handoff.mjs";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import pg from "pg";
-import { normalRootProjection } from "./normal-root-projection.mjs";
 import { expect, it } from "vitest";
 import { createDatabase } from "@pi-cloud/database";
 import { nativeNavigation } from "@pi-cloud/pi-session-postgres/durable";
@@ -99,15 +98,6 @@ it("pages a Tool across proposal and result, and restores original input and com
       },
     };
     await pgClient.query("update runs set projection_tools=$1", [wait]);
-    const { brokerTimedRetention } = normalRootProjection(
-      pgClient,
-      "test",
-      () => {},
-      () => {},
-    ).nativeStore;
-    const replyFloors = async () =>
-      (await brokerTimedRetention.replyFloors(db, ["original-tool-replies"])).rows;
-    expect(await replyFloors()).toEqual([{ topic: "original-tool-replies", floor: "81" }]);
     const latest = async () => (await readRootMessageWindow(db, input)).transcripts.get(turn).items;
     expect(await latest()).toMatchObject([
       { kind: "tool", toolCallId: "task:7", status: "running", input: args },
@@ -124,7 +114,6 @@ it("pages a Tool across proposal and result, and restores original input and com
       { task: 7, assistant: 3 },
     );
     await pgClient.query("update runs set projection_tools='{}'");
-    expect(await replyFloors()).toEqual([]);
     expect(await latest()).toMatchObject([
       { kind: "tool", toolCallId: "task:7", status: "completed", input: args },
     ]);
