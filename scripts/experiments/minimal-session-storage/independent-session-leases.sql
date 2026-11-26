@@ -42,23 +42,24 @@ create trigger independent_successor_ready after update of state on runs for eac
   when(old.state is distinct from new.state and new.state in ('completed','failed','cancelled','timed_out'))
   execute function notify_segment_work();
 
--- Wake parked tool waiters only when their exact child Turn settles. Closing
--- a parent retires its callbacks and does not send a cancellation to children.
+-- Closing the caller retires undeliverable acknowledgements. Child completion has no callback.
 create function wake_segment_returns() returns trigger language plpgsql set search_path from current as $$
 begin
-  update subagent_deliveries set due_at=clock_timestamp(),claim=null where child_id=new.id and not sent;
   delete from subagent_deliveries where root_id=new.id;
-  perform pg_notify('pma_named_children','');
   return null;
 end $$;
 create trigger independent_turn_return after update of state on runs for each row
   when(old.state is distinct from new.state and new.state in ('completed','cancelled','failed','timed_out'))
   execute function wake_segment_returns();
 
--- The retryable return dispatcher still needs the child's sealed answer and
--- Turn header if a user deletes the child's window before the Kafka ACK.
+-- Creation acknowledgements contain the stable Session identity and never read child history.
 create or replace function flow_delivery_allows_gc(t uuid,physical uuid) returns boolean
 language sql stable set search_path from current as $$
-  select not exists(select from runs c join subagent_deliveries d on d.child_id=c.id
-    where c.tenant_id=t and c.session_id=physical and not d.sent)
+  select true
+$$;
+
+create function segment_input_notify(t uuid,s uuid) returns void language sql set search_path from current as $$
+ select pg_notify('pma_segment_ready_'||md5(current_schema()), 'owner:'||w.id||'/'||w.boot_id||':'||t||'/'||s)
+ from session_leases l join workers w on w.id=l.worker_id
+ where l.tenant_id=t and l.pi_session_id=s::text and l.released_at is null
 $$;

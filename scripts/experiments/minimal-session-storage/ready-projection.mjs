@@ -313,9 +313,62 @@ export class ReadyProjection {
         if (view && !draft.frame.rejected && f.kind === "durable_commit") {
           if (this.persistUsage !== undefined)
             coCommittedUsage(view, f, draft.frame, this.persistUsage && !covered);
+          if (this.sessionInputs && !covered) {
+            const receipts = new Map();
+            for (const { type, value } of f.commit.writes) {
+              if (
+                type !== "submission" ||
+                value.conversationId !== 1 ||
+                value.type !== "input" ||
+                !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value.requestId ?? "")
+              )
+                continue;
+              // A placed input remains visible after the Run answers or aborts.
+              // Pi placed it in an earlier write (or earlier in this same batch).
+              if (
+                value.status === "done" ||
+                (value.status === "unanswered" && value.entry !== undefined)
+              )
+                continue;
+              const id = value.requestId;
+              const state =
+                value.entry !== undefined
+                  ? "placed"
+                  : value.status === "unanswered"
+                    ? value.reason === "aborted"
+                      ? "withdrawn"
+                      : "unanswered"
+                    : value.status;
+              receipts.set(id, { id, native_id: value.id, state });
+            }
+            if (receipts.size) {
+              draft.frame.sessionMail = [f.scope.tenantId, f.scope.piSessionId];
+              draft.frame.strict = true;
+              draft.frame.ops.push({
+                kind: "session-input",
+                args: [f.scope.tenantId, f.scope.runId],
+                receipts: [...receipts.values()],
+                count: 1,
+              });
+            }
+          }
           projectWorld(view, f, draft.frame);
           if (r.rootPresentation) {
             foldRootPresentation(view, f, draft.frame);
+            if (this.sessionInputs && !covered && view.rootInputDoc !== previous?.rootInputDoc) {
+              const before = previous?.rootInputDoc?.value.receipts ?? {};
+              const changes = Object.keys(view.rootInputDoc?.value.receipts ?? {}).filter(
+                (k) => !before[k] && /^[a-f0-9-]{36}$/i.test(k),
+              );
+              if (changes.length) draft.frame.sessionMail = [f.scope.tenantId, f.scope.piSessionId];
+              if (changes.length)
+                draft.frame.ops.push({
+                  kind: "session-edit",
+                  args: [f.scope.tenantId, f.scope.runId],
+                  changes,
+                  count: 1,
+                });
+            }
           }
           if (!this.independentSessions && (r.rootPresentation || this.delegatedRuns))
             projectChildOutcomes(

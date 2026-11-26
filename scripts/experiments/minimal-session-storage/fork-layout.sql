@@ -289,3 +289,19 @@ begin
     and not exists(select from messages where tenant_id=t and pi_session_id=f.flow_id);
   return true;
 end $$;
+
+create function pin_input_assets(t uuid,physical uuid,turn_id uuid,request text,uploads json) returns void
+language plpgsql set search_path from current as $$
+declare ref json; ready boolean;
+begin
+  for ref in select part from json_array_elements(uploads) u
+    cross join lateral(values(u->'image'),(u->'original'->'attachment')) v(part)
+    where part is not null order by part->>'id'
+  loop
+    select true into ready from public.session_attachment_objects o where o.tenant_id=t
+      and o.id=(ref->>'id')::uuid and o.state='ready' and o.sha256=ref->>'sha256'
+      and o.byte_length=(ref->>'byteLength')::bigint and o.mime_type=ref->>'mimeType' for share;
+    if not found then raise exception 'Unavailable retained input attachment'; end if;
+    insert into flow_input_assets values(t,physical,turn_id,request,(ref->>'id')::uuid) on conflict do nothing;
+  end loop;
+end $$;

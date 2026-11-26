@@ -23,6 +23,8 @@ import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { NamedSubagentExecutor } from "../../../packages/control-plane/src/named-subagent-executor.ts";
 import { operationsFor, decodeWorkspaceFact } from "./workspace-operations.mjs";
 import { ChildNameConflict, ForkStorage } from "./fork-storage.mjs";
+import { installSegmentInputApi } from "./segment-input-api.mjs";
+import { SegmentInputs } from "./segment-inputs.mjs";
 import { serveSegmentScheduler } from "./segment-wake.mjs";
 import { SegmentLeaseProjection, SegmentWorker } from "./independent-session-leases.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
@@ -46,6 +48,7 @@ export class IndependentSessionRuntime {
   #owners = new Map();
   constructor({ pool, topic, partitions = 1, selectSandbox, resolveSandbox, bashLog = false }) {
     this.store = new ForkStorage(pool);
+    this.inputs = this.store.inputs = new SegmentInputs(this.store.db);
     this.topic = topic;
     this.partitions = partitions;
     this.bashLog = bashLog;
@@ -106,6 +109,9 @@ export class IndependentSessionRuntime {
       },
     });
   }
+  installInputApi(app, authorize) {
+    installSegmentInputApi(app, this.inputs, authorize);
+  }
   serveScheduler(options) {
     return serveSegmentScheduler(this.store.pool, options);
   }
@@ -130,6 +136,11 @@ export class IndependentSessionRuntime {
       token,
       () => true,
       async (o) => {
+        if (o.tool === "send_message" && "args" in o.input) {
+          await this.inputs.sendAgent(o);
+          dispatcher.wake();
+          return;
+        }
         if (o.tool !== "subagent")
           throw new SubagentAdmissionRefused("Expected independent delegation");
         const {
@@ -345,7 +356,7 @@ export class IndependentSessionRuntime {
     if (!result.admitted) return false;
     await this.projection.dispatch({ ...record, fact: mapped }, current, grant);
     for (const ref of fact.tools) {
-      if (ref.toolName !== "subagent") continue;
+      if (ref.toolName !== "subagent" && ref.toolName !== "send_message") continue;
       if (!this.subagents) throw Error("Independent subagent admission endpoint is unavailable");
       let through;
       if (!ref.recovery && ref.contextAnchor !== null) {

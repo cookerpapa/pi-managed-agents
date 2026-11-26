@@ -42,6 +42,7 @@ export function normalRootProjection(
   const view = new ReadyProjection(pool, topic, new Map(), projectionTemplates);
   view.delegatedRuns = delegatedRuns;
   view.independentSessions = independentSessions;
+  view.sessionInputs = independentSessions;
   view.bashLog = bashLog;
   view.namedExecutor = namedExecutor;
   view.configure(16, "recorded-history");

@@ -18,6 +18,7 @@ try {
     "scripts/experiments/minimal-session-storage/segment-fork.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/independent-session-leases.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/segment-wake.integration.spec.mjs",
+    "scripts/experiments/minimal-session-storage/segment-inputs.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/agent-configuration.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/admission-retention.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/conversation-world.integration.spec.mjs",
@@ -54,6 +55,9 @@ try {
       cwd: fileURLToPath(new URL("..", import.meta.url)),
       env: {
         ...process.env,
+        TSX_TSCONFIG_PATH:
+          process.env.TSX_TSCONFIG_PATH ??
+          fileURLToPath(new URL("../packages/control-plane/tsconfig.json", import.meta.url)),
         PI_CLOUD_POSTGRES_INTEGRATION_URL: postgres.url,
         PI_CLOUD_KAFKA_INTEGRATION_BROKERS: kafka.brokers.join(","),
         PI_CLOUD_ISOLATED_TOOL_CATALOG_CHECK: "1",

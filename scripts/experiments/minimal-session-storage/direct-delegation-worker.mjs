@@ -30,9 +30,17 @@ import { ControlToolRegistry } from "../../../packages/control-plane/src/control
 import { delegatedControl } from "./delegated-runs.mjs";
 import { encodeWorkspaceFact, decodeWorkspaceFact } from "./workspace-operations.mjs";
 
-async function workerDelegationTool(scope, mailbox, nativeConversations, namedSubagents = false) {
+export async function workerDelegationTool(
+  scope,
+  mailbox,
+  nativeConversations,
+  namedSubagents = false,
+  toolName = "subagent",
+  independentSessions = false,
+) {
   const bindings = await new WorkerToolRuntime({
     namedSubagents,
+    independentSessions,
     catalog: new ControlToolRegistry(),
     maximumDepth: null,
     implementation: () => undefined,
@@ -53,7 +61,7 @@ async function workerDelegationTool(scope, mailbox, nativeConversations, namedSu
     },
     environment: () => assert.fail("Unexpected sandbox"),
   });
-  return bindings.current().find((b) => b.tool.name === "subagent").tool;
+  return bindings.current().find((b) => b.tool.name === toolName).tool;
 }
 
 export async function bootMailbox() {

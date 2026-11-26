@@ -62,6 +62,7 @@ export class WorkerToolRuntime {
       };
       maximumDepth: number | null;
       namedSubagents?: boolean;
+      independentSessions?: boolean;
       subagentWaitMs?: number;
       prepareTarget?(
         command: ExecuteTurnCommandMessage,
@@ -445,9 +446,10 @@ export class WorkerToolRuntime {
         } as PreparedAgentTool,
       };
     };
-    const native = infrastructureToolDefinitions(this.options.namedSubagents).map((definition) =>
-      createBinding(definition, false),
-    );
+    const native = infrastructureToolDefinitions(
+      this.options.namedSubagents,
+      this.options.independentSessions,
+    ).map((definition) => createBinding(definition, false));
     let revision: string | undefined;
     let current: readonly TrustedAgentTool[] = native;
     return {

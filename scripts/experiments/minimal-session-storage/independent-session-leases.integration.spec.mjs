@@ -247,7 +247,7 @@ it.skipIf(!endpoint)(
 
 const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS?.split(",");
 it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
-  "returns a recovered %s child's canonical answer to the waiting parent through RF3",
+  "acknowledges %s creation independently of child completion and restores the Session through RF3",
   async (mode) => {
     const schema = "segment_log_" + randomUUID().replaceAll("-", "");
     const url = new URL(endpoint);
@@ -437,16 +437,14 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
           async () =>
             (
               await pool.query(
-                "select 1 from subagent_deliveries where writer=$1 and child_id=$2 and destination<>$3",
-                [scope.writerId, child.turn, oldTopic],
+                "select 1 from subagent_deliveries where writer=$1 and value->>'text' like '%' || $2 || '%' and destination<>$3",
+                [scope.writerId, child.id, oldTopic],
               )
             ).rowCount,
         );
-        const answer = await one.ask({ op: "execute" });
-        assert(!answer.resumed);
         const end = await restored;
         assert.equal(end.results.length, 1);
-        assert(JSON.stringify(end.results).includes("independent answer"));
+        assert(JSON.stringify(end.results).includes(child.id));
         await send({
           kind: "work_finished",
           scope,
@@ -457,6 +455,13 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
           terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
           occurredAt: new Date().toISOString(),
         });
+        await until(
+          async () =>
+            (await pool.query("select 1 from runs where id=$1 and state='completed'", [parentRun]))
+              .rowCount,
+        );
+        const answer = await one.ask({ op: "execute" });
+        assert(!answer.resumed);
         await until(
           async () =>
             (
@@ -495,6 +500,24 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         reader = newReader(topic + "-replacement");
         await reader.start();
         await reader.waitForPartition(0);
+      }
+      // Lose the owner between PG handoff and the native submit. Withdrawal
+      // stays provisional until a fenced successor emits the native receipt.
+      const lostId = randomUUID(),
+        human = randomUUID();
+      if (mode === "fresh") {
+        await one.ask({ op: "disconnect-inputs" });
+        await rt.inputs.admit({
+          tenant: t,
+          session: child.id,
+          id: lostId,
+          source: "user",
+          sender: human,
+          mode: "steer",
+          text: "never deliver",
+        });
+        assert((await rt.inputs.take(first)).some((m) => m.id === lostId));
+        assert((await rt.inputs.withdraw(t, child.id, human, lostId)).withdrawing);
       }
       await one.kill();
       const two = await actor(db, url.href, 1, directed);
@@ -545,7 +568,20 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         assert.equal(third.runId, first.runId);
         assert.equal(third.fencingToken, second.fencingToken + 1);
       }
-      const completed = await successor.ask({ op: "execute" });
+      const completed = await successor.ask({
+        op: "execute",
+        ...(mode === "branch" ? { report: "Payment tests passed" } : {}),
+      });
+      if (mode === "branch")
+        await until(
+          async () =>
+            (
+              await pool.query(
+                "select 1 from user_or_agent_messages where session_id=$1 and sender_id=$2 and source='agent' and mode='follow_up' and body='Payment tests passed'",
+                [parentSession, child.id],
+              )
+            ).rowCount,
+        );
       assert.equal(
         (
           await pool.query("select 1 from messages where run_id=$1 and entry_id=110001", [
@@ -554,14 +590,25 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         ).rowCount,
         0,
       );
+      if (mode === "fresh")
+        await until(
+          async () =>
+            (
+              await pool.query(
+                "select 1 from user_or_agent_messages where id=$1 and state='withdrawn' and not withdrawing",
+                [lostId],
+              )
+            ).rowCount,
+        );
       assert.equal(completed.resumed, true);
       assert.deepEqual(completed.history, model.history);
       await until(
         async () =>
           (
-            await pool.query("select 1 from subagent_deliveries where child_id=$1 and sent", [
-              child.turn,
-            ])
+            await pool.query(
+              "select 1 from subagent_deliveries where value->>'text' like '%' || $1 || '%' and sent",
+              [child.id],
+            )
           ).rowCount,
       );
       await nativeParent.root.waitForIdle(ctx);
@@ -571,7 +618,8 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         .flatMap((f) => f.commit.writes)
         .filter((w) => w.type === "entry" && w.value.kind === "pi.tool-result");
       assert.equal(canonical.length, 1);
-      assert(JSON.stringify(canonical[0]).includes("independent answer: Check the tests"));
+      assert(JSON.stringify(canonical[0]).includes(child.id));
+      assert(!JSON.stringify(canonical[0]).includes("independent answer"));
       for (const f of nativeParent.facts.slice(nativeParent.prefix.length)) await send(f);
       await send({
         kind: "work_finished",
@@ -724,6 +772,13 @@ it.skipIf(!endpoint)(
           finished.push(e);
         },
         execute: async (job) => {
+          // This scheduling-only fixture stands in for Pi's first input placement.
+          for (const m of await runtime.inputs.take(job.scope))
+            await pool.query("select segment_input_receipts($1,$2,$3)", [
+              job.tenant_id,
+              job.id,
+              JSON.stringify([{ id: m.id, state: "placed", native_id: 2 }]),
+            ]);
           jobs.push(job);
           const r = Promise.withResolvers();
           releases.push(r);

@@ -156,7 +156,7 @@ export function prepareSubagentControlArguments(value: unknown): Static<typeof c
   return value;
 }
 export type ControlToolName =
-  "subagent" | "subagent_control" | "contact_supervisor" | "subagent_supervisor";
+  "send_message" | "subagent" | "subagent_control" | "contact_supervisor" | "subagent_supervisor";
 export type InfrastructureToolDefinition = {
   name: ControlToolName;
   description: string;
@@ -219,17 +219,37 @@ const supervisorSchema = Type.Object(
 /** Frozen code-owned catalogue; handlers never import the Pi Runner. */
 export function infrastructureToolDefinitions(
   named = false,
+  independentSessions = false,
 ): readonly InfrastructureToolDefinition[] {
   return [
+    ...(independentSessions
+      ? [
+          {
+            name: "send_message" as const,
+            description:
+              "Send a message to parent, root, or a named child. Urgent steers active work. Normal queues a follow-up. A receipt confirms delivery to the Session mailbox.",
+            parameters: Type.Object(
+              {
+                to: Type.String({ minLength: 1, maxLength: 128 }),
+                text: Type.String({ minLength: 1, maxLength: MAX_AGENT_INPUT_CHARACTERS }),
+                priority: Type.Union([Type.Literal("urgent"), Type.Literal("normal")]),
+              },
+              { additionalProperties: false },
+            ),
+          },
+        ]
+      : []),
     named
       ? {
           ...subagent,
           parameters: NamedSubagentToolSchema,
           prepareArguments: prepareNamedSubagentArguments,
-          description: subagent.description.replace(
-            "Recovery continues this same delegation; a new Tool call creates distinct work.",
-            "Choose a stable name unique among your children. Same name, task and options return the existing child or its original result. Conflicting options return a name conflict.",
-          ),
+          description: independentSessions
+            ? "Create a named independent child and return its Session ID as soon as it is registered. Use branch for a frozen context prefix or fresh for an empty context. Identical names and options reuse the child. Children can report back with send_message."
+            : subagent.description.replace(
+                "Recovery continues this same delegation; a new Tool call creates distinct work.",
+                "Choose a stable name unique among your children. Same name, task and options return the existing child or its original result. Conflicting options return a name conflict.",
+              ),
         }
       : subagent,
     named
@@ -256,7 +276,11 @@ export function infrastructureToolDefinitions(
   ];
 }
 export function isControlToolName(value: unknown): value is ControlToolName {
-  return ["subagent", "subagent_control", "contact_supervisor", "subagent_supervisor"].includes(
-    String(value),
-  );
+  return [
+    "send_message",
+    "subagent",
+    "subagent_control",
+    "contact_supervisor",
+    "subagent_supervisor",
+  ].includes(String(value));
 }

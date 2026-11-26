@@ -210,6 +210,18 @@ export function InputQueueProvider({
     void refresh(undefined, true);
   }, [refresh, refreshSignal]);
 
+  useEffect(() => {
+    if (
+      !queue?.takeBackToEdit ||
+      !queue.items.some((item) => item.status === "withdrawing" || item.status === "sending")
+    )
+      return;
+    const timer = window.setInterval(() => {
+      void refresh(undefined, true);
+    }, 350);
+    return () => window.clearInterval(timer);
+  }, [queue, refresh]);
+
   async function loadMore(): Promise<void> {
     const snapshot = current.current;
     const last = snapshot?.items.at(-1);
@@ -675,7 +687,11 @@ export function PendingInputQueue() {
                   <UploadCards api={api} uploads={item.uploads ?? []} compact />
                 </div>
                 <div className="pending-input-actions" aria-busy={busy === item.inputId}>
-                  {item.status === "steering" ? (
+                  {item.status === "sending" || item.status === "withdrawing" ? (
+                    <span className="pending-input-status">
+                      {t(item.status === "sending" ? "queue.sending" : "queue.withdrawing")}
+                    </span>
+                  ) : item.status === "steering" ? (
                     <span className="pending-input-status">{t("queue.steering")}</span>
                   ) : (
                     <button
@@ -703,23 +719,25 @@ export function PendingInputQueue() {
                 </div>
                 {menuInputId === item.inputId ? (
                   <div className="pending-input-menu" role="menu" aria-label={t("queue.actions")}>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled={!canMutate || busy !== null}
-                      onClick={() => {
-                        setMenuInputId(null);
-                        setEditing({
-                          inputId: item.inputId,
-                          text: item.text,
-                          uploads: item.uploads ?? [],
-                          initial: false,
-                        });
-                        setError(null);
-                      }}
-                    >
-                      {t("queue.edit")}
-                    </button>
+                    {!queue?.takeBackToEdit && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!canMutate || busy !== null}
+                        onClick={() => {
+                          setMenuInputId(null);
+                          setEditing({
+                            inputId: item.inputId,
+                            text: item.text,
+                            uploads: item.uploads ?? [],
+                            initial: false,
+                          });
+                          setError(null);
+                        }}
+                      >
+                        {t("queue.edit")}
+                      </button>
+                    )}
                     <button
                       type="button"
                       role="menuitem"
@@ -755,7 +773,7 @@ export function PendingInputQueue() {
                         void perform(item.inputId, { action: "cancel" });
                       }}
                     >
-                      {t("queue.remove")}
+                      {t(queue?.takeBackToEdit ? "queue.takeBack" : "queue.remove")}
                     </button>
                   </div>
                 ) : null}

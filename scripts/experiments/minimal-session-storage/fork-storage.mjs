@@ -268,8 +268,8 @@ export class ForkStorage {
           .digest("hex");
         const ack =
           await sql`insert into subagent_deliveries(operation_id,root_id,writer,caller_task,caller_lane,operation_hash,destination,call_id,tool,child_id,kind,value,due_at)
-          select ${key}::uuid,${child.caller.run}::uuid,${child.caller.writer}::uuid,${route.task},${route.lane},${fingerprint},${route.topic},${route.call}, 'subagent',r.id,'watch',jsonb_build_object('name',${child.name}::text,'executionId',${target}::uuid),clock_timestamp()
-          from runs r where r.tenant_id=${t}::uuid and r.session_id=${target}::uuid and r.mailbox_position=1
+          values(${key}::uuid,${child.caller.run}::uuid,${child.caller.writer}::uuid,${route.task},${route.lane},${fingerprint},${route.topic},${route.call},'subagent',null,'fixed',
+            jsonb_build_object('text',jsonb_build_object('name',${child.name}::text,'sessionId',${target}::uuid,'status','created')::text),clock_timestamp())
           on conflict(operation_id) do update set operation_hash=excluded.operation_hash where subagent_deliveries.operation_hash=excluded.operation_hash returning operation_id`.execute(
             tx,
           );
@@ -368,10 +368,23 @@ export class ForkStorage {
         values(${t}::uuid,${target}::uuid,${target}::uuid,${child ? parent.family_id : target}::uuid,
           ${child ? source : null}::uuid,${child?.name ?? "root"},${creation})`.execute(tx);
     if (child) {
+      const initialTurn = randomUUID();
       await sql`insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,workspace_grant)
-          values(${randomUUID()}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},${child.model},'queued',${grant ? JSON.stringify(grant) : null}::jsonb)`.execute(
+          values(${initialTurn}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},${child.model},'queued',${grant ? JSON.stringify(grant) : null}::jsonb)`.execute(
         tx,
       );
+      if (this.inputs)
+        await this.inputs.admitIn(tx, {
+          tenant: t,
+          session: target,
+          id: key,
+          sender: source,
+          source: "agent",
+          mode: point ? "steer" : "input",
+          text: child.task,
+          model: child.model,
+          initialTurn,
+        });
     }
     await sql`insert into fork_requests values(${t}::uuid,${source}::uuid,${key},${target}::uuid,${fingerprint})`.execute(
       tx,

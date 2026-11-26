@@ -29,6 +29,7 @@ type HumanInput = {
   revision: number;
   cancelled: boolean;
   nativeId: number | null;
+  senderId?: string;
 };
 export type HumanInputState = {
   runId: string;
@@ -82,7 +83,7 @@ export class DurableHumanInputs {
       throw new NativeInputError("input_closed", "The Run has closed input admission");
   }
 
-  async submit(input: NativeHumanInput): Promise<NativeInputResult> {
+  async submit(input: NativeHumanInput, senderId?: string): Promise<NativeInputResult> {
     await this.options.assertCurrent();
     const { conversation, runId, storage } = this.options;
     let replayed = false;
@@ -110,6 +111,7 @@ export class DurableHumanInputs {
         revision: 0,
         cancelled: false,
         nativeId: null,
+        ...(senderId === undefined ? {} : { senderId }),
       };
       state.order.push(input.inputId);
     }, BACKGROUND_CONTEXT);
@@ -141,7 +143,10 @@ export class DurableHumanInputs {
     return { queue: await this.snapshot(), replayed, acceptedAt };
   }
 
-  async mutate(mutation: NativeInputMutation): Promise<NativeInputResult> {
+  async mutate(
+    mutation: NativeInputMutation,
+    expectedNeighbor?: string,
+  ): Promise<NativeInputResult> {
     await this.options.assertCurrent();
     const { conversation, runId } = this.options;
     const hash = mutation.fingerprint;
@@ -205,7 +210,11 @@ export class DurableHumanInputs {
         input.text = "";
         input.uploads = [];
       } else if (change.action === "move") {
-        const humanIds = new Set(Object.values(state.inputs).map((input) => input.nativeId));
+        const humanIds = new Set(
+          Object.values(state.inputs)
+            .filter((other) => other.senderId === input.senderId)
+            .map((other) => other.nativeId),
+        );
         const positions = inbox.items.flatMap((item, index) =>
           humanIds.has(item.id) ? [index] : [],
         );
@@ -214,6 +223,8 @@ export class DurableHumanInputs {
         if (otherIndex === undefined)
           throw new NativeInputError("input_conflict", "The input cannot move further");
         const other = inbox.items[otherIndex]!;
+        if (expectedNeighbor !== undefined && state.inputs[expectedNeighbor]?.nativeId !== other.id)
+          throw new NativeInputError("input_conflict", "The neighboring input has changed");
         inbox.items[index] = other;
         inbox.items[otherIndex] = item;
         const otherId = Object.keys(state.inputs).find(

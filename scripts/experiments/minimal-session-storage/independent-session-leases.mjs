@@ -10,7 +10,11 @@ import { PostgresSessionLeaseObserver } from "../../../packages/pi-session-postg
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 
 export async function installIndependentSessionLeases(db) {
-  for (const file of ["subagent-deliveries.sql", "independent-session-leases.sql"])
+  for (const file of [
+    "subagent-deliveries.sql",
+    "independent-session-leases.sql",
+    "session-inputs.sql",
+  ])
     await db.query(await readFile(new URL(file, import.meta.url), "utf8"));
 }
 
@@ -18,6 +22,7 @@ export class SegmentWorker {
   #coordinator;
   #observer;
   #active = new Map();
+  #bySession = new Map();
   #pending = 0;
   #closed = false;
   #stop = new AbortController();
@@ -42,13 +47,17 @@ export class SegmentWorker {
         const {
           rows: [job],
         } = await sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
-          s.parent_session_id,s.agent_name,s.family_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_ref,r.workspace_grant
-          from runs r join sessions s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id
+          s.parent_session_id,s.agent_name,s.family_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_ref,r.workspace_grant,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.position limit 1) as first_message,
+          exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs
+          from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
+          join runs r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
           where r.state='queued' and r.lease_id is null and r.output_seal_id is null
             and not exists(select from session_leases l where l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.released_at is null)
             and not exists(select from runs p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position and
               (p.state not in ('completed','failed','timed_out','cancelled') or (p.output_seal_id is not null and p.output_sealed_at is null)))
-          order by r.created_at,r.id limit 1 for update of r,s skip locked`.execute(tx);
+          order by q.ready_at,q.session_id,r.mailbox_position limit 1 for update of r,s skip locked`.execute(
+          tx,
+        );
         if (!job) return;
         const worker = await tx
           .selectFrom("workers")
@@ -92,6 +101,9 @@ export class SegmentWorker {
             and w.boot_id=c.boot_id and w.supervisor_id=c.supervisor_id where w.id=${this.workerId}::uuid and w.state='ready'
             and c.state='active' and c.expires_at>clock_timestamp()) returning id`.execute(tx);
         if (!claim.rows.length) throw Error("Worker management connection is unavailable");
+        await sql`delete from ready_agent_sessions where tenant_id=${job.tenant_id}::uuid and session_id=${job.logical_id}::uuid`.execute(
+          tx,
+        );
         return {
           ...job,
           scope: {
@@ -115,11 +127,16 @@ export class SegmentWorker {
           fencingToken: s.fencingToken,
         };
       const guard = this.#observer.open(identity);
+      const sessionKey = identity.tenantId + "/" + identity.piSessionId;
       const release = async () => {
         this.#active.delete(identity.leaseId);
+        if (this.#bySession.get(sessionKey)?.identity === identity)
+          this.#bySession.delete(sessionKey);
         await guard.close();
       };
-      this.#active.set(identity.leaseId, { identity, guard });
+      const active = { identity, guard };
+      this.#active.set(identity.leaseId, active);
+      this.#bySession.set(sessionKey, active);
       try {
         await guard.assertCurrent();
         guard.start();
@@ -128,7 +145,15 @@ export class SegmentWorker {
         await release();
         throw error;
       }
-      return { ...job, authority: guard, release };
+      return {
+        ...job,
+        authority: guard,
+        release,
+        onInput(callback) {
+          active.wake = callback;
+          callback();
+        },
+      };
     } finally {
       this.#pending--;
     }
@@ -156,6 +181,10 @@ export class SegmentWorker {
       scheduler,
       id: this.workerId + "/" + this.bootId,
       slots: this.capacity,
+      onInput: (session) => this.#bySession.get(session)?.wake?.(),
+      onRegistered: () => {
+        for (const active of this.#active.values()) active.wake?.();
+      },
       claim: () => this.claimNext(),
       execute: async (job) => {
         try {
@@ -199,6 +228,19 @@ export class SegmentWorker {
     const at = performance.now(),
       ack = await this.#coordinator.renewFromHeartbeat(heartbeat);
     this.#observer.observeRenewals(heartbeat, ack, at);
+    const held = [...this.#bySession.values()]
+      .filter((a) => a.wake)
+      .map((a) => a.identity.piSessionId);
+    if (held.length) {
+      const { rows } =
+        await sql`select distinct m.tenant_id,m.session_id from user_or_agent_messages m join runs r on r.id=m.turn_id
+        where m.session_id=any(${held}::uuid[]) and (m.state in ('pending','sending') or m.withdrawing) and r.state='running'
+        union select tenant_id,session_id from session_input_changes where state='pending' and session_id=any(${held}::uuid[])`.execute(
+          this.db,
+        );
+      for (const { tenant_id, session_id } of rows)
+        this.#bySession.get(tenant_id + "/" + session_id)?.wake?.();
+    }
     return ack;
   }
   async close() {
@@ -208,6 +250,7 @@ export class SegmentWorker {
     await this.#renewing;
     await this.#observer.close();
     this.#active.clear();
+    this.#bySession.clear();
   }
 }
 
@@ -302,8 +345,9 @@ export class SegmentLeaseProjection {
       const {
         rows: [r],
       } =
-        await sql`select r.state,r.output_seal_id,r.native_work_handoff,r.projection_first,r.output_first_offset,r.session_id as flow_id,l.writer_failed_at
-        from runs r join sessions s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
+        await sql`with target as materialized (select * from sessions where tenant_id=${s.tenantId}::uuid and id=${s.sessionId}::uuid for no key update)
+        select r.state,r.output_seal_id,r.native_work_handoff,r.projection_first,r.output_first_offset,r.session_id as flow_id,l.writer_failed_at
+        from runs r join target s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
         where r.tenant_id=${s.tenantId}::uuid and s.id=${s.sessionId}::uuid and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid
           and r.fencing_token=${s.fencingToken} and l.fencing_token=r.fencing_token and l.released_at is null and r.state in ('running','cancel_requested')
         for update of r,l`.execute(tx);

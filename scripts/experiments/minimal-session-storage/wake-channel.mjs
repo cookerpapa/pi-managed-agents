@@ -169,6 +169,11 @@ export async function openWakeRouter(host, path, fail, port = 0, token) {
   return {
     port: server.address().port,
     notify,
+    notifyOwner(id, session) {
+      const socket = connections.get(id);
+      if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
+        socket.send("input:" + session);
+    },
     configure(config) {
       reset();
       stage = config;
@@ -205,6 +210,7 @@ export function connectClaimWorker({
   execute,
   fail,
   onRegistered,
+  onInput,
   token,
 }) {
   const address = new URL(url);
@@ -316,8 +322,12 @@ export function connectClaimWorker({
       });
     current.on("message", (raw) => {
       if (stopped || socket !== current) return;
-      const frame = raw.toString(),
-        hint = frame.startsWith("[") ? JSON.parse(frame) : undefined;
+      const frame = raw.toString();
+      if (frame.startsWith("input:")) {
+        onInput?.(frame.slice(6));
+        return;
+      }
+      const hint = frame.startsWith("[") ? JSON.parse(frame) : undefined;
       const message = hint ? "arrival" : frame;
       if (message === "registered") {
         online = true;

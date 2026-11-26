@@ -54,7 +54,12 @@ export const QueuedInputResourceSchema = Type.Object(
     /** Absolute Run ordering; only present for unclaimed initial messages. */
     runMailboxPosition: Type.Optional(PositiveSafeIntegerSchema),
     acceptedAt: UtcTimestampSchema,
-    status: Type.Union([Type.Literal("queued"), Type.Literal("steering")]),
+    status: Type.Union([
+      Type.Literal("queued"),
+      Type.Literal("steering"),
+      Type.Literal("sending"),
+      Type.Literal("withdrawing"),
+    ]),
   },
   options,
 );
@@ -64,6 +69,7 @@ export const InputQueueResourceSchema = Type.Object(
     revision: Revision,
     activeTurnId: Type.Union([UuidSchema, Type.Null()]),
     hasReturnedInputs: Type.Boolean(),
+    takeBackToEdit: Type.Optional(Type.Boolean()),
     viewVersion: Type.String({ pattern: "^(0|[1-9][0-9]{0,38})$" }),
     afterPosition: NonNegativeSafeIntegerSchema,
     hasMore: Type.Boolean(),

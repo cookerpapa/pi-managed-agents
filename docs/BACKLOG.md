@@ -2,13 +2,16 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Direct new inputs to the independent Session owner, confirm take-back at the Pi boundary, and acknowledge named delegation at registration. Children report explicitly through their family mailbox. [Candidate evidence](reports/session-mailbox-20261126.md).
+- [ ] Deferred — define `wait_for_input` and durable wake conditions if a workload requires suspended Sessions to release their slots.
+
 - [x] Wire the directed readiness router into independent Session claiming and measure PG selection attempts with 1,000 management sockets. [Acceptance](reports/segment-worker-wake-20261126.md).
 
 - [x] Give independently scheduled child Sessions their own Worker leases on the segmented candidate. Verify competing claims, parent/child loss, ordered sealing, cold Pi continuation and result delivery. [Acceptance](reports/independent-child-leases-20261126.md).
 
 - [x] Implement and measure frozen segment Forks, clipped public paging, attachment retention, and guarded collection on the candidate. [Results](reports/segmented-session-forks-20261125.md).
 
-- [ ] Deferred — evaluate independent Session scheduling under slot exhaustion. Reproduce parents occupying all execution slots while their children are ready. Check how a child can run and the original parent Tool call can receive its result, including completion racing with the wait or Stop. Choose a scheduling strategy when revisiting this item. The current [Fork study](research/session-fork-design-review-20261125.md) assumes sufficient execution slots.
+- [ ] Deferred — evaluate independent Session scheduling under slot exhaustion. Reproduce parents occupying all execution slots while their children are ready. Check how a child can run if a future explicit waiting tool parks the parent, including completion racing with the wait or Stop. Choose a scheduling strategy when revisiting this item. The current [Fork study](research/session-fork-design-review-20261125.md) assumes sufficient execution slots.
 
 - [x] Reuse the admitted operation and its cached binding for live Stop. The [PG routing check](../scripts/experiments/minimal-session-storage/workspace-routing-recovery.mjs) observed zero routing reads on a warm Stop and recovered the same Guest with one locator and one binding read after revocation.
 

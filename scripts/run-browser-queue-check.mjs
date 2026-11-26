@@ -87,7 +87,7 @@ window.renderQueue=(canMutate=true,count=3,initial=false)=>{
   if(initial){window.queue.items[0].runMailboxPosition=1;window.queue.activeTurnId=null;}
   root.render(React.createElement(React.StrictMode,null,React.createElement(I18nProvider,{initialLanguage:"zh-CN"},
     React.createElement(InputQueueProvider,{key:++generation,api,sessionId:window.queue.sessionId,canMutate,refreshSignal:String(generation),streamQueue:null,
-      returnRecovery:inputReturnRecovery(),onInitialWithdrawn:item=>{window.withdrawn=true;window.restored.push(item.text);},onSnapshot:q=>window.snapshots.push(q),onRestoreDraft:text=>window.restored.push(text)},React.createElement(React.Fragment,null,React.createElement(InitialDemo),React.createElement(PendingInputQueue))))));
+      returnRecovery:inputReturnRecovery(),onRestoreReturned:items=>{window.restored.push(items.map(item=>item.text).join("\\n\\n"));return true;},onReturnAcknowledged:()=>{},onInitialWithdrawn:item=>{window.withdrawn=true;window.restored.push(item.text);},onSnapshot:q=>window.snapshots.push(q),onRestoreDraft:text=>window.restored.push(text)},React.createElement(React.Fragment,null,React.createElement(InitialDemo),React.createElement(PendingInputQueue))))));
 };
 window.refreshQueue=()=>window.dispatchEvent(new Event("focus"));
 window.renderQueue();window.fixtureReady=true;

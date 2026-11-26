@@ -11,6 +11,7 @@ import { up as receipts } from "../../../packages/database/src/migrations/210_mo
 import { up as eligibility } from "../../../packages/database/src/migrations/226_model_charge_evidence.ts";
 import { visibleOutput } from "./visible-output.mjs";
 import { installFlowHistory, seedFlowHeads } from "./flow-history.mjs";
+import { ForkStorage, installForkTables } from "./fork-storage.mjs";
 import { captureNativeUsage } from "./native-usage-fixture.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 
@@ -145,14 +146,25 @@ try {
   const compareFlow = process.argv[3] === "flow",
     compareSql = process.argv[3] === "flow-sql";
   const tape = Array.from({ length: partitions }, () => []);
-  const layouts = comparePages
-    ? []
-    : compareFlow
-      ? [false, true, true, false, true, false, false, true]
-      : compareSql
-        ? [false]
-        : [false, false];
-  for (const [index, flowHistory] of layouts.entries()) {
+  const compareMail = process.argv[3] === "session-inputs";
+  const pairs = compareMail && process.argv[4] === "pairs";
+  const warmMail = compareMail && (pairs || process.argv[4] === "warm");
+  const layouts = pairs
+    ? [false, true, ...Array.from({ length: 6 }, () => [true, false, false, true]).flat()]
+    : compareMail
+      ? warmMail
+        ? [false, true, true, false, false, true, false, true, true, false]
+        : [false, true, true, false, true, false, false, true]
+      : comparePages
+        ? []
+        : compareFlow
+          ? [false, true, true, false, true, false, false, true]
+          : compareSql
+            ? [false]
+            : [false, false];
+  for (const [index, layout] of layouts.entries()) {
+    const flowHistory = !compareMail && layout,
+      segmentInputs = compareMail && layout;
     const sample = index + 1;
     const schema = "rate_" + randomUUID().replaceAll("-", "");
     const pool = new pg.Pool({
@@ -195,9 +207,20 @@ try {
         () => assert.fail(),
         () => assert.fail(),
         undefined,
-        { partitions },
+        { partitions, independentSessions: compareMail },
       );
+      if (compareMail) p.view.sessionInputs = segmentInputs;
       await p.view.install();
+      if (segmentInputs) {
+        await pool.query(
+          "alter table runs add input_uploads jsonb default '[]',add workspace_grant jsonb",
+        );
+        await installForkTables(pool);
+        // This tape includes data-plane commits only. The managed scheduler
+        // and API are exercised separately with their real Worker registry.
+        const ddl = await readFile(new URL("./session-inputs.sql", import.meta.url), "utf8");
+        await pool.query(ddl);
+      }
       if (flowHistory) await installFlowHistory(pool, true);
       await p.view.reset(new Map(lanes.map((_, i) => [i, 0n])), 16, "recorded-history");
       const runs = lanes.flat(),
@@ -207,6 +230,15 @@ try {
       select "runId","tenantId","sessionId","writerId",'Inspect',"runId",'fixture','running',1 from jsonb_to_recordset($1::jsonb) t("runId" uuid,"tenantId" uuid,"sessionId" uuid,"writerId" uuid)`,
         [JSON.stringify(runs.map((r) => r.scope))],
       );
+      if (segmentInputs) {
+        await new ForkStorage(pool).register(
+          tenantId,
+          runs.map((r) => r.scope.sessionId),
+        );
+        await pool.query(
+          "insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,fingerprint,turn_id,state,request_key) select tenant_id,session_id,id,tenant_id,'user','input',initial_input,'fixture',id,'sending',id::text from runs",
+        );
+      }
       if (flowHistory) await seedFlowHeads(pool, tenantId);
       // A model request normally reaches the gateway before the Worker publishes its settlement.
       await pool.query(
@@ -227,6 +259,15 @@ try {
       );
       const ms = performance.now() - begin;
       timed = false;
+      if (segmentInputs)
+        assert.equal(
+          (
+            await pool.query(
+              "select count(*)::int n from user_or_agent_messages where state='placed'",
+            )
+          ).rows[0].n,
+          runs.length,
+        );
       const {
         rows: [totals],
       } = await pool.query(
@@ -238,6 +279,7 @@ try {
       console.log(
         JSON.stringify({
           sample,
+          ...(compareMail ? { segmentInputs, warmup: warmMail && index < 2 } : {}),
           ...(compareFlow ? { flowHistory } : {}),
           runs: runs.length,
           commits: groups.flat().length,

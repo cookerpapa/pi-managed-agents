@@ -193,6 +193,8 @@ In the #52 prototype the Projector routes a live Stop from its admitted pending 
 
 On the #52 candidate, the model sees an interrupted Bash wait with an unconfirmed remote outcome. Kafka retains mailbox records for seven days. The daily collector checks retirement and empty broker bounds. The projector no longer calculates a database retention floor for replies. [Decision](adr/0361-stop-context-and-mailbox-retention.md)
 
+In #52 a ready row identifies one logical Session. Its owner receives active input hints on the same management socket. PG admits messages, Pi arbitrates inbox placement and withdrawal, and the accepted projection confirms the result. Delegation acknowledges creation and agents send subsequent reports explicitly. [Session inputs](adr/0365-segment-session-inputs.md).
+
 The #52 Fork candidate uses per-Flow ancestor ranges for shared history, separate from Session management ancestry. [Storage and rollout boundary](reports/segmented-session-forks-20261125.md).
 
 On this candidate, each attached child is an independently claimable physical Session. The stable Session key owns the lease and its current Flow owns new messages. The named executor returns the independently settled Turn to its parent. [Ownership and failure evidence](reports/independent-child-leases-20261126.md).
