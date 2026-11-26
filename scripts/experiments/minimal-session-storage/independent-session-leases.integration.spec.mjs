@@ -618,6 +618,15 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
             mode: "steer",
             text: "boundary-steer-" + i,
           });
+        await until(
+          async () =>
+            (
+              await pool.query(
+                "select 1 from user_or_agent_messages where id=$1 and steer_seen_epoch=$2",
+                [steerIds[1], second.fencingToken],
+              )
+            ).rowCount,
+        );
         const placed = await successor.ask({
           op: "execute",
           report: "Payment tests passed",
@@ -635,10 +644,49 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         );
         await successor.kill();
         await until(() => publishedSeals.get(second.writerId));
+        await until(
+          async () =>
+            (await pool.query("select 1 from runs where id=$1 and state='queued'", [child.turn]))
+              .rowCount,
+        );
+        const lateAck = () =>
+          pool.query(
+            "select acknowledge_segment_steer(w.id,w.boot_id,$1,m.steer_notice) from workers w,user_or_agent_messages m where w.id=$2 and m.id=$3",
+            [second.writerId, two.workerId, steerIds[1]],
+          );
+        await lateAck();
+        assert.equal(
+          (
+            await pool.query("select steer_seen_epoch from user_or_agent_messages where id=$1", [
+              steerIds[1],
+            ])
+          ).rows[0].steer_seen_epoch,
+          null,
+        );
         successor = await actor(db, url.href, 1, directed);
         actors.push(successor);
         const takeover = (await successor.ask({ op: "claimed" })).scope;
         assert.equal(takeover.fencingToken, second.fencingToken + 1);
+        await until(
+          async () =>
+            (
+              await pool.query(
+                "select 1 from user_or_agent_messages where id=$1 and steer_seen_epoch=$2",
+                [steerIds[1], takeover.fencingToken],
+              )
+            ).rowCount,
+        );
+        await lateAck();
+        assert.equal(
+          Number(
+            (
+              await pool.query("select steer_seen_epoch from user_or_agent_messages where id=$1", [
+                steerIds[1],
+              ])
+            ).rows[0].steer_seen_epoch,
+          ),
+          takeover.fencingToken,
+        );
       }
       const completed = await successor.ask({ op: "execute" });
       if (mode === "branch")

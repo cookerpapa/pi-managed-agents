@@ -4,7 +4,7 @@ import { WebSocket, WebSocketServer } from "ws";
 
 // Live connections advertise capacity. Undelivered hints occupy one bounded
 // counter; PostgreSQL remains the authority on which Turns can be claimed.
-export async function openWakeRouter(host, path, fail, port = 0, token) {
+export async function openWakeRouter(host, path, fail, port = 0, token, onSteerAck) {
   const digest = (value) => createHash("sha256").update(value).digest();
   const expected = token === undefined ? undefined : digest("Bearer " + token);
   const server = new WebSocketServer({
@@ -118,6 +118,13 @@ export async function openWakeRouter(host, path, fail, port = 0, token) {
     socket.on("message", (raw) => {
       if (connections.get(id) !== socket) return;
       const frame = raw.toString();
+      if (onSteerAck && frame.startsWith("seen:")) {
+        const match =
+          /^seen:([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}):([1-9][0-9]{0,18})$/.exec(frame);
+        if (!match || BigInt(match[2]) > 9223372036854775807n) return socket.close(1008);
+        onSteerAck(id, match[1], match[2]);
+        return;
+      }
       if (frame.startsWith("[") && stage.cacheMode === "prefer") {
         const [tenant, session, version, action] = JSON.parse(frame);
         const key = tenant + "/" + session;
@@ -169,6 +176,11 @@ export async function openWakeRouter(host, path, fail, port = 0, token) {
   return {
     port: server.address().port,
     notify,
+    notifySteer(id, writer, revision) {
+      const socket = connections.get(id);
+      if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
+        socket.send("steer:" + writer + ":" + revision);
+    },
     configure(config) {
       reset();
       stage = config;
@@ -205,6 +217,7 @@ export function connectClaimWorker({
   execute,
   fail,
   onRegistered,
+  onSteer,
   token,
 }) {
   const address = new URL(url);
@@ -316,8 +329,13 @@ export function connectClaimWorker({
       });
     current.on("message", (raw) => {
       if (stopped || socket !== current) return;
-      const frame = raw.toString(),
-        hint = frame.startsWith("[") ? JSON.parse(frame) : undefined;
+      const frame = raw.toString();
+      if (onSteer && frame.startsWith("steer:")) {
+        const [, writer, revision] = frame.split(":");
+        onSteer(writer, revision);
+        return;
+      }
+      const hint = frame.startsWith("[") ? JSON.parse(frame) : undefined;
       const message = hint ? "arrival" : frame;
       if (message === "registered") {
         online = true;
@@ -349,6 +367,15 @@ export function connectClaimWorker({
   connect();
   return {
     stats,
+    ackSteer(writer, revision) {
+      if (
+        online &&
+        !stopped &&
+        socket.readyState === WebSocket.OPEN &&
+        socket.bufferedAmount < 65536
+      )
+        socket.send("seen:" + writer + ":" + revision);
+    },
     advertise(tenant, session, version, action) {
       if (online && !stopped && stage.cacheMode === "prefer")
         socket.send(

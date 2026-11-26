@@ -1,5 +1,7 @@
 # PG mailbox adoption at native boundaries
 
+[ADR-0367](../adr/0367-worker-steer-hints.md) supersedes the unconditional Worker lookup measured here.
+
 The #52 candidate uses the pinned, unmodified Pi Durable 1.0.0 SDK. The scheduler still wakes an available Worker for an idle Session. For an active Session, a tool round checks PG for an eligible steer. Normal native settlement checks for the next pending input. Neither path relies on the arrival of a management hint. Editing, moving, promoting, or withdrawing a pending message completes in PG. [Decision](../adr/0366-pg-input-boundaries.md).
 
 ## Storage and recovery

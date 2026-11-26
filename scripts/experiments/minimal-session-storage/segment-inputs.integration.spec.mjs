@@ -239,6 +239,10 @@ it.skipIf(!endpoint)(
                     : m.content?.map((x) => x.text ?? "").join(""),
                 ),
               );
+              if (contexts.length === 1)
+                return fauxAssistantMessage(fauxToolCall("probe", {}, { id: "tool-b" }), {
+                  stopReason: "toolUse",
+                });
               return fauxAssistantMessage("done");
             }),
           ]);
@@ -291,23 +295,58 @@ it.skipIf(!endpoint)(
           .then((r) => r.rowCount),
       );
       await entered.promise;
-      if (process.env.PMA_SEGMENT_BROWSER === "1") {
-        const b = await put("browser input");
-        await wait(() =>
-          pool
-            .query("select 1 from user_or_agent_messages where id=$1 and state='pending'", [
-              b.inputId,
-            ])
-            .then((r) => r.rowCount),
+      const originalSelect = rt.inputs.selectAt.bind(rt.inputs);
+      let toolReads = 0;
+      rt.inputs.selectAt = (scope, at, ...rest) => {
+        if (at === "postTools") toolReads++;
+        return originalSelect(scope, at, ...rest);
+      };
+      assert.equal(job.steerHint.ticket, null, "claim did not bootstrap the inbox");
+      for (let i = 0; i < 100; i++) await pump.postTools(i + 1, ctx);
+      assert.equal(toolReads, 0, "clean tool boundaries read PG");
+      // Drop the first receipt in PG after the lamp has lit. Use the existing
+      // renew/reconcile path to retry without re-enqueuing the user's message.
+      await pool.query(`create table missed_ack(id uuid);
+        create function skip_test_ack() returns trigger language plpgsql set search_path from current as $$
+        begin insert into missed_ack values(new.id);return null;end $$;
+        create trigger skip_test_ack before update of steer_seen_epoch on user_or_agent_messages for each row
+        when(new.body='browser input' and new.steer_seen_epoch is not null) execute function skip_test_ack()`);
+      const browserInput = await put("browser input", "steer");
+      await wait(() =>
+        pool
+          .query("select 1 from missed_ack where id=$1", [browserInput.inputId])
+          .then((r) => r.rowCount),
+      );
+      assert.notEqual(job.steerHint.ticket, null);
+      assert.equal(
+        (await api.getInputQueue(session)).items.find((m) => m.inputId === browserInput.inputId)
+          .status,
+        "sending",
+      );
+      const repair = async () => {
+        await pool.query("drop trigger skip_test_ack on user_or_agent_messages");
+        await worker.renew();
+        await wait(
+          async () =>
+            (await api.getInputQueue(session)).items.find((m) => m.inputId === browserInput.inputId)
+              ?.status === "steering",
         );
+      };
+      if (process.env.PMA_SEGMENT_BROWSER === "1") {
         const uiIds = await (
           await import("./segment-input-browser.mjs")
-        ).verifyBrowserTakeback(origin, session, token);
+        ).verifyBrowserTakeback(origin, session, token, repair);
         for (const id of uiIds) {
           if (error) throw error;
           await withdraw(id);
         }
+      } else {
+        await repair();
+        await withdraw(browserInput.inputId);
       }
+      await pump.postTools(101, ctx);
+      assert.equal(toolReads, 1, "a withdrawn steer costs at most one empty check");
+      assert.equal(job.steerHint.ticket, null);
       const key = "turn:" + randomUUID(),
         one = await put("one", "follow_up", key);
       assert.equal((await put("one", "follow_up", key)).inputId, one.inputId);
@@ -326,20 +365,118 @@ it.skipIf(!endpoint)(
         (await api.getInputQueue(session)).items.map((i) => i.text),
         ["two", "one"],
       );
+      // The owner keeps running with its only slot occupied. A missed notice
+      // must remain visibly unconfirmed until the same lease can acknowledge.
+      assert.equal(
+        job.steerHint.ticket,
+        null,
+        "follow-ups and reordering should not arm the steer flag",
+      );
+      const port = Number(new URL(scheduler.url).port);
+      await scheduler.close();
       await api.mutateQueuedInput(
         session,
         two.inputId,
         { action: "steer", revision: (await api.getInputQueue(session)).revision },
         "turn:" + randomUUID(),
       );
+      assert.equal(
+        (await api.getInputQueue(session)).items.find((m) => m.inputId === two.inputId).status,
+        "sending",
+      );
+      // A deferred boundary makes this same message pending again. A delayed
+      // acknowledgement for its first notice must not certify the new notice.
+      const deferred = await originalSelect(job.scope, "postTools", 999);
+      assert.equal(deferred.id, two.inputId);
+      await rt.inputs.releaseBeforePlacement(job.scope, deferred.id);
+      await pool.query("select acknowledge_segment_steer($1,$2,$3,$4)", [
+        registration.workerId,
+        registration.bootId,
+        job.scope.writerId,
+        deferred.steer_notice,
+      ]);
+      assert.equal(
+        (await api.getInputQueue(session)).items.find((m) => m.inputId === two.inputId).status,
+        "sending",
+      );
+      // The lease is still live; an ACK from a different Worker boot is insufficient.
+      await pool.query(
+        "select acknowledge_segment_steer($1,$2,$3,steer_notice) from user_or_agent_messages where id=$4",
+        [registration.workerId, randomUUID(), job.scope.writerId, two.inputId],
+      );
+      assert.equal(
+        (await api.getInputQueue(session)).items.find((m) => m.inputId === two.inputId).status,
+        "sending",
+      );
+      scheduler = await rt.serveScheduler({ connectionString: url.href, token, port, tickMs: 150 });
+      await wait(
+        async () =>
+          (await api.getInputQueue(session)).items.find((m) => m.inputId === two.inputId)
+            ?.status === "steering",
+      );
+      assert.notEqual(job.steerHint.ticket, null);
+      const reserved = await originalSelect(job.scope, "postTools", 1000);
+      assert.equal(reserved.id, two.inputId);
+      assert.equal(
+        (await api.getInputQueue(session)).items.find((m) => m.inputId === two.inputId).status,
+        "steering",
+        "an acknowledged steer must not flash back to sending during placement",
+      );
+      await rt.inputs.releaseBeforePlacement(job.scope, reserved.id);
+      await wait(
+        async () =>
+          (await api.getInputQueue(session)).items.find((m) => m.inputId === two.inputId)
+            ?.status === "steering",
+      );
       await withdraw(one.inputId);
       assert.equal((await api.getInputQueue(session)).items[0].status, "steering");
+      const agentSteer = randomUUID();
+      await rt.inputs.admit({
+        tenant,
+        session,
+        id: agentSteer,
+        sender: randomUUID(),
+        source: "agent",
+        mode: "steer",
+        text: "agent-urgent-test",
+        model: "fixture",
+      });
+      await wait(() =>
+        pool
+          .query("select 1 from user_or_agent_messages where id=$1 and steer_seen_epoch=$2", [
+            agentSteer,
+            job.scope.fencingToken,
+          ])
+          .then((r) => r.rowCount),
+      );
+      assert(!(await api.getInputQueue(session)).items.some((m) => m.inputId === agentSteer));
+      await pool.query(`create table test_steer_latency(ms double precision); create function sample_seen_steer() returns trigger language plpgsql set search_path from current as $$
+        begin insert into test_steer_latency values(extract(epoch from clock_timestamp()-new.accepted_at)*1000);return null;end $$;
+        create trigger sample_seen after update of steer_seen_epoch on user_or_agent_messages for each row
+        when(new.steer_seen_epoch is not null and old.steer_seen_epoch is null and new.body like 'withdraw-before-boundary-%') execute function sample_seen_steer()`);
       const before = commits.length;
       const keep = await put("follow-after-answer");
       for (let i = 0; i < 32; i++) {
-        const m = await put("withdraw-before-boundary-" + i);
+        const m = await put("withdraw-before-boundary-" + i, "steer");
+        await wait(() =>
+          pool
+            .query("select 1 from user_or_agent_messages where id=$1 and steer_seen_epoch=$2", [
+              m.inputId,
+              job.scope.fencingToken,
+            ])
+            .then((r) => r.rowCount),
+        );
         await withdraw(m.inputId);
       }
+      const ackMs = (await pool.query("select ms from test_steer_latency order by ms")).rows.map(
+        (r) => r.ms,
+      );
+      assert.equal(ackMs.length, 32);
+      process.stdout.write(
+        "steer-receipt-ms " +
+          JSON.stringify({ samples: 32, p95: ackMs[30], p99: ackMs[31] }) +
+          "\n",
+      );
       assert.equal(commits.length, before, "PG queue edits triggered native publication");
       assert.equal((await native.snapshot(InboxDoc, source.id, ctx)).items.length, 0);
       assert.equal(
@@ -365,9 +502,16 @@ it.skipIf(!endpoint)(
       );
       modelGate.resolve();
       await pump.finish();
-      assert.equal(contexts.length, 2);
+      assert.equal(contexts.length, 3);
       assert(contexts[0].includes("two") && !contexts[0].includes("follow-after-answer"));
-      assert(contexts[1].includes("follow-after-answer"));
+      assert(!contexts[0].some((s) => s?.includes("agent-urgent-test")));
+      assert(
+        contexts[1].some((s) => s?.includes("agent-urgent-test")) &&
+          !contexts[1].includes("follow-after-answer"),
+      );
+      assert(contexts[2].includes("follow-after-answer"));
+      assert.equal(toolReads, 3, "one withdrawn hint and both acknowledged steers queried PG");
+      assert.equal(job.steerHint.ticket, null, "last steer should clear the hint");
       assert.equal((await passive.wait(ctx)).status, "done");
       assert(
         contexts[0].indexOf("maintenance-before-steer") >= 0 &&

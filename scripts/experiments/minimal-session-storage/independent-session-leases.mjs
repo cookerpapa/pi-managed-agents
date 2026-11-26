@@ -1,5 +1,6 @@
 // Ownership adapter for the #52 segmented Run queue. Public Worker identities,
 // renewable leases and the on-disk epoch are the same ones the serving coordinator uses.
+import { SteerHint } from "./steer-hint.mjs";
 import { connectSegmentWorker } from "./segment-wake.mjs";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
@@ -22,6 +23,9 @@ export class SegmentWorker {
   #coordinator;
   #observer;
   #active = new Map();
+  #control;
+  #hintRepair;
+  #fullRepairDue = false;
   #pending = 0;
   #closed = false;
   #stop = new AbortController();
@@ -130,20 +134,62 @@ export class SegmentWorker {
         this.#active.delete(identity.leaseId);
         await guard.close();
       };
-      const active = { identity, guard };
+      const steerHint = new SteerHint();
+      const active = { identity, guard, steerHint };
       this.#active.set(identity.leaseId, active);
       try {
         await guard.assertCurrent();
         guard.start();
         this.#schedule();
+        // The initial ticket remains conservative if bootstrap is unavailable.
+        await this.#syncSteers([active], true).catch(() =>
+          console.warn("segment.steer_bootstrap_deferred"),
+        );
       } catch (error) {
         await release();
         throw error;
       }
-      return { ...job, authority: guard, release };
+      return { ...job, authority: guard, steerHint, release };
     } finally {
       this.#pending--;
     }
+  }
+  #notice(writer, revision) {
+    const active = this.#active.get(writer);
+    if (!active || this.#closed) return;
+    active.steerHint.mark();
+    this.#control?.ackSteer(writer, revision);
+  }
+  // A fresh/reconnected owner checks even previously acknowledged steers. The
+  // heartbeat repairs only missing receipts in one query for this Worker boot.
+  async #syncSteers(active, full) {
+    if (!active.length || this.#closed) return;
+    const tickets = new Map(active.map((a) => [a.identity.leaseId, a.steerHint.ticket]));
+    const outstanding = full ? sql`` : sql`and m.steer_seen_epoch is null`;
+    const { rows } = await sql`select distinct on(r.lease_id) r.lease_id,m.steer_notice
+      from runs r join user_or_agent_messages m on m.turn_id=r.id and m.tenant_id=r.tenant_id
+      where r.lease_id=any(${[...tickets.keys()]}::uuid[]) and r.state='running' and r.output_seal_id is null
+        and m.state='pending' and m.mode='steer' and m.steer_notice is not null ${outstanding}
+      order by r.lease_id,m.steer_notice desc`.execute(this.db);
+    for (const { lease_id, steer_notice } of rows) {
+      tickets.delete(lease_id);
+      this.#notice(lease_id, steer_notice);
+    }
+    if (full)
+      for (const [writer, ticket] of tickets) this.#active.get(writer)?.steerHint.clear(ticket);
+  }
+  #repairHints(full) {
+    if (this.#closed || !this.#active.size) return;
+    this.#fullRepairDue ||= full;
+    if (this.#hintRepair) return;
+    const scanAll = this.#fullRepairDue;
+    this.#fullRepairDue = false;
+    this.#hintRepair = this.#syncSteers([...this.#active.values()], scanAll)
+      .catch(() => console.warn("segment.steer_reconciliation_deferred"))
+      .finally(() => {
+        this.#hintRepair = undefined;
+        if (this.#fullRepairDue) this.#repairHints(true);
+      });
   }
   #schedule() {
     if (this.#closed || this.#timer || !this.#active.size) return;
@@ -168,6 +214,11 @@ export class SegmentWorker {
       scheduler,
       id: this.workerId + "/" + this.bootId,
       slots: this.capacity,
+      onSteer: (writer, revision) => this.#notice(writer, revision),
+      onRegistered: () => {
+        for (const active of this.#active.values()) active.steerHint.mark();
+        this.#repairHints(true);
+      },
       claim: () => this.claimNext(),
       execute: async (job) => {
         try {
@@ -181,6 +232,7 @@ export class SegmentWorker {
       },
       fail: (error) => finished.reject(error),
     });
+    this.#control = client;
     this.#serving = true;
     until.addEventListener("abort", stop, { once: true });
     try {
@@ -188,6 +240,7 @@ export class SegmentWorker {
     } finally {
       until.removeEventListener("abort", stop);
       await client.close();
+      this.#control = undefined;
       this.#serving = false;
     }
   }
@@ -211,6 +264,7 @@ export class SegmentWorker {
     const at = performance.now(),
       ack = await this.#coordinator.renewFromHeartbeat(heartbeat);
     this.#observer.observeRenewals(heartbeat, ack, at);
+    this.#repairHints(false);
     return ack;
   }
   async close() {
@@ -218,6 +272,7 @@ export class SegmentWorker {
     this.#stop.abort();
     clearTimeout(this.#timer);
     await this.#renewing;
+    await this.#hintRepair;
     await this.#observer.close();
     this.#active.clear();
   }
@@ -351,6 +406,8 @@ export class SegmentLeaseProjection {
         await sql`update user_or_agent_messages set state=case when withdrawing then 'withdrawn' else 'pending' end,
           withdrawing=false,boundary_task=null where tenant_id=${s.tenantId}::uuid and session_id=${s.sessionId}::uuid
           and turn_id=${s.runId}::uuid and state='sending'`.execute(tx);
+        await sql`update user_or_agent_messages set steer_seen_epoch=null where turn_id=${s.runId}::uuid and
+          mode='steer' and state='pending' and steer_seen_epoch=${s.fencingToken}`.execute(tx);
         await sql`update runs set stop_on_resume=(stop_on_resume or state='cancel_requested'),state='queued',lease_id=null,fencing_token=null,recovery_requested_at=null,seal_offer_after=null,output_seal_id=null,
           output_sealed_at=null,output_seal_offset=null,output_first_offset=null,output_first_partition=null,output_first_topic=null,
           projection_first=null,projection_partition=null,projection_pin=null,projection_state=null where id=${s.runId}::uuid`.execute(

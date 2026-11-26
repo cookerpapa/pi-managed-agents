@@ -1,5 +1,7 @@
 # ADR-0366. Adopt Session mail at execution boundaries
 
+[ADR-0367](0367-worker-steer-hints.md) supersedes the unconditional PG check at ordinary tool boundaries.
+
 The #52 candidate keeps pending human and agent input exclusively in PostgreSQL. Editing, promotion, withdrawal and ordering are Session transactions. A boundary selects at most one eligible message in queue order. Native initialization or idle continuation admits the first input directly. A normal completed tool round may place a steer. After Pi settles the current native run, an idle continuation may adopt either kind of pending mail. Stop, reset, terminal tool controls and ordered writer closure retain their existing semantics.
 
 Reuse Pi Durable 1.0.0's public generation hooks and transaction API. Append the canonical user entry, create its placed submission with the original request ID, and attach it to the active generation's inputs in one commit for a steer. At idle use Pi's direct submission path. Never publish a native queued submission for external mail. Preserve Pi's own maintenance writes. Represent an empty native Inbox by its document coordinates on the existing Flow, retaining a PG payload row only while Pi has internal items.

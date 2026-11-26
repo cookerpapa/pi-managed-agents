@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0367](0367-worker-steer-hints.md) confirms pending steers on the owning Worker and skips empty boundary queries.
+
 [ADR-0366](0366-pg-input-boundaries.md) places PG mailbox inputs at native execution boundaries.
 
 [ADR-0365](0365-segment-session-inputs.md) admits human and agent messages to independently owned Sessions.

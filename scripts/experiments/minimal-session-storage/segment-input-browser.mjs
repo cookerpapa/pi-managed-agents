@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import { withChromePage } from "../../lib/chrome-cdp.mjs";
 
-export async function verifyBrowserTakeback(origin, session, token) {
+export async function verifyBrowserTakeback(origin, session, token, repairSteerReceipt) {
   const cacheDir = await mkdtemp(join(tmpdir(), "segment-input-ui-"));
   const code = `
 import React from "react";import {createRoot} from "react-dom/client";
@@ -73,6 +73,13 @@ createRoot(document.getElementById("root")).render(h(Editor));
         throw Error("Browser did not reach " + fn);
       };
       await until("Boolean(document.querySelector('.pending-input-row'))");
+      await until(
+        '["发送中","Sending"].includes(document.querySelector(".pending-input-status")?.textContent)',
+      );
+      await repairSteerReceipt();
+      await until(
+        '["待引导","Steer queued"].includes(document.querySelector(".pending-input-status")?.textContent)',
+      );
       await page.evaluate("document.querySelector('.pending-input-more').click()");
       await until(
         "Array.from(document.querySelectorAll('[role=menuitem]')).some(b=>b.textContent.includes('取回重写')||b.textContent.includes('Take back'))",

@@ -11,6 +11,8 @@ import { up as receipts } from "../../../packages/database/src/migrations/210_mo
 import { up as eligibility } from "../../../packages/database/src/migrations/226_model_charge_evidence.ts";
 import { visibleOutput } from "./visible-output.mjs";
 import { installFlowHistory, seedFlowHeads } from "./flow-history.mjs";
+import { SteerHint } from "./steer-hint.mjs";
+import { connectSessionInputs } from "./segment-input-worker.mjs";
 import { SegmentInputs } from "./segment-inputs.mjs";
 import { ForkStorage, installForkTables } from "./fork-storage.mjs";
 import { captureNativeUsage } from "./native-usage-fixture.mjs";
@@ -278,6 +280,36 @@ try {
             p50: samples[Math.ceil(samples.length * 0.5) - 1],
             p95: samples[Math.ceil(samples.length * 0.95) - 1],
             p99: samples[Math.ceil(samples.length * 0.99) - 1],
+          }),
+        );
+        let queries = 0;
+        const workers = scope.map((s) => {
+          const hint = new SteerHint();
+          hint.clear(hint.ticket); // bootstrap found only follow-ups above
+          return connectSessionInputs({
+            job: { scope: s, steerHint: hint, authority: { assertActive() {} } },
+            inputs: {
+              selectAt(...args) {
+                queries++;
+                return mailbox.selectAt(...args);
+              },
+            },
+          });
+        });
+        const localStart = performance.now();
+        await Promise.all(
+          workers.map(async (worker) => {
+            for (let i = 0; i < 100; i++) await worker.postTools(i + 2);
+          }),
+        );
+        assert.equal(queries, 0);
+        console.log(
+          JSON.stringify({
+            workload: "clean Worker tool boundary",
+            sessions: workers.length,
+            checks: workers.length * 100,
+            postToolsQueries: queries,
+            ms: performance.now() - localStart,
           }),
         );
         continue;

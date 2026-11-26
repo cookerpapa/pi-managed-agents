@@ -122,10 +122,12 @@ export function installSegmentInputApi(app, inputs, authorize) {
             acceptedAt: r.accepted_at.toISOString(),
             status: r.withdrawing
               ? "withdrawing"
-              : r.state === "sending"
-                ? "sending"
-                : r.mode === "steer"
+              : r.mode === "steer"
+                ? r.owner_notified
                   ? "steering"
+                  : "sending"
+                : r.state === "sending"
+                  ? "sending"
                   : "queued",
           })),
         };

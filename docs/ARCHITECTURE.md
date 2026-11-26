@@ -193,7 +193,7 @@ In the #52 prototype the Projector routes a live Stop from its admitted pending 
 
 On the #52 candidate, the model sees an interrupted Bash wait with an unconfirmed remote outcome. Kafka retains mailbox records for seven days. The daily collector checks retirement and empty broker bounds. The projector no longer calculates a database retention floor for replies. [Decision](adr/0361-stop-context-and-mailbox-retention.md)
 
-In #52 a ready row identifies one logical Session. Its Worker checks the PG mailbox after a tool round and at native settlement. Queue edits commit in PG. Pi records each adopted input with its request ID and the Projector confirms it along the ordered prefix. Fault sealing resolves any remaining reservation before takeover. Delegation acknowledges creation and agents report explicitly. [Boundary-owned input adoption](adr/0366-pg-input-boundaries.md).
+In #52 a ready row identifies one logical Session. After a tool round its Worker checks a lease-local steer hint. A positive hint selects from the PG mailbox. Native settlement always checks the mailbox. The Session API exposes the current Worker acknowledgement before showing a steer as queued. [Worker hints](adr/0367-worker-steer-hints.md). Queue edits commit in PG. Pi records each adopted input with its request ID and the Projector confirms it along the ordered prefix. Fault sealing resolves any remaining reservation before takeover. Delegation acknowledges creation and agents report explicitly. [Boundary-owned input adoption](adr/0366-pg-input-boundaries.md).
 
 The #52 Fork candidate uses per-Flow ancestor ranges for shared history, separate from Session management ancestry. [Storage and rollout boundary](reports/segmented-session-forks-20261125.md).
 

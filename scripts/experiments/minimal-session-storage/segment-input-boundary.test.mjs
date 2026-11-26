@@ -20,6 +20,7 @@ import {
   InboxDoc,
 } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
+import { SteerHint } from "./steer-hint.mjs";
 import { connectSessionInputs } from "./segment-input-worker.mjs";
 
 it.each(["ordinary", "terminate", "handoff", "reset"])(
@@ -91,7 +92,7 @@ it.each(["ordinary", "terminate", "handoff", "reset"])(
         conversation: root,
         harness: h,
         storage: store,
-        job: { scope: {}, authority: { assertActive() {} } },
+        job: { scope: {}, steerHint: new SteerHint(), authority: { assertActive() {} } },
         inputs: {
           async selectAt(_s, at) {
             if (mail.state !== "pending") return;
@@ -150,7 +151,7 @@ it("leaves subsequent mail in PG when the original native input fails", async ()
     const root = await harness.root(ctx),
       selections = [];
     const boundary = connectSessionInputs({
-      job: { scope: {}, authority: { assertActive() {} } },
+      job: { scope: {}, steerHint: new SteerHint(), authority: { assertActive() {} } },
       storage: store,
       harness,
       conversation: root,
@@ -173,7 +174,7 @@ it("leaves subsequent mail in PG when the original native input fails", async ()
 it("releases a reservation on definite attachment preparation failure", async () => {
   let released;
   const boundary = connectSessionInputs({
-    job: { scope: {}, authority: { assertActive() {} } },
+    job: { scope: {}, steerHint: new SteerHint(), authority: { assertActive() {} } },
     inputs: {
       async selectAt() {
         return { id: "attachment", body: "image", uploads: [] };
@@ -188,4 +189,65 @@ it("releases a reservation on definite attachment preparation failure", async ()
   });
   await assert.rejects(boundary.start(), /attachment unavailable/);
   assert.equal(released, "attachment");
+});
+
+it("skips clean tool boundaries and preserves a notice arriving during an empty check", async () => {
+  const hint = new SteerHint();
+  hint.clear(hint.ticket);
+  let reads = 0;
+  const started = Promise.withResolvers(),
+    resume = Promise.withResolvers();
+  const boundary = connectSessionInputs({
+    job: { scope: {}, steerHint: hint, authority: { assertActive() {} } },
+    inputs: {
+      async selectAt(_s, _at, _task, onEmpty) {
+        reads++;
+        started.resolve();
+        await resume.promise;
+        onEmpty();
+      },
+    },
+  });
+  for (let i = 0; i < 100; i++) await boundary.postTools(i + 1, ctx);
+  assert.equal(reads, 0);
+  hint.mark();
+  const first = boundary.postTools(101, ctx);
+  await started.promise;
+  hint.mark();
+  resume.resolve();
+  await first;
+  assert.notEqual(hint.ticket, null);
+  await boundary.postTools(102, ctx);
+  assert.equal(hint.ticket, null);
+  assert.equal(reads, 2);
+});
+
+it("keeps a new hint received while the previous last steer is being prepared", async () => {
+  const hint = new SteerHint(),
+    prepare = Promise.withResolvers(),
+    proceed = Promise.withResolvers();
+  const boundary = connectSessionInputs({
+    job: { scope: {}, steerHint: hint, authority: { assertActive() {} } },
+    inputs: {
+      async selectAt() {
+        return { id: "last", source: "user", body: "test", uploads: [], more_steers: false };
+      },
+    },
+    conversation: {
+      async commit() {
+        return true;
+      },
+    },
+    prepare: async () => {
+      prepare.resolve();
+      await proceed.promise;
+      return "test";
+    },
+  });
+  const applying = boundary.postTools(1, ctx);
+  await prepare.promise;
+  hint.mark();
+  proceed.resolve();
+  await applying;
+  assert.notEqual(hint.ticket, null);
 });

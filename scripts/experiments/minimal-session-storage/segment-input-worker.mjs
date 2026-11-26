@@ -30,12 +30,14 @@ export function connectSessionInputs({
       : value;
   }
   async function postTools(taskId, context) {
+    const ticket = job.steerHint.ticket;
     if (closed) return;
     let m,
       publicationPossible = false;
     try {
       job.authority.assertActive();
-      m = await inputs.selectAt(job.scope, "postTools", taskId);
+      if (ticket === null) return;
+      m = await inputs.selectAt(job.scope, "postTools", taskId, () => job.steerHint.clear(ticket));
       if (!m) return;
       const value = await content(m, context.abortSignal);
       const adopted = await conversation.commit(async (tx) => {
@@ -89,6 +91,7 @@ export function connectSessionInputs({
         return true;
       }, context);
       if (!adopted) await inputs.releaseBeforePlacement(job.scope, m.id);
+      else if (m.more_steers === false) job.steerHint.clear(ticket);
     } catch (error) {
       // Pi reports extension exceptions. Keep the same failure at the Worker
       // boundary so it cannot publish successful completion after a lost write.

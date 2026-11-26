@@ -168,8 +168,9 @@ export class SegmentInputs {
   async queue(tenant, session, sender, tx = this.db, after = 0, limit = 64) {
     return (
       await sql`select m.id,m.mode,m.body,m.uploads,m.state,m.withdrawing,m.position,m.turn_id,m.accepted_at,
-     case when m.starts_turn and r.state='queued' then r.mailbox_position end as initial_position
-     from user_or_agent_messages m join runs r on r.id=m.turn_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
+     case when m.starts_turn and r.state='queued' then r.mailbox_position end as initial_position,
+     (m.steer_seen_epoch=r.fencing_token and r.state='running' and r.output_seal_id is null and l.released_at is null and l.writer_failed_at is null and l.valid_until>statement_timestamp()) as owner_notified
+     from user_or_agent_messages m join runs r on r.id=m.turn_id left join session_leases l on l.lease_id=r.lease_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
      and m.state in ('pending','sending') and m.position>${after} order by m.position limit ${limit}`.execute(
         tx,
       )
@@ -297,7 +298,7 @@ export class SegmentInputs {
       );
     });
   }
-  async selectAt(s, at, taskId = null) {
+  async selectAt(s, at, taskId = null, onEmpty) {
     if (
       !["start", "idle", "postTools"].includes(at) ||
       (at === "postTools") !== Number.isSafeInteger(taskId)
@@ -306,7 +307,10 @@ export class SegmentInputs {
     const mode = at === "postTools" ? sql`and m.mode='steer'` : sql``;
     const maybe = await sql`select 1 from user_or_agent_messages m where m.turn_id=${s.runId}::uuid
       and m.state='pending' ${mode} limit 1`.execute(this.db);
-    if (!maybe.rows.length) return;
+    if (!maybe.rows.length) {
+      onEmpty?.();
+      return;
+    }
     return this.db.transaction().execute(async (tx) => {
       await sql`set local synchronous_commit=on`.execute(tx);
       const locked =
@@ -325,9 +329,13 @@ export class SegmentInputs {
               where prev.turn_id=m.turn_id and prev.boundary_task=${taskId}::bigint))
           order by ${at === "start" ? sql`m.starts_turn desc,m.position` : sql`m.position`} limit 1)
         update user_or_agent_messages m set state='sending',boundary_task=${taskId}::bigint from candidate c
-         where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.id=c.id returning m.*`.execute(
-        tx,
-      );
+         where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.id=c.id returning m.*,
+           ${
+             at === "postTools"
+               ? sql`exists(select from user_or_agent_messages more where more.turn_id=m.turn_id
+             and more.state='pending' and more.mode='steer' and more.id<>m.id)`
+               : sql`false`
+           } as more_steers`.execute(tx);
       return m;
     });
   }

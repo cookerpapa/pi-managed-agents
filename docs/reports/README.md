@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Worker-confirmed steer hints](worker-steer-hints-20261126.md) covers empty tool boundaries, UI acknowledgements, missed notices and lease takeover.
+
 - [PG input adoption at native boundaries](pg-input-boundaries-20261126.md) covers editing, crash cuts and indexed queue checks in #52.
 
 - [Bash intent log and display coverage](bash-intent-log-20261125.md) compares PG writes, bounded history reads, Stop and sealed takeover.
