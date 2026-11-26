@@ -160,6 +160,13 @@ process.on("message", async (msg) => {
         {
           runId: job.id,
           initialRequestId,
+          afterToolRound: async (task, context) => {
+            await inputPump.postTools(task, context);
+            if (msg.holdAfterPlacement) {
+              process.send({ kind: "at-boundary" });
+              await new Promise(() => {});
+            }
+          },
           conversationId: 1,
           model,
           agent,
@@ -167,7 +174,10 @@ process.on("message", async (msg) => {
           remoteTools: () => [...bindings.keys()],
           tools: [],
           assertCurrent: () => job.authority.assertCurrent(),
-          openModel: async (r) => ({ model, options: r.options, release() {} }),
+          openModel: async (r) => {
+            inputPump?.assertHealthy();
+            return { model, options: r.options, release() {} };
+          },
           prepareRemote: async (v) =>
             withToolInvocation({ id: "task:" + v.taskId, nativeToolCallId: v.callId }, () =>
               bindings.get(v.toolName).prepareExecution(v.callId, v.args, v.context.abortSignal),
@@ -175,22 +185,18 @@ process.on("message", async (msg) => {
         },
         attached ? "reattach" : "initialize",
       );
-      {
-        inputPump = connectSessionInputs({
-          job,
-          inputs: new SegmentInputs(storage.db),
-          storage: opened.storage,
-          harness: native,
-          conversation: root,
-          fail: (e) => process.send?.({ kind: "error", message: e.stack }),
-        });
-        await inputPump.flush();
-      }
+      inputPump = connectSessionInputs({
+        job,
+        inputs: new SegmentInputs(storage.db),
+        conversation: root,
+        harness: native,
+        storage: opened.storage,
+      });
+      if (!attached && job.has_inputs) await inputPump.start();
       if (opened.resumed) native.resume();
-      else if (!job.has_inputs) {
+      else if (!job.has_inputs)
         await root.submit({ type: "input", content: job.initial_input, requestId: job.id }, ctx);
-      }
-      await root.waitForIdle(ctx);
+      const receipt = await inputPump.finish();
       await inputPump?.close();
       job.authority.assertActive();
       await publish({
@@ -200,13 +206,22 @@ process.on("message", async (msg) => {
         agentId: "root",
         baseSequence: 0,
         nativeSequence: sequence,
-        terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
+        terminal:
+          !receipt || (receipt.status === "unanswered" && receipt.reason === "aborted")
+            ? { type: "turn.cancelled", payload: { reason: "user_request" } }
+            : receipt.status === "done"
+              ? { type: "turn.completed", payload: { stopReason: "stop" } }
+              : {
+                  type: "turn.failed",
+                  payload: {
+                    code: receipt.reason ?? "input_unanswered",
+                    message: "The native input was not answered",
+                    retryable: false,
+                  },
+                },
         occurredAt: new Date().toISOString(),
       });
       process.send({ kind: "finished", history, resumed: opened.resumed });
-    } else if (msg.op === "disconnect-inputs") {
-      await inputPump?.close();
-      process.send({ kind: "disconnected" });
     } else if (msg.op === "answer") {
       job.authority.assertActive();
       const memory = new MemoryStorage();

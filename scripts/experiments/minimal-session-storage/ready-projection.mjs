@@ -323,23 +323,14 @@ export class ReadyProjection {
                 !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value.requestId ?? "")
               )
                 continue;
-              // A placed input remains visible after the Run answers or aborts.
-              // Pi placed it in an earlier write (or earlier in this same batch).
-              if (
-                value.status === "done" ||
-                (value.status === "unanswered" && value.entry !== undefined)
-              )
-                continue;
-              const id = value.requestId;
-              const state =
-                value.entry !== undefined
-                  ? "placed"
-                  : value.status === "unanswered"
-                    ? value.reason === "aborted"
-                      ? "withdrawn"
-                      : "unanswered"
-                    : value.status;
-              receipts.set(id, { id, native_id: value.id, state });
+              if (value.status === "queued")
+                throw Error("External Session input entered the native Inbox");
+              if (value.status === "placed")
+                receipts.set(value.requestId, {
+                  id: value.requestId,
+                  native_id: value.id,
+                  state: "placed",
+                });
             }
             if (receipts.size) {
               draft.frame.sessionMail = [f.scope.tenantId, f.scope.piSessionId];
@@ -355,20 +346,6 @@ export class ReadyProjection {
           projectWorld(view, f, draft.frame);
           if (r.rootPresentation) {
             foldRootPresentation(view, f, draft.frame);
-            if (this.sessionInputs && !covered && view.rootInputDoc !== previous?.rootInputDoc) {
-              const before = previous?.rootInputDoc?.value.receipts ?? {};
-              const changes = Object.keys(view.rootInputDoc?.value.receipts ?? {}).filter(
-                (k) => !before[k] && /^[a-f0-9-]{36}$/i.test(k),
-              );
-              if (changes.length) draft.frame.sessionMail = [f.scope.tenantId, f.scope.piSessionId];
-              if (changes.length)
-                draft.frame.ops.push({
-                  kind: "session-edit",
-                  args: [f.scope.tenantId, f.scope.runId],
-                  changes,
-                  count: 1,
-                });
-            }
           }
           if (!this.independentSessions && (r.rootPresentation || this.delegatedRuns))
             projectChildOutcomes(

@@ -6,9 +6,22 @@ import { it } from "vitest";
 import pg from "pg";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { PostgresAttachmentStore } from "@pi-cloud/session-attachments";
-import { Harness, createRegistry } from "@earendil-works/pi-durable";
+import { Type } from "@earendil-works/pi-ai";
+import {
+  Harness,
+  createRegistry,
+  defineExtension,
+  defineTool,
+  hook,
+  GenerationTask,
+  InboxDoc,
+} from "@earendil-works/pi-durable";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
+import {
+  fauxProvider,
+  fauxAssistantMessage,
+  fauxToolCall,
+} from "@earendil-works/pi-ai/providers/faux";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { createPrivateTenant } from "../../../packages/control-plane/src/tenant-administration.ts";
 import { registerTestWorker } from "../../../packages/control-plane/test/fixtures/registered-worker.ts";
@@ -22,7 +35,7 @@ import { connectSessionInputs } from "./segment-input-worker.mjs";
 
 const endpoint = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
 it.skipIf(!endpoint)(
-  "delivers, reorders and withdraws by Session through the active full Worker and projected Pi receipts",
+  "delivers, reorders and withdraws by Session through the PG queue and native tool/final boundaries",
   async () => {
     const admin = createDatabase({ connectionString: endpoint }),
       schema = "mail_" + randomUUID().replaceAll("-", "");
@@ -48,6 +61,8 @@ it.skipIf(!endpoint)(
       job,
       history,
       source;
+    const commits = [],
+      contexts = [];
     const fail = (e) => {
       process.stderr.write("Session input worker failed: " + e.message + "\n");
       error = e;
@@ -191,6 +206,7 @@ it.skipIf(!endpoint)(
         execute: async (claimed) => {
           job = claimed;
           const opened = await openSegmentNative(rt.store, job, "mail", async (commit) => {
+            commits.push(commit);
             const fact = {
               kind: "durable_commit",
               scope: job.scope,
@@ -212,26 +228,56 @@ it.skipIf(!endpoint)(
             fake = fauxProvider({ tokensPerSecond: 0 });
           models.setProvider(fake.provider);
           fake.setResponses([
-            async () => {
-              entered.resolve();
-              await modelGate.promise;
-              return fauxAssistantMessage("first answer");
-            },
-            ...Array.from({ length: 45 }, () => fauxAssistantMessage("done")),
+            fauxAssistantMessage(fauxToolCall("probe", {}, { id: "tool-a" }), {
+              stopReason: "toolUse",
+            }),
+            ...Array.from({ length: 8 }, () => async (c) => {
+              contexts.push(
+                c.messages.map((m) =>
+                  typeof m.content === "string"
+                    ? m.content
+                    : m.content?.map((x) => x.text ?? "").join(""),
+                ),
+              );
+              return fauxAssistantMessage("done");
+            }),
           ]);
-          native = await Harness.open(opened.storage, { models, registry: createRegistry() }, ctx);
+          const registry = createRegistry();
+          registry.install(
+            defineExtension({
+              name: "mail-boundary",
+              tools: [
+                defineTool({
+                  name: "probe",
+                  description: "Controlled round",
+                  parameters: Type.Object({}),
+                  execute: async () => {
+                    entered.resolve();
+                    await modelGate.promise;
+                    return { content: [{ type: "text", text: "tool completed" }] };
+                  },
+                }),
+              ],
+              hooks: [
+                hook(GenerationTask, {
+                  afterTools: (_a, _r, api, context) => pump.postTools(api.taskId, context),
+                }),
+              ],
+            }),
+          );
+          native = await Harness.open(opened.storage, { models, registry }, ctx);
           const m = fake.getModel(),
             root = await native.root(ctx, {
               agent: { model: { provider: m.provider, modelId: m.id } },
             });
           pump = connectSessionInputs({
             job,
-            storage: opened.storage,
             inputs: rt.inputs,
-            harness: native,
             conversation: root,
-            fail,
+            harness: native,
+            storage: opened.storage,
           });
+          await pump.start();
           source = root;
           await finish.promise;
         },
@@ -249,7 +295,7 @@ it.skipIf(!endpoint)(
         const b = await put("browser input");
         await wait(() =>
           pool
-            .query("select 1 from user_or_agent_messages where id=$1 and state='queued'", [
+            .query("select 1 from user_or_agent_messages where id=$1 and state='pending'", [
               b.inputId,
             ])
             .then((r) => r.rowCount),
@@ -288,45 +334,67 @@ it.skipIf(!endpoint)(
       );
       await withdraw(one.inputId);
       assert.equal((await api.getInputQueue(session)).items[0].status, "steering");
-      await pool.query(
-        `create table test_mail_latency(ms double precision);create function test_mail_sample() returns trigger language plpgsql set search_path from current as $$begin insert into test_mail_latency values(extract(epoch from clock_timestamp()-new.accepted_at)*1000);return null;end$$;create trigger sample after update of state on user_or_agent_messages for each row when(old.state<>new.state and new.state='queued' and new.body like 'queued %') execute function test_mail_sample()`,
-      );
-      const samples = [],
-        admission = [];
+      const before = commits.length;
+      const keep = await put("follow-after-answer");
       for (let i = 0; i < 32; i++) {
-        const at = performance.now();
-        const msg = await put("queued " + i);
-        admission.push(performance.now() - at);
-        await wait(() =>
-          pool
-            .query("select state='queued' ok from user_or_agent_messages where id=$1", [
-              msg.inputId,
-            ])
-            .then((r) => r.rows[0]?.ok),
-        );
-        samples.push(performance.now() - at);
-        await withdraw(msg.inputId);
+        const m = await put("withdraw-before-boundary-" + i);
+        await withdraw(m.inputId);
       }
-      samples.sort((a, b) => a - b);
-      admission.sort((a, b) => a - b);
-      const measured = (await pool.query("select ms from test_mail_latency order by ms")).rows;
-      assert.equal(measured.length, 32);
-      process.stdout.write(
-        "segment-input-latency " +
-          JSON.stringify({
-            samples: samples.length,
-            pgToInboxP95: measured[30].ms,
-            pgToInboxP99: measured[31].ms,
-            admissionP95: admission[30],
-            admissionP99: admission[31],
-            inboxP95: samples[30],
-            inboxP99: samples[31],
-          }) +
-          "\n",
+      assert.equal(commits.length, before, "PG queue edits triggered native publication");
+      assert.equal((await native.snapshot(InboxDoc, source.id, ctx)).items.length, 0);
+      assert.equal(
+        (await pool.query("select count(*)::int n from native_inbox_payloads")).rows[0].n,
+        0,
       );
       assert.equal(scheduler.snapshot().waiting, 0);
+      const passive = await source.submit(
+        {
+          type: "write",
+          requestId: "passive",
+          entry: {
+            kind: "test.maintenance",
+            model: [{ role: "user", content: "maintenance-before-steer", timestamp: 1 }],
+          },
+        },
+        ctx,
+      );
+      assert.equal(
+        (await pool.query("select jsonb_array_length(items) as n from native_inbox_payloads"))
+          .rows[0].n,
+        1,
+      );
       modelGate.resolve();
-      await source.waitForIdle(ctx);
+      await pump.finish();
+      assert.equal(contexts.length, 2);
+      assert(contexts[0].includes("two") && !contexts[0].includes("follow-after-answer"));
+      assert(contexts[1].includes("follow-after-answer"));
+      assert.equal((await passive.wait(ctx)).status, "done");
+      assert(
+        contexts[0].indexOf("maintenance-before-steer") >= 0 &&
+          contexts[0].indexOf("maintenance-before-steer") < contexts[0].indexOf("two"),
+      );
+      for (const id of [two.inputId, keep.inputId]) {
+        const matching = commits.flatMap((c) =>
+          c.writes
+            .filter((w) => w.type === "submission" && w.value.requestId === id)
+            .map((w) => [c, w.value]),
+        );
+        assert.deepEqual(
+          matching.map(([, v]) => v.status),
+          ["placed", "done"],
+        );
+        const [adopted, receipt] = matching[0];
+        assert(
+          adopted.writes.some(
+            (w) => w.type === "entry" && w.value.id === receipt.entry && w.value.kind === "pi.user",
+          ),
+        );
+      }
+      assert(!JSON.stringify(commits).includes("withdraw-before-boundary-"));
+      assert.equal(
+        (await pool.query("select count(*)::int n from native_inbox_payloads")).rows[0].n,
+        0,
+      );
       await wait(() =>
         pool
           .query("select 1 from user_or_agent_messages where id=$1 and state='placed'", [
@@ -335,6 +403,63 @@ it.skipIf(!endpoint)(
           .then((r) => r.rowCount),
       );
       await assert.rejects(withdraw(two.inputId), (e) => e.status === 409);
+      // The last initial input can be withdrawn after a claim but before
+      // startup. Later mail must open a successor, not join the cancelled Turn.
+      const spareSession = randomUUID(),
+        spareUser = randomUUID(),
+        id = randomUUID();
+      await rt.store.register(tenant, [spareSession]);
+      const pending = await rt.inputs.admit({
+        tenant,
+        session: spareSession,
+        sender: spareUser,
+        id,
+        source: "user",
+        mode: "input",
+        model: "fixture",
+        text: "take this back",
+      });
+      const spareId = randomUUID(),
+        bootId = randomUUID();
+      await admin
+        .insertInto("workers")
+        .values({
+          id: spareId,
+          supervisor_id: spareId,
+          boot_id: bootId,
+          state: "ready",
+          max_concurrent_sessions: 1,
+        })
+        .execute();
+      await registerTestWorker(admin, spareId);
+      const spare = rt.worker({ workerId: spareId, bootId, capacity: 1, leaseDurationMs: 30000 });
+      try {
+        const claimed = await spare.claimNext();
+        assert.equal(claimed.id, pending.turn_id);
+        assert.equal(
+          (await rt.inputs.withdraw(tenant, spareSession, spareUser, id)).state,
+          "withdrawn",
+        );
+        assert.equal(
+          (await pool.query("select state from runs where id=$1", [pending.turn_id])).rows[0].state,
+          "cancel_requested",
+        );
+        const successor = await rt.inputs.admit({
+          tenant,
+          session: spareSession,
+          sender: spareUser,
+          id: randomUUID(),
+          source: "user",
+          mode: "follow_up",
+          model: "fixture",
+          text: "replacement",
+        });
+        assert.notEqual(successor.turn_id, claimed.id);
+        assert.equal(await rt.inputs.selectAt(claimed.scope, "start"), undefined);
+        await claimed.release();
+      } finally {
+        await spare.close();
+      }
       history = JSON.stringify((await source.context(ctx)).messages);
       assert(
         history.includes("two") &&

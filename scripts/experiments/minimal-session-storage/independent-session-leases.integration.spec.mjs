@@ -319,6 +319,20 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         token,
       });
       rt.connectDelegations(returns.url, token);
+      // Inspect the real broker records observed by this Projector, deduplicating
+      // by position when a test deliberately restarts the reader.
+      const observed = new Map(),
+        consume = rt.consume.bind(rt);
+      rt.consume = (record, ...args) => {
+        for (const w of record.fact.commit?.writes ?? [])
+          if (w.type === "submission" && w.value.requestId) {
+            const key = w.value.requestId,
+              positions = observed.get(key) ?? new Map();
+            positions.set(String(record.offset) + "/" + w.value.status, w.value.status);
+            observed.set(key, positions);
+          }
+        return consume(record, ...args);
+      };
       const newReader = (id) =>
         rt.reader({
           brokers,
@@ -502,11 +516,11 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         await reader.waitForPartition(0);
       }
       // Lose the owner between PG handoff and the native submit. Withdrawal
-      // stays provisional until a fenced successor emits the native receipt.
-      const lostId = randomUUID(),
+      // is settled by the projected seal before a successor is eligible.
+      const retryId = randomUUID(),
+        lostId = randomUUID(),
         human = randomUUID();
       if (mode === "fresh") {
-        await one.ask({ op: "disconnect-inputs" });
         await rt.inputs.admit({
           tenant: t,
           session: child.id,
@@ -516,16 +530,40 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
           mode: "steer",
           text: "never deliver",
         });
-        assert((await rt.inputs.take(first)).some((m) => m.id === lostId));
+        assert.equal((await rt.inputs.selectAt(first, "postTools", 700))?.id, lostId);
         assert((await rt.inputs.withdraw(t, child.id, human, lostId)).withdrawing);
+        await rt.inputs.admit({
+          tenant: t,
+          session: child.id,
+          id: retryId,
+          sender: human,
+          source: "user",
+          mode: "steer",
+          text: "survive unpublished reservation",
+        });
+        assert.equal((await rt.inputs.selectAt(first, "postTools", 701)).id, retryId);
       }
       await one.kill();
       const two = await actor(db, url.href, 1, directed);
       actors.push(two);
       await until(() => publishedSeals.get(first.writerId));
       const second = (await two.ask({ op: "claimed" })).scope;
+      if (mode === "fresh")
+        assert.equal(
+          (await pool.query("select state from user_or_agent_messages where id=$1", [lostId]))
+            .rows[0].state,
+          "withdrawn",
+        );
       assert.equal(second.runId, first.runId);
       assert.equal(second.fencingToken, first.fencingToken + 1);
+      if (mode === "fresh") {
+        const {
+          rows: [retry],
+        } = await pool.query("select state,boundary_task from user_or_agent_messages where id=$1", [
+          retryId,
+        ]);
+        assert.deepEqual(retry, { state: "pending", boundary_task: null });
+      }
       // The old boot can still put bytes into Kafka. Its receipt cannot append
       // a body, start a tool or settle the new owner's Run.
       await send({
@@ -568,10 +606,41 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
         assert.equal(third.runId, first.runId);
         assert.equal(third.fencingToken, second.fencingToken + 1);
       }
-      const completed = await successor.ask({
-        op: "execute",
-        ...(mode === "branch" ? { report: "Payment tests passed" } : {}),
-      });
+      const steerIds = [randomUUID(), randomUUID()];
+      if (mode === "branch") {
+        for (const [i, id] of steerIds.entries())
+          await rt.inputs.admit({
+            tenant: t,
+            session: child.id,
+            sender: human,
+            id,
+            source: "user",
+            mode: "steer",
+            text: "boundary-steer-" + i,
+          });
+        const placed = await successor.ask({
+          op: "execute",
+          report: "Payment tests passed",
+          holdAfterPlacement: true,
+        });
+        assert.equal(placed.kind, "at-boundary");
+        await until(
+          async () =>
+            (
+              await pool.query("select 1 from messages where run_id=$1 and source_input_id=$2", [
+                child.turn,
+                steerIds[0],
+              ])
+            ).rowCount,
+        );
+        await successor.kill();
+        await until(() => publishedSeals.get(second.writerId));
+        successor = await actor(db, url.href, 1, directed);
+        actors.push(successor);
+        const takeover = (await successor.ask({ op: "claimed" })).scope;
+        assert.equal(takeover.fencingToken, second.fencingToken + 1);
+      }
+      const completed = await successor.ask({ op: "execute" });
       if (mode === "branch")
         await until(
           async () =>
@@ -601,7 +670,29 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
             ).rowCount,
         );
       assert.equal(completed.resumed, true);
-      assert.deepEqual(completed.history, model.history);
+      if (mode === "fresh") {
+        await until(() => observed.get(retryId)?.size === 2);
+        assert(!observed.has(lostId));
+        assert.deepEqual([...observed.get(retryId).values()], ["placed", "done"]);
+      } else
+        for (const id of steerIds) {
+          await until(() => observed.get(id)?.size === 2);
+          assert.deepEqual([...observed.get(id).values()], ["placed", "done"]);
+        }
+      if (mode === "branch") {
+        assert(
+          completed.history.includes("boundary-steer-0") &&
+            !completed.history.includes("boundary-steer-1"),
+        );
+        const { rows } = await pool.query(
+          "select state,boundary_task from user_or_agent_messages where id=any($1::uuid[]) order by position",
+          [steerIds],
+        );
+        assert.equal(rows[0].state, "placed");
+        assert(rows[0].boundary_task);
+        assert.equal(rows[1].state, "placed");
+        assert.equal(rows[1].boundary_task, null);
+      } else assert.deepEqual(completed.history, model.history);
       await until(
         async () =>
           (
@@ -646,7 +737,7 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
             child.turn,
           ])
         ).rows[0].n,
-        1,
+        mode === "branch" ? 3 : 2,
       );
     } finally {
       await Promise.allSettled(actors.map((w) => w.kill()));
@@ -773,7 +864,8 @@ it.skipIf(!endpoint)(
         },
         execute: async (job) => {
           // This scheduling-only fixture stands in for Pi's first input placement.
-          for (const m of await runtime.inputs.take(job.scope))
+          const m = await runtime.inputs.selectAt(job.scope, "start");
+          if (m)
             await pool.query("select segment_input_receipts($1,$2,$3)", [
               job.tenant_id,
               job.id,

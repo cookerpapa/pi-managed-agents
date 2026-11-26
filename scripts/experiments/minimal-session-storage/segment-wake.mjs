@@ -20,15 +20,10 @@ export async function serveSegmentScheduler(
   } = await pool.query(
     "select 'pma_segment_ready_' || md5(n.nspname::text) as channel from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.oid='runs'::regclass",
   );
+  const wake = new PostgresNotificationWake(connectionString, channel);
   const abort = new AbortController();
   const router = await openWakeRouter(host, path, (err) => abort.abort(err), port, token);
   router.configure({ ...stage, tickMs });
-  const wake = new PostgresNotificationWake(connectionString, channel, (payload) => {
-    if (!payload.startsWith("owner:")) return false;
-    const [, worker, session] = payload.split(":");
-    router.notifyOwner(worker, session);
-    return true;
-  });
   const listen = (async () => {
     let observed = wake.generation;
     try {
@@ -54,16 +49,7 @@ export async function serveSegmentScheduler(
   };
 }
 
-export function connectSegmentWorker({
-  scheduler,
-  id,
-  slots,
-  claim,
-  execute,
-  fail,
-  onInput,
-  onRegistered,
-}) {
+export function connectSegmentWorker({ scheduler, id, slots, claim, execute, fail }) {
   checkToken(scheduler.token);
   return connectClaimWorker({
     url: scheduler.url,
@@ -77,7 +63,5 @@ export function connectSegmentWorker({
     },
     execute,
     fail,
-    onInput,
-    onRegistered,
   });
 }

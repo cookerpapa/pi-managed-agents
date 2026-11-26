@@ -133,6 +133,10 @@ export type DurableRunConfiguration = {
     request: CloudModelRequest,
     native: NativeRequestContext | undefined,
   ): Promise<CloudModelPermit>;
+  afterToolRound?(
+    generation: number,
+    context: import("@earendil-works/chord").Context,
+  ): Promise<void>;
   beforeYield?: (
     answer: AssistantMessage,
   ) => Promise<import("@earendil-works/pi-durable").UserInput | undefined>;
@@ -324,6 +328,9 @@ export class DurableAgentSession {
                     : {}),
                 };
               }, context);
+            },
+            afterTools: async (_assistant, _results, api, context) => {
+              await this.#bindings.get(api.conversationId)?.afterToolRound?.(api.taskId, context);
             },
             onYield: async (answer, api) => {
               const run = this.#bindings.get(api.conversationId);

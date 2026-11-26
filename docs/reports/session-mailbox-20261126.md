@@ -1,5 +1,7 @@
 # Independent Session input and explicit agent messages
 
+The subsequent [boundary implementation and measurements](pg-input-boundaries-20261126.md) supersede the immediate delivery of pending mail described in this report.
+
 This is the isolated #52 storage candidate. A ready row is unique by tenant and logical Session. The existing management socket serves two purposes. An idle slot receives a claim hint, while a full Worker can receive a message hint for one of its current leases. The listener carries identities only. Reconnect resynchronizes owned Sessions, and the Worker reconciles pending inputs in one query per active boot heartbeat. [Decision](../adr/0365-segment-session-inputs.md) · [Ready queue](../../scripts/experiments/minimal-session-storage/segment-wake.mjs).
 
 ## Delivery and withdrawal

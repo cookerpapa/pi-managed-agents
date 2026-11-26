@@ -1,161 +1,153 @@
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
+import { InboxDoc, LiveDoc, UserEntry } from "@earendil-works/pi-durable";
 import { inputWithUploads } from "@pi-cloud/protocol";
-import { sql } from "kysely";
-import {
-  DurableHumanInputs,
-  NativeInputError,
-} from "../../../packages/sandbox-supervisor/src/durable/human-inputs.ts";
 
-// One pump per owned Session. A hint arriving during a read sets dirty so that
-// an older empty result can never swallow it. Each page bounds Worker memory.
 function describeFiles(text, uploads) {
   if (uploads.some((file) => file.image))
     throw Error("Image input requires the Worker attachment preparation port");
   return inputWithUploads(text, uploads);
 }
+
+// All mutable mail remains in PG. Only an actual native boundary can adopt it.
 export function connectSessionInputs({
   inputs,
   job,
-  storage,
-  harness,
   conversation,
+  harness,
+  storage,
   prepare = describeFiles,
-  fail,
 }) {
-  const scope = job.scope;
-  let stopped = false,
-    dirty = false,
-    draining,
-    failure;
-  const humans = new DurableHumanInputs({
-    storage,
-    conversation,
-    runId: job.id,
-    prepare,
-    sequence: () => 0,
-    accepting: () => !stopped,
-    assertCurrent: async () => job.authority.assertActive(),
-  });
-  async function deliver(m) {
-    job.authority.assertActive();
-    const requestId = m.id;
-    if (m.withdrawing) {
-      // Reconciliation on the new fenced owner can see an intent whose original
-      // submit never happened. Record that decision on the native writer too.
-      await conversation.commit(async (tx) => {
-        let sub = await tx.submissionByRequest(conversation.id, requestId);
-        if (!sub) {
-          if (m.native_id !== null)
-            throw Error("Projected input is missing from restored native storage");
-          sub = await tx.createSubmission({
-            conversationId: conversation.id,
-            requestId,
-            type: "input",
-            status: "queued",
-          });
-          tx.settleSubmission(sub.id, { status: "unanswered", reason: "aborted" });
-        }
-      }, ctx);
-      const record = await storage.submissionByRequest(conversation.id, requestId, ctx);
-      if (record?.status === "queued") {
-        await harness.abortSubmission(record.id, ctx, conversation.id);
-      }
-      return;
-    }
-    if (m.source === "user") {
-      await humans.submit(
-        {
-          inputId: requestId,
-          idempotencyKey: m.request_key,
-          fingerprint: m.fingerprint,
-          text: m.body,
-          uploads: m.uploads,
-          mode: m.mode === "follow_up" ? "follow_up" : "steer",
-          acceptedAt: m.accepted_at.toISOString(),
-        },
-        m.sender_id,
-      );
-    } else {
-      const content = await prepare(m.body, m.uploads);
-      await conversation.submit(
-        {
-          type: "input",
-          requestId,
-          whenBusy: m.mode === "follow_up" ? "followUp" : "steer",
-          content:
-            typeof content === "string" && m.mode !== "input" && m.sender_id !== m.session_id
-              ? "[From Agent " + m.sender_id + "]\n" + content
-              : content,
-        },
-        ctx,
-      );
-    }
+  let closed = false,
+    failure,
+    lastSubmission;
+  async function content(m, signal) {
+    const value = await prepare(m.body, m.uploads, signal);
+    return m.source === "agent" &&
+      m.mode !== "input" &&
+      m.sender_id !== m.session_id &&
+      typeof value === "string"
+      ? "[From Agent " + m.sender_id + "]\n" + value
+      : value;
   }
-  async function reconcile() {
-    let after = 0,
-      rows;
-    do {
-      rows = await inputs.take(scope, after);
-      for (const m of rows) {
-        if (stopped) return;
-        await deliver(m);
-        after = m.position;
-      }
-    } while (rows.length === 32 && !stopped);
-    const c = await inputs.changeFor(scope);
-    if (!c || stopped) return;
-    const snapshot = await humans.snapshot(),
-      id = c.message_id;
+  async function postTools(taskId, context) {
+    if (closed) return;
+    let m,
+      publicationPossible = false;
     try {
-      await humans.mutate(
-        {
-          operationId: c.id,
-          fingerprint: c.id,
-          inputId: id,
-          revision: snapshot.revision,
-          change:
-            c.action === "steer" ? { action: "steer" } : { action: "move", direction: c.action },
-        },
-        c.other_id ?? undefined,
-      );
-    } catch (e) {
-      if (!(e instanceof NativeInputError) || e.code !== "input_conflict") throw e;
-      await sql`update session_input_changes c set state='conflict' from runs r where c.tenant_id=${scope.tenantId}::uuid and c.session_id=${scope.sessionId}::uuid and c.id=${c.id}::uuid and c.state='pending'
-        and r.id=${job.id}::uuid and r.lease_id=${scope.writerId}::uuid and r.fencing_token=${scope.fencingToken} and r.output_seal_id is null`.execute(
-        inputs.db,
-      );
+      job.authority.assertActive();
+      m = await inputs.selectAt(job.scope, "postTools", taskId);
+      if (!m) return;
+      const value = await content(m, context.abortSignal);
+      const adopted = await conversation.commit(async (tx) => {
+        const live = await tx.doc(LiveDoc, conversation.id);
+        if (live.run?.taskId !== taskId || !live.tools?.length) return;
+        const inbox = await tx.doc(InboxDoc, conversation.id);
+        // Reset, handoff and tool-requested termination close the native Run.
+        // The next idle submission then belongs to the new Run.
+        if (inbox.items.some((i) => i.mode !== "write" || i.entry.head === "self")) return;
+        const controls = await Promise.all(
+          live.tools.map(async (slot) => {
+            if (!slot.taskId) return;
+            const task = await tx.task(slot.taskId);
+            return task?.state.outcome?.result?.control;
+          }),
+        );
+        if (controls.every((c) => c?.terminate) || controls.some((c) => c?.handoff !== undefined))
+          return;
+        if (await tx.submissionByRequest(conversation.id, m.id))
+          throw Error("Session input was already adopted");
+        context.abortSignal?.throwIfAborted();
+        job.authority.assertActive();
+        // Pi normally places passive writes (e.g. compaction) before steers.
+        // Keep that ordering in the same public transaction as the new entry.
+        if (inbox.items.length) {
+          let head = (await tx.latestHeadMarker(conversation.id))?.head;
+          for (const item of inbox.items) {
+            const draft = item.entry;
+            if (typeof draft.head === "number" && head !== undefined && draft.head < head) {
+              tx.settleSubmission(item.id, { status: "unanswered", reason: "stale" });
+            } else {
+              const entry = await tx.appendEntry(conversation.id, draft);
+              tx.placeSubmission(item.id, entry.id);
+              if (draft.head !== undefined) head = draft.head === "self" ? entry.id : draft.head;
+            }
+          }
+          inbox.items.splice(0, inbox.items.length);
+        }
+        const entry = await tx.appendEntry(UserEntry, conversation.id, {
+          model: [{ role: "user", content: value, timestamp: Date.now() }],
+        });
+        const sub = await tx.createSubmission({
+          conversationId: conversation.id,
+          requestId: m.id,
+          type: "input",
+          status: "placed",
+          entry: entry.id,
+        });
+        live.run.inputs.push(sub.id);
+        publicationPossible = true;
+        return true;
+      }, context);
+      if (!adopted) await inputs.releaseBeforePlacement(job.scope, m.id);
+    } catch (error) {
+      // Pi reports extension exceptions. Keep the same failure at the Worker
+      // boundary so it cannot publish successful completion after a lost write.
+      if (!context.abortSignal?.aborted) failure = error;
+      if (m && !publicationPossible) await inputs.releaseBeforePlacement(job.scope, m.id);
+      throw error;
     }
   }
-  function wake() {
-    if (stopped) return;
-    dirty = true;
-    draining ??= (async () => {
-      while (dirty && !stopped) {
-        dirty = false;
-        await reconcile();
-      }
-    })()
-      .catch((e) => {
-        stopped = true;
-        failure = e;
-        fail(e);
-      })
-      .finally(() => {
-        draining = undefined;
-        if (dirty && !stopped) wake();
-      });
+  async function admitIdle(at) {
+    if (closed) return false;
+    if (failure) throw failure;
+    job.authority.assertActive();
+    const m = await inputs.selectAt(job.scope, at);
+    if (!m) return false;
+    let value;
+    try {
+      value = await content(m);
+      job.authority.assertActive();
+    } catch (error) {
+      await inputs.releaseBeforePlacement(job.scope, m.id);
+      throw error;
+    }
+    lastSubmission = await conversation.submit(
+      { type: "input", requestId: m.id, content: value, whenBusy: "reject" },
+      ctx,
+    );
+    return true;
   }
-  job.onInput(wake);
   return {
-    async flush() {
-      wake();
-      while (draining) await draining;
+    postTools,
+    assertHealthy() {
       if (failure) throw failure;
     },
-    async close() {
-      stopped = true;
-      await draining;
-      if (failure) throw failure;
+    start: () => admitIdle("start"),
+    async finish() {
+      if (!lastSubmission) {
+        const active = await harness.snapshot(LiveDoc, conversation.id, ctx);
+        const id =
+          active?.run?.inputs[0] ??
+          (job.recovering ? await inputs.lastPlaced(job.scope) : undefined);
+        const record = id
+          ? { id }
+          : job.id && (await storage.submissionByRequest(conversation.id, job.id, ctx));
+        if (record) {
+          lastSubmission = await harness.submission(record.id, ctx);
+          if (!lastSubmission) throw Error("Restored native input is missing");
+        }
+      }
+      let receipt;
+      do {
+        await conversation.waitForIdle(ctx);
+        if (failure) throw failure;
+        receipt = await lastSubmission?.status(ctx);
+        if (receipt?.status === "unanswered" && receipt.reason !== "reset") break;
+      } while (await admitIdle("idle"));
+      return receipt;
+    },
+    close() {
+      closed = true;
     },
   };
 }

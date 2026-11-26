@@ -45,15 +45,8 @@ export class PostgresNotificationWake extends PostgresQueueWake {
   #closed = false;
   #retryAt = 0;
 
-  readonly #handlePayload: ((payload: string) => boolean) | undefined;
-
-  constructor(
-    connectionString: string,
-    channel: string,
-    handlePayload?: (payload: string) => boolean,
-  ) {
+  constructor(connectionString: string, channel: string) {
     super();
-    this.#handlePayload = handlePayload;
     if (!/^[a-z_][a-z0-9_]{0,62}$/.test(channel)) throw new Error("Invalid notification channel");
     this.#connectionString = connectionString;
     this.#channel = channel;
@@ -93,12 +86,7 @@ export class PostgresNotificationWake extends PostgresQueueWake {
     client.on("error", disconnected);
     client.once("end", disconnected);
     client.on("notification", (message) => {
-      if (
-        !this.#closed &&
-        this.#client === client &&
-        message.channel === this.#channel &&
-        !this.#handlePayload?.(message.payload ?? "")
-      )
+      if (!this.#closed && this.#client === client && message.channel === this.#channel)
         this.notify();
     });
     try {

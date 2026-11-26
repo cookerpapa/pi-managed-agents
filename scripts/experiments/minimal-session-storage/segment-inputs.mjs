@@ -70,7 +70,7 @@ export class SegmentInputs {
     if (
       source === "user" &&
       (
-        await sql`select 1 from user_or_agent_messages where tenant_id=${tenant}::uuid and session_id=${session}::uuid and sender_id=${sender}::uuid and source='user' and state in ('pending','sending','queued') offset 63 limit 1`.execute(
+        await sql`select 1 from user_or_agent_messages where tenant_id=${tenant}::uuid and session_id=${session}::uuid and sender_id=${sender}::uuid and source='user' and state in ('pending','sending') offset 63 limit 1`.execute(
           tx,
         )
       ).rows.length
@@ -90,7 +90,6 @@ export class SegmentInputs {
       values(${tenant}::uuid,${session}::uuid,${id}::uuid,${sender}::uuid,${source},${!open && !initialTurn && source === "user" ? "input" : mode},${text},${JSON.stringify(uploads)}::jsonb,${hash},${turn}::uuid,${Boolean(initialTurn) || !open},${requestKey}) returning *`.execute(
         tx,
       );
-    if (open && !initialTurn) await this.wake(tx, tenant, session);
     return row;
   }
   async sendAgent(o) {
@@ -157,9 +156,6 @@ export class SegmentInputs {
       await sql`select pg_notify('pma_named_children','')`.execute(tx);
     });
   }
-  async wake(tx, tenant, session) {
-    await sql`select segment_input_notify(${tenant}::uuid,${session}::uuid)`.execute(tx);
-  }
   async version(tx, tenant, session, sender) {
     return String(
       (
@@ -174,7 +170,7 @@ export class SegmentInputs {
       await sql`select m.id,m.mode,m.body,m.uploads,m.state,m.withdrawing,m.position,m.turn_id,m.accepted_at,
      case when m.starts_turn and r.state='queued' then r.mailbox_position end as initial_position
      from user_or_agent_messages m join runs r on r.id=m.turn_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
-     and m.state in ('pending','sending','queued') and m.position>${after} order by m.position limit ${limit}`.execute(
+     and m.state in ('pending','sending') and m.position>${after} order by m.position limit ${limit}`.execute(
         tx,
       )
     ).rows;
@@ -212,11 +208,12 @@ export class SegmentInputs {
             tx,
           );
         }
-        await sql`update runs set state='cancelled',settled_at=clock_timestamp() where id=${m.turn_id}::uuid and state='queued' and started_at is null and
+        await sql`update runs set state=case when state='running' then 'cancel_requested' else 'cancelled' end,
+          settled_at=case when state='queued' then clock_timestamp() else settled_at end where id=${m.turn_id}::uuid and state in ('queued','running') and exists(select from user_or_agent_messages where turn_id=${m.turn_id}::uuid and starts_turn) and
           not exists(select from user_or_agent_messages where turn_id=${m.turn_id}::uuid and state<>'withdrawn')`.execute(
           tx,
         );
-      } else await this.wake(tx, tenant, session);
+      }
       return changed;
     });
   }
@@ -237,12 +234,12 @@ export class SegmentInputs {
       if (old) {
         if (old.message_id !== id || old.other_id !== other || old.action !== action)
           throw new InputConflict("Change identity reused");
-        return old.state;
+        return "applied";
       }
       if (version !== undefined && (await this.version(tx, tenant, session, sender)) !== version)
         throw new InputConflict("Queue changed");
       const { rows } =
-        await sql`select id,state,turn_id,withdrawing from user_or_agent_messages where tenant_id=${tenant}::uuid and session_id=${session}::uuid and sender_id=${sender}::uuid and source='user' and state in ('pending','sending','queued') order by position for update`.execute(
+        await sql`select id,state,turn_id,withdrawing,position from user_or_agent_messages where tenant_id=${tenant}::uuid and session_id=${session}::uuid and sender_id=${sender}::uuid and source='user' and state in ('pending','sending') order by position for update`.execute(
           tx,
         );
       const i = rows.findIndex((m) => m.id === id),
@@ -258,43 +255,80 @@ export class SegmentInputs {
             neighbor.turn_id !== rows[i].turn_id)
       )
         throw new InputConflict("Queue changed");
-      const created =
-        await sql`insert into session_input_changes(tenant_id,session_id,id,message_id,other_id,action) values(${tenant}::uuid,${session}::uuid,${operation}::uuid,${id}::uuid,${other}::uuid,${action}) on conflict do nothing returning id`.execute(
+      if (rows[i].state !== "pending" || (other && neighbor.state !== "pending"))
+        throw new InputConflict("Input is entering the conversation");
+      await sql`insert into session_input_changes(tenant_id,session_id,id,message_id,other_id,action)
+        values(${tenant}::uuid,${session}::uuid,${operation}::uuid,${id}::uuid,${other}::uuid,${action})`.execute(
+        tx,
+      );
+      if (action === "steer") {
+        await sql`update user_or_agent_messages set mode='steer' where tenant_id=${tenant}::uuid and session_id=${session}::uuid and id=${id}::uuid`.execute(
           tx,
         );
-      if (!created.rows.length) throw new InputConflict("Another queue edit is being confirmed");
-      if (rows[i].state === "pending" && (!other || neighbor.state === "pending")) {
-        await sql`select apply_segment_input_change(${tenant}::uuid,${session}::uuid,${operation}::uuid)`.execute(
+      } else {
+        await sql`update user_or_agent_messages set position=case when id=${id}::uuid then ${neighbor.position}::bigint else ${rows[i].position}::bigint end
+          where tenant_id=${tenant}::uuid and session_id=${session}::uuid and id in (${id}::uuid,${other}::uuid)`.execute(
           tx,
         );
-        return "applied";
       }
-      await this.wake(tx, tenant, session);
-      return "pending";
+      return "applied";
     });
   }
-  async changeFor(s) {
+  // Empty boundaries do one indexed read. A positive read is rechecked under
+  // the same Session lock used by reordering, withdrawal and writer closure.
+  async lastPlaced(s) {
     const {
-      rows: [change],
+      rows: [row],
     } =
-      await sql`select c.* from session_input_changes c join user_or_agent_messages m on (m.tenant_id,m.session_id,m.id)=(c.tenant_id,c.session_id,c.message_id)
-      where c.tenant_id=${s.tenantId}::uuid and c.session_id=${s.sessionId}::uuid and m.turn_id=${s.runId}::uuid and c.state='pending'`.execute(
+      await sql`select native_id from user_or_agent_messages where tenant_id=${s.tenantId}::uuid and session_id=${s.sessionId}::uuid and turn_id=${s.runId}::uuid and state='placed' order by native_id desc limit 1`.execute(
         this.db,
       );
-    return change;
+    return row ? Number(row.native_id) : undefined;
   }
-  async take(scope, after = 0, limit = 32) {
-    const s = scope;
-    const { rows } =
-      await sql`with locked as materialized (select tenant_id,id,flow_id from sessions where tenant_id=${s.tenantId}::uuid and id=${s.sessionId}::uuid for no key update), owned as materialized (
-       select r.id from runs r join locked s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id
-       where r.tenant_id=${s.tenantId}::uuid and s.id=${s.sessionId}::uuid and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid
-        and r.fencing_token=${s.fencingToken} and r.state='running' and r.output_seal_id is null),
-      picked as materialized (select m.* from user_or_agent_messages m join owned on owned.id=m.turn_id
-       where m.position>${after} and (m.state in ('pending','sending') or m.withdrawing) order by m.position limit ${limit} for update of m)
-      ,sent as (update user_or_agent_messages m set state='sending' from picked p
-         where p.state='pending' and m.turn_id=p.turn_id and m.id=p.id returning m.id)
-      select p.* from picked p order by p.position`.execute(this.db);
-    return rows;
+  async releaseBeforePlacement(s, id) {
+    await this.db.transaction().execute(async (tx) => {
+      await sql`select id from sessions where tenant_id=${s.tenantId}::uuid and id=${s.sessionId}::uuid for no key update`.execute(
+        tx,
+      );
+      await sql`update user_or_agent_messages m set state=case when m.withdrawing then 'withdrawn' else 'pending' end,withdrawing=false,boundary_task=null
+      from runs r where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.id=${id}::uuid and m.turn_id=r.id
+      and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid and r.fencing_token=${s.fencingToken} and r.output_seal_id is null and m.state='sending'`.execute(
+        tx,
+      );
+    });
+  }
+  async selectAt(s, at, taskId = null) {
+    if (
+      !["start", "idle", "postTools"].includes(at) ||
+      (at === "postTools") !== Number.isSafeInteger(taskId)
+    )
+      throw Error("Invalid Session input boundary");
+    const mode = at === "postTools" ? sql`and m.mode='steer'` : sql``;
+    const maybe = await sql`select 1 from user_or_agent_messages m where m.turn_id=${s.runId}::uuid
+      and m.state='pending' ${mode} limit 1`.execute(this.db);
+    if (!maybe.rows.length) return;
+    return this.db.transaction().execute(async (tx) => {
+      await sql`set local synchronous_commit=on`.execute(tx);
+      const locked =
+        await sql`select flow_id from sessions where tenant_id=${s.tenantId}::uuid and id=${s.sessionId}::uuid for no key update`.execute(
+          tx,
+        );
+      if (!locked.rows.length) return;
+      const {
+        rows: [m],
+      } = await sql`with candidate as (
+          select m.id from user_or_agent_messages m join runs r on r.id=m.turn_id
+          where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.turn_id=${s.runId}::uuid and
+            r.session_id=${locked.rows[0].flow_id}::uuid and r.lease_id=${s.writerId}::uuid and r.fencing_token=${s.fencingToken}
+            and r.state='running' and r.output_seal_id is null and m.state='pending' ${mode}
+            and (${taskId}::bigint is null or not exists(select from user_or_agent_messages prev
+              where prev.turn_id=m.turn_id and prev.boundary_task=${taskId}::bigint))
+          order by ${at === "start" ? sql`m.starts_turn desc,m.position` : sql`m.position`} limit 1)
+        update user_or_agent_messages m set state='sending',boundary_task=${taskId}::bigint from candidate c
+         where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.id=c.id returning m.*`.execute(
+        tx,
+      );
+      return m;
+    });
   }
 }

@@ -57,9 +57,3 @@ create or replace function flow_delivery_allows_gc(t uuid,physical uuid) returns
 language sql stable set search_path from current as $$
   select true
 $$;
-
-create function segment_input_notify(t uuid,s uuid) returns void language sql set search_path from current as $$
- select pg_notify('pma_segment_ready_'||md5(current_schema()), 'owner:'||w.id||'/'||w.boot_id||':'||t||'/'||s)
- from session_leases l join workers w on w.id=l.worker_id
- where l.tenant_id=t and l.pi_session_id=s::text and l.released_at is null
-$$;

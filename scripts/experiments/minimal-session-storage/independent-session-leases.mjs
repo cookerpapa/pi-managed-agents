@@ -22,7 +22,6 @@ export class SegmentWorker {
   #coordinator;
   #observer;
   #active = new Map();
-  #bySession = new Map();
   #pending = 0;
   #closed = false;
   #stop = new AbortController();
@@ -127,16 +126,12 @@ export class SegmentWorker {
           fencingToken: s.fencingToken,
         };
       const guard = this.#observer.open(identity);
-      const sessionKey = identity.tenantId + "/" + identity.piSessionId;
       const release = async () => {
         this.#active.delete(identity.leaseId);
-        if (this.#bySession.get(sessionKey)?.identity === identity)
-          this.#bySession.delete(sessionKey);
         await guard.close();
       };
       const active = { identity, guard };
       this.#active.set(identity.leaseId, active);
-      this.#bySession.set(sessionKey, active);
       try {
         await guard.assertCurrent();
         guard.start();
@@ -145,15 +140,7 @@ export class SegmentWorker {
         await release();
         throw error;
       }
-      return {
-        ...job,
-        authority: guard,
-        release,
-        onInput(callback) {
-          active.wake = callback;
-          callback();
-        },
-      };
+      return { ...job, authority: guard, release };
     } finally {
       this.#pending--;
     }
@@ -181,10 +168,6 @@ export class SegmentWorker {
       scheduler,
       id: this.workerId + "/" + this.bootId,
       slots: this.capacity,
-      onInput: (session) => this.#bySession.get(session)?.wake?.(),
-      onRegistered: () => {
-        for (const active of this.#active.values()) active.wake?.();
-      },
       claim: () => this.claimNext(),
       execute: async (job) => {
         try {
@@ -228,19 +211,6 @@ export class SegmentWorker {
     const at = performance.now(),
       ack = await this.#coordinator.renewFromHeartbeat(heartbeat);
     this.#observer.observeRenewals(heartbeat, ack, at);
-    const held = [...this.#bySession.values()]
-      .filter((a) => a.wake)
-      .map((a) => a.identity.piSessionId);
-    if (held.length) {
-      const { rows } =
-        await sql`select distinct m.tenant_id,m.session_id from user_or_agent_messages m join runs r on r.id=m.turn_id
-        where m.session_id=any(${held}::uuid[]) and (m.state in ('pending','sending') or m.withdrawing) and r.state='running'
-        union select tenant_id,session_id from session_input_changes where state='pending' and session_id=any(${held}::uuid[])`.execute(
-          this.db,
-        );
-      for (const { tenant_id, session_id } of rows)
-        this.#bySession.get(tenant_id + "/" + session_id)?.wake?.();
-    }
     return ack;
   }
   async close() {
@@ -250,7 +220,6 @@ export class SegmentWorker {
     await this.#renewing;
     await this.#observer.close();
     this.#active.clear();
-    this.#bySession.clear();
   }
 }
 
@@ -377,6 +346,11 @@ export class SegmentLeaseProjection {
         tool_bindings_closed_at=coalesce(tool_bindings_closed_at,clock_timestamp()),released_at=clock_timestamp()
         where lease_id=${s.writerId}::uuid`.execute(tx);
       if (recover) {
+        // All admitted publications of this writer precede this seal. A remaining
+        // reservation has no canonical entry and can safely be returned to PG.
+        await sql`update user_or_agent_messages set state=case when withdrawing then 'withdrawn' else 'pending' end,
+          withdrawing=false,boundary_task=null where tenant_id=${s.tenantId}::uuid and session_id=${s.sessionId}::uuid
+          and turn_id=${s.runId}::uuid and state='sending'`.execute(tx);
         await sql`update runs set stop_on_resume=(stop_on_resume or state='cancel_requested'),state='queued',lease_id=null,fencing_token=null,recovery_requested_at=null,seal_offer_after=null,output_seal_id=null,
           output_sealed_at=null,output_seal_offset=null,output_first_offset=null,output_first_partition=null,output_first_topic=null,
           projection_first=null,projection_partition=null,projection_pin=null,projection_state=null where id=${s.runId}::uuid`.execute(

@@ -88,11 +88,6 @@ export async function installPrefixSql(db, { message, presentedMessage, inbox, f
               'latest',coalesce(op->>'latest',root_compacts->>'latest'),'seq',frame->'nativeSeq')
               where id=(a->>2)::uuid and tenant_id=(a->>0)::uuid and session_id=(a->>1)::uuid and lease_id=(a->>3)::uuid and state in ('running','cancel_requested');
             ok:=found;n:=1;
-          when 'session-edit' then
-            perform apply_segment_input_change(m.tenant_id,m.session_id,c.id) from jsonb_array_elements_text(op->'changes') x(id)
-              join session_input_changes c on c.id=x.id::uuid join user_or_agent_messages m on (m.tenant_id,m.session_id,m.id)=(c.tenant_id,c.session_id,c.message_id)
-              where m.tenant_id=(a->>0)::uuid and m.turn_id=(a->>1)::uuid;
-            ok:=true;n:=1;
           when 'session-input' then
             perform segment_input_receipts((a->>0)::uuid,(a->>1)::uuid,op->'receipts');
             ok:=true; n:=1;

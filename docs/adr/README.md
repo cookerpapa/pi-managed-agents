@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0366](0366-pg-input-boundaries.md) places PG mailbox inputs at native execution boundaries.
+
 [ADR-0365](0365-segment-session-inputs.md) admits human and agent messages to independently owned Sessions.
 
 [ADR-0364](0364-directed-segment-worker-wake.md) connects the segmented Worker queue to directed wakeups.

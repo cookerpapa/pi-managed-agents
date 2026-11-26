@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [PG input adoption at native boundaries](pg-input-boundaries-20261126.md) covers editing, crash cuts and indexed queue checks in #52.
+
 - [Bash intent log and display coverage](bash-intent-log-20261125.md) compares PG writes, bounded history reads, Stop and sealed takeover.
 
 - [Bash outcome after Worker loss](sealed-bash-unknown-20261125.md) covers the cut between the original reply mailbox and accepted native history.

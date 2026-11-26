@@ -122,7 +122,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
             acceptedAt: r.accepted_at.toISOString(),
             status: r.withdrawing
               ? "withdrawing"
-              : r.state !== "queued"
+              : r.state === "sending"
                 ? "sending"
                 : r.mode === "steer"
                   ? "steering"
@@ -225,15 +225,6 @@ export function installSegmentInputApi(app, inputs, authorize) {
           other: action.action === "move" ? (q[i + (kind === "up" ? -1 : 1)]?.id ?? null) : null,
         });
       }
-      const until = Date.now() + 6500;
-      do {
-        previous = await stored();
-        if (previous?.state !== "pending") break;
-        await delay(75);
-      } while (Date.now() < until);
-      if (previous?.state === "pending")
-        return res.code(503).send({ message: "Queue change pending" });
-      if (previous?.state !== "applied") throw new InputConflict("Queue changed");
     }
     return { queue: await snapshot(a), replayed: false };
   });

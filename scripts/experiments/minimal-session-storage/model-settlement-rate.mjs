@@ -11,6 +11,7 @@ import { up as receipts } from "../../../packages/database/src/migrations/210_mo
 import { up as eligibility } from "../../../packages/database/src/migrations/226_model_charge_evidence.ts";
 import { visibleOutput } from "./visible-output.mjs";
 import { installFlowHistory, seedFlowHeads } from "./flow-history.mjs";
+import { SegmentInputs } from "./segment-inputs.mjs";
 import { ForkStorage, installForkTables } from "./fork-storage.mjs";
 import { captureNativeUsage } from "./native-usage-fixture.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
@@ -149,19 +150,22 @@ try {
   const compareMail = process.argv[3] === "session-inputs";
   const pairs = compareMail && process.argv[4] === "pairs";
   const warmMail = compareMail && (pairs || process.argv[4] === "warm");
-  const layouts = pairs
-    ? [false, true, ...Array.from({ length: 6 }, () => [true, false, false, true]).flat()]
-    : compareMail
-      ? warmMail
-        ? [false, true, true, false, false, true, false, true, true, false]
-        : [false, true, true, false, true, false, false, true]
-      : comparePages
-        ? []
-        : compareFlow
-          ? [false, true, true, false, true, false, false, true]
-          : compareSql
-            ? [false]
-            : [false, false];
+  const checkBoundaries = compareMail && process.argv[4] === "boundaries";
+  const layouts = checkBoundaries
+    ? [true]
+    : pairs
+      ? [false, true, ...Array.from({ length: 6 }, () => [true, false, false, true]).flat()]
+      : compareMail
+        ? warmMail
+          ? [false, true, true, false, false, true, false, true, true, false]
+          : [false, true, true, false, true, false, false, true]
+        : comparePages
+          ? []
+          : compareFlow
+            ? [false, true, true, false, true, false, false, true]
+            : compareSql
+              ? [false]
+              : [false, false];
   for (const [index, layout] of layouts.entries()) {
     const flowHistory = !compareMail && layout,
       segmentInputs = compareMail && layout;
@@ -238,6 +242,45 @@ try {
         await pool.query(
           "insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,fingerprint,turn_id,state,request_key) select tenant_id,session_id,id,tenant_id,'user','input',initial_input,'fixture',id,'sending',id::text from runs",
         );
+      }
+      if (checkBoundaries) {
+        // Exercise the normal indexed Worker check with many pending follow-ups
+        // and no eligible steer. Each lane models a different Session.
+        await pool.query(`insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,fingerprint,turn_id,request_key)
+          select r.tenant_id,r.session_id,gen_random_uuid(),r.session_id,'agent','follow_up','later','test',r.id,n::text
+          from runs r cross join generate_series(1,256) n`);
+        await pool.query("analyze user_or_agent_messages");
+        const mailbox = new SegmentInputs(db),
+          scope = runs.slice(0, 32).map((r) => r.scope),
+          samples = [];
+        const probe = async (s, n) => {
+          const at = performance.now();
+          assert.equal(await mailbox.selectAt(s, "postTools", n), undefined);
+          return performance.now() - at;
+        };
+        await Promise.all(scope.map((s) => probe(s, 1)));
+        const start = performance.now();
+        await Promise.all(
+          scope.map(async (s) => {
+            for (let n = 0; n < 100; n++) samples.push(await probe(s, n + 2));
+          }),
+        );
+        const ms = performance.now() - start;
+        samples.sort((a, b) => a - b);
+        console.log(
+          JSON.stringify({
+            workload: "empty postTools lookups",
+            sessions: scope.length,
+            pendingFollowUpsPerSession: 256,
+            checks: samples.length,
+            ms,
+            checksPerSecond: Math.round((samples.length * 1000) / ms),
+            p50: samples[Math.ceil(samples.length * 0.5) - 1],
+            p95: samples[Math.ceil(samples.length * 0.95) - 1],
+            p99: samples[Math.ceil(samples.length * 0.99) - 1],
+          }),
+        );
+        continue;
       }
       if (flowHistory) await seedFlowHeads(pool, tenantId);
       // A model request normally reaches the gateway before the Worker publishes its settlement.

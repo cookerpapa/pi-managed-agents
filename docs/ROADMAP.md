@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The #52 candidate adopts external inputs directly from its PG queue through [Pi tool and settlement boundaries](adr/0366-pg-input-boundaries.md).
+
 The #52 candidate routes Session inputs, withdrawals and inter-agent messages through the [segmented mailbox](adr/0365-segment-session-inputs.md). The production storage cutover remains a separate milestone.
 
 The segmented queue now uses directed Worker wakes for root, child and recovery Turns. [Fan-out and reconnection measurements](reports/segment-worker-wake-20261126.md).

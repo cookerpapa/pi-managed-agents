@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Keep pending inputs and edits in PG. Place one eligible input in native history at each boundary, retain only nonempty native maintenance payloads, and reconcile at the ordered writer seal. [Decision](adr/0366-pg-input-boundaries.md).
+
 - [x] Direct new inputs to the independent Session owner, confirm take-back at the Pi boundary, and acknowledge named delegation at registration. Children report explicitly through their family mailbox. [Candidate evidence](reports/session-mailbox-20261126.md).
 - [ ] Deferred — define `wait_for_input` and durable wake conditions if a workload requires suspended Sessions to release their slots.
 
