@@ -7,6 +7,7 @@ import { KafkaWorkerProducer, KafkaToolReplyPublisher } from "@pi-cloud/event-lo
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { IndependentSessionRuntime } from "./independent-session-runtime.mjs";
 import { readSealedFamily } from "@pi-cloud/pi-session-postgres/durable";
+import { verifyTurnSettings } from "./turn-settings-acceptance.mjs";
 import { waitingDelegation, resumeParent } from "./direct-delegation-worker.mjs";
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
@@ -18,7 +19,7 @@ import { sql } from "kysely";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { createPrivateTenant } from "../../../packages/control-plane/src/tenant-administration.ts";
 import { registerTestWorker } from "../../../packages/control-plane/test/fixtures/registered-worker.ts";
-import { ForkStorage, installForkTables, setForkLayout } from "./fork-storage.mjs";
+import { installForkTables, setForkLayout } from "./fork-storage.mjs";
 import { installPagingProjection } from "./flow-paging-fixture.mjs";
 import {
   SegmentLeaseProjection,
@@ -46,17 +47,22 @@ async function actor(db, url, capacity = 1, transport = {}) {
     { execArgv: ["--import", "tsx"], stdio: ["ignore", "inherit", "inherit", "ipc"] },
   );
   const ended = once(child, "exit");
-  async function ask(m) {
+  async function receive() {
     const incoming = once(child, "message", { signal: AbortSignal.timeout(12000) });
-    child.send(m);
     const [r] = await Promise.race([incoming, ended]);
     assert(r && r.kind !== "error", r?.message ?? "Worker exited");
     return r;
+  }
+  function ask(m) {
+    const result = receive();
+    child.send(m);
+    return result;
   }
   await ask({ url, workerId, bootId, capacity, leaseDurationMs: 2400, ...transport });
   return {
     workerId,
     ask,
+    receive,
     async kill() {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
       await ended;
@@ -72,7 +78,7 @@ it.skipIf(!endpoint)(
     url.searchParams.set("options", "-c search_path=" + schema + ",public");
     const db = createDatabase({ connectionString: endpoint });
     const pool = new pg.Pool({ connectionString: url.href }),
-      store = new ForkStorage(pool);
+      store = new IndependentSessionRuntime({ pool, topic: "independent" }).store;
     const topic = "segment-" + randomUUID(),
       projection = new SegmentLeaseProjection(store.db, topic, 1);
     const actors = [];
@@ -109,7 +115,7 @@ it.skipIf(!endpoint)(
         turn = randomUUID();
       await store.register(t, [parent]);
       await pool.query(
-        "insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state) values($1,$2,$3,1,$1,'parent','fixture','queued')",
+        "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) values($1,$2,$3,1,$1,'parent','queued')",
         [turn, t, parent],
       );
       const a = await nextWorker(),
@@ -218,6 +224,13 @@ it.skipIf(!endpoint)(
       assert(reply.history.includes("parent evidence"));
       assert(reply.history.includes("child task"));
       assert.equal(reply.text, "checked: child task");
+      // The lease-only harness synthesizes terminal facts. Deliver its real
+      // native input receipt before that boundary, like the RF3 projector.
+      await pool.query("select segment_input_receipts($1,$2,$3)", [
+        t,
+        second.turnId,
+        JSON.stringify([reply.placement]),
+      ]);
       assert.equal(await consume(finish(second)), true);
       assert.deepEqual(
         (await pool.query("select state from runs order by id")).rows.map((r) => r.state),
@@ -246,8 +259,8 @@ it.skipIf(!endpoint)(
 );
 
 const brokers = process.env.PI_CLOUD_KAFKA_INTEGRATION_BROKERS?.split(",");
-it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
-  "acknowledges %s creation independently of child completion and restores the Session through RF3",
+it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff", "turn-settings"])(
+  "executes the independent Session %s scenario through RF3",
   async (mode) => {
     const schema = "segment_log_" + randomUUID().replaceAll("-", "");
     const url = new URL(endpoint);
@@ -290,16 +303,17 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
     }
     try {
       await runMigrations(db, "up");
-      const { tenantId: t } = await createPrivateTenant(db, {
+      const tenant = await createPrivateTenant(db, {
         slug: schema.replaceAll("_", "-"),
         ownerDisplayName: "Test",
       });
+      const t = tenant.tenantId;
       await pool.query("create schema " + schema);
       await installPagingProjection(pool);
       await installForkTables(pool);
       await setForkLayout(pool, true, false);
-      await installIndependentSessionLeases(pool);
       await installWorkspaceRoutes(pool);
+      await installIndependentSessionLeases(pool);
       await admin.connect();
       await admin.createTopics({
         topics: [
@@ -357,11 +371,32 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff"])(
       reconciliation.catch((e) => {
         failed = e;
       });
+      if (mode === "turn-settings") {
+        scheduler = await rt.serveScheduler({ connectionString: url.href, token, tickMs: 300 });
+        await verifyTurnSettings({
+          rt,
+          pool,
+          db,
+          tenant,
+          token,
+          until,
+          newWorker: async () => {
+            const w = await actor(db, url.href, 1, {
+              topic,
+              brokers,
+              scheduler: { url: scheduler.url, token },
+            });
+            actors.push(w);
+            return w;
+          },
+        });
+        return;
+      }
       const parentSession = randomUUID(),
         parentRun = randomUUID();
       await rt.store.register(t, [parentSession]);
       await pool.query(
-        "insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state) values($1,$2,$3,1,$1,'Delegate','fixture','queued')",
+        "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) values($1,$2,$3,1,$1,'Delegate','queued')",
         [parentRun, t, parentSession],
       );
       const workerId = randomUUID(),
@@ -898,7 +933,7 @@ it.skipIf(!endpoint)(
       async function enqueue(flow, pos) {
         const id = randomUUID();
         await pool.query(
-          "insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state) values($1,$2,$3,$4,$1,'task','fixture','queued')",
+          "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) values($1,$2,$3,$4,$1,'task','queued')",
           [id, t, flow, pos],
         );
         return id;

@@ -50,7 +50,13 @@ export function normalRootProjection(
     pool,
     sessions: view.sessions,
     partitions,
-    stage: { integrated: true, sink: "single", scene: "plain", rootPresentation: true },
+    stage: {
+      integrated: true,
+      sink: "single",
+      scene: "plain",
+      rootPresentation: true,
+      independentSessions,
+    },
     nextOffsets: new Map(),
     metrics: {
       byPartition: Array(partitions).fill(0),

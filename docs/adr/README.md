@@ -1,5 +1,9 @@
 # Current architecture decisions
 
+[ADR-0369](0369-placed-input-navigation.md) uses adopted inputs for conversation navigation.
+
+[ADR-0368](0368-session-defaults-and-turn-snapshots.md) freezes the model and logical environment on each admitted Turn.
+
 [ADR-0367](0367-worker-steer-hints.md) confirms pending steers on the owning Worker and skips empty boundary queries.
 
 [ADR-0366](0366-pg-input-boundaries.md) places PG mailbox inputs at native execution boundaries.

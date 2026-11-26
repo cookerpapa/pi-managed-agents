@@ -48,9 +48,22 @@ function branchChildren(tree: ConversationTreeResource) {
     const parent = tree.branches.find(
       (candidate) => candidate.sessionId === branch.parentSessionId,
     );
-    const anchor = parent?.entries.some((entry) => entry.entryId === branch.forkedFromEntryId)
-      ? branch.forkedFromEntryId
-      : null;
+    // A branch can fork at an assistant answer. Attach it under the last
+    // visible input up to that answer in the same Turn.
+    const sourceEntry = branch.forkedFromEntryId;
+    const exact = parent?.entries.find((entry) => entry.entryId === sourceEntry);
+    const anchor =
+      exact?.role === "user"
+        ? exact.entryId
+        : parent?.entries
+            .filter(
+              (entry) =>
+                entry.role === "user" &&
+                entry.turnId === branch.forkedFromTurnId &&
+                sourceEntry !== null &&
+                Number(entry.entryId) <= Number(sourceEntry),
+            )
+            .at(-1)?.entryId;
     const key = `${branch.parentSessionId}:${anchor ?? "__root__"}`;
     const siblings = children.get(key) ?? [];
     siblings.push(branch);
@@ -79,7 +92,7 @@ function TreeBranch({
   branch,
   children,
   depth,
-  activeTurnId,
+  activeEntryKey,
   navigate,
   page,
 }: {
@@ -87,7 +100,7 @@ function TreeBranch({
   branch: ConversationTreeBranchResource;
   children: ReadonlyMap<string, readonly ConversationTreeBranchResource[]>;
   depth: number;
-  activeTurnId: string | null;
+  activeEntryKey: string | null;
   navigate: (sessionId: string, target?: { turnId: string; entryId: string }) => void;
 }) {
   const { t } = useI18n();
@@ -130,7 +143,7 @@ function TreeBranch({
       ) : null}
       {unanchoredChildren.map((child) => (
         <TreeBranch
-          activeTurnId={activeTurnId}
+          activeEntryKey={activeEntryKey}
           branch={child}
           children={children}
           depth={depth + 1}
@@ -139,40 +152,44 @@ function TreeBranch({
           page={page}
         />
       ))}
-      {branch.entries.map((entry) => {
-        const nested = children.get(`${branch.sessionId}:${entry.entryId}`) ?? [];
-        return (
-          <div className="product-tree-entry-wrap" key={`${branch.sessionId}:${entry.entryId}`}>
-            <button
-              aria-current={activeTurnId === entry.turnId ? "true" : undefined}
-              className={`product-tree-entry product-tree-${entry.role}${
-                activeTurnId === entry.turnId ? " active" : ""
-              }`}
-              onClick={() =>
-                navigate(branch.sessionId, { turnId: entry.turnId, entryId: entry.entryId })
-              }
-              title={compact(entry.text, 240, t("tree.emptyMessage"))}
-              type="button"
-            >
-              <span className="product-tree-connector" aria-hidden="true">
-                {entry.role === "user" ? "U" : "A"}
-              </span>
-              <span>{compact(entry.text, 76, t("tree.emptyMessage"))}</span>
-            </button>
-            {nested.map((child) => (
-              <TreeBranch
-                activeTurnId={activeTurnId}
-                branch={child}
-                children={children}
-                depth={depth + 1}
-                key={child.sessionId}
-                navigate={navigate}
-                page={page}
-              />
-            ))}
-          </div>
-        );
-      })}
+      {branch.entries
+        .filter((entry) => entry.role === "user")
+        .map((entry) => {
+          const nested = children.get(`${branch.sessionId}:${entry.entryId}`) ?? [];
+          return (
+            <div className="product-tree-entry-wrap" key={`${branch.sessionId}:${entry.entryId}`}>
+              <button
+                aria-current={
+                  activeEntryKey === entry.turnId + "/" + entry.entryId ? "true" : undefined
+                }
+                className={`product-tree-entry product-tree-${entry.role}${
+                  activeEntryKey === entry.turnId + "/" + entry.entryId ? " active" : ""
+                }`}
+                onClick={() =>
+                  navigate(branch.sessionId, { turnId: entry.turnId, entryId: entry.entryId })
+                }
+                title={compact(entry.text, 240, t("tree.emptyMessage"))}
+                type="button"
+              >
+                <span className="product-tree-connector" aria-hidden="true">
+                  {entry.source === "agent" ? "A" : "U"}
+                </span>
+                <span>{compact(entry.text, 76, t("tree.emptyMessage"))}</span>
+              </button>
+              {nested.map((child) => (
+                <TreeBranch
+                  activeEntryKey={activeEntryKey}
+                  branch={child}
+                  children={children}
+                  depth={depth + 1}
+                  key={child.sessionId}
+                  navigate={navigate}
+                  page={page}
+                />
+              ))}
+            </div>
+          );
+        })}
     </div>
   );
 }
@@ -203,7 +220,7 @@ export function ConversationTreeNavigator({
     minimumWidth: 220,
     maximumWidth: 520,
   });
-  const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
+  const [activeEntryKey, setActiveEntryKey] = useState<string | null>(null);
   const jumpTargetRef = useRef<string | null>(null);
   const jumpReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentEntries = useMemo(() => {
@@ -217,28 +234,24 @@ export function ConversationTreeNavigator({
     }
     return tree.branches
       .filter((branch) => lineage.has(branch.sessionId))
-      .flatMap((branch) => branch.entries);
+      .flatMap((branch) => branch.entries.filter((entry) => entry.role === "user"));
   }, [tree]);
-  const currentTurnIds = useMemo(
-    () => [...new Set(currentEntries.map((entry) => entry.turnId))],
-    [currentEntries],
-  );
-  const identity = currentTurnIds.join("\u0000");
+  const identity = currentEntries.map((e) => e.turnId + "/" + e.entryId).join("\u0000");
 
   useEffect(() => {
     const scroller = scrollerRef.current;
-    if (scroller === null || currentTurnIds.length === 0) return;
+    if (scroller === null || currentEntries.length === 0) return;
     const updateActive = (): void => {
       if (jumpTargetRef.current !== null) return;
       const bounds = scroller.getBoundingClientRect();
-      const elements = turnElements(scroller);
-      setActiveTurnId(
+      const elements = entryElements(scroller);
+      setActiveEntryKey(
         selectActiveTurn({
-          anchors: currentTurnIds.flatMap((turnId) => {
-            const element = elements.get(turnId);
-            return element === undefined
-              ? []
-              : [{ turnId, top: element.getBoundingClientRect().top }];
+          anchors: currentEntries.flatMap(({ turnId, entryId }) => {
+            const element = elements.get(entryId);
+            return element?.dataset.conversationTurnId === turnId
+              ? [{ turnId: turnId + "/" + entryId, top: element.getBoundingClientRect().top }]
+              : [];
           }),
           clientHeight: scroller.clientHeight,
           scrollHeight: scroller.scrollHeight,
@@ -270,7 +283,7 @@ export function ConversationTreeNavigator({
     onJump?.();
     const scroller = scrollerRef.current;
     const target =
-      scroller === null
+      scroller === null || sessionId !== tree?.currentSessionId
         ? undefined
         : selectConversationNavigationTarget(
             entryElements(scroller),
@@ -281,8 +294,8 @@ export function ConversationTreeNavigator({
       onNavigate(sessionId, targetIdentity);
       return;
     }
-    jumpTargetRef.current = targetIdentity.turnId;
-    setActiveTurnId(targetIdentity.turnId);
+    jumpTargetRef.current = targetIdentity.entryId;
+    setActiveEntryKey(targetIdentity.turnId + "/" + targetIdentity.entryId);
     target.scrollIntoView({ behavior: "smooth", block: "start" });
     if (jumpReleaseTimerRef.current !== null) clearTimeout(jumpReleaseTimerRef.current);
     jumpReleaseTimerRef.current = setTimeout(() => {
@@ -349,7 +362,7 @@ export function ConversationTreeNavigator({
             <div className="product-tree-empty" aria-hidden="true" />
           ) : (
             <TreeBranch
-              activeTurnId={activeTurnId}
+              activeEntryKey={activeEntryKey}
               branch={root}
               children={children}
               depth={0}

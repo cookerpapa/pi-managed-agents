@@ -1,5 +1,8 @@
 # ADR-0365. Deliver human and agent input to independently owned Sessions
 
+
+[ADR-0369](0369-placed-input-navigation.md) refines Stop and post-Stop Agent mail delivery in this candidate.
+
 [ADR-0366](0366-pg-input-boundaries.md) supersedes the active-mail handoff and native queue editing portions of this decision.
 
 Accepted for the isolated #52 candidate. ADR-0362 owns shared prefixes and management ancestry. ADR-0363 owns the Session lease. Keep the one-listener directed scheduler from ADR-0364. Queue one ready Session, with its earliest eligible Turn as the execution and history anchor. A busy Session receives a hint on its owner's existing management socket, including when that Worker has no spare slots. Reconnect and reconciliation must repair missed hints.

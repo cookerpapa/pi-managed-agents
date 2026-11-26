@@ -334,7 +334,8 @@ window.renderChat = (sessionState='idle', history=false, childViews=false, peerF
   const fixtureMachines=window.fixtureMachineState&&!['missing-binding','unavailable'].includes(window.fixtureMachineState)?[{environmentId:fixtureMachineId,projectId:project.projectId,workspaceId:project.workspaceId,workspaceName:'Bound machine',state:window.fixtureMachineState,generation:1,profileKey:'starter',cpuCount:1,memoryMiB:2048,systemDiskGiB:8,createdAt,updatedAt:createdAt}]:[];
   const tree=(label,sessionId=sid)=>({currentSessionId:sessionId,branches:[{sessionId,parentSessionId:sessionId===sid?null:sid,
     kind:sessionId===sid?'conversation':'subagent',title:'Fixture tree',current:true,
-    entries:[{entryId:'answer-entry',turnId:fixtureTurnId,role:'assistant',text:label,finalAssistant:true}]}],delegatedSessions:[]});
+    entries:[{entryId:'user-entry',turnId:fixtureTurnId,role:'user',text:label,finalAssistant:false},
+      {entryId:'answer-entry',turnId:fixtureTurnId,role:'assistant',text:'Fixture final answer',finalAssistant:true}]}],delegatedSessions:[]});
   window.treeRequests=[];window.deferTrees=false;
   window.historyMutations=[];
   window.fixtureParentDeleted=false;window.fixtureForkDeleted=false;window.fixtureSourcePointGone=false;window.sourceNavigationReads=[];
@@ -1745,7 +1746,7 @@ try {
         '!document.querySelectorAll(".product-model-menu-panel")[2].querySelector("button").disabled',
       );
       await page.evaluate(
-        `Array.from(document.querySelectorAll('.product-model-menu-panel')[2].querySelectorAll('button')).find(b=>b.querySelector('span')?.textContent==='High').click()`,
+        `Array.from(document.querySelectorAll('.product-model-menu-panel')[2].querySelectorAll('button')).find(b=>['High','高'].includes(b.querySelector('span')?.textContent)).click()`,
       );
       await page.waitFor('!document.querySelector(".product-model-menu-panel")');
     };
@@ -2189,6 +2190,12 @@ try {
     await page.waitFor("document.querySelector('.product-delete-conversation')");
     await page.evaluate(`document.querySelector(${JSON.stringify(parentButton)}).click()`);
     await page.waitFor("document.querySelector('.product-stop-button')");
+    await page.waitFor(
+      "/Next turn|下轮生效/.test(document.querySelector('.product-model-menu-trigger')?.textContent)",
+    );
+    await openModel(1);
+    await high();
+    await page.waitFor("savedSelection.provider==='deepseek'");
     await page.evaluate("document.querySelector('.product-account-menu-trigger').click()");
     await page.waitFor("document.querySelector('.product-account-menu-panel:not([hidden])')");
     await page.evaluate(

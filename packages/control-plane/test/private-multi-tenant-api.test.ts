@@ -311,8 +311,18 @@ describe.sequential("private multi-tenant HTTP boundary", () => {
         fastMode: false,
       },
     });
-    expect(activeModelChange.statusCode).toBe(409);
-    expect(activeModelChange.json()).toMatchObject({ error: { code: "conflict" } });
+    expect(activeModelChange.statusCode).toBe(200);
+    expect(activeModelChange.json()).toMatchObject({
+      provider: "deepseek",
+      modelId: "deepseek-v4-flash",
+    });
+    expect(
+      await database
+        .selectFrom("runs")
+        .select(["provider", "thinking_level", "service_tier"])
+        .where("id", "=", turnA.runId)
+        .executeTakeFirstOrThrow(),
+    ).toMatchObject({ provider: "openai-codex", thinking_level: "medium", service_tier: "fast" });
 
     const foreignProbes = [
       await http.inject({
@@ -454,7 +464,7 @@ describe.sequential("private multi-tenant HTTP boundary", () => {
     expect(newTurn.json()).toMatchObject({ error: { code: "input_delivery_unavailable" } });
   });
 
-  it("switches only an idle conversation default and snapshots the next Turn", async () => {
+  it("snapshots the selected conversation default on the next Turn", async () => {
     await database
       .updateTable("runs")
       .set({ state: "completed", settled_at: NOW })

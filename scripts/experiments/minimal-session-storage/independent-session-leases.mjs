@@ -1,3 +1,4 @@
+import { installPhysicalTurnProjection } from "./ready-projection-sql.mjs";
 // Ownership adapter for the #52 segmented Run queue. Public Worker identities,
 // renewable leases and the on-disk epoch are the same ones the serving coordinator uses.
 import { SteerHint } from "./steer-hint.mjs";
@@ -14,9 +15,11 @@ export async function installIndependentSessionLeases(db) {
   for (const file of [
     "subagent-deliveries.sql",
     "independent-session-leases.sql",
-    "session-inputs.sql",
+    "turn-snapshots.sql",
   ])
     await db.query(await readFile(new URL(file, import.meta.url), "utf8"));
+  await installPhysicalTurnProjection(db);
+  await db.query(await readFile(new URL("session-inputs.sql", import.meta.url), "utf8"));
 }
 
 export class SegmentWorker {
@@ -50,13 +53,14 @@ export class SegmentWorker {
         const {
           rows: [job],
         } = await sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
-          s.parent_session_id,s.agent_name,s.family_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_ref,r.workspace_grant,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.position limit 1) as first_message,
+          s.parent_session_id,s.agent_name,s.family_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
+          (select prev.workspace_grant from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id and prev.mailbox_position=r.mailbox_position-1) previous_workspace,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.starts_turn desc,m.position limit 1) as first_message,
           exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs
           from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
-          join runs r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
+          join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
           where r.state='queued' and r.lease_id is null and r.output_seal_id is null
             and not exists(select from session_leases l where l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.released_at is null)
-            and not exists(select from runs p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position and
+            and not exists(select from turns p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position and
               (p.state not in ('completed','failed','timed_out','cancelled') or (p.output_seal_id is not null and p.output_sealed_at is null)))
           order by q.ready_at,q.session_id,r.mailbox_position limit 1 for update of r,s skip locked`.execute(
           tx,
@@ -99,7 +103,7 @@ export class SegmentWorker {
           physical.lease_epoch,
         );
         const claim =
-          await sql`update runs set state=case when stop_on_resume then 'cancel_requested' else 'running' end,lease_id=${lease.lease_id}::uuid,fencing_token=${lease.fencing_token},
+          await sql`update turns set state=case when stop_on_resume then 'cancel_requested' else 'running' end,lease_id=${lease.lease_id}::uuid,fencing_token=${lease.fencing_token},
           started_at=coalesce(started_at,clock_timestamp()) where id=${job.id}::uuid and exists(select from supervisor_connections c join workers w on w.id=c.worker_id
             and w.boot_id=c.boot_id and w.supervisor_id=c.supervisor_id where w.id=${this.workerId}::uuid and w.state='ready'
             and c.state='active' and c.expires_at>clock_timestamp()) returning id`.execute(tx);
@@ -109,6 +113,7 @@ export class SegmentWorker {
         );
         return {
           ...job,
+          turnId: job.id,
           scope: {
             tenantId: job.tenant_id,
             sessionId: job.logical_id,
@@ -135,7 +140,9 @@ export class SegmentWorker {
         await guard.close();
       };
       const steerHint = new SteerHint();
-      const active = { identity, guard, steerHint };
+      const stop = new AbortController();
+      if (job.stop_on_resume) stop.abort();
+      const active = { identity, guard, steerHint, stop };
       this.#active.set(identity.leaseId, active);
       try {
         await guard.assertCurrent();
@@ -149,7 +156,14 @@ export class SegmentWorker {
         await release();
         throw error;
       }
-      return { ...job, authority: guard, steerHint, release };
+      return {
+        ...job,
+        turnId: job.id,
+        authority: guard,
+        steerHint,
+        stopSignal: stop.signal,
+        release,
+      };
     } finally {
       this.#pending--;
     }
@@ -166,14 +180,19 @@ export class SegmentWorker {
     if (!active.length || this.#closed) return;
     const tickets = new Map(active.map((a) => [a.identity.leaseId, a.steerHint.ticket]));
     const outstanding = full ? sql`` : sql`and m.steer_seen_epoch is null`;
-    const { rows } = await sql`select distinct on(r.lease_id) r.lease_id,m.steer_notice
-      from runs r join user_or_agent_messages m on m.turn_id=r.id and m.tenant_id=r.tenant_id
-      where r.lease_id=any(${[...tickets.keys()]}::uuid[]) and r.state='running' and r.output_seal_id is null
+    const owners = [...tickets.keys()];
+    const { rows } = await sql`(select distinct on(r.lease_id) r.lease_id,m.steer_notice
+      from turns r join user_or_agent_messages m on m.turn_id=r.id and m.tenant_id=r.tenant_id
+      where r.lease_id=any(${owners}::uuid[]) and r.state='running' and r.output_seal_id is null
         and m.state='pending' and m.mode='steer' and m.steer_notice is not null ${outstanding}
-      order by r.lease_id,m.steer_notice desc`.execute(this.db);
+      order by r.lease_id,m.steer_notice desc) union all select lease_id,null::bigint from turns
+      where lease_id=any(${owners}::uuid[]) and state='cancel_requested' and output_seal_id is null`.execute(
+      this.db,
+    );
     for (const { lease_id, steer_notice } of rows) {
       tickets.delete(lease_id);
-      this.#notice(lease_id, steer_notice);
+      if (steer_notice === null) this.#active.get(lease_id)?.stop.abort();
+      else this.#notice(lease_id, steer_notice);
     }
     if (full)
       for (const [writer, ticket] of tickets) this.#active.get(writer)?.steerHint.clear(ticket);
@@ -215,6 +234,7 @@ export class SegmentWorker {
       id: this.workerId + "/" + this.bootId,
       slots: this.capacity,
       onSteer: (writer, revision) => this.#notice(writer, revision),
+      onStop: (writer) => this.#active.get(writer)?.stop.abort(),
       onRegistered: () => {
         for (const active of this.#active.values()) active.steerHint.mark();
         this.#repairHints(true);
@@ -293,7 +313,7 @@ export class SegmentLeaseProjection {
       await sql`set local synchronous_commit=on`.execute(tx);
       const { rows } =
         await sql`select r.id,r.tenant_id,s.id as session,r.lease_id,r.fencing_token,r.output_seal_id,r.recovery_requested_at,r.output_display_seq
-        from session_leases l join runs r on r.tenant_id=l.tenant_id and r.lease_id=l.lease_id join sessions s on s.id::text=l.pi_session_id and s.tenant_id=r.tenant_id and s.flow_id=r.session_id
+        from session_leases l join turns r on r.tenant_id=l.tenant_id and r.lease_id=l.lease_id join sessions s on s.id::text=l.pi_session_id and s.tenant_id=r.tenant_id and s.flow_id=r.session_id
         where r.state in ('running','cancel_requested') and l.released_at is null and l.valid_until<=clock_timestamp() and (r.seal_offer_after is null or r.seal_offer_after<=clock_timestamp())
         order by l.valid_until,r.id limit ${limit} for update of r,l skip locked`.execute(tx);
       const seals = [];
@@ -301,7 +321,7 @@ export class SegmentLeaseProjection {
         const id = r.output_seal_id ?? randomUUID();
         const {
           rows: [intent],
-        } = await sql`update runs set output_seal_id=${id}::uuid,
+        } = await sql`update turns set output_seal_id=${id}::uuid,
           recovery_requested_at=coalesce(recovery_requested_at,clock_timestamp()),seal_offer_after=clock_timestamp()+interval '1 second'
           where id=${r.id}::uuid returning recovery_requested_at`.execute(tx);
         if (!r.output_seal_id)
@@ -371,7 +391,7 @@ export class SegmentLeaseProjection {
       } =
         await sql`with target as materialized (select * from sessions where tenant_id=${s.tenantId}::uuid and id=${s.sessionId}::uuid for no key update)
         select r.state,r.output_seal_id,r.native_work_handoff,r.projection_first,r.output_first_offset,r.session_id as flow_id,l.writer_failed_at
-        from runs r join target s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
+        from turns r join target s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
         where r.tenant_id=${s.tenantId}::uuid and s.id=${s.sessionId}::uuid and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid
           and r.fencing_token=${s.fencingToken} and l.fencing_token=r.fencing_token and l.released_at is null and r.state in ('running','cancel_requested')
         for update of r,l`.execute(tx);
@@ -390,7 +410,7 @@ export class SegmentLeaseProjection {
           r.native_work_handoff !== null
         ) {
           const { rows } =
-            await sql`select from runs where id=${s.runId}::uuid and native_work_handoff->>'sealId'=${fact.factId}
+            await sql`select from turns where id=${s.runId}::uuid and native_work_handoff->>'sealId'=${fact.factId}
             and native_work_handoff->>'offset'=${String(offset)} and native_work_handoff->>'topic'=${topic}
             and native_work_handoff#>>'{scope,writerId}'=${s.writerId}`.execute(tx);
           if (!rows.length) throw Error("No native checkpoint for this writer seal");
@@ -408,7 +428,7 @@ export class SegmentLeaseProjection {
           and turn_id=${s.runId}::uuid and state='sending'`.execute(tx);
         await sql`update user_or_agent_messages set steer_seen_epoch=null where turn_id=${s.runId}::uuid and
           mode='steer' and state='pending' and steer_seen_epoch=${s.fencingToken}`.execute(tx);
-        await sql`update runs set stop_on_resume=(stop_on_resume or state='cancel_requested'),state='queued',lease_id=null,fencing_token=null,recovery_requested_at=null,seal_offer_after=null,output_seal_id=null,
+        await sql`update turns set stop_on_resume=(stop_on_resume or state='cancel_requested'),state='queued',lease_id=null,fencing_token=null,recovery_requested_at=null,seal_offer_after=null,output_seal_id=null,
           output_sealed_at=null,output_seal_offset=null,output_first_offset=null,output_first_partition=null,output_first_topic=null,
           projection_first=null,projection_partition=null,projection_pin=null,projection_state=null where id=${s.runId}::uuid`.execute(
           tx,
@@ -420,14 +440,14 @@ export class SegmentLeaseProjection {
           "turn.cancelled": "cancelled",
         }[fact.terminal.type];
         if (!state) throw Error("Invalid terminal outcome");
-        await sql`update runs set state=${state},settled_at=clock_timestamp(),output_seal_id=${fact.factId}::uuid,
+        await sql`update turns set state=${state},settled_at=clock_timestamp(),output_seal_id=${fact.factId}::uuid,
           output_sealed_at=clock_timestamp(),output_seal_offset=${String(offset)}::bigint where id=${s.runId}::uuid`.execute(
           tx,
         );
         await settleNative(tx, r);
         if (fact.nativeSequence > 0) {
           const { rows } =
-            await sql`select from runs where id=${s.runId}::uuid and history_head->>'version'=${fact.factId}
+            await sql`select from turns where id=${s.runId}::uuid and history_head->>'version'=${fact.factId}
             and (history_head->>'seq')::bigint=${fact.nativeSequence}`.execute(tx);
           if (!rows.length) throw Error("Terminal native state is not projected");
         }

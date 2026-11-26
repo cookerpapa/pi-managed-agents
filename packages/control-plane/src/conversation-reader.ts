@@ -107,6 +107,7 @@ export class ConversationReader {
     tenantId: string,
     private readonly rootMessageHistory = false,
     private readonly flowRootHistory = false,
+    private readonly placedInputHistory?: boolean,
   ) {
     this.#database = database;
     this.#tenantId = tenantId;
@@ -258,6 +259,7 @@ export class ConversationReader {
           this.#tenantId,
           this.rootMessageHistory,
           this.flowRootHistory,
+          this.placedInputHistory,
         );
         return reader.#readConversation(sessionId, query, filters);
       });
@@ -570,6 +572,7 @@ export class ConversationReader {
           childMessages,
           flows,
           this.flowRootHistory,
+          this.placedInputHistory,
         )
       : await readCanonicalHistoryWindow(this.#database, windowInput);
     const sourceByTurn = new Map(sources.map((r) => [r.turnId, r]));

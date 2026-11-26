@@ -1,3 +1,5 @@
+import { resolveWorkspaceBindingTarget } from "./workspace-binding-target.ts";
+import { resolveTurnModelSnapshot } from "./turn-model-snapshot.ts";
 import { selectedBackendTemplate } from "./resource-backend-selection.ts";
 import { defaultWorkspaceCapacityBytes } from "./workspace-capacity-service.ts";
 import { runRetainsResource } from "./resource-admission.ts";
@@ -8,12 +10,7 @@ import { searchConversationPage } from "./conversation-history-service.ts";
 import type { ConversationHistoryQuery } from "@pi-cloud/protocol";
 import { compactFingerprint } from "./conversation-command-identity.ts";
 import { environmentForImage } from "@pi-cloud/database";
-import {
-  catalogModel,
-  currentModelCatalog,
-  freezeModelRuntime,
-  runtimeModelCatalog,
-} from "./runtime-model-catalog.ts";
+import { catalogModel, currentModelCatalog, runtimeModelCatalog } from "./runtime-model-catalog.ts";
 import { requestInputReturn } from "./stopped-inputs.ts";
 import { resourceLimit } from "@pi-cloud/domain";
 import { createHash, randomUUID } from "node:crypto";
@@ -21,10 +18,7 @@ import { bindInputUploads } from "./workspace-upload-service.ts";
 import { laneDependenciesReady, advanceLaneReadiness } from "@pi-cloud/runtime-core/run-readiness";
 import type { Database } from "@pi-cloud/database";
 import {
-  DomainModelValidationError,
   PI_CODING_AGENT_REVISION_ID,
-  resolveTurnModel,
-  type ModelProfile,
   type ModelThinkingLevel,
   type SessionState,
 } from "@pi-cloud/domain";
@@ -92,6 +86,7 @@ export type ControlPlaneStoreOptions = {
   olderHistoryReader?: OlderHistoryReader;
   database: Kysely<Database>;
   conversationReadDatabase?: Kysely<Database>;
+  placedInputHistory?: boolean;
   rootMessageHistory?: boolean;
   flowRootHistory?: boolean;
   delegatedRunHistory?: boolean;
@@ -153,19 +148,6 @@ type AcceptedTurnCancellationRow = {
   sessionId: string;
   acceptedAt: Date | string;
   requestSha256: string;
-};
-
-type ModelSnapshotRow = {
-  profileId: string;
-  provider: string;
-  modelId: string;
-  defaultThinkingLevel: string;
-  allowedThinkingLevels: string[];
-  credentialBindingId: string;
-  credentialBindingVersion: string;
-  profileEnabled: boolean;
-  credentialStatus: string;
-  credentialProvider: string;
 };
 
 type TenantRuntimePolicy = {
@@ -307,6 +289,7 @@ export class ControlPlaneStore {
       options.tenantId,
       options.rootMessageHistory,
       options.flowRootHistory,
+      options.placedInputHistory,
     );
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#delegatedRunHistory = options.delegatedRunHistory ?? false;
@@ -611,8 +594,9 @@ export class ControlPlaneStore {
               now: new Date(),
             });
       const modelProfileId = selectedModelProfile?.profileId ?? policy.defaultModelProfileId;
-      const model = await this.#resolveModelSnapshot(
+      const model = await resolveTurnModelSnapshot(
         transaction,
+        this.#tenantId,
         modelProfileId,
         execution.model?.thinkingLevel,
         execution.model?.fastMode === true ? "fast" : null,
@@ -743,20 +727,6 @@ export class ControlPlaneStore {
         .executeTakeFirst();
       if (session === undefined || session.sessionKind !== "conversation") {
         throw new ControlPlaneStoreError("not_found", "Conversation was not found");
-      }
-      const activeTurn = await transaction
-        .selectFrom("runs")
-        .select("id")
-        .where("tenant_id", "=", this.#tenantId)
-        .where("session_id", "=", sessionId)
-        .where("state", "in", ["queued", "running", "settling", "cancel_requested"])
-        .limit(1)
-        .executeTakeFirst();
-      if (activeTurn !== undefined) {
-        throw new ControlPlaneStoreError(
-          "conflict",
-          "Conversation model cannot change while a Run is active",
-        );
       }
       if (supportedSessionModelSelection(selection) === undefined) {
         throw new ControlPlaneStoreError(
@@ -1164,81 +1134,15 @@ export class ControlPlaneStore {
           "Wait for all Session work to settle before rebinding",
         );
 
-      // Match machine lifecycle/admission: machine before Workspace. A release
-      // intent may leave the machine marked running until its external call ends.
-      const machine = await transaction
-        .selectFrom("development_environments")
-        .select(["id", "owner_user_id", "profile_key", "state"])
-        .where("tenant_id", "=", this.#tenantId)
-        .where("workspace_id", "=", workspaceId)
-        .where("state", "!=", "released")
-        .forShare()
-        .executeTakeFirst();
-      if (machine) {
-        if (
-          machine.owner_user_id !== execution.ownerUserId ||
-          session.createdByUserId !== execution.ownerUserId
-        )
-          throw new ControlPlaneStoreError("not_found", "Target development machine was not found");
-        if (!["ready"].includes(machine.state))
-          throw new ControlPlaneStoreError("conflict", "Cloud development machine is not ready");
-        const releasing = await transaction
-          .selectFrom("development_environment_operations")
-          .select("id")
-          .where("tenant_id", "=", this.#tenantId)
-          .where("environment_id", "=", machine.id)
-          .where("action", "=", "release")
-          .where("result_state", "!=", "released")
-          .limit(1)
-          .executeTakeFirst();
-        if (releasing)
-          throw new ControlPlaneStoreError(
-            "conflict",
-            "Cloud development machine is being released",
-          );
-      }
-      const target = await transaction
-        .selectFrom("workspaces as workspace")
-        .innerJoin("projects as project", (join) =>
-          join
-            .onRef("project.tenant_id", "=", "workspace.tenant_id")
-            .onRef("project.id", "=", "workspace.project_id"),
-        )
-        .select([
-          "workspace.id",
-          "workspace.project_id as projectId",
-          "project.name as workspaceName",
-          "workspace.workspace_kind as workspaceKind",
-        ])
-        .where("workspace.tenant_id", "=", this.#tenantId)
-        .where("workspace.id", "=", workspaceId)
-        .where("workspace.workspace_kind", "in", ["user", "development_environment"])
-        .where("workspace.deleted_at", "is", null)
-        .where("project.deleted_at", "is", null)
-        .forUpdate("workspace")
-        .executeTakeFirst();
-      if (target === undefined) {
-        throw new ControlPlaneStoreError("not_found", "Target Workspace was not found");
-      }
-      const machineTarget = target.workspaceKind === "development_environment";
-      if (machineTarget !== (machine !== undefined))
-        throw new ControlPlaneStoreError(
-          "conflict",
-          "Target Workspace execution resource is unavailable",
+      const { machine, target, machineTarget, workingDirectory } =
+        await resolveWorkspaceBindingTarget(
+          transaction,
+          this.#tenantId,
+          workspaceId,
+          execution.ownerUserId,
+          session.createdByUserId,
+          execution.workingDirectory,
         );
-      const workingDirectory =
-        execution.workingDirectory ?? (machineTarget ? "/home/user" : "/workspace");
-      if (!machineTarget && workingDirectory !== "/workspace")
-        throw new ControlPlaneStoreError(
-          "invalid_request",
-          "Elastic Workspace requires /workspace",
-        );
-      if (machine && !["starter", "standard", "performance"].includes(machine.profile_key))
-        throw new ControlPlaneStoreError(
-          "control_plane_misconfigured",
-          "Development machine profile is invalid",
-        );
-
       const boundAt = new Date();
       await transaction
         .updateTable("sessions")
@@ -1726,8 +1630,9 @@ export class ControlPlaneStore {
         session.next_mailbox_position,
         "Next mailbox position",
       );
-      const model = await this.#resolveModelSnapshot(
+      const model = await resolveTurnModelSnapshot(
         transaction,
+        this.#tenantId,
         session.desired_model_profile_id,
         chat?.thinkingLevel ?? (session.desired_thinking_level as ModelThinkingLevel),
         session.desired_service_tier,
@@ -2102,100 +2007,6 @@ export class ControlPlaneStore {
           : "Active environment failed validation and must be rolled back",
       );
     return environmentSnapshot(result.row);
-  }
-
-  async #resolveModelSnapshot(
-    transaction: Transaction<Database>,
-    modelProfileId: string,
-    requestedThinkingLevel?: ModelThinkingLevel,
-    serviceTier: "fast" | null = null,
-  ) {
-    const row = (await transaction
-      .selectFrom("model_profiles as profile")
-      .innerJoin("credential_bindings as credential", (join) =>
-        join
-          .onRef("credential.tenant_id", "=", "profile.tenant_id")
-          .onRef("credential.id", "=", "profile.credential_binding_id")
-          .onRef("credential.version", "=", "profile.credential_binding_version"),
-      )
-      .select([
-        "profile.id as profileId",
-        "profile.provider as provider",
-        "profile.model_id as modelId",
-        "profile.default_thinking_level as defaultThinkingLevel",
-        "profile.allowed_thinking_levels as allowedThinkingLevels",
-        "profile.credential_binding_id as credentialBindingId",
-        "profile.credential_binding_version as credentialBindingVersion",
-        "profile.enabled as profileEnabled",
-        "credential.status as credentialStatus",
-        "credential.provider as credentialProvider",
-      ])
-      .where("profile.tenant_id", "=", this.#tenantId)
-      .where("profile.id", "=", modelProfileId)
-      .executeTakeFirst()) as ModelSnapshotRow | undefined;
-
-    if (
-      !row ||
-      !row.profileEnabled ||
-      row.credentialStatus !== "active" ||
-      row.credentialProvider !== row.provider
-    ) {
-      throw new ControlPlaneStoreError(
-        "control_plane_misconfigured",
-        "The configured model profile is unavailable",
-      );
-    }
-
-    const profile: ModelProfile = {
-      profileId: row.profileId,
-      provider: row.provider,
-      modelId: row.modelId,
-      defaultThinkingLevel: row.defaultThinkingLevel as ModelThinkingLevel,
-      allowedThinkingLevels: row.allowedThinkingLevels as ModelThinkingLevel[],
-      credentialBindingId: row.credentialBindingId,
-      credentialBindingVersion: positiveSafeInteger(
-        row.credentialBindingVersion,
-        "Credential binding version",
-      ),
-      enabled: row.profileEnabled,
-    };
-    try {
-      const catalog = currentModelCatalog();
-      const supported = catalogModel(profile.provider, profile.modelId, catalog);
-      if (profile.provider !== "pi-cloud-fake" && (!supported || !supported.visible)) {
-        throw new DomainModelValidationError(
-          "The selected model is unavailable in the current catalog",
-        );
-      }
-      // Credential identity/enabled state belongs to PG; real provider capabilities
-      // belong to the one deployment catalog, not an older profile-row copy.
-      const resolved = resolveTurnModel(
-        supported
-          ? {
-              ...profile,
-              defaultThinkingLevel: supported.defaultThinkingLevel,
-              allowedThinkingLevels: [...supported.thinkingLevels],
-            }
-          : profile,
-        requestedThinkingLevel,
-      );
-      if (serviceTier === "fast" && supported?.fastModeAvailable !== true) {
-        throw new DomainModelValidationError(`Fast mode is not supported by ${resolved.modelId}`);
-      }
-      return {
-        ...resolved,
-        serviceTier,
-        runtime: supported ? freezeModelRuntime(supported, catalog) : null,
-      };
-    } catch (error) {
-      if (error instanceof DomainModelValidationError) {
-        throw new ControlPlaneStoreError(
-          requestedThinkingLevel === undefined ? "control_plane_misconfigured" : "invalid_request",
-          error.message,
-        );
-      }
-      throw error;
-    }
   }
 
   async #sessionModelResource(

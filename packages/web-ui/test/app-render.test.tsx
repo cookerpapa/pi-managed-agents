@@ -488,7 +488,8 @@ describe("product chat experience", () => {
     expect(markup).toContain("写一个插入排序并测试");
     expect(markup).toContain("改用泛型实现");
     expect(markup).toContain("product-tree-user");
-    expect(markup).toContain("product-tree-assistant");
+    expect(markup).not.toContain("product-tree-assistant");
+    expect(markup).not.toContain("插入排序已经通过测试。");
     expect(markup).toContain("Subagent");
     expect(markup).toContain("继承上下文");
     expect(markup).toContain("共享计算环境");
@@ -910,9 +911,9 @@ it("keeps a focused independent Fork and a detached full-tree anchor navigable",
         entryId: "C",
         parentEntryId: null,
         turnId: "turn",
-        role: "assistant" as const,
+        role: "user" as const,
         text: "Retained C",
-        finalAssistant: true,
+        finalAssistant: false,
         createdAt: "2026-10-28T00:00:00Z",
       },
     ],

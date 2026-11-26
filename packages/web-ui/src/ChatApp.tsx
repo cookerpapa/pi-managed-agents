@@ -484,8 +484,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const forkTargets = useMemo(() => {
     const targets = new Map<string, { sourceSessionId: string; turnId: string; entryId: string }>();
     for (const branch of conversationTree?.branches ?? []) {
-      for (const entry of branch.entries) {
-        if (!entry.finalAssistant) continue;
+      for (const entry of branch.answerAnchors ??
+        branch.entries.filter((item) => item.finalAssistant)) {
         targets.set(entry.turnId, {
           sourceSessionId: branch.sessionId,
           turnId: entry.turnId,
@@ -832,7 +832,7 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
     };
     reconcileQueue.current = reconcile;
     let childRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-    const refreshChildren = () => {
+    const refreshTreeSoon = () => {
       if (childRefreshTimer !== undefined) return;
       childRefreshTimer = setTimeout(() => {
         childRefreshTimer = undefined;
@@ -893,7 +893,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
                 ),
             )
           )
-            refreshChildren();
+            refreshTreeSoon();
+          if (event.type === "user.input" || event.type === "turn.started") refreshTreeSoon();
           timelineControl.current?.event(event);
           update({ type: "stream.event", event });
           commandEvents.current(event.type);
@@ -942,7 +943,7 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
               const key = `${observation.childSessionId}:${observation.state}`;
               if (!discoveredChildren.has(key)) {
                 discoveredChildren.add(key);
-                refreshChildren();
+                refreshTreeSoon();
               }
             }
           }
@@ -962,7 +963,7 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
           // the initial HTTP snapshot and SSE opening. Later updates are pushed.
           if (status.phase === "live") {
             setQueueRefreshGeneration((value) => value + 1);
-            refreshChildren();
+            refreshTreeSoon();
           }
           update({ type: "stream.status", status });
         },
@@ -1372,7 +1373,6 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
     if (
       sessionId === undefined ||
       selectedDelegatedSession !== null ||
-      currentTurn !== undefined ||
       operation !== null ||
       (sessionModel !== null &&
         modelSettingsKey(settingsFromSessionModel(sessionModel)) === modelSettingsKey(selection))
@@ -3064,7 +3064,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
                   composerModelSelection !== null ? (
                     <ModelSettingsMenu
                       catalog={modelCatalog}
-                      disabled={currentTurn !== undefined || operation !== null}
+                      disabled={operation !== null}
+                      nextTurn={currentTurn !== undefined}
                       onApply={
                         state.session === null ? setNewConversationModel : switchCurrentModel
                       }

@@ -1,3 +1,7 @@
+import { FamilyPresentation } from "./family-presentation.mjs";
+import { openPageApi } from "./flow-page-api.mjs";
+import { ControlPlaneStore } from "../../../packages/control-plane/src/control-plane-store.ts";
+import { placedInputNavigation } from "../../../packages/control-plane/src/placed-input-navigation.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
@@ -45,13 +49,13 @@ it.skipIf(!endpoint)(
       rt = new IndependentSessionRuntime({ pool, topic: "mail", partitions: 1 });
     const app = Fastify(),
       token = randomUUID() + randomUUID(),
-      sender = randomUUID(),
-      session = randomUUID();
+      sender = randomUUID();
     const abort = new AbortController(),
       finish = Promise.withResolvers(),
       modelGate = Promise.withResolvers(),
       entered = Promise.withResolvers();
-    let scheduler,
+    let fullServer,
+      scheduler,
       worker,
       loop,
       pump,
@@ -78,16 +82,37 @@ it.skipIf(!endpoint)(
     };
     try {
       await runMigrations(admin, "up");
-      const { tenantId: tenant } = await createPrivateTenant(admin, {
+      const identity = await createPrivateTenant(admin, {
         slug: schema.replace("_", "-"),
         ownerDisplayName: "test",
       });
-      await pool.query("create schema " + schema);
+      const tenant = identity.tenantId,
+        servingStore = new ControlPlaneStore({ database: admin, ...identity });
+      const project = await servingStore.createProject({
+        name: "Navigation",
+        source: { kind: "empty" },
+      });
+      const { sessionId: session } = await servingStore.createSession(
+        project.projectId,
+        project.workspaceId,
+        "Inputs",
+        "elastic",
+      );
+      const web = schema + "_web";
+      await pool.query(
+        "create schema " +
+          schema +
+          "; create schema " +
+          web +
+          "; create view " +
+          web +
+          ".sessions as select * from public.sessions",
+      );
       await installPagingProjection(pool);
       await installForkTables(pool);
       await setForkLayout(pool, true, false);
-      await installIndependentSessionLeases(pool);
       await installWorkspaceRoutes(pool);
+      await installIndependentSessionLeases(pool);
       await rt.store.register(tenant, [session]);
       await rt.replayOffsets([{ partition: 0, low: 0n, high: 0n }]);
       const registeredUploads = new Map();
@@ -108,6 +133,9 @@ it.skipIf(!endpoint)(
       );
       assert.equal(puts.filter((r) => r.status === "fulfilled").length, 1);
       assert(puts.filter((r) => r.status === "rejected").every((r) => r.reason.status === 409));
+      const inputsPage = (limit = 80, before) =>
+        placedInputNavigation(rt.store.db, schema, tenant, session, limit, before);
+      assert.deepEqual((await inputsPage()).entries, [], "queued input has no navigation entry");
       const put = (text, mode = "follow_up", key = "turn:" + randomUUID()) =>
         api.acceptTurn(session, text, key, undefined, undefined, mode);
       const withdraw = async (id) =>
@@ -205,8 +233,11 @@ it.skipIf(!endpoint)(
         onError: fail,
         execute: async (claimed) => {
           job = claimed;
+          const presenter = new FamilyPresentation();
+          presenter.bind(1, job.scope);
           const opened = await openSegmentNative(rt.store, job, "mail", async (commit) => {
             commits.push(commit);
+            const presented = presenter.prepare(commit);
             const fact = {
               kind: "durable_commit",
               scope: job.scope,
@@ -215,7 +246,7 @@ it.skipIf(!endpoint)(
               occurredAt: new Date().toISOString(),
               origins: [],
               tools: [],
-              display: [],
+              display: presented.display,
               cancellations: [],
             };
             await rt.consume(
@@ -223,6 +254,7 @@ it.skipIf(!endpoint)(
               () => true,
               async () => true,
             );
+            presented.confirmed();
           });
           const models = createModels(),
             fake = fauxProvider({ tokensPerSecond: 0 });
@@ -293,6 +325,10 @@ it.skipIf(!endpoint)(
             "select 1 from user_or_agent_messages where source='user' and mode='input' and state='placed'",
           )
           .then((r) => r.rowCount),
+      );
+      assert.deepEqual(
+        (await inputsPage()).entries.map((e) => e.text),
+        ["first"],
       );
       await entered.promise;
       const originalSelect = rt.inputs.selectAt.bind(rt.inputs);
@@ -546,6 +582,57 @@ it.skipIf(!endpoint)(
           ])
           .then((r) => r.rowCount),
       );
+      const readUrl = new URL(endpoint);
+      readUrl.searchParams.set("options", "-c search_path=" + web + "," + schema + ",public");
+      fullServer = await openPageApi(
+        endpoint,
+        readUrl.href,
+        true,
+        undefined,
+        undefined,
+        false,
+        schema,
+      );
+      const client = new PiCloudApi(
+        (path, opts) => fetch(new URL(path, fullServer.origin), opts),
+        identity.credential.token,
+      );
+      const tree = await client.getConversationTree(session, "focus");
+      const nav = await inputsPage();
+      assert.deepEqual(tree.branches[0].entries, nav.entries);
+      const target = nav.entries.find((e) => e.text === "two");
+      const detail = await client.getConversation(session, {
+        turnId: target.turnId,
+        entryId: target.entryId,
+      });
+      assert(
+        detail.turns.some((t) =>
+          t.transcript?.items.some(
+            (i) =>
+              i.kind === "user" && i.text === "two" && i.messageId === "entry:" + target.entryId,
+          ),
+        ),
+      );
+      assert.deepEqual(
+        nav.entries.map((e) => e.text),
+        ["first", "two", "agent-urgent-test", "follow-after-answer"],
+      );
+      assert.deepEqual(
+        nav.entries.map((e) => e.source),
+        ["user", "user", "agent", "user"],
+      );
+      const newest = await inputsPage(2);
+      assert.deepEqual(
+        newest.entries,
+        nav.entries.slice(-2).map((entry, index, page) => ({
+          ...entry,
+          parentEntryId: index ? page[index - 1].entryId : null,
+        })),
+      );
+      assert.deepEqual(
+        (await inputsPage(2, newest.earlierEntryId)).entries,
+        nav.entries.slice(0, 2),
+      );
       await assert.rejects(withdraw(two.inputId), (e) => e.status === 409);
       // The last initial input can be withdrawn after a claim but before
       // startup. Later mail must open a successor, not join the cancelled Turn.
@@ -604,6 +691,195 @@ it.skipIf(!endpoint)(
       } finally {
         await spare.close();
       }
+      const inherited = await rt.store.delegate(
+        tenant,
+        session,
+        { run: job.id, lane: 1, entry: Number(target.entryId) },
+        randomUUID(),
+        "inherit",
+        "Child task",
+        "fixture",
+        { run: job.id, writer: job.scope.writerId },
+      );
+      assert.deepEqual(
+        (await placedInputNavigation(rt.store.db, schema, tenant, inherited, 80)).entries,
+        nav.entries.slice(0, 2),
+        "a child sees only the already placed prefix frozen at its anchor",
+      );
+      // Stop the active Turn with both kinds of unadopted input. The API
+      // returns the human's draft and keeps placed entries navigable.
+      const pendingAtStop = await put("draft at stop");
+      const agentAtStop = await rt.inputs.admit({
+        tenant,
+        session,
+        sender: randomUUID(),
+        id: randomUUID(),
+        source: "agent",
+        mode: "follow_up",
+        text: "agent report at stop",
+      });
+      const reservedAtStop = await rt.inputs.selectAt(job.scope, "idle");
+      // The previous human input may precede the agent report in the queue.
+      if (reservedAtStop.id !== agentAtStop.id)
+        assert.equal((await rt.inputs.selectAt(job.scope, "idle")).id, agentAtStop.id);
+      const stopKey = "stop:" + randomUUID();
+      assert(!(await api.cancelTurn(session, job.id, stopKey)).replayed);
+      assert((await api.cancelTurn(session, job.id, stopKey)).replayed);
+      const agentMail = (text) =>
+        rt.inputs.admit({
+          tenant,
+          session,
+          sender: agentAtStop.sender_id,
+          id: randomUUID(),
+          source: "agent",
+          mode: "steer",
+          text,
+        });
+      const during = await agentMail("during stop");
+      assert.equal(during.state, "held");
+      const sealStop = (scope, seq) =>
+        rt.consume(
+          {
+            topic: "mail",
+            partition: 0,
+            offset: offset++,
+            fact: {
+              kind: "work_finished",
+              scope,
+              factId: randomUUID(),
+              agentId: "root",
+              baseSequence: 0,
+              nativeSequence: seq,
+              terminal: {
+                type: "turn.cancelled",
+                payload: { reason: "user_request", forced: false },
+              },
+              occurredAt: new Date().toISOString(),
+            },
+          },
+          () => true,
+          async () => true,
+        );
+      assert(await sealStop(job.scope, commits.at(-1).seq));
+      const stopped = (
+        await pool.query(
+          "select id,state,return_requested from user_or_agent_messages where id=any($1::uuid[])",
+          [[pendingAtStop.inputId, agentAtStop.id]],
+        )
+      ).rows;
+      assert.deepEqual(
+        stopped.find((r) => r.id === pendingAtStop.inputId),
+        { id: pendingAtStop.inputId, state: "withdrawn", return_requested: true },
+      );
+      assert.deepEqual(
+        stopped.find((r) => r.id === agentAtStop.id),
+        { id: agentAtStop.id, state: "held", return_requested: false },
+      );
+      assert.deepEqual((await inputsPage()).entries, nav.entries);
+      assert.equal(
+        (await api.getReturnedInputs(session, undefined, { requestId: pendingAtStop.inputId }))
+          .items[0]?.text,
+        "draft at stop",
+      );
+      const after = await agentMail("after stop");
+      assert.equal(after.turn_id, null);
+      assert.equal(
+        (await pool.query("select count(*)::int n from turns where session_id=$1", [session]))
+          .rows[0].n,
+        1,
+      );
+      const resumed = (
+        await api.acceptTurn(session, "continue payment tests", "turn:" + randomUUID())
+      ).turnId;
+      const carried = (
+        await pool.query(
+          "select id,state,turn_id,starts_turn,boundary_task from user_or_agent_messages where id=any($1::uuid[]) order by position",
+          [[agentAtStop.id, during.id, after.id]],
+        )
+      ).rows;
+      assert.deepEqual(
+        carried,
+        [agentAtStop, during, after].map((m) => ({
+          id: m.id,
+          state: "pending",
+          turn_id: resumed,
+          starts_turn: false,
+          boundary_task: null,
+        })),
+      );
+      assert.deepEqual(
+        (await inputsPage()).entries,
+        nav.entries,
+        "held and rebound mail is invisible until placed",
+      );
+      // A human can reopen before the old writer's cancellation reaches PG.
+      // A fresh queued Turn has no writer and can stop immediately. First
+      // claim this successor to exercise the running-to-closing race.
+
+      // The independently created child has a separate lease and queue.
+      await rt.store.retire(tenant, inherited);
+      const finalWorker = randomUUID(),
+        finalBoot = randomUUID();
+      await admin
+        .insertInto("workers")
+        .values({
+          id: finalWorker,
+          supervisor_id: finalWorker,
+          boot_id: finalBoot,
+          max_concurrent_sessions: 1,
+          state: "ready",
+        })
+        .execute();
+      await registerTestWorker(admin, finalWorker);
+      const racer = rt.worker({
+        workerId: finalWorker,
+        bootId: finalBoot,
+        capacity: 1,
+        leaseDurationMs: 30000,
+      });
+      try {
+        const nextJob = await racer.claimNext();
+        assert.equal(nextJob.id, resumed);
+        await api.cancelTurn(session, resumed, "stop:" + randomUUID());
+        const late = await agentMail("while closing again");
+        const newer = (await api.acceptTurn(session, "next instruction", "turn:" + randomUUID()))
+          .turnId;
+        // This lease-only claimant has no native harness or model.
+        assert(
+          await rt.leases.projectBoundary(
+            {
+              topic: "mail",
+              partition: 0,
+              offset: offset++,
+              fact: {
+                kind: "work_finished",
+                scope: nextJob.scope,
+                factId: randomUUID(),
+                agentId: "root",
+                baseSequence: 0,
+                nativeSequence: 0,
+                terminal: {
+                  type: "turn.cancelled",
+                  payload: { reason: "user_request", forced: false },
+                },
+                occurredAt: new Date().toISOString(),
+              },
+            },
+            async () => {},
+          ),
+        );
+        assert.deepEqual(
+          (
+            await pool.query(
+              "select distinct turn_id,state from user_or_agent_messages where id=any($1::uuid[])",
+              [[agentAtStop.id, during.id, after.id, late.id]],
+            )
+          ).rows,
+          [{ turn_id: newer, state: "pending" }],
+        );
+      } finally {
+        await racer.close();
+      }
       history = JSON.stringify((await source.context(ctx)).messages);
       assert(
         history.includes("two") &&
@@ -613,6 +889,7 @@ it.skipIf(!endpoint)(
       );
     } finally {
       modelGate.resolve();
+      await fullServer?.close();
       await pump?.close();
       await native?.close(ctx);
       abort.abort();
@@ -621,6 +898,7 @@ it.skipIf(!endpoint)(
       await worker?.close();
       await scheduler?.close();
       await app.close();
+      await pool.query("drop schema if exists " + schema + "_web cascade");
       await pool.query("drop schema if exists " + schema + " cascade");
       await rt.store.db.destroy();
       await admin.destroy();

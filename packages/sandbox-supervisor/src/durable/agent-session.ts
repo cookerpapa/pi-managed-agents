@@ -121,6 +121,7 @@ export type DurableRunConfiguration = {
   context: Record<string, JsonValue>;
   skillCatalog?: readonly import("@pi-cloud/protocol").SkillCatalogEntry[];
   workspaceAvailable?: boolean;
+  turnEnvironment?: string;
   remoteTools: () => readonly string[];
   recoveryTools?: () => readonly string[];
   tools: readonly ToolRegistration[];
@@ -235,6 +236,10 @@ export class DurableAgentSession {
       defineExtension({
         name: "pi-cloud-runtime",
         sections: [
+          section(
+            "workspace-environment",
+            (input) => this.#bindings.get(Number(input.conversationId))?.turnEnvironment,
+          ),
           section("skills", (input) => {
             const run = this.#bindings.get(Number(input.conversationId));
             return skillCatalogSection(

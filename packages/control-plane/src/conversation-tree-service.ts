@@ -1,3 +1,4 @@
+import { placedInputNavigation } from "./placed-input-navigation.ts";
 import {
   flowRootMessageTurns,
   rootMessageNavigation,
@@ -257,6 +258,7 @@ function conversationLeaves(
 
 /** The matched message store installs history and pins inside the public Fork transaction. */
 export type MessageHistoryMutations = {
+  readonly placedInputNavigation?: boolean;
   readonly schema: string;
   fork(
     tx: Transaction<Database>,
@@ -326,9 +328,29 @@ export class ConversationTreeService {
     return this.#readDatabase
       .transaction()
       .setIsolationLevel("repeatable read")
-      .execute((database) =>
-        this.#readTree(database, tenantId, currentSessionId, view, navigation),
-      );
+      .execute(async (database) => {
+        const tree = await this.#readTree(database, tenantId, currentSessionId, view, navigation);
+        if (!this.#messageHistory?.placedInputNavigation) return tree;
+        const target = navigation.branchSessionId ?? currentSessionId;
+        for (const branch of tree.branches) {
+          const page = await placedInputNavigation(
+            database,
+            this.#messageHistory.schema,
+            tenantId,
+            branch.sessionId,
+            branch.current || branch.sessionId === target ? 80 : 8,
+            branch.sessionId === target ? navigation.beforeEntryId : undefined,
+            view === "full" && branch.parentSessionId !== null ? branch.forkedFromEntryId : null,
+          );
+          branch.answerAnchors = branch.entries
+            .filter((e) => e.finalAssistant)
+            .map(({ turnId, entryId }) => ({ turnId, entryId }));
+          delete branch.earlierEntryId;
+          delete branch.hasLaterEntries;
+          Object.assign(branch, page);
+        }
+        return tree;
+      });
   }
 
   async #readTree(

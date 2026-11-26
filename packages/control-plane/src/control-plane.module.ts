@@ -120,6 +120,9 @@ export class ControlPlaneModule {
       ...(options.idGenerator === undefined ? {} : { idGenerator: options.idGenerator }),
     });
     const controlPlaneStores = new ControlPlaneStoreFactory({
+      ...(options.messageHistoryMutations?.placedInputNavigation
+        ? { placedInputHistory: true }
+        : {}),
       ...(options.olderHistoryReader ? { olderHistoryReader: options.olderHistoryReader } : {}),
       flowRootHistory: options.flowRootHistory ?? false,
       delegatedRunHistory: options.delegatedRunHistory ?? false,

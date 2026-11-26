@@ -1,5 +1,7 @@
 # Session clients
 
+The #52 candidate returns adopted inputs as the conversation tree's navigation entries. Each entry identifies its sender class, Turn and exact native Entry. The optional branch `answerAnchors` contains the sealed answer IDs used by Fork and prune actions. Before placement a human input appears in the editable queue. Stop returns unplaced human input to the composer and holds unread Agent mail until a human starts another Turn. [Candidate contract](adr/0369-placed-input-navigation.md).
+
 `@pi-cloud/session-client` owns the existing public Session HTTP methods,
 snapshot-first SSE, Session state reducer and uncertain-submission identity.
 It is shared by the web application and non-browser clients under ADR-0321.

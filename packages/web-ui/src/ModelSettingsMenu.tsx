@@ -83,12 +83,14 @@ export function ModelSettingsMenu({
   catalog,
   value,
   disabled = false,
+  nextTurn = false,
   onApply,
   t,
 }: {
   catalog: ModelCatalogResource;
   value: SessionModelSelection;
   disabled?: boolean;
+  nextTurn?: boolean;
   onApply(value: SessionModelSelection): void | Promise<void>;
   t: Translate;
 }) {
@@ -175,6 +177,7 @@ export function ModelSettingsMenu({
           ✦
         </span>
         <strong>{selectedModel?.displayName ?? value.modelId}</strong>
+        {nextTurn && <small>{t("chat.model.nextTurn")}</small>}
         <small>{thinkingName(value.thinkingLevel, t)}</small>
         {value.fastMode ? <em>{t("chat.model.fast")}</em> : null}
         <span aria-hidden="true" className="product-model-menu-caret">

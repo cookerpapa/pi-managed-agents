@@ -176,6 +176,11 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
   return {
     port: server.address().port,
     notify,
+    notifyStop(id, writer) {
+      const socket = connections.get(id);
+      if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
+        socket.send("stop:" + writer);
+    },
     notifySteer(id, writer, revision) {
       const socket = connections.get(id);
       if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
@@ -218,6 +223,7 @@ export function connectClaimWorker({
   fail,
   onRegistered,
   onSteer,
+  onStop,
   token,
 }) {
   const address = new URL(url);
@@ -330,6 +336,10 @@ export function connectClaimWorker({
     current.on("message", (raw) => {
       if (stopped || socket !== current) return;
       const frame = raw.toString();
+      if (onStop && frame.startsWith("stop:")) {
+        onStop(frame.slice(5));
+        return;
+      }
       if (onSteer && frame.startsWith("steer:")) {
         const [, writer, revision] = frame.split(":");
         onSteer(writer, revision);

@@ -970,6 +970,7 @@ export const ConversationTreeEntryResourceSchema = Type.Object(
     parentEntryId: Type.Union([PiEntryIdSchema, Type.Null()]),
     turnId: UuidSchema,
     role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
+    source: Type.Optional(Type.Union([Type.Literal("user"), Type.Literal("agent")])),
     text: Type.String({ maxLength: MAX_AGENT_INPUT_CHARACTERS }),
     finalAssistant: Type.Boolean(),
     createdAt: UtcTimestampSchema,
@@ -992,6 +993,18 @@ export const ConversationTreeBranchResourceSchema = Type.Object(
     earlierEntryId: Type.Optional(PiEntryIdSchema),
     hasLaterEntries: Type.Optional(Type.Literal(true)),
     entries: Type.Array(ConversationTreeEntryResourceSchema, { maxItems: 10_000 }),
+    answerAnchors: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            turnId: UuidSchema,
+            entryId: PiEntryIdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        { maxItems: 10_000 },
+      ),
+    ),
   },
   { additionalProperties: false },
 );

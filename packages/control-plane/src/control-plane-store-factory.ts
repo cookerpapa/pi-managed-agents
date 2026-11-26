@@ -9,6 +9,7 @@ export class ControlPlaneStoreFactory {
   readonly #database: Kysely<Database>;
   readonly #olderHistoryReader: OlderHistoryReader | undefined;
   readonly #conversationReadDatabase: Kysely<Database>;
+  readonly #placedInputHistory: boolean;
   readonly #rootMessageHistory: boolean;
   readonly #flowRootHistory: boolean;
   readonly #idGenerator: (() => string) | undefined;
@@ -19,6 +20,7 @@ export class ControlPlaneStoreFactory {
     database: Kysely<Database>;
     conversationReadDatabase?: Kysely<Database>;
     olderHistoryReader?: OlderHistoryReader;
+    placedInputHistory?: boolean;
     rootMessageHistory?: boolean;
     flowRootHistory?: boolean;
     delegatedRunHistory?: boolean;
@@ -31,6 +33,7 @@ export class ControlPlaneStoreFactory {
     this.#olderHistoryReader = options.olderHistoryReader;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
     this.#flowRootHistory = options.flowRootHistory ?? false;
+    this.#placedInputHistory = options.placedInputHistory ?? false;
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#idGenerator = options.idGenerator;
     this.#environmentImageRevision = options.environmentImageRevision;
@@ -43,6 +46,7 @@ export class ControlPlaneStoreFactory {
       conversationReadDatabase: this.#conversationReadDatabase,
       ...(this.#olderHistoryReader ? { olderHistoryReader: this.#olderHistoryReader } : {}),
       tenantId: identity.tenantId,
+      ...(this.#placedInputHistory ? { placedInputHistory: this.#placedInputHistory } : {}),
       rootMessageHistory: this.#rootMessageHistory,
       flowRootHistory: this.#flowRootHistory,
       delegatedRunHistory: this.#delegatedRunHistory,

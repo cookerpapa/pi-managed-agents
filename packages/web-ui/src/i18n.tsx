@@ -214,6 +214,7 @@ const zhCN = {
   "chat.connecting": "连接中",
   "chat.reconnecting": "正在重连",
   "chat.connectionFailed": "连接已中断",
+  "chat.model.nextTurn": "下轮生效",
   "chat.model.nextTurnHint": "切换只影响下一轮，不会改变当前任务或历史消息。",
   "chat.model.provider": "模型族",
   "chat.model.model": "模型",
@@ -792,6 +793,7 @@ const enUS: Record<UiTextKey, string> = {
   "chat.connecting": "Connecting",
   "chat.reconnecting": "Reconnecting",
   "chat.connectionFailed": "Connection lost",
+  "chat.model.nextTurn": "Next turn",
   "chat.model.nextTurnHint":
     "Changes apply to the next turn without altering the active task or conversation history.",
   "chat.model.provider": "Model family",

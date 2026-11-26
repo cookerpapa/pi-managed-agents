@@ -19,23 +19,6 @@ const ownerWhere = (run, lease) =>
 function guardedMutation(owner, mutation) {
   return `with owner as materialized (${owner}), changed as (${mutation}) select exists(select 1 from owner) as accepted, (select count(*)::int from changed) as writes`;
 }
-const oneMessage = guardedMutation(
-  `select id from runs ${ownerWhere("$3", "$6")} for share`,
-  messageSql(true),
-);
-const oneInbox = guardedMutation(
-  `select id from runs ${ownerWhere("$8", "$9")} for share`,
-  inboxSql(true),
-);
-// This frame already needs to advance its Run's display coverage. The admitted
-// UPDATE locks the writer and supplies the input row for the immutable INSERT.
-const presentedMessage = guardedMutation(
-  `update runs set output_first_topic=coalesce(output_first_topic,$7),
-  output_first_partition=coalesce(output_first_partition,$8),output_first_offset=coalesce(output_first_offset,$9),
-  output_display_seq=greatest(output_display_seq,$10),output_display_native_seq=greatest(output_display_native_seq,$4)
-  ${ownerWhere("$3", "$6")} returning id`,
-  messageSql(true),
-);
 // Recount a compacted root inside the same transaction that retires the Run.
 const settledHead = `case when $5::jsonb ? 'recount' then ($5::jsonb - 'recount') ||
   (select jsonb_build_object('count',count(*),'bytes',coalesce(sum(octet_length(m.content)),0))
@@ -46,18 +29,41 @@ const settledHead = `case when $5::jsonb ? 'recount' then ($5::jsonb - 'recount'
 export const finishStatement = (
   head,
   releaseRecovery = false,
-) => `update runs set state='completed',settled_at=clock_timestamp()${head ? ",history_head=" + settledHead : ""}${releaseRecovery ? ",native_work_handoff=null,projection_state=null,projection_partition=null,projection_first=null,projection_pin=null,cancel_positions='{}'::jsonb" : ""}
+  physicalTurns = false,
+) => `update ${physicalTurns ? "turns" : "runs"} set state='completed',settled_at=clock_timestamp()${head ? ",history_head=" + settledHead : ""}${releaseRecovery ? ",native_work_handoff=null,projection_state=null,projection_partition=null,projection_first=null,projection_pin=null,cancel_positions='{}'::jsonb" : ""}
      where tenant_id=$1 and session_id=$2 and id=$3 and lease_id=$4 and state='running'${releaseRecovery ? " and projection_tools='{}'::jsonb" : ""} returning id`;
 
-export const projectionTemplates = {
-  message: oneMessage,
-  presentedMessage,
-  inbox: oneInbox,
-  finish: finishStatement(true),
-  finishAndRelease: finishStatement(true, true),
-  plainMessage: insertMessages,
-  plainInbox: upsertInbox,
-};
+export function projectionTemplatesFor(physicalTurns) {
+  const relation = physicalTurns ? "turns" : "runs";
+  const oneMessage = guardedMutation(
+    `select id from ${relation} ${ownerWhere("$3", "$6")} for share`,
+    messageSql(true),
+  );
+  const oneInbox = guardedMutation(
+    `select id from ${relation} ${ownerWhere("$8", "$9")} for share`,
+    inboxSql(true),
+  );
+  // This frame already needs to advance its Run's display coverage. The admitted
+  // UPDATE locks the writer and supplies the input row for the immutable INSERT.
+  const presentedMessage = guardedMutation(
+    `update ${relation} set output_first_topic=coalesce(output_first_topic,$7),
+  output_first_partition=coalesce(output_first_partition,$8),output_first_offset=coalesce(output_first_offset,$9),
+  output_display_seq=greatest(output_display_seq,$10),output_display_native_seq=greatest(output_display_native_seq,$4)
+  ${ownerWhere("$3", "$6")} returning id`,
+    messageSql(true),
+  );
+  return {
+    message: oneMessage,
+    presentedMessage,
+    inbox: oneInbox,
+    finish: finishStatement(true, false, physicalTurns),
+    finishAndRelease: finishStatement(true, true, physicalTurns),
+    plainMessage: insertMessages,
+    plainInbox: upsertInbox,
+  };
+}
+export const projectionTemplates = projectionTemplatesFor(false);
+const { message: oneMessage, inbox: oneInbox } = projectionTemplates;
 export { oneMessage, oneInbox, insertMessages, upsertInbox };
 
 export const entryWithCoverage = guardedMutation(

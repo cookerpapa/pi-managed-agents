@@ -58,7 +58,7 @@ export async function serveSegmentScheduler(
   const {
     rows: [{ channel }],
   } = await pool.query(
-    "select 'pma_segment_ready_' || md5(n.nspname::text) as channel from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.oid='runs'::regclass",
+    "select 'pma_segment_ready_' || md5(n.nspname::text) as channel from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.oid='turns'::regclass",
   );
   const abort = new AbortController();
   const receipts = steerReceipts(pool);
@@ -71,6 +71,11 @@ export async function serveSegmentScheduler(
     receipts.receive,
   );
   const wake = new PostgresNotificationWake(connectionString, channel, (payload) => {
+    if (payload.startsWith("stop:")) {
+      const [, id, writer] = payload.split(":");
+      router.notifyStop(id, writer);
+      return true;
+    }
     if (!payload.startsWith("steer:")) return false;
     const [, id, writer, revision] = payload.split(":");
     router.notifySteer(id, writer, revision);
@@ -110,6 +115,7 @@ export function connectSegmentWorker({
   execute,
   fail,
   onSteer,
+  onStop,
   onRegistered,
 }) {
   checkToken(scheduler.token);
@@ -126,6 +132,7 @@ export function connectSegmentWorker({
     execute,
     fail,
     onSteer,
+    onStop,
     onRegistered,
   });
 }

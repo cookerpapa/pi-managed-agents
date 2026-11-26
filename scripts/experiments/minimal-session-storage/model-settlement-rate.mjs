@@ -1,3 +1,4 @@
+import { installPhysicalTurnProjection } from "./ready-projection-sql.mjs";
 // Replay fixed Pi commits directly into the serving candidate. Only the PG projection leg is timed.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -149,7 +150,8 @@ try {
   const compareFlow = process.argv[3] === "flow",
     compareSql = process.argv[3] === "flow-sql";
   const tape = Array.from({ length: partitions }, () => []);
-  const compareMail = process.argv[3] === "session-inputs";
+  const compareInputHistory = process.argv[3] === "input-history";
+  const compareMail = compareInputHistory || process.argv[3] === "session-inputs";
   const pairs = compareMail && process.argv[4] === "pairs";
   const warmMail = compareMail && (pairs || process.argv[4] === "warm");
   const checkBoundaries = compareMail && process.argv[4] === "boundaries";
@@ -170,7 +172,7 @@ try {
               : [false, false];
   for (const [index, layout] of layouts.entries()) {
     const flowHistory = !compareMail && layout,
-      segmentInputs = compareMail && layout;
+      segmentInputs = compareMail && (compareInputHistory || layout);
     const sample = index + 1;
     const schema = "rate_" + randomUUID().replaceAll("-", "");
     const pool = new pg.Pool({
@@ -222,25 +224,40 @@ try {
           "alter table runs add input_uploads jsonb default '[]',add workspace_grant jsonb",
         );
         await installForkTables(pool);
+        await pool.query(await readFile(new URL("./turn-snapshots.sql", import.meta.url), "utf8"));
+        await installPhysicalTurnProjection(pool);
         // This tape includes data-plane commits only. The managed scheduler
         // and API are exercised separately with their real Worker registry.
         const ddl = await readFile(new URL("./session-inputs.sql", import.meta.url), "utf8");
         await pool.query(ddl);
+        if (compareInputHistory && !layout) {
+          // Keep receipt confirmation, Turn layout, Kafka tape and synchronous
+          // boundaries identical. Vary only the new canonical input metadata.
+          await pool.query(
+            "alter table messages disable trigger stamp_placed_input; drop index message_input_navigation; drop index message_initial_input",
+          );
+        }
       }
       if (flowHistory) await installFlowHistory(pool, true);
       await p.view.reset(new Map(lanes.map((_, i) => [i, 0n])), 16, "recorded-history");
       const runs = lanes.flat(),
         calls = runs.flatMap((r) => r.calls.filter(Boolean));
-      await pool.query(
-        `insert into runs(id,tenant_id,session_id,lease_id,initial_input,idempotency_key,model_ref,state,mailbox_position)
-      select "runId","tenantId","sessionId","writerId",'Inspect',"runId",'fixture','running',1 from jsonb_to_recordset($1::jsonb) t("runId" uuid,"tenantId" uuid,"sessionId" uuid,"writerId" uuid)`,
-        [JSON.stringify(runs.map((r) => r.scope))],
-      );
       if (segmentInputs) {
         await new ForkStorage(pool).register(
           tenantId,
           runs.map((r) => r.scope.sessionId),
         );
+        await pool.query(
+          "update sessions set desired_model=jsonb_build_object('provider','pi-cloud-fake','modelId','fixture') where tenant_id=$1",
+          [tenantId],
+        );
+      }
+      await pool.query(
+        `insert into ${segmentInputs ? "turns" : "runs"}(id,tenant_id,session_id,lease_id,initial_input,idempotency_key,${segmentInputs ? "" : "model_ref,"}state,mailbox_position)
+      select "runId","tenantId","sessionId","writerId",'Inspect',"runId",${segmentInputs ? "" : "'fixture',"}'running',1 from jsonb_to_recordset($1::jsonb) t("runId" uuid,"tenantId" uuid,"sessionId" uuid,"writerId" uuid)`,
+        [JSON.stringify(runs.map((r) => r.scope))],
+      );
+      if (segmentInputs) {
         await pool.query(
           "insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,fingerprint,turn_id,state,request_key) select tenant_id,session_id,id,tenant_id,'user','input',initial_input,'fixture',id,'sending',id::text from runs",
         );
@@ -343,6 +360,12 @@ try {
           ).rows[0].n,
           runs.length,
         );
+      if (compareInputHistory) {
+        const count = (
+          await pool.query("select count(*)::int n from messages where input_display is not null")
+        ).rows[0].n;
+        assert.equal(count, layout ? runs.length : 0);
+      }
       const {
         rows: [totals],
       } = await pool.query(
@@ -355,6 +378,7 @@ try {
         JSON.stringify({
           sample,
           ...(compareMail ? { segmentInputs, warmup: warmMail && index < 2 } : {}),
+          ...(compareInputHistory ? { inputHistory: layout } : {}),
           ...(compareFlow ? { flowHistory } : {}),
           runs: runs.length,
           commits: groups.flat().length,

@@ -1,14 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "kysely";
+import { SessionDefaults } from "./session-defaults.mjs";
 import { assertUserInputBudget, parseUserUploads } from "@pi-cloud/protocol";
 
 const fingerprint = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export class InputConflict extends Error {}
-const terminal = new Set(["placed", "withdrawn", "unanswered"]);
+const terminal = new Set(["placed", "withdrawn"]);
 
 export class SegmentInputs {
   constructor(db) {
     this.db = db;
+    this.settings = new SessionDefaults(db);
   }
   async admit(input) {
     return this.db.transaction().execute((tx) => this.admitIn(tx, input));
@@ -25,7 +27,6 @@ export class SegmentInputs {
       text,
       uploads = [],
       requestKey = id,
-      model,
       strict = false,
       initialTurn,
     },
@@ -41,7 +42,7 @@ export class SegmentInputs {
     const {
       rows: [s],
     } =
-      await sql`select flow_id from sessions where tenant_id=${tenant}::uuid and id=${session}::uuid for no key update`.execute(
+      await sql`select flow_id,agent_mail_paused from sessions where tenant_id=${tenant}::uuid and id=${session}::uuid for no key update`.execute(
         tx,
       );
     if (!s) throw new InputConflict("Unknown Session");
@@ -59,13 +60,15 @@ export class SegmentInputs {
     const {
       rows: [last],
     } =
-      await sql`select id,state,mailbox_position,model_ref,workspace_grant,output_seal_id from runs where tenant_id=${tenant}::uuid and session_id=${s.flow_id}::uuid order by mailbox_position desc limit 1`.execute(
+      await sql`select id,state,mailbox_position,output_seal_id from turns where tenant_id=${tenant}::uuid and session_id=${s.flow_id}::uuid order by mailbox_position desc limit 1`.execute(
         tx,
       );
     const busy = last && ["queued", "running", "cancel_requested", "settling"].includes(last.state);
     // A new message after an explicit Stop waits behind that closing Turn.
-    const open = busy && last.state !== "cancel_requested";
-    if (strict && busy && !initialTurn) throw new InputConflict("Session is busy");
+    const held = source === "agent" && s.agent_mail_paused && !initialTurn;
+    const open = busy && last.state !== "cancel_requested" && !s.agent_mail_paused;
+    if (strict && busy && !s.agent_mail_paused && !initialTurn)
+      throw new InputConflict("Session is busy");
     if (open && mode === "input" && !initialTurn) throw new InputConflict("A Turn is already open");
     if (
       source === "user" &&
@@ -76,21 +79,92 @@ export class SegmentInputs {
       ).rows.length
     )
       throw new InputConflict("Too many pending user messages");
-    const turn = initialTurn ?? (open ? last.id : randomUUID());
-    if (!initialTurn && !open) {
-      await sql`insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,input_uploads,model_ref,state,workspace_grant)
-        values(${turn}::uuid,${tenant}::uuid,${s.flow_id}::uuid,${Number(last?.mailbox_position ?? 0) + 1},${id}::uuid,${text},${JSON.stringify(uploads)}::jsonb,${model ?? last?.model_ref},'queued',${last?.workspace_grant ? JSON.stringify(last.workspace_grant) : null}::jsonb)`.execute(
+    const turn = held ? null : (initialTurn ?? (open ? last.id : randomUUID()));
+    if (!held && !initialTurn && !open) {
+      await sql`insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,input_uploads,state)
+        values(${turn}::uuid,${tenant}::uuid,${s.flow_id}::uuid,${Number(last?.mailbox_position ?? 0) + 1},${id}::uuid,${text},${JSON.stringify(uploads)}::jsonb,'queued')`.execute(
         tx,
       );
+      if (source === "user" && s.agent_mail_paused) {
+        await sql`update sessions set agent_mail_paused=false where tenant_id=${tenant}::uuid and id=${session}::uuid`.execute(
+          tx,
+        );
+        await sql`update user_or_agent_messages set turn_id=${turn}::uuid,state='pending'
+          where tenant_id=${tenant}::uuid and session_id=${session}::uuid and state='held'`.execute(
+          tx,
+        );
+      }
     }
     const {
       rows: [row],
     } =
-      await sql`insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,uploads,fingerprint,turn_id,starts_turn,request_key)
-      values(${tenant}::uuid,${session}::uuid,${id}::uuid,${sender}::uuid,${source},${!open && !initialTurn && source === "user" ? "input" : mode},${text},${JSON.stringify(uploads)}::jsonb,${hash},${turn}::uuid,${Boolean(initialTurn) || !open},${requestKey}) returning *`.execute(
+      await sql`insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,uploads,fingerprint,turn_id,starts_turn,request_key,state)
+      values(${tenant}::uuid,${session}::uuid,${id}::uuid,${sender}::uuid,${source},${!open && !initialTurn && source === "user" ? "input" : mode},${text},${JSON.stringify(uploads)}::jsonb,${hash},${turn}::uuid,${!held && (Boolean(initialTurn) || !open)},${requestKey},${held ? "held" : "pending"}) returning *`.execute(
         tx,
       );
     return row;
+  }
+  async stop({ tenant, session }, turn, key, gracePeriodMs) {
+    return this.db.transaction().execute(async (tx) => {
+      await sql`set local synchronous_commit=on`.execute(tx);
+      const {
+        rows: [window],
+      } =
+        await sql`select flow_id from sessions where tenant_id=${tenant}::uuid and id=${session}::uuid for no key update`.execute(
+          tx,
+        );
+      if (!window) throw new InputConflict("Unknown Session");
+      const {
+        rows: [old],
+      } =
+        await sql`select id,stop_request from turns where tenant_id=${tenant}::uuid and session_id=${window.flow_id}::uuid and stop_request is not null and stop_request->>'key'=${key}`.execute(
+          tx,
+        );
+      if (old) {
+        if (old.id !== turn || old.stop_request.gracePeriodMs !== gracePeriodMs)
+          throw new InputConflict("Stop identity changed");
+        return { ...old.stop_request.receipt, replayed: true };
+      }
+      const {
+        rows: [target],
+      } =
+        await sql`select state,started_at,stop_request,output_seal_id from turns where tenant_id=${tenant}::uuid and session_id=${window.flow_id}::uuid and id=${turn}::uuid for no key update`.execute(
+          tx,
+        );
+      if (
+        !target ||
+        target.stop_request ||
+        !["queued", "running", "settling"].includes(target.state)
+      )
+        throw new InputConflict("Turn is not available for Stop");
+      const receipt = {
+        controlRequestId: randomUUID(),
+        targetRunId: turn,
+        turnId: turn,
+        sessionId: session,
+        state: "pending",
+        acceptedAt: new Date().toISOString(),
+        replayed: false,
+      };
+      // A sealed writer cannot act on a new control. Its replacement claims
+      // the existing Turn with the stop signal already set.
+      const recovering =
+        (target.state === "queued" && target.started_at !== null) || target.output_seal_id !== null;
+      const state = recovering
+        ? target.state
+        : target.state === "queued"
+          ? "cancelled"
+          : "cancel_requested";
+      await sql`update turns set stop_request=${JSON.stringify({ key, gracePeriodMs, receipt })}::jsonb,state=${state},stop_on_resume=stop_on_resume or ${recovering},
+        settled_at=case when ${state}='cancelled' then clock_timestamp() else settled_at end where id=${turn}::uuid`.execute(
+        tx,
+      );
+      if (recovering)
+        await sql`update sessions set agent_mail_paused=true where tenant_id=${tenant}::uuid and id=${session}::uuid`.execute(
+          tx,
+        );
+      return receipt;
+    });
   }
   async sendAgent(o) {
     return this.db.transaction().execute(async (tx) => {
@@ -98,7 +172,7 @@ export class SegmentInputs {
       const {
         rows: [source],
       } =
-        await sql`select s.*,r.model_ref from sessions s join runs r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
+        await sql`select s.* from sessions s join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
         where s.tenant_id=${o.tenant}::uuid and s.id=${o.session}::uuid and r.id=${o.root}::uuid and r.state='running' and r.lease_id=${o.writer}::uuid
         and r.fencing_token=${o.epoch} and r.output_seal_id is null`.execute(tx);
       if (!source) throw new InputConflict("Sender Turn closed");
@@ -138,10 +212,9 @@ export class SegmentInputs {
           mode: priority === "urgent" ? "steer" : "follow_up",
           id: o.operation,
           text,
-          model: source.model_ref,
         });
       const current =
-        await sql`select id from runs where id=${o.root}::uuid and tenant_id=${o.tenant}::uuid and state='running' and output_seal_id is null and lease_id=${o.writer}::uuid and fencing_token=${o.epoch} for share`.execute(
+        await sql`select id from turns where id=${o.root}::uuid and tenant_id=${o.tenant}::uuid and state='running' and output_seal_id is null and lease_id=${o.writer}::uuid and fencing_token=${o.epoch} for share`.execute(
           tx,
         );
       if (!current.rows.length) throw new InputConflict("Sender Turn closed");
@@ -170,7 +243,7 @@ export class SegmentInputs {
       await sql`select m.id,m.mode,m.body,m.uploads,m.state,m.withdrawing,m.position,m.turn_id,m.accepted_at,
      case when m.starts_turn and r.state='queued' then r.mailbox_position end as initial_position,
      (m.steer_seen_epoch=r.fencing_token and r.state='running' and r.output_seal_id is null and l.released_at is null and l.writer_failed_at is null and l.valid_until>statement_timestamp()) as owner_notified
-     from user_or_agent_messages m join runs r on r.id=m.turn_id left join session_leases l on l.lease_id=r.lease_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
+     from user_or_agent_messages m join turns r on r.id=m.turn_id left join session_leases l on l.lease_id=r.lease_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
      and m.state in ('pending','sending') and m.position>${after} order by m.position limit ${limit}`.execute(
         tx,
       )
@@ -183,7 +256,7 @@ export class SegmentInputs {
       await sql`select id from sessions where tenant_id=${tenant}::uuid and id=${session}::uuid for no key update`.execute(
         tx,
       );
-      await sql`select r.id from runs r join user_or_agent_messages m on m.turn_id=r.id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user' and m.id=${id}::uuid and r.state='queued' and r.started_at is null for no key update of r`.execute(
+      await sql`select r.id from turns r join user_or_agent_messages m on m.turn_id=r.id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user' and m.id=${id}::uuid and r.state='queued' and r.started_at is null for no key update of r`.execute(
         tx,
       );
       const {
@@ -203,13 +276,13 @@ export class SegmentInputs {
         );
       if (!changed.withdrawing) {
         if (m.starts_turn) {
-          await sql`update runs r set initial_input=coalesce(next.body,''),input_uploads=coalesce(next.uploads,'[]'::jsonb)
+          await sql`update turns r set initial_input=coalesce(next.body,''),input_uploads=coalesce(next.uploads,'[]'::jsonb)
             from (select n.body,n.uploads from (values(1)) first_input(dummy) left join lateral
               (select body,uploads from user_or_agent_messages where turn_id=${m.turn_id}::uuid and state='pending' order by position limit 1) n on true) next where r.id=${m.turn_id}::uuid and r.state='queued' and r.started_at is null`.execute(
             tx,
           );
         }
-        await sql`update runs set state=case when state='running' then 'cancel_requested' else 'cancelled' end,
+        await sql`update turns set state=case when state='running' then 'cancel_requested' else 'cancelled' end,
           settled_at=case when state='queued' then clock_timestamp() else settled_at end where id=${m.turn_id}::uuid and state in ('queued','running') and exists(select from user_or_agent_messages where turn_id=${m.turn_id}::uuid and starts_turn) and
           not exists(select from user_or_agent_messages where turn_id=${m.turn_id}::uuid and state<>'withdrawn')`.execute(
           tx,
@@ -292,7 +365,7 @@ export class SegmentInputs {
         tx,
       );
       await sql`update user_or_agent_messages m set state=case when m.withdrawing then 'withdrawn' else 'pending' end,withdrawing=false,boundary_task=null
-      from runs r where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.id=${id}::uuid and m.turn_id=r.id
+      from turns r where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.id=${id}::uuid and m.turn_id=r.id
       and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid and r.fencing_token=${s.fencingToken} and r.output_seal_id is null and m.state='sending'`.execute(
         tx,
       );
@@ -321,7 +394,7 @@ export class SegmentInputs {
       const {
         rows: [m],
       } = await sql`with candidate as (
-          select m.id from user_or_agent_messages m join runs r on r.id=m.turn_id
+          select m.id from user_or_agent_messages m join turns r on r.id=m.turn_id
           where m.tenant_id=${s.tenantId}::uuid and m.session_id=${s.sessionId}::uuid and m.turn_id=${s.runId}::uuid and
             r.session_id=${locked.rows[0].flow_id}::uuid and r.lease_id=${s.writerId}::uuid and r.fencing_token=${s.fencingToken}
             and r.state='running' and r.output_seal_id is null and m.state='pending' ${mode}

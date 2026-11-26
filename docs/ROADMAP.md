@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The #52 candidate freezes each Turn’s model and logical environment before scheduling. Its navigator follows retained input Entries. Unread Agent mail waits across a user Stop. [Session acceptance](reports/turn-input-navigation-20261126.md).
+
 The #52 candidate now pushes steer notices to the owning Worker. The [receipt and failure semantics](adr/0367-worker-steer-hints.md) preserve PG queue ownership across reconnects.
 
 The #52 candidate adopts external inputs directly from its PG queue through [Pi tool and settlement boundaries](adr/0366-pg-input-boundaries.md).

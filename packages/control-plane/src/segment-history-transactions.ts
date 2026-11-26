@@ -4,7 +4,10 @@ import type { MessageHistoryMutations } from "./conversation-tree-service.ts";
 import { ControlPlaneStoreError } from "./control-plane-store-error.ts";
 
 /** Matched PG schema. The public Session metadata and history pins commit together. */
-export function segmentHistoryTransactions(schema: string): MessageHistoryMutations {
+export function segmentHistoryTransactions(
+  schema: string,
+  placedInputNavigation = false,
+): MessageHistoryMutations {
   const detach = async (
     tx: Transaction<Database>,
     tenant: string,
@@ -37,6 +40,7 @@ export function segmentHistoryTransactions(schema: string): MessageHistoryMutati
   };
   return {
     schema,
+    placedInputNavigation,
     async fork(tx, tenant, source, target, request, key, fingerprint) {
       try {
         const {

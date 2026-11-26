@@ -70,7 +70,7 @@ it.skipIf(!endpoint)(
       async function enqueue(s, position = 1, client = pool) {
         const id = randomUUID();
         await client.query(
-          "insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state) values($1,$2,$3,$4,$1,'wake','fake','queued')",
+          "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) values($1,$2,$3,$4,$1,'wake','queued')",
           [id, t, s, position],
         );
         return id;
@@ -84,7 +84,7 @@ it.skipIf(!endpoint)(
           agentId: "root",
           nativeSequence: 0,
           baseSequence: 0,
-          terminal: { type: "turn.cancelled", payload: { reason: "user_request" } },
+          terminal: { type: "turn.cancelled", payload: { reason: "user_request", forced: false } },
           occurredAt: new Date().toISOString(),
         };
         assert(

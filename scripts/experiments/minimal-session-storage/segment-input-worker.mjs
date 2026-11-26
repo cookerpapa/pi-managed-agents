@@ -20,6 +20,12 @@ export function connectSessionInputs({
   let closed = false,
     failure,
     lastSubmission;
+  const abort = () => {
+    void conversation.abort(ctx).catch((error) => {
+      failure = error;
+    });
+  };
+  job.stopSignal?.addEventListener("abort", abort, { once: true });
   async function content(m, signal) {
     const value = await prepare(m.body, m.uploads, signal);
     return m.source === "agent" &&
@@ -31,7 +37,7 @@ export function connectSessionInputs({
   }
   async function postTools(taskId, context) {
     const ticket = job.steerHint.ticket;
-    if (closed) return;
+    if (closed || job.stopSignal?.aborted) return;
     let m,
       publicationPossible = false;
     try {
@@ -58,6 +64,7 @@ export function connectSessionInputs({
           return;
         if (await tx.submissionByRequest(conversation.id, m.id))
           throw Error("Session input was already adopted");
+        if (job.stopSignal?.aborted) return;
         context.abortSignal?.throwIfAborted();
         job.authority.assertActive();
         // Pi normally places passive writes (e.g. compaction) before steers.
@@ -95,13 +102,13 @@ export function connectSessionInputs({
     } catch (error) {
       // Pi reports extension exceptions. Keep the same failure at the Worker
       // boundary so it cannot publish successful completion after a lost write.
-      if (!context.abortSignal?.aborted) failure = error;
+      if (!context.abortSignal?.aborted && !job.stopSignal?.aborted) failure = error;
       if (m && !publicationPossible) await inputs.releaseBeforePlacement(job.scope, m.id);
       throw error;
     }
   }
   async function admitIdle(at) {
-    if (closed) return false;
+    if (closed || job.stopSignal?.aborted) return false;
     if (failure) throw failure;
     job.authority.assertActive();
     const m = await inputs.selectAt(job.scope, at);
@@ -114,12 +121,17 @@ export function connectSessionInputs({
       await inputs.releaseBeforePlacement(job.scope, m.id);
       throw error;
     }
+    if (job.stopSignal?.aborted) {
+      await inputs.releaseBeforePlacement(job.scope, m.id);
+      return false;
+    }
     lastSubmission = await conversation.submit(
       { type: "input", requestId: m.id, content: value, whenBusy: "reject" },
       ctx,
     );
     return true;
   }
+  if (job.stopSignal?.aborted) abort();
   return {
     postTools,
     assertHealthy() {
@@ -151,6 +163,7 @@ export function connectSessionInputs({
     },
     close() {
       closed = true;
+      job.stopSignal?.removeEventListener("abort", abort);
     },
   };
 }

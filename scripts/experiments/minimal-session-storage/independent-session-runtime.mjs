@@ -53,7 +53,13 @@ export class IndependentSessionRuntime {
     this.partitions = partitions;
     this.bashLog = bashLog;
     this.leases = new SegmentLeaseProjection(this.store.db, topic, partitions);
-    this.projection = normalRootProjection(pool, topic, selectSandbox, resolveSandbox, undefined, {
+    const selectForTurn = (scope, lane) => {
+      const owner = this.#owners.get(scope.tenantId + "/" + scope.sessionId);
+      if (!owner || !matches(scope, owner) || !owner.workspace_grant)
+        throw Error("No admitted Turn workspace for tool routing");
+      return selectSandbox(scope, lane, owner.workspace_grant);
+    };
+    this.projection = normalRootProjection(pool, topic, selectForTurn, resolveSandbox, undefined, {
       partitions,
       bashLog,
       namedExecutor: false,
@@ -71,7 +77,7 @@ export class IndependentSessionRuntime {
       );
     const starts = await this.projection.view.recover(bounds);
     const { rows } = await this.store.pool.query(
-      `select output_first_partition as p,min(output_first_offset) as first from runs
+      `select output_first_partition as p,min(output_first_offset) as first from turns
       where state in ('running','cancel_requested') and output_first_topic=$1 and output_first_partition=any($2::int[])
       group by output_first_partition`,
       [this.topic, bounds.map((b) => b.partition)],
@@ -98,7 +104,14 @@ export class IndependentSessionRuntime {
       orderedEffects: true,
       onRevoked: () => this.reset(),
       replayOffsets: (bounds) => this.replayOffsets(bounds),
-      decode: (bytes) => decodeWorkspaceFact(bytes).fact,
+      decode: (bytes) => {
+        try {
+          return decodeWorkspaceFact(bytes).fact;
+        } catch (error) {
+          onError?.(error);
+          throw error;
+        }
+      },
       handler: async (record, current, grant) => {
         try {
           return await this.consume(record, current, grant);
@@ -146,7 +159,7 @@ export class IndependentSessionRuntime {
         const {
           rows: [caller],
         } =
-          await sql`select s.flow_id,r.model_ref from sessions s join runs r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
+          await sql`select s.flow_id,r.model_snapshot from sessions s join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
         where s.tenant_id=${o.tenant}::uuid and s.id=${o.session}::uuid and r.id=${o.root}::uuid and r.lease_id=${o.writer}::uuid
         and r.fencing_token=${o.epoch} and r.state='running' and r.output_seal_id is null`.execute(
             this.store.db,
@@ -194,7 +207,7 @@ export class IndependentSessionRuntime {
             o.session,
             { run: o.root, writer: o.writer },
             intent,
-            caller.model_ref,
+            caller.model_snapshot.modelId,
             { operationId: o.operation, topic: o.destination },
           );
         } catch (error) {
@@ -206,7 +219,7 @@ export class IndependentSessionRuntime {
             await sql`insert into subagent_deliveries(operation_id,root_id,writer,caller_task,caller_lane,operation_hash,destination,call_id,tool,kind,value,due_at)
           select ${o.operation}::uuid,r.id,${o.writer}::uuid,${o.task},${o.lane},${hash},${o.destination},${intent.nativeCallId},'subagent','fixed',
             jsonb_build_object('isError',true,'text',${"名字已被占用。已有子 Agent 的 UUID 是 " + error.childId + "。请换一个名字或联系已有的子 Agent。"}::text),clock_timestamp()
-          from (select id from runs where id=${o.root}::uuid and tenant_id=${o.tenant}::uuid and session_id=${caller.flow_id}::uuid and state='running'
+          from (select id from turns where id=${o.root}::uuid and tenant_id=${o.tenant}::uuid and session_id=${caller.flow_id}::uuid and state='running'
             and output_seal_id is null and lease_id=${o.writer}::uuid and fencing_token=${o.epoch} for share) r
           on conflict(operation_id) do update set operation_hash=excluded.operation_hash where subagent_deliveries.operation_hash=excluded.operation_hash returning operation_id`.execute(
               this.store.db,
@@ -238,8 +251,8 @@ export class IndependentSessionRuntime {
     const {
       rows: [r],
     } =
-      await sql`select s.flow_id,r.native_work_handoff is not null as recovering,r.model_ref,r.output_first_offset from sessions s
-      join runs r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
+      await sql`select s.flow_id,r.native_work_handoff is not null as recovering,r.workspace_grant,r.output_first_offset from sessions s
+      join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
       where s.tenant_id=${s.tenantId}::uuid and s.id=${s.sessionId}::uuid and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid
       and r.fencing_token=${s.fencingToken} and l.fencing_token=r.fencing_token and l.released_at is null and r.state in ('running','cancel_requested')`.execute(
         this.store.db,

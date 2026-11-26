@@ -2,6 +2,9 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Freeze the model and authorized Workspace on Turn admission, including the successor after late mail. [Turn semantics](adr/0368-session-defaults-and-turn-snapshots.md).
+- [x] Read adopted inputs from retained Entries, keep unread Agent mail across Stop, and resume delivery on explicit human input. [Recovery and Fork acceptance](reports/turn-input-navigation-20261126.md).
+
 - [x] Skip PG lookups at clean tool boundaries and confirm pending steers on the current Worker. Exercise races, dropped acknowledgements, reconnect and lease rotation. [Decision](adr/0367-worker-steer-hints.md).
 
 - [x] Keep pending inputs and edits in PG. Place one eligible input in native history at each boundary, retain only nonempty native maintenance payloads, and reconcile at the ordered writer seal. [Decision](adr/0366-pg-input-boundaries.md).

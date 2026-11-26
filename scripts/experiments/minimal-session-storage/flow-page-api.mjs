@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { PiCloudApi } from "../../../packages/web-ui/src/api.ts";
 import pg from "pg";
+import { sql } from "kysely";
 import { capturePageQueries, profilePage, tracePageCpu } from "./flow-page-profile.mjs";
 
 export async function openPageApi(
@@ -118,6 +119,15 @@ if (import.meta.main) {
   let app, liveServer, remote, restoreProbe;
 
   try {
+    const hasPlacedInputs =
+      segmentedForks &&
+      Boolean(
+        (
+          await sql`select to_regclass(${segmentedForks + ".user_or_agent_messages"}) as mailbox`.execute(
+            reads,
+          )
+        ).rows[0].mailbox,
+      );
     const { createControlPlaneApplication, ProductionHttpGateway, PostgresTenantApiAuthenticator } =
       await import(moduleUrl("packages/control-plane/src/index.ts"));
     if (live) {
@@ -131,6 +141,7 @@ if (import.meta.main) {
       new SessionLiveService({
         database: reads,
         stream: new SessionEventStream(live, live.eventHub),
+        ...(hasPlacedInputs ? { placedInputHistory: true } : {}),
         rootMessageHistory: true,
         flowRootHistory,
         token,
@@ -140,7 +151,7 @@ if (import.meta.main) {
     const mutations = segmentedForks
       ? (
           await import(moduleUrl("packages/control-plane/src/segment-history-transactions.ts"))
-        ).segmentHistoryTransactions(segmentedForks)
+        ).segmentHistoryTransactions(segmentedForks, hasPlacedInputs)
       : undefined;
     app = await createControlPlaneApplication({
       ...(mutations ? { messageHistoryMutations: mutations } : {}),

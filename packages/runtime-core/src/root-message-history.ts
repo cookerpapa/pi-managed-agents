@@ -173,6 +173,7 @@ export async function readRootMessageWindow(
   flows = false,
   // Child Turns can use the Flow point reader with their own lane addressing.
   flowPoints = flows,
+  placedInputHistory?: boolean,
 ) {
   if (!input.turns.length)
     return {
@@ -268,6 +269,8 @@ export async function readRootMessageWindow(
       source_input_id: string | null;
       human: string | null;
       native_input_id: string | null;
+      mail: { text?: string; uploads?: UserUpload[]; initial?: boolean } | null;
+      run_id: string;
       created_at: Date;
       pending: {
         arguments: Record<string, unknown>;
@@ -278,17 +281,18 @@ export async function readRootMessageWindow(
       assistant_id: string | null;
       proposal: string | null;
     }>`
-      select p.id::text,p.seq::text,p.ordinal,s.pi_session_id,m.content,m.source_input_id,r.root_input_receipts->m.source_input_id->>'id' as native_input_id,case when starts_with(m.source_input_id,'input-') and strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')>0 then
+      select p.id::text,p.seq::text,p.ordinal,s.pi_session_id,m.content,m.source_input_id,p.run_id,${placedInputHistory ? sql`m.input_display` : sql`null`} as mail,r.root_input_receipts->m.source_input_id->>'id' as native_input_id,case when starts_with(m.source_input_id,'input-') and strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')>0 then
         substring(r.root_human_inputs from strpos(r.root_human_inputs,to_json(m.source_input_id)::text||':')+length(to_json(m.source_input_id)::text)+1 for p.human_limit) end as human,coalesce(m.created_at,r.created_at) as created_at,
         case when p.pending then ${flowPoints ? sql`coalesce(r.projection_tools->p.id::text,flow_pending_tool(r.tenant_id,s.pi_session_id::uuid,r.id,${lane},p.id))` : sql`r.projection_tools->p.id::text`} end as pending,a.entry_id::text as assistant_id,a.content as proposal
       from unnest(${picked.map((p) => p.run_id)}::uuid[],${picked.map((p) => p.id)}::bigint[],${picked.map((p) => p.seq)}::bigint[],${picked.map((p) => p.ordinal)}::int[],${picked.map((p) => p.pending)}::boolean[],${picked.map((p) => p.assistant_id)}::bigint[],${picked.map((p) => (p.fields.role === "user" ? humanPresentationSliceCharacters(p.body_bytes) : 0))}::int[]) p(run_id,id,seq,ordinal,pending,assistant_id,human_limit)
       join ${runSource} r on r.id=p.run_id and r.tenant_id=${input.tenantId}::uuid ${flows ? sql`` : sql`and r.session_id=${input.sessionId}::uuid`}
       ${sessionJoin}
       ${clipped ? sql`join unnest(${input.turns.map((t) => t.turnId)}::uuid[]${rangeArrays},${input.turns.map((t) => t.through?.sequence ?? Number.MAX_SAFE_INTEGER)}::bigint[]) t(turn_id ,lo,hi,source_lane,inherited,partial_coverage,through_seq) on t.turn_id=p.run_id` : sql``}
-      left join lateral(select m.run_id,m.content,m.created_at,m.source_input_id from messages m
+      left join lateral(select m.run_id,m.content,m.created_at,m.source_input_id${placedInputHistory ? sql`,m.input_display` : sql``} from messages m
         where not p.pending and m.tenant_id=r.tenant_id and m.pi_session_id=s.pi_session_id::uuid
           and m.entry_id=p.id and m.conversation_id=${lane} limit 1) m on m.run_id=r.id
       ${assistantAt}`.execute(db);
+    const headers = new Set(selected.filter((p) => p.header).map((p) => p.turn_id));
     for (const r of bodies.rows) {
       let pendingArgs = r.pending?.arguments;
       if (r.pending?.commandFromProposal) {
@@ -325,7 +329,15 @@ export async function readRootMessageWindow(
       rows.push(row);
       if (r.assistant_id && r.proposal)
         dependencies.push({ ...row, id: r.assistant_id, body: '{"value":' + r.proposal + "}" });
-      if (!child && r.source_input_id?.startsWith("input-")) {
+      if (r.mail && r.source_input_id && !(r.mail.initial && headers.has(r.run_id))) {
+        const collection = humans.get(r.pi_session_id) ?? new Map();
+        collection.set(r.id, {
+          inputId: r.source_input_id,
+          text: r.mail.text ?? entry.model[0].content,
+          uploads: parseUserUploads(r.mail.uploads ?? []),
+        });
+        humans.set(r.pi_session_id, collection);
+      } else if (!child && r.source_input_id?.startsWith("input-")) {
         const human = r.human && (firstJsonObject(r.human) as StoredHumanInput | undefined);
         if (
           !human ||

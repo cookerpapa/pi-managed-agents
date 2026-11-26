@@ -4,10 +4,15 @@ import {
   ControlPlaneApiValidationError,
   parseUuidPathParameter,
   parseAcceptTurnRequest,
+  parseCreateTurnCancellationRequest,
+  parseIdempotencyKey,
+  parseUpdateSessionModelRequest,
+  parseRebindConversationWorkspaceRequest,
   parseQueuedInputAction,
   INPUT_QUEUE_PAGE_SIZE,
 } from "@pi-cloud/protocol";
 import { sql } from "kysely";
+import { ControlPlaneStoreError } from "../../../packages/control-plane/src/control-plane-store-error.ts";
 import { InputConflict } from "./segment-inputs.mjs";
 const hash = (x) => createHash("sha256").update(JSON.stringify(x)).digest("hex");
 function identity(key, actor, session) {
@@ -25,10 +30,10 @@ function identity(key, actor, session) {
 // Mount with the Session API's authenticated identity and Session-scoped upload resolver.
 export function installSegmentInputApi(app, inputs, authorize) {
   const base = "/v1/sessions/:session";
-  const route = (method, path, handle) =>
+  const route = (method, path, handle, prefix = base) =>
     app.route({
       method,
-      url: base + path,
+      url: prefix + path,
       handler: async (req, res) => {
         try {
           const session = parseUuidPathParameter(req.params.session, "sessionId");
@@ -39,14 +44,36 @@ export function installSegmentInputApi(app, inputs, authorize) {
         } catch (e) {
           if (e instanceof ControlPlaneApiValidationError)
             return res.code(400).send({ message: e.message });
+          if (e instanceof ControlPlaneStoreError) {
+            const status =
+              { not_found: 404, conflict: 409, idempotency_conflict: 409, invalid_request: 400 }[
+                e.code
+              ] ?? 503;
+            return res.code(status).send({ error: { code: e.code, message: e.message } });
+          }
           if (e instanceof InputConflict) return res.code(409).send({ message: e.message });
           throw e;
         }
       },
     });
+  route("GET", "/model", (_req, a) => inputs.settings.model(a.tenant, a.session));
+  route("PUT", "/model", (req, a) =>
+    inputs.settings.selectModel(a.tenant, a.session, parseUpdateSessionModelRequest(req.body)),
+  );
+  route(
+    "PUT",
+    "/workspace",
+    (req, a) =>
+      inputs.settings.rebind(
+        a,
+        req.headers["idempotency-key"],
+        parseRebindConversationWorkspaceRequest(req.body),
+      ),
+    "/v1/conversations/:session",
+  );
   const status = async (a, id) =>
     (
-      await sql`select m.*,r.mailbox_position from user_or_agent_messages m join runs r on r.id=m.turn_id
+      await sql`select m.*,r.mailbox_position from user_or_agent_messages m join turns r on r.id=m.turn_id
     where m.id=${id}::uuid and m.tenant_id=${a.tenant}::uuid and m.session_id=${a.session}::uuid and m.sender_id=${a.sender}::uuid and m.source='user'`.execute(
         inputs.db,
       )
@@ -141,6 +168,13 @@ export function installSegmentInputApi(app, inputs, authorize) {
       ? "accepted"
       : "unconfirmed",
   }));
+  route("POST", "/turns/:turnId/cancellations", async (req, a, res) => {
+    const turn = parseUuidPathParameter(req.params.turnId, "turnId");
+    const key = parseIdempotencyKey(req.headers["idempotency-key"]);
+    const { gracePeriodMs = 2000 } = parseCreateTurnCancellationRequest(req.body);
+    const receipt = await inputs.stop(a, turn, key, gracePeriodMs);
+    return res.code(202).send(receipt);
+  });
   route("POST", "/turns", async (req, a) => {
     const request = parseAcceptTurnRequest(req.body),
       id = identity(req.headers["idempotency-key"], a.sender, a.session);

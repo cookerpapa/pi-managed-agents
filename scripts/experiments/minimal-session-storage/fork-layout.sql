@@ -9,6 +9,7 @@ create index fork_stream_agent_base on flows(tenant_id,agent_base_stream,agent_b
 create table sessions (
   tenant_id uuid not null,id uuid not null,flow_id uuid not null,
   family_id uuid not null, parent_session_id uuid,agent_name text not null,creation_hash text,title text not null default '',
+  desired_model jsonb, desired_workspace jsonb, owner_user_id uuid,
   primary key(tenant_id,id),unique(tenant_id,flow_id),unique(tenant_id,family_id,id),
   foreign key(tenant_id,flow_id) references flows,
   foreign key(tenant_id,family_id,parent_session_id) references sessions(tenant_id,family_id,id),
@@ -127,7 +128,8 @@ begin
   end if;
   select flow_id into src from sessions where tenant_id=t and id=window_id for share;
   if not found or not pin_message_fork(t,src,dest,target_run,1,entry,'web') then return false; end if;
-  insert into sessions(tenant_id,id,flow_id,family_id,agent_name) values(t,dest,dest,dest,'root');
+  insert into sessions(tenant_id,id,flow_id,family_id,agent_name,desired_model,desired_workspace,owner_user_id)
+    select t,dest,dest,dest,'root',desired_model,desired_workspace,owner_user_id from sessions where tenant_id=t and id=window_id;
   insert into conversation_worlds(tenant_id,pi_session_id,conversation_id,state)
     select t,dest,1,state from conversation_worlds where tenant_id=t and pi_session_id=src and conversation_id=1;
   insert into fork_requests values(t,window_id,request_key_text,dest,request_hash);

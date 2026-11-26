@@ -1,0 +1,9 @@
+# ADR-0368. Snapshot Session settings on the Turn
+
+Accepted for the isolated #52 candidate. The scheduler selects a Session and issues its lease. A Turn identifies an execution window from admission through ordered closure. Worker replacement keeps the Turn ID and snapshot. Pi's own Run and the serving protocol retain their own meanings.
+
+Use one physical turns table. Shared history and executor readers can address its updatable runs view in the candidate schema. The matched PG projection functions target the physical turns relation directly. Foreign keys and ownership triggers attach to the physical table. New candidate scheduling and mailbox code uses turns directly. Keep the runId wire field where an existing consumer requires it; it carries the same ID as turnId in this composition.
+
+Session defaults describe the selected model and logical environment. Admission copies the resolved model selection, thinking level, service tier, catalog capabilities and credential reference, plus the authorized Workspace, working directory and logical compute scope. A subsequent model selection changes future admissions even during active work. Environment edits require quiescence under the Session lock. A pending or closing Turn excludes a rebind; retries of an already admitted input keep its original Turn. A retained VM observation and the physical routing span remain under their respective resource and execution authorities.
+
+Named children initialize their settings from the calling Turn and a narrowed workspace grant. A pending message which crosses ordinary closure uses the target Session's current defaults on its first new Turn. A Web Fork creates an independent Session with its own settings. Verify races, browser model selection, ordered handoff, changed directories, different logical sandboxes, and next-Turn admission. Production cutover remains gated under #48.

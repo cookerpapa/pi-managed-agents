@@ -28,6 +28,7 @@ export class SessionLiveService {
       stream: SessionEventStream;
       rootMessageHistory?: boolean;
       flowRootHistory?: boolean;
+      placedInputHistory?: boolean;
       token: string;
       inputConfirmations?: Pick<SessionEventHub, "watchInput">;
     },
@@ -122,6 +123,7 @@ export class SessionLiveService {
                 tenantId,
                 this.options.rootMessageHistory,
                 this.options.flowRootHistory,
+                this.options.placedInputHistory,
               ).getConversationView(sessionId),
           }),
         );

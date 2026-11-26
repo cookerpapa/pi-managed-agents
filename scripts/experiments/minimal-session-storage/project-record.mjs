@@ -226,7 +226,12 @@ export async function projectRecord(
   const messages = [],
     inputs = new Map();
   for (const w of batch.writes)
-    if (w.type === "submission" && w.value.requestId && w.value.entry !== undefined)
+    if (
+      w.type === "submission" &&
+      w.value.requestId &&
+      w.value.entry !== undefined &&
+      (!stage?.independentSessions || (w.value.type === "input" && w.value.status === "placed"))
+    )
       inputs.set(w.value.entry, w.value.requestId);
   for (const [ordinal, w] of batch.writes.entries()) {
     if (

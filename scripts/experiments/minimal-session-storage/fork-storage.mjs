@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { prepareNamedSubagentArguments, subagentName } from "@pi-cloud/protocol";
 import { TOOL_REPLY_TOPIC_PATTERN } from "@pi-cloud/event-log";
+import { initializeRoots } from "./session-defaults.mjs";
 import { childWorkspaceGrant } from "@pi-cloud/subagent-control/delegated-workspace-grant";
 import { restoreForkPrefix } from "./session-prefix.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
@@ -97,7 +98,7 @@ export class ForkStorage {
     this.db = new Kysely({ dialect: new PostgresDialect({ pool }) });
     this.pool = pool;
   }
-  async register(tenant, ids, templateFlow = null) {
+  async register(tenant, ids, templateFlow = null, settings) {
     await this.db.transaction().execute(async (tx) => {
       await this.lock(tx, tenant);
       await sql`insert into flows select ${tenant}::uuid,x from unnest(${ids}::uuid[]) x`.execute(
@@ -105,6 +106,7 @@ export class ForkStorage {
       );
       await sql`insert into sessions(tenant_id,id,flow_id,family_id,agent_name)
         select ${tenant}::uuid,x,x,x,'root' from unnest(${ids}::uuid[]) x`.execute(tx);
+      if (this.inputs) await initializeRoots(tx, tenant, ids, settings);
       if (templateFlow) {
         await sql`update flows f set native_id_floor=b.native_id_floor,agent_base_stream=b.agent_base_stream,
           agent_base_seq=b.agent_base_seq,agent_base_ordinal=b.agent_base_ordinal from flows b where f.tenant_id=${tenant}::uuid and
@@ -311,15 +313,17 @@ export class ForkStorage {
     const parent = await this.session(tx, t, source);
     assert(parent, "Unknown Fork source");
     let creation = null;
-    let inheritedGrant = null;
+    let inheritedGrant = null,
+      childModel;
     if (child) {
       const caller =
-        await sql`select id,workspace_grant from runs where tenant_id=${t}::uuid and id=${child.caller.run}::uuid and session_id=${parent.flow_id}::uuid
+        await sql`select id,workspace_grant${this.inputs ? sql`,model_snapshot` : sql``} from ${this.inputs ? sql`turns` : sql`runs`} where tenant_id=${t}::uuid and id=${child.caller.run}::uuid and session_id=${parent.flow_id}::uuid
           and lease_id=${child.caller.writer}::uuid and state='running' and output_seal_id is null for share`.execute(
           tx,
         );
       assert(caller.rows.length, "Calling Turn is no longer active");
       inheritedGrant = caller.rows[0].workspace_grant;
+      childModel = caller.rows[0].model_snapshot;
       creation = createHash("sha256")
         .update(
           JSON.stringify([
@@ -367,12 +371,40 @@ export class ForkStorage {
     await sql`insert into sessions(tenant_id,id,flow_id,family_id,parent_session_id,agent_name,creation_hash)
         values(${t}::uuid,${target}::uuid,${target}::uuid,${child ? parent.family_id : target}::uuid,
           ${child ? source : null}::uuid,${child?.name ?? "root"},${creation})`.execute(tx);
-    if (child) {
-      const initialTurn = randomUUID();
-      await sql`insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,workspace_grant)
-          values(${initialTurn}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},${child.model},'queued',${grant ? JSON.stringify(grant) : null}::jsonb)`.execute(
+    if (this.inputs) {
+      const logical =
+        child && grant
+          ? {
+              ...grant,
+              executionMode:
+                grant.compute === "ephemeral"
+                  ? "elastic"
+                  : (inheritedGrant.executionMode ?? "elastic"),
+              developmentEnvironmentId:
+                grant.compute === "ephemeral"
+                  ? null
+                  : (inheritedGrant.developmentEnvironmentId ?? null),
+            }
+          : null;
+      const workspace = child ? logical : parent.desired_workspace;
+      const model = child ? childModel : parent.desired_model;
+      await sql`update sessions set desired_model=${JSON.stringify(model)}::jsonb,desired_workspace=${workspace && JSON.stringify(workspace)}::jsonb,
+        owner_user_id=${parent.owner_user_id}::uuid where tenant_id=${t}::uuid and id=${target}::uuid`.execute(
         tx,
       );
+    }
+    if (child) {
+      const initialTurn = randomUUID();
+      if (this.inputs) {
+        await sql`insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state)
+          values(${initialTurn}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},'queued')`.execute(
+          tx,
+        );
+      } else
+        await sql`insert into runs(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,model_ref,state,workspace_grant)
+          values(${initialTurn}::uuid,${t}::uuid,${target}::uuid,1,${key}::uuid,${child.task},${child.model},'queued',${grant ? JSON.stringify(grant) : null}::jsonb)`.execute(
+          tx,
+        );
       if (this.inputs)
         await this.inputs.admitIn(tx, {
           tenant: t,
@@ -382,7 +414,6 @@ export class ForkStorage {
           source: "agent",
           mode: point ? "steer" : "input",
           text: child.task,
-          model: child.model,
           initialTurn,
         });
     }
