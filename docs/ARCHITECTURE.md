@@ -14,6 +14,8 @@ The segmented Session candidate has [separate serving processes](adr/0375-indepe
 
 The isolated Worker now grants a selected Session batch with set-based SQL while retaining separate leases. [Claim timing and contention](reports/session-claim-cost-20261127.md).
 
+The candidate selects unsettled Turns using a partial index and probes the per-Turn mailbox index for input presence. Existing candidate installations can build the index while accepting writes. [Installation and measurements](reports/session-claim-selector-integration-20261127.md).
+
 [ADR-0313](adr/0313-alternate-runtime-production-integration.md) implements
 explicit stock BoxLite and Android integration beyond the earlier ADR-0312
 operator experiments. The BoxLite native SDK lives in its own trusted node,

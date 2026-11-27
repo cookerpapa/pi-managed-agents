@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID, randomBytes, scryptSync } from "node:crypto";
-import { mkdtemp, chmod, writeFile, rm, readFile } from "node:fs/promises";
+import { mkdtemp, chmod, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -16,6 +16,7 @@ import { createPrivateTenant } from "../packages/control-plane/src/tenant-admini
 import { PiCloudApi } from "../packages/web-ui/src/api.ts";
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { testPostgres } from "./lib/test-postgres.mjs";
+import { createUnsettledTurnIndex } from "./experiments/minimal-session-storage/independent-session-leases.mjs";
 import { defaultSessionClaimBatch } from "./experiments/minimal-session-storage/segment-wake.mjs";
 import { servingLoadFixture } from "./serving/independent-session/load-fixture.mjs";
 import { withChromePage } from "./lib/chrome-cdp.mjs";
@@ -124,21 +125,19 @@ try {
   clean.push(() => db.destroy());
   const pool = new pg.Pool({ connectionString: pgFix.url });
   clean.push(() => pool.end());
-  const indexStudy = load && process.argv.includes("--index-unsettled");
+  const {
+    rows: [{ installed: claimIndexInstalled }],
+  } = await pool.query(
+    "select exists(select from pg_index where indexrelid=to_regclass('pma_segments.turns_unsettled_by_session') and indisvalid) as installed",
+  );
+  // Allows the historical serving images to participate in the same A/B study.
+  const indexStudy = load && process.argv.includes("--index-unsettled") && !claimIndexInstalled;
   if (indexStudy) {
     const c = await pool.connect();
     try {
       await c.query("begin");
       await c.query("set local search_path=pma_segments,public");
-      await c.query(
-        await readFile(
-          new URL(
-            "./experiments/minimal-session-storage/claim-selector-index.sql",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-      );
+      await createUnsettledTurnIndex(c);
       await c.query("commit");
     } catch (e) {
       await c.query("rollback");
@@ -236,8 +235,81 @@ try {
     headers: { authorization: "Bearer " + identity.credential.token },
   });
   assert.equal(pendingUsage.status, 501, "An unmapped usage source cannot return a zero balance");
+  const verifyUpgrade = process.argv.includes("--verify-claim-upgrade");
+  if (verifyUpgrade) {
+    assert(claimIndexInstalled, "Fresh migration missed the Turn claim index");
+    // Re-create an existing pre-index installation in the disposable database.
+    await pool.query("drop index pma_segments.turns_unsettled_by_session");
+    const blocker = await pool.connect();
+    try {
+      await blocker.query("begin");
+      await blocker.query("lock table pma_segments.turns in row exclusive mode");
+      const {
+        rows: [{ pid: blockerPid }],
+      } = await blocker.query("select pg_backend_pid() as pid");
+      const attempt = role("interrupted-migration", "migrate", {}, []);
+      const pid = await until(
+        "online Turn index build",
+        async () => {
+          const {
+            rows: [r],
+          } = await pool.query(
+            `select pid from pg_stat_progress_create_index
+          where relid='pma_segments.turns'::regclass and current_locker_pid=$1`,
+            [blockerPid],
+          );
+          return r?.pid;
+        },
+        30000,
+      );
+      const writer = await pool.connect();
+      try {
+        await writer.query("begin");
+        await writer.query("set local search_path=pma_segments,public");
+        await writer.query("set local lock_timeout='1s'");
+        const inserted = await writer.query(
+          `insert into pma_segments.turns
+          (id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state)
+          select gen_random_uuid(),tenant_id,flow_id,1,gen_random_uuid(),'index check','queued'
+          from pma_segments.sessions where id=$1`,
+          [session],
+        );
+        assert.equal(inserted.rowCount, 1);
+      } finally {
+        await writer.query("rollback");
+        writer.release();
+      }
+      await pool.query("select pg_cancel_backend($1)", [pid]);
+      assert.notEqual(docker(["wait", attempt]).trim(), "0");
+      const {
+        rows: [index],
+      } = await pool.query(
+        "select indisvalid from pg_index where indexrelid=to_regclass('pma_segments.turns_unsettled_by_session')",
+      );
+      assert.equal(index?.indisvalid, false, "Expected a recoverable incomplete index");
+    } finally {
+      await blocker.query("rollback");
+      blocker.release();
+    }
+  }
   const repeat = role("migration-check", "migrate", {}, []);
   assert.equal(docker(["wait", repeat]).trim(), "0", "Migration retry with an existing Session");
+  if (verifyUpgrade) {
+    const validIndex = async () =>
+      (
+        await pool.query(
+          "select indexrelid::oid as oid from pg_index where indexrelid=to_regclass('pma_segments.turns_unsettled_by_session') and indisvalid",
+        )
+      ).rows[0]?.oid;
+    const repaired = await validIndex();
+    assert.ok(repaired);
+    const again = role("migration-noop", "migrate", {}, []);
+    assert.equal(docker(["wait", again]).trim(), "0");
+    assert.equal(await validIndex(), repaired, "Healthy index rebuilt on migration retry");
+    console.log(
+      "Existing installation accepted a concurrent Turn insert, recovered the interrupted index build and retained the valid index on retry.",
+    );
+  }
   const startWorker = async (i) => {
     const label = role(
       "worker-" + i,
@@ -490,6 +562,7 @@ try {
               drainMs: elapsedMs - admittedMs,
             }
           : {}),
+        claimIndexInstalled,
         indexStudy,
         ...(profileClaims
           ? {

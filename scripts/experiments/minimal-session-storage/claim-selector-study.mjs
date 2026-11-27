@@ -2,7 +2,7 @@
 // disposable fixture is populated. Every locking measurement rolls back.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pg from "pg";
@@ -11,10 +11,13 @@ import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { createPrivateTenant } from "../../../packages/control-plane/src/tenant-administration.ts";
 import { testPostgres } from "../../lib/test-postgres.mjs";
 import { IndependentSessionRuntime } from "./independent-session-runtime.mjs";
-import { installIndependentSessionLeases, SegmentWorker } from "./independent-session-leases.mjs";
+import {
+  createUnsettledTurnIndex,
+  installIndependentSessionLeases,
+  SegmentWorker,
+} from "./independent-session-leases.mjs";
 import { installForkTables, setForkLayout } from "./fork-storage.mjs";
 import { installPagingProjection } from "./flow-paging-fixture.mjs";
-const indexSql = await readFile(new URL("./claim-selector-index.sql", import.meta.url), "utf8");
 const fixture = await testPostgres({}),
   url = new URL(fixture.url),
   cache = await mkdtemp(join(tmpdir(), "claim-select-"));
@@ -60,26 +63,27 @@ try {
     hint = [t, head, first, "version", head];
   await worker.claimBatch(8);
   await worker.claimBatch(1, hint);
-  const fifo = captured[0],
-    target = captured[1];
-  assert(fifo && target);
-  // Change just the projected boolean in this arm. An empty/withdrawn-only
-  // mailbox still has two different meanings for first_message and has_inputs.
-  function pointMail(query) {
-    const scalar = query.sql.replace(
-      "exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs",
+  const point = captured[0],
+    pointTarget = captured[1];
+  assert(point && pointTarget);
+  // Synthesize the previous SELECT only for the baseline arm. The optimized
+  // arm always executes the SQL captured from the actual Worker.
+  function priorMail(query) {
+    const previous = query.sql.replace(
       "coalesce((select true from user_or_agent_messages m where m.turn_id=r.id limit 1),false) as has_inputs",
+      "exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs",
     );
-    assert.notEqual(scalar, query.sql, "Recheck the study after changing the Worker SELECT");
-    return { ...query, sql: scalar };
+    assert.notEqual(previous, query.sql, "Expected the Worker point lookup");
+    return { ...query, sql: previous };
   }
-  const point = pointMail(fifo);
+  const fifo = priorMail(point),
+    target = priorMail(pointTarget);
   async function sameMail(query) {
     const c = await pool.connect();
     try {
       await c.query("begin");
       const a = await c.query(query.sql, query.parameters),
-        b = await c.query(pointMail(query).sql, query.parameters);
+        b = await c.query(priorMail(query).sql, query.parameters);
       assert.deepEqual(b.rows, a.rows);
       return a.rows[0];
     } finally {
@@ -92,7 +96,7 @@ try {
       mid = Math.floor(sorted.length / 2);
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   }
-  async function measure(label, query, expected) {
+  async function measure(label, query, expected, verifyPlan) {
     const c = await pool.connect();
     const plans = [];
     let ids;
@@ -117,6 +121,7 @@ try {
     }
     const plan = plans[2].Plan;
     const nodes = flatten(plan);
+    verifyPlan?.(nodes);
     console.log(
       JSON.stringify({
         label,
@@ -203,9 +208,14 @@ try {
   const fresh = Array.from({ length: 192 }, () => randomUUID());
   await rt.store.register(t, fresh);
   await enqueue(fresh);
-  await measure("fresh192-default-stats", fifo, 8);
+  const freshNative = await measure("fresh192-native-default-stats", point, 8);
+  await pool.query("drop index turns_unsettled_by_session");
+  assert.deepEqual(await measure("fresh192-default-stats", fifo, 8), freshNative);
   await analyze();
   await measure("fresh192", fifo, 8);
+  await createUnsettledTurnIndex(pool);
+  assert.deepEqual(await measure("fresh192-both", point, 8), freshNative);
+  await pool.query("drop index turns_unsettled_by_session");
   await comparePrepared("prepared_fresh", fifo);
   const blocker = await pool.connect();
   try {
@@ -244,16 +254,17 @@ try {
   await analyze();
   const longIds = await measure("nine-ready-after-4096", fifo, 8);
   await measure("warm-hint-after-4096", target, 1);
-  await pool.query(indexSql);
+  await createUnsettledTurnIndex(pool);
   assert.deepEqual(await measure("nine-ready-indexed", fifo, 8), longIds);
-  await measure("warm-hint-indexed", target, 1);
+  await measure("warm-hint-indexed", pointTarget, 1);
+  assert.deepEqual(await measure("nine-ready-both", point, 8), longIds);
   const seal = randomUUID();
   await pool.query(
     "update turns set output_seal_id=$3 where tenant_id=$1 and session_id=$2 and mailbox_position=4096",
     [t, head, seal],
   );
-  await measure("hint-before-seal-indexed", target, 0);
-  await pool.query("drop index study_unfinished");
+  await measure("hint-before-seal-indexed", pointTarget, 0);
+  await pool.query("drop index turns_unsettled_by_session");
   await measure("hint-before-seal", target, 0);
   await pool.query("update turns set output_sealed_at=clock_timestamp() where output_seal_id=$1", [
     seal,
@@ -266,12 +277,30 @@ try {
   const busyIds = await measure("4105-ready-with-history", fifo, 8);
   assert.deepEqual(await measure("4105-ready-point-mail", point, 8), busyIds);
   await comparePrepared("prepared_long", fifo);
-  // An experimental partial index exists only inside this disposable fixture.
-  await pool.query(indexSql);
+  await createUnsettledTurnIndex(pool);
   assert.deepEqual(await measure("4105-ready-indexed", fifo, 8), busyIds);
-  assert.deepEqual(await measure("4105-ready-both", point, 8), busyIds);
-  await sameMail(fifo);
-  const empty = await sameMail(target);
+  const {
+    rows: [{ input_count }],
+  } = await pool.query("select count(*)::int as input_count from user_or_agent_messages");
+  const integrated = await measure("4105-ready-both", point, 8, (nodes) => {
+    assert(
+      nodes.some((n) => n["Index Name"] === "turns_unsettled_by_session"),
+      "Long backlog did not use the unfinished-Turn index",
+    );
+    assert(
+      !nodes.some(
+        (n) =>
+          n["Relation Name"] === "user_or_agent_messages" &&
+          (n["Actual Rows"] + (n["Rows Removed by Filter"] ?? 0)) * n["Actual Loops"] >=
+            input_count,
+      ),
+      "Selector examined the entire input history",
+    );
+  });
+  assert.deepEqual(integrated, busyIds);
+  await measure("hint-after-seal-integrated", pointTarget, 1);
+  await sameMail(point);
+  const empty = await sameMail(pointTarget);
   assert.equal(empty.first_message, null);
   assert.equal(empty.has_inputs, false);
   await pool.query(
@@ -279,7 +308,7 @@ try {
   values($1,$2,gen_random_uuid(),$1,true,'user','input','withdrawn','test','test',$3,'withdrawn')`,
     [t, head, first],
   );
-  const withdrawn = await sameMail(target);
+  const withdrawn = await sameMail(pointTarget);
   assert.equal(withdrawn.first_message, null);
   assert.equal(withdrawn.has_inputs, true);
   await comparePrepared("prepared_indexed", fifo);

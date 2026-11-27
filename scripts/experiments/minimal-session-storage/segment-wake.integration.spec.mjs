@@ -104,6 +104,16 @@ it.skipIf(!endpoint)(
       const queued = Array.from({ length: 13 }, () => randomUUID());
       await runtime.store.register(t, queued);
       const turnIds = await Promise.all(queued.map((id) => enqueue(id)));
+      // A withdrawn-only Turn still has input history, but has no eligible
+      // first input. A different Turn in the same claim can have a placed input.
+      const placed = randomUUID();
+      await pool.query(
+        `insert into user_or_agent_messages
+        (tenant_id,session_id,id,sender_id,starts_turn,source,mode,request_key,body,fingerprint,turn_id,state)
+        values($1,$2,gen_random_uuid(),$1,true,'user','input','withdrawn','test','test',$3,'withdrawn'),
+              ($1,$4,$5,$1,true,'user','input','placed','test','test',$6,'placed')`,
+        [t, queued[0], turnIds[0], queued[1], placed, turnIds[1]],
+      );
       const bulk = [];
       try {
         for (let i = 0; i < 2; i++) {
@@ -188,8 +198,12 @@ it.skipIf(!endpoint)(
             .flat()
             .map((job) => job.id)
             .sort(),
-          turnIds.sort(),
+          turnIds.toSorted(),
         );
+        for (const job of batches.flat()) {
+          assert.equal(job.has_inputs, job.id === turnIds[0] || job.id === turnIds[1]);
+          assert.equal(job.first_message, job.id === turnIds[1] ? placed : null);
+        }
         assert.equal(new Set(batches.flat().map((job) => job.scope.writerId)).size, 13);
         assert.equal(reads - before, 2, "one candidate selection per Worker");
         for (const job of batches.flat()) {

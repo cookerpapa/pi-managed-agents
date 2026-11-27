@@ -14,6 +14,13 @@ import { SessionLeaseCoordinator } from "@pi-cloud/runtime-core/session-lease-co
 import { PostgresSessionLeaseObserver } from "../../../packages/pi-session-postgres/src/postgres-session-lease-observer.ts";
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 
+export function createUnsettledTurnIndex(db, concurrently = false) {
+  return db.query(`create index ${concurrently ? "concurrently " : ""}turns_unsettled_by_session
+    on turns(tenant_id,session_id,mailbox_position)
+    where state not in ('completed','failed','timed_out','cancelled')
+       or (output_seal_id is not null and output_sealed_at is null)`);
+}
+
 export async function installIndependentSessionLeases(db) {
   for (const file of [
     "subagent-deliveries.sql",
@@ -23,6 +30,7 @@ export async function installIndependentSessionLeases(db) {
     await db.query(await readFile(new URL(file, import.meta.url), "utf8"));
   await installPhysicalTurnProjection(db);
   await db.query(await readFile(new URL("session-inputs.sql", import.meta.url), "utf8"));
+  await createUnsettledTurnIndex(db);
 }
 
 export class SegmentWorker {
@@ -84,7 +92,7 @@ export class SegmentWorker {
             where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position
               and p.output_display_seq>0 order by p.mailbox_position desc limit 1),0)) as display_base,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
           (select prev.workspace_grant from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id and prev.mailbox_position=r.mailbox_position-1) previous_workspace,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.starts_turn desc,m.position limit 1) as first_message,
-          exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs
+          coalesce((select true from user_or_agent_messages m where m.turn_id=r.id limit 1),false) as has_inputs
           from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
           join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
           where ${eligible} ${skip ? sql`and r.id <>${skip}::uuid` : sql``} and r.state='queued' and r.lease_id is null and r.output_seal_id is null

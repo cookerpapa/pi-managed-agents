@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Integrated Turn selector](session-claim-selector-integration-20261127.md) covers the online index migration, steady write cost and matched serving measurements.
+
 - [Worker claim selector](session-claim-selector-20261127.md) measures real plan work, client pool contention and fixed-rate Kafka lag.
 
 - [Session claim cost](session-claim-cost-20261127.md) breaks down actual PG, client and post-commit time and compares set-based lease granting with serial grants.

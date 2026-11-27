@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Use a point mailbox lookup and an unfinished-Turn index in the serving candidate. Verify online upgrade, recovery from a cancelled build, and index maintenance cost. [Results](reports/session-claim-selector-integration-20261127.md).
+
 - [x] Profile the exact Session selector under short and long histories, compare an unfinished-Turn index and measure backpressure at fixed arrival rates. [Evidence](reports/session-claim-selector-20261127.md).
 
 - [x] Measure and batch independent Session lease grants; preserve ownership and rollback under concurrent claims. [Claim timings and remaining load tail](reports/session-claim-cost-20261127.md).

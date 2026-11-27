@@ -2,11 +2,13 @@
 
 Issue #52’s candidate Worker selects eligible Turns, grants their leases in the same transaction, then confirms authority and bootstraps its inbox. These are separate operations. This study measures the first SELECT, the Worker’s local connection checkout and the end-to-end response under controlled arrival rates. All measurements used isolated synthetic data. [Selector](../../scripts/experiments/minimal-session-storage/independent-session-leases.mjs) · [Previous lease measurements](session-claim-cost-20261127.md).
 
+The [subsequent candidate integration](session-claim-selector-integration-20261127.md) implements both measured changes. The comparisons below describe the preceding revision.
+
 ## Why the SELECT has several joins
 
 The FIFO path starts from a ready Session, finds its writable Flow and a queued Turn, checks that an unreleased physical owner or an earlier unfinished Turn cannot be bypassed, and locks the Session and Turn with SKIP LOCKED. A cache-holder hint also validates the prior Turn’s history version. The query returns Turn settings, prior display position and Workspace grant, and the first eligible input ID and presence of input. It does not scan the transcript body table. Boot registration, remaining Worker capacity and the grant itself are checked later in the transaction.
 
-For example, to start Turn 4,097, it is sufficient to rule out an **unfinished** predecessor. The existing sequence index can find earlier positions, but depending on the plan PG still reads each earlier Turn to test whether it has settled. The study evaluates a partial index on tenant, Flow and mailbox position containing only nonterminal Turns and Turns whose seal has yet to be projected. A queued Turn is itself covered by that predicate. The index changes no eligibility rule. The same SQL runs in both arms. [Index tested only in the fixture](../../scripts/experiments/minimal-session-storage/claim-selector-index.sql).
+For example, to start Turn 4,097, it is sufficient to rule out an **unfinished** predecessor. The existing sequence index can find earlier positions, but depending on the plan PG still reads each earlier Turn to test whether it has settled. The study evaluates a partial index on tenant, Flow and mailbox position containing only nonterminal Turns and Turns whose seal has yet to be projected. A queued Turn is itself covered by that predicate. The index changes no eligibility rule. The same SQL runs in both arms. [Index tested only in the fixture](https://github.com/cookerpapa/pi-managed-agents/blob/881cd3f1/scripts/experiments/minimal-session-storage/claim-selector-index.sql).
 
 ## What the plans actually read
 

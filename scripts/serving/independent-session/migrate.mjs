@@ -9,7 +9,10 @@ import {
   installForkLayout,
   installForkAttachmentChecks,
 } from "../../experiments/minimal-session-storage/fork-storage.mjs";
-import { installIndependentSessionLeases } from "../../experiments/minimal-session-storage/independent-session-leases.mjs";
+import {
+  createUnsettledTurnIndex,
+  installIndependentSessionLeases,
+} from "../../experiments/minimal-session-storage/independent-session-leases.mjs";
 import { installWorkspaceRoutes } from "../../experiments/minimal-session-storage/workspace-route-spans.mjs";
 import { pathToFileURL } from "node:url";
 export async function migrate(config) {
@@ -28,6 +31,21 @@ export async function migrate(config) {
       } = await c.query("select * from pma_segments.installation");
       if (row?.version !== 1 || row.topic !== config.topic || row.partitions !== config.partitions)
         throw Error("Mismatched installation");
+      // The advisory lock serializes installers. Both Worker revisions can use
+      // the same data while PG builds this additive index outside a transaction.
+      await c.query("set search_path=pma_segments,public");
+      const {
+        rows: [index],
+      } = await c.query(`select i.indisvalid,
+        i.indrelid='pma_segments.turns'::regclass as on_turns
+        from pg_class c left join pg_index i on i.indexrelid=c.oid
+        where c.oid=to_regclass('pma_segments.turns_unsettled_by_session')`);
+      if (index && !index.on_turns) throw Error("Unexpected object at Turn claim index name");
+      if (!index?.indisvalid) {
+        // Cancellation can leave an invalid index with the final name.
+        if (index) await c.query("drop index concurrently pma_segments.turns_unsettled_by_session");
+        await createUnsettledTurnIndex(c, true);
+      }
       return;
     }
     if (
