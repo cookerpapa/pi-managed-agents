@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Session claim cost](session-claim-cost-20261127.md) breaks down actual PG, client and post-commit time and compares set-based lease granting with serial grants.
+
 - [Independent Session serving and cutover audit](independent-session-serving-20261127.md) covers real browser/provider continuation, a directed batch claim, the synthetic baseline and the remaining product paths.
 
 - [Worker-confirmed steer hints](worker-steer-hints-20261126.md) covers empty tool boundaries, UI acknowledgements, missed notices and lease takeover.

@@ -12,6 +12,8 @@ limits. Historical migrations and reports are not alternate production modes.
 
 The segmented Session candidate has [separate serving processes](adr/0375-independent-session-serving-entry.md) in a dedicated installation. Its [integration audit](reports/independent-session-serving-20261127.md) tracks the ports still required for a production cutover.
 
+The isolated Worker now grants a selected Session batch with set-based SQL while retaining separate leases. [Claim timing and contention](reports/session-claim-cost-20261127.md).
+
 [ADR-0313](adr/0313-alternate-runtime-production-integration.md) implements
 explicit stock BoxLite and Android integration beyond the earlier ADR-0312
 operator experiments. The BoxLite native SDK lives in its own trusted node,

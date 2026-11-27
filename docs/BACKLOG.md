@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Measure and batch independent Session lease grants; preserve ownership and rollback under concurrent claims. [Claim timings and remaining load tail](reports/session-claim-cost-20261127.md).
+
 - [x] Serve authenticated text from the segmented queue through separate API, Projector and Worker images, then read the result through Web and continue on a replacement Worker. [Evidence](reports/independent-session-serving-20261127.md).
 - [ ] Connect a real Guest round through these images and measure mixed traffic with batched projection. Reconcile the remaining read, recovery and deployment gates in the [integration audit](reports/independent-session-serving-20261127.md).
 

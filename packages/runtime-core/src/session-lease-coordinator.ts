@@ -372,6 +372,47 @@ export class SessionLeaseCoordinator implements TurnExecutionAuthority {
     return lease;
   }
 
+  /** The caller has locked the ready Worker and its eligible logical Sessions
+   * and reserved capacity in this transaction. An existing physical owner,
+   * including one awaiting its seal, prevents a grant for the entire batch. */
+  async grantPhysicalSessionBatch(
+    tx: Transaction<Database>,
+    sessions: readonly { tenantId: string; sessionId: string }[],
+  ) {
+    const tenants = sessions.map((s) => s.tenantId);
+    const ids = sessions.map((s) => s.sessionId);
+    const writers = sessions.map(() => this.#idGenerator());
+    // A separate statement makes newly initialized rows visible to the epoch update.
+    await sql`insert into pi_sessions(tenant_id,id)
+      select tenant,id from unnest(${tenants}::uuid[],${ids}::text[]) as s(tenant,id)
+      order by tenant,id on conflict(tenant_id,id) do nothing`.execute(tx);
+    const { rows } = await sql<{ lease_id: string; fencing_token: string | number }>`
+      with requested(tenant,id,writer) as materialized (
+        select * from unnest(${tenants}::uuid[],${ids}::text[],${writers}::uuid[])
+      ), advanced as (
+        update pi_sessions p set lease_epoch=p.lease_epoch+1
+        from requested s where p.tenant_id=s.tenant and p.id=s.id
+          and p.lease_epoch<9007199254740991
+          and not exists(select from session_leases l where l.tenant_id=p.tenant_id
+            and l.pi_session_id=p.id and l.released_at is null)
+        returning p.tenant_id,p.id,p.lease_epoch,s.writer
+      ) insert into session_leases(tenant_id,pi_session_id,lease_id,worker_id,
+        fencing_token,valid_until,acquired_at,renewed_at)
+        select tenant_id,id,writer,${this.#workerId}::uuid,lease_epoch,
+          clock_timestamp()+${this.#leaseDurationMs}*interval '1 millisecond',
+          clock_timestamp(),clock_timestamp() from advanced
+        returning lease_id,fencing_token`.execute(tx);
+    if (rows.length !== sessions.length)
+      throw new SessionLeaseCoordinatorError(
+        "session_lease_conflict",
+        "Could not grant every reserved Session",
+        true,
+      );
+    // UPDATE/RETURNING order is independent of the scheduler's priority order.
+    const byWriter = new Map(rows.map((row) => [row.lease_id, row]));
+    return writers.map((id) => byWriter.get(id)!);
+  }
+
   async assertCurrent(
     transaction: Transaction<Database>,
     request: TurnExecutionRequest,

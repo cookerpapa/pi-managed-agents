@@ -130,6 +130,53 @@ it.skipIf(!endpoint)(
             }),
           );
         }
+        // Vary the starting epochs to verify lease-to-Session mapping, including
+        // when RETURNING uses a different order from the queue.
+        await pool.query(
+          `insert into pi_sessions(tenant_id,id,lease_epoch)
+          select $1,id,ordinality from unnest($2::text[]) with ordinality as s(id,ordinality)`,
+          [t, queued],
+        );
+        const assertRolledBack = async () => {
+          const {
+            rows: [counts],
+          } = await pool.query(
+            `select
+            (select count(*)::int from turns where tenant_id=$1 and state='queued') queued,
+            (select count(*)::int from ready_agent_sessions where tenant_id=$1) ready,
+            (select count(*)::int from session_leases where tenant_id=$1) leases`,
+            [t],
+          );
+          assert.deepEqual(counts, { queued: 13, ready: 13, leases: 0 });
+        };
+        // A failure after grant creation must roll back the entire claim.
+        await pool.query(
+          "update supervisor_connections set state='expired',close_reason='heartbeat_timeout',closed_at=clock_timestamp() where worker_id=$1",
+          [bulk[0].workerId],
+        );
+        await assert.rejects(bulk[0].claimBatch(8), /management connection/);
+        await assertRolledBack();
+        await pool.query(
+          "update supervisor_connections set state='active',close_reason=null,closed_at=null where worker_id=$1",
+          [bulk[0].workerId],
+        );
+        const {
+          rows: [first],
+        } = await pool.query(
+          "select session_id from ready_agent_sessions where tenant_id=$1 order by ready_at,session_id limit 1",
+          [t],
+        );
+        await pool.query(
+          "update pi_sessions set lease_epoch=9007199254740991 where tenant_id=$1 and id=$2",
+          [t, first.session_id],
+        );
+        await assert.rejects(bulk[0].claimBatch(8), /grant every reserved Session/);
+        await assertRolledBack();
+        await pool.query("update pi_sessions set lease_epoch=$3 where tenant_id=$1 and id=$2", [
+          t,
+          first.session_id,
+          queued.indexOf(first.session_id) + 1,
+        ]);
         const before = reads;
         const batches = await Promise.all(bulk.map((w) => w.claimBatch(32)));
         assert.deepEqual(
@@ -146,6 +193,7 @@ it.skipIf(!endpoint)(
         assert.equal(new Set(batches.flat().map((job) => job.scope.writerId)).size, 13);
         assert.equal(reads - before, 2, "one candidate selection per Worker");
         for (const job of batches.flat()) {
+          assert.equal(job.scope.fencingToken, queued.indexOf(job.logical_id) + 2);
           await settle(job);
           await job.release();
         }

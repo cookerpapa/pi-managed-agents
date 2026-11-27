@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID, randomBytes, scryptSync } from "node:crypto";
 import { mkdtemp, chmod, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "node:net";
@@ -21,7 +22,11 @@ import { withChromePage } from "./lib/chrome-cdp.mjs";
 import { testKafka } from "./lib/test-kafka.mjs";
 const tag = process.argv[2],
   load = process.argv[3] === "--load",
-  capacity = load ? 64 : 4;
+  capacity = load ? Number(process.env.PI_CLOUD_CHECK_WORKER_SLOTS ?? 64) : 4;
+if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 64)
+  throw Error("Invalid load Worker capacity");
+const profileClaims = load && process.argv.includes("--profile-claims");
+const probe = "scripts/experiments/minimal-session-storage/claim-timing-probe.mjs";
 let provider = process.env.PI_CLOUD_PROVIDER_GATEWAY_URL,
   keyFile = process.env.PI_CLOUD_PROVIDER_GATEWAY_API_KEY_FILE;
 if (!tag || (!load && (!provider || !keyFile)))
@@ -52,6 +57,8 @@ const docker = (args, options = {}) =>
 try {
   const pgFix = await testPostgres({});
   clean.push(() => pgFix.close());
+  if (load && process.env.PI_CLOUD_CHECK_PG_CPUS)
+    await pgFix.setCpuLimit(Number(process.env.PI_CLOUD_CHECK_PG_CPUS));
   const kafka = await testKafka({});
   clean.push(() => kafka.close());
   const tmp = await mkdtemp(join(tmpdir(), "pma-serving-"));
@@ -85,7 +92,7 @@ try {
   ];
   const mgEnv = { PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN_FILE: "/run/pma/management" },
     enEnv = { PI_CLOUD_SUPERVISOR_ENROLLMENT_TOKEN_FILE: "/run/pma/enroll" };
-  function role(name, roleName, env, files) {
+  function role(name, roleName, env, files, command = []) {
     const label = "pma-" + name + "-" + suffix;
     docker([
       "run",
@@ -104,6 +111,7 @@ try {
       ...mount(dbFile, "database"),
       ...files,
       "pi-managed-agents/segment-" + roleName + ":" + tag,
+      ...command,
     ]);
     names.push(label);
     clean.push(() => docker(["rm", "-f", label]));
@@ -233,7 +241,18 @@ try {
         ...mount(management, "management"),
         ...mount(enroll, "enroll"),
         ...mount(keyFile, "provider"),
+        ...(profileClaims
+          ? [
+              "--mount",
+              "type=bind,src=" +
+                fileURLToPath(new URL("../" + probe, import.meta.url)) +
+                ",dst=/app/" +
+                probe +
+                ",readonly",
+            ]
+          : []),
       ],
+      profileClaims ? ["/app/" + probe] : [],
     );
     await until("Worker ready", () => health(hostPorts[i]), 45000);
     return label;
@@ -241,7 +260,7 @@ try {
   if (load) {
     const count = 192,
       parallel = 64;
-    await startWorker(0);
+    const workerName = await startWorker(0);
     const sessions = [];
     for (let at = 0; at < count; at += 16)
       sessions.push(
@@ -256,6 +275,16 @@ try {
           ),
         )),
       );
+    async function pgCpu() {
+      const {
+        rows: [r],
+      } = await pool.query(`select
+        substring(body from 'usage_usec ([0-9]+)')::float8/1000 cpu_ms,
+        substring(body from 'nr_throttled ([0-9]+)')::int periods
+        from pg_read_file('/sys/fs/cgroup/cpu.stat') body`);
+      return r;
+    }
+    const initialCpu = await pgCpu();
     let cursor = 0;
     const begin = performance.now(),
       ids = [];
@@ -322,6 +351,7 @@ try {
     );
     const elapsedMs = performance.now() - begin;
     clearInterval(timer);
+    const finalCpu = await pgCpu();
     if (sampleError) throw sampleError;
     const {
       rows: [timing],
@@ -399,9 +429,44 @@ try {
         peakSampledRawLag,
         ...timing,
         ...claims,
+        workerSlots: capacity,
+        pgCpuLimit: Number(process.env.PI_CLOUD_CHECK_PG_CPUS ?? 2),
+        pgCpuMs: finalCpu.cpu_ms - initialCpu.cpu_ms,
+        pgThrottledPeriods: finalCpu.periods - initialCpu.periods,
+        peakModelRequests: fake.metrics().maximumInflight,
         upstreamRequests: fake.metrics().completed,
       }),
     );
+    if (profileClaims) {
+      const timeline = await pgFix.durationTimeline();
+      const samples = docker(["logs", workerName], { maxBuffer: 8 * 1024 * 1024 })
+        .split("\n")
+        .filter((l) => l.startsWith('{"measurement":"sessionClaimTiming"'))
+        .map((l) => JSON.parse(l));
+      assert.equal(
+        samples.reduce((n, r) => n + r.size, 0),
+        count,
+      );
+      for (const sample of samples) {
+        assert.ok(sample.stages.commit.notices, "PG duration messages missing");
+        for (const [label, pid, lo, hi, start, end] of sample.queries) {
+          const phases = timeline.get(pid)?.slice(lo, hi);
+          assert.equal(phases?.length, hi - lo, "Missing server timing for Worker query");
+          assert.ok(phases.length);
+          const part = sample.stages[label],
+            first = phases[0],
+            last = phases.at(-1);
+          part.toPgMs = (part.toPgMs ?? 0) + first.end - first.duration - start;
+          part.fromPgMs = (part.fromPgMs ?? 0) + end - last.end;
+          part.pgSpanMs = (part.pgSpanMs ?? 0) + last.end - first.end + first.duration;
+          part.loggedMs = (part.loggedMs ?? 0) + phases.reduce((n, i) => n + i.duration, 0);
+        }
+        for (const part of Object.values(sample.stages))
+          assert.ok(Math.abs(part.loggedMs - part.serverMs) < 0.01, "PG log/notice mismatch");
+        delete sample.queries;
+        console.log(JSON.stringify(sample));
+      }
+    }
     const held = await api.acceptTurn(
       session,
       fake.prompt("stop_test", { firstByteMs: 30000 }),

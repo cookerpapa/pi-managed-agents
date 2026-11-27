@@ -103,7 +103,7 @@ export class SegmentWorker {
         if (!candidates.length) return [];
         const worker = await tx
           .selectFrom("workers")
-          .select(["state", "boot_id", "max_concurrent_sessions"])
+          .select(["state", "boot_id", "supervisor_id", "max_concurrent_sessions"])
           .where("id", "=", this.workerId)
           .forUpdate()
           .executeTakeFirst();
@@ -121,47 +121,45 @@ export class SegmentWorker {
           await sql`select count(*)::int used from session_leases where worker_id=${this.workerId}::uuid and released_at is null`.execute(
             tx,
           );
-        const jobs = [];
-        for (const job of candidates.slice(0, Math.max(0, this.capacity - used))) {
-          await sql`insert into pi_sessions(tenant_id,id) values(${job.tenant_id}::uuid,${job.logical_id}) on conflict do nothing`.execute(
-            tx,
-          );
-          const {
-            rows: [physical],
-          } =
-            await sql`select lease_epoch from pi_sessions where tenant_id=${job.tenant_id}::uuid and id=${job.logical_id} for update`.execute(
-              tx,
-            );
-          const lease = await this.#coordinator.grantLockedPhysicalSession(
-            tx,
-            job.tenant_id,
-            job.logical_id,
-            physical.lease_epoch,
-          );
-          const claim =
-            await sql`update turns set state=case when stop_on_resume then 'cancel_requested' else 'running' end,lease_id=${lease.lease_id}::uuid,fencing_token=${lease.fencing_token},
-          started_at=coalesce(started_at,clock_timestamp()) where id=${job.id}::uuid and exists(select from supervisor_connections c join workers w on w.id=c.worker_id
-            and w.boot_id=c.boot_id and w.supervisor_id=c.supervisor_id where w.id=${this.workerId}::uuid and w.state='ready'
-            and c.state='active' and c.expires_at>clock_timestamp()) returning id`.execute(tx);
-          if (!claim.rows.length) throw Error("Worker management connection is unavailable");
-          await sql`delete from ready_agent_sessions where tenant_id=${job.tenant_id}::uuid and session_id=${job.logical_id}::uuid`.execute(
-            tx,
-          );
-          jobs.push({
-            ...job,
+        const selected = candidates.slice(0, Math.max(0, this.capacity - used));
+        if (!selected.length) return [];
+        const leases = await this.#coordinator.grantPhysicalSessionBatch(
+          tx,
+          selected.map((job) => ({
+            tenantId: job.tenant_id,
+            sessionId: job.logical_id,
+          })),
+        );
+        const turns = selected.map((job) => job.id),
+          tenants = selected.map((job) => job.tenant_id);
+        // The Turn guard trigger reads the newly granted physical leases in this statement.
+        const attached = await sql`update turns r set
+          state=case when stop_on_resume then 'cancel_requested' else 'running' end,
+          lease_id=g.writer,fencing_token=g.epoch,started_at=coalesce(started_at,clock_timestamp())
+          from unnest(${turns}::uuid[],${tenants}::uuid[],${leases.map((l) => l.lease_id)}::uuid[],
+              ${leases.map((l) => l.fencing_token)}::bigint[]) as g(turn_id,tenant,writer,epoch)
+          where r.id=g.turn_id and r.tenant_id=g.tenant and r.state='queued' and r.lease_id is null
+          and exists(select from supervisor_connections c where c.worker_id=${this.workerId}::uuid
+            and c.boot_id=${this.bootId}::uuid and c.supervisor_id=${worker.supervisor_id}
+            and c.state='active' and c.expires_at>clock_timestamp())`.execute(tx);
+        if (Number(attached.numAffectedRows) !== selected.length)
+          throw Error("Worker management connection is unavailable");
+        await sql`delete from ready_agent_sessions q using unnest(${tenants}::uuid[],
+          ${selected.map((job) => job.logical_id)}::uuid[]) as s(tenant,id)
+          where q.tenant_id=s.tenant and q.session_id=s.id`.execute(tx);
+        return selected.map((job, i) => ({
+          ...job,
+          turnId: job.id,
+          scope: {
+            tenantId: job.tenant_id,
+            sessionId: job.logical_id,
+            piSessionId: job.logical_id,
+            runId: job.id,
             turnId: job.id,
-            scope: {
-              tenantId: job.tenant_id,
-              sessionId: job.logical_id,
-              piSessionId: job.logical_id,
-              runId: job.id,
-              turnId: job.id,
-              writerId: lease.lease_id,
-              fencingToken: Number(lease.fencing_token),
-            },
-          });
-        }
-        return jobs;
+            writerId: leases[i].lease_id,
+            fencingToken: Number(leases[i].fencing_token),
+          },
+        }));
       });
       if (!jobs.length || this.#closed) return [];
       const claimed = jobs.map((job) => {

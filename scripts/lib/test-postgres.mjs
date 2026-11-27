@@ -122,6 +122,28 @@ exec sleep infinity`;
       url,
       ...(replica ? { standbyUrl: replica.url, stopStandby: replica.stop } : {}),
       close,
+      async durationTimeline() {
+        const { stdout, stderr } = await execute("docker", ["logs", name], {
+          maxBuffer: 32 * 1024 * 1024,
+        });
+        const timelines = new Map();
+        // Only duration and backend PID are exported, never SQL or parameters.
+        for (const line of (stdout + "\n" + stderr).split("\n")) {
+          const match =
+            /^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d\.\d+) UTC \[(\d+)\] LOG:\s+duration: ([0-9.]+) ms$/.exec(
+              line,
+            );
+          if (!match) continue;
+          const pid = Number(match[3]);
+          if (!timelines.has(pid)) timelines.set(pid, []);
+          // PG log timestamps have millisecond resolution. Use the bin midpoint.
+          timelines.get(pid).push({
+            end: Date.parse(match[1] + "T" + match[2] + "Z") + 0.5,
+            duration: Number(match[4]),
+          });
+        }
+        return timelines;
+      },
       async setCpuLimit(cpus) {
         if (!started || closed || !Number.isInteger(cpus) || cpus < 1 || cpus > 4)
           throw new Error("Invalid disposable PG CPU limit");
