@@ -1,5 +1,7 @@
 # Minimal Session lifecycle load test
 
+The independent Session [warm continuation acceptance](../../../docs/reports/warm-image-continuation-20261127.md) compares cold and hot Pi input for image-heavy history, including bounded scheduling delay and fallback.
+
 For the isolated root-only Session and delegated-Run schema, see the [design, cold-read measurements and reproduction commands](../../../docs/reports/delegated-runs-20261122.md).
 
 This experiment measures the proposed Run queue, immutable messages and one current Pi Inbox per Conversation. It runs the actual pinned Pi Harness on two Worker Pods with a deterministic local model, using the maintained RF3 producer and partition-ordered consumer. A separate Projector process inside the Session runtime Pod uses a private topic and a disposable logged PostgreSQL database. Each role is invoked through kubectl exec. Source changes to these experiment files do not replace any application image.

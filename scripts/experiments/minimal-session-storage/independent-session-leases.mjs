@@ -1,6 +1,7 @@
 import { installPhysicalTurnProjection } from "./ready-projection-sql.mjs";
 // Ownership adapter for the #52 segmented Run queue. Public Worker identities,
 // renewable leases and the on-disk epoch are the same ones the serving coordinator uses.
+import { SegmentWarmHistory } from "./segment-warm-history.mjs";
 import { SteerHint } from "./steer-hint.mjs";
 import { connectSegmentWorker } from "./segment-wake.mjs";
 import { randomUUID } from "node:crypto";
@@ -35,36 +36,49 @@ export class SegmentWorker {
   #serving = false;
   #timer;
   #renewing;
-  constructor({ database, workerId, bootId, capacity, leaseDurationMs }) {
+  constructor({ database, workerId, bootId, capacity, leaseDurationMs, historyCache }) {
     if (!Number.isSafeInteger(capacity) || capacity < 1) throw Error("Invalid Worker capacity");
     this.db = database;
+    this.warmHistory = new SegmentWarmHistory({
+      ...historyCache,
+      advertise: (...args) => this.#control?.advertise(...args),
+    });
     this.workerId = workerId;
     this.bootId = bootId;
     this.capacity = capacity;
     this.#coordinator = new SessionLeaseCoordinator({ database, workerId, leaseDurationMs });
     this.#observer = new PostgresSessionLeaseObserver({ database });
   }
-  async claimNext() {
+  async claimNext(hint) {
     if (this.#closed || this.#pending + this.#active.size >= this.capacity) return;
     this.#pending++;
     try {
       const job = await this.db.transaction().execute(async (tx) => {
         await sql`set local synchronous_commit=on`.execute(tx);
-        const {
-          rows: [job],
-        } = await sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
+        const selectJob = (target) => {
+          let eligible = sql`q.ready_at<=statement_timestamp()`;
+          if (target) {
+            const [tenant, session, turn, version, flow] = target;
+            eligible = sql`r.tenant_id=${tenant}::uuid and s.id=${session}::uuid and r.id=${turn}::uuid and r.session_id=${flow}::uuid
+              and exists(select from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id
+                and prev.mailbox_position=r.mailbox_position-1 and prev.history_head->>'version'=${version})`;
+          }
+          return sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
           s.parent_session_id,s.agent_name,s.family_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
           (select prev.workspace_grant from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id and prev.mailbox_position=r.mailbox_position-1) previous_workspace,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.starts_turn desc,m.position limit 1) as first_message,
           exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs
           from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
           join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
-          where r.state='queued' and r.lease_id is null and r.output_seal_id is null
+          where ${eligible} and r.state='queued' and r.lease_id is null and r.output_seal_id is null
             and not exists(select from session_leases l where l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.released_at is null)
             and not exists(select from turns p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position and
               (p.state not in ('completed','failed','timed_out','cancelled') or (p.output_seal_id is not null and p.output_sealed_at is null)))
           order by q.ready_at,q.session_id,r.mailbox_position limit 1 for update of r,s skip locked`.execute(
-          tx,
-        );
+            tx,
+          );
+        };
+        let job = (await selectJob(hint)).rows[0];
+        if (!job && hint) job = (await selectJob()).rows[0];
         if (!job) return;
         const worker = await tx
           .selectFrom("workers")
@@ -160,6 +174,7 @@ export class SegmentWorker {
         ...job,
         turnId: job.id,
         authority: guard,
+        warmHistory: this.warmHistory,
         steerHint,
         stopSignal: stop.signal,
         release,
@@ -236,10 +251,11 @@ export class SegmentWorker {
       onSteer: (writer, revision) => this.#notice(writer, revision),
       onStop: (writer) => this.#active.get(writer)?.stop.abort(),
       onRegistered: () => {
+        this.warmHistory.advertiseAll();
         for (const active of this.#active.values()) active.steerHint.mark();
         this.#repairHints(true);
       },
-      claim: () => this.claimNext(),
+      claim: (hint) => this.claimNext(hint),
       execute: async (job) => {
         try {
           await execute(job);
@@ -289,6 +305,7 @@ export class SegmentWorker {
   }
   async close() {
     this.#closed = true;
+    this.warmHistory.close();
     this.#stop.abort();
     clearTimeout(this.#timer);
     await this.#renewing;

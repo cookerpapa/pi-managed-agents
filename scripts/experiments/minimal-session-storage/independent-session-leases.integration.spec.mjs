@@ -385,6 +385,7 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff", "tur
               topic,
               brokers,
               scheduler: { url: scheduler.url, token },
+              historyCache: { minBytes: 1 },
             });
             actors.push(w);
             return w;

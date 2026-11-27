@@ -176,6 +176,7 @@ export async function verifyTurnSettings({ rt, pool, db, tenant, token, until, n
     assert(handoff.fencingToken > owner.fencingToken);
     const resumed = await replacement.ask({ op: "execute" });
     assert(resumed.resumed);
+    assert.equal(resumed.historyLoad.path, "recovery");
     assert.equal(resumed.modelId, pickA.modelId);
     assert.equal(resumed.cwd, "/workspace/game");
     await where(t17, "completed");
@@ -317,6 +318,8 @@ export async function verifyTurnSettings({ rt, pool, db, tenant, token, until, n
     assert.equal((await replacement.ask({ op: "claimed" })).scope.turnId, carried);
     const carriedAnswer = await replacement.ask({ op: "execute" });
     assert.equal(carriedAnswer.modelId, pickA.modelId);
+    assert.equal(carriedAnswer.historyLoad.path, "warm");
+    assert.equal(carriedAnswer.historyLoad.pgEntryBytes, 0);
     await where(carried, "completed");
     await replacement.ask({ op: "release" });
     const interrupted = (await submit("hold for Stop", "turn:" + randomUUID())).turnId;

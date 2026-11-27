@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Reuse verified image-bearing histories across normal Turns, give their cache holder bounded scheduling preference, and verify cold fallback after pruning, expiry and missed wakes. [Acceptance](reports/warm-image-continuation-20261127.md).
+
 - [x] Freeze the model and authorized Workspace on Turn admission, including the successor after late mail. [Turn semantics](adr/0368-session-defaults-and-turn-snapshots.md).
 - [x] Read adopted inputs from retained Entries, keep unread Agent mail across Stop, and resume delivery on explicit human input. [Recovery and Fork acceptance](reports/turn-input-navigation-20261126.md).
 

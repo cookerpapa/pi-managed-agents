@@ -4,7 +4,13 @@ import { PostgresNotificationWake } from "@pi-cloud/database";
 import { openWakeRouter, connectClaimWorker } from "./wake-channel.mjs";
 
 const path = "/internal/segment-work";
-const stage = { label: "segments", wakeMode: "directed", perTurn: true, batch: 1 };
+const stage = {
+  label: "segments",
+  wakeMode: "directed",
+  perTurn: true,
+  batch: 1,
+  cacheMode: "prefer",
+};
 function checkToken(token) {
   if (typeof token !== "string" || token.length < 32) throw Error("Invalid management credential");
 }
@@ -71,6 +77,11 @@ export async function serveSegmentScheduler(
     receipts.receive,
   );
   const wake = new PostgresNotificationWake(connectionString, channel, (payload) => {
+    if (payload.startsWith("[")) {
+      const hint = JSON.parse(payload);
+      router.notifySegment(hint);
+      return true;
+    }
     if (payload.startsWith("stop:")) {
       const [, id, writer] = payload.split(":");
       router.notifyStop(id, writer);
@@ -125,8 +136,8 @@ export function connectSegmentWorker({
     id,
     stage,
     slots,
-    claim: async () => {
-      const job = await claim();
+    claim: async (_limit, hint) => {
+      const job = await claim(hint);
       return job ? [job] : [];
     },
     execute,

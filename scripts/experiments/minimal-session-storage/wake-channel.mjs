@@ -53,7 +53,68 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
     }
     return sent;
   }
+  // Only exact continuation notices occupy this bounded directory. Plain
+  // queue wakes retain their count. Each large job has a fixed PG deadline.
+  const continuations = new Map();
+  let deadlineTimer,
+    fifoNext = false;
+  const versionKey = (tenant, flow, version) => tenant + "/" + flow + "/" + version;
+  function drainContinuations() {
+    clearTimeout(deadlineTimer);
+    let earliest = Infinity;
+    for (const [turn, hint] of continuations) {
+      if (!waiting.size) break;
+      const holder = directory.get(versionKey(hint[0], hint[4], hint[3]));
+      const live =
+        holder &&
+        holder.version === hint[3] &&
+        holder.expires > Date.now() &&
+        connections.get(holder.id) === holder.socket &&
+        holder.socket.readyState === WebSocket.OPEN;
+      let socket;
+      if (live && waiting.has(holder.socket)) {
+        socket = holder.socket;
+        stats.preferred++;
+      } else if (live && holder.large && hint[5] > Date.now()) {
+        earliest = Math.min(earliest, hint[5], holder.expires);
+        continue;
+      } else socket = waiting.values().next().value;
+      continuations.delete(turn);
+      signal(socket, "arrival", hint);
+    }
+    if (Number.isFinite(earliest))
+      deadlineTimer = setTimeout(drainContinuations, Math.max(1, earliest - Date.now()));
+  }
+  function notifySegment(hint) {
+    if (
+      !stage?.perTurn ||
+      !Array.isArray(hint) ||
+      hint.length !== 6 ||
+      !hint
+        .slice(0, 5)
+        .every(
+          (v) => typeof v === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(v),
+        ) ||
+      !Number.isSafeInteger(hint[5])
+    )
+      return;
+    const holder = directory.get(versionKey(hint[0], hint[4], hint[3]));
+    if (hint[5] <= Date.now() && (!holder || !waiting.has(holder.socket))) {
+      notify(stage.label, 1);
+      return;
+    }
+    stats.notifications++;
+    if (continuations.size >= 1024 && !continuations.has(hint[2])) {
+      // Ordinary FIFO probes can take forgotten turns after their PG deadline.
+      signalWaiting(1, "arrival");
+      return;
+    }
+    hint[5] = Math.min(hint[5], Date.now() + 2000);
+    continuations.set(hint[2], hint);
+    drainContinuations();
+  }
   function tick() {
+    if (continuations.size) drainContinuations();
     if (signalWaiting(1, "tick") || !stage.probeUnlisted || !connections.size) return;
     // A lost ready/wake can leave a live, willing Worker off the list.
     // Rotate a single online connection; a full Worker ignores it locally.
@@ -114,6 +175,7 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
     socket.on("close", () => {
       waiting.delete(socket);
       if (connections.get(id) === socket) connections.delete(id);
+      if (continuations.size) drainContinuations();
     });
     socket.on("message", (raw) => {
       if (connections.get(id) !== socket) return;
@@ -126,11 +188,25 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
         return;
       }
       if (frame.startsWith("[") && stage.cacheMode === "prefer") {
-        const [tenant, session, version, action] = JSON.parse(frame);
-        const key = tenant + "/" + session;
+        let offer;
+        try {
+          offer = JSON.parse(frame);
+        } catch {
+          return socket.close(1008);
+        }
+        if (
+          !Array.isArray(offer) ||
+          ![3, 4].includes(offer.length) ||
+          !offer.slice(0, 3).every((v) => typeof v === "string") ||
+          (offer.length === 4 && !["keep", "large", "drop"].includes(offer[3]))
+        )
+          return socket.close(1008);
+        const [tenant, session, version, action] = offer;
+        const key = stage.perTurn ? versionKey(tenant, session, version) : tenant + "/" + session;
         if (action === "drop") {
           const held = directory.get(key);
           if (held?.socket === socket && held.version === version) directory.delete(key);
+          if (continuations.size) drainContinuations();
           return;
         }
         directory.delete(key);
@@ -138,9 +214,11 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
         directory.set(key, {
           id,
           socket,
+          large: action === "large",
           version,
           expires: Date.now() + (stage.cacheTtlMs ?? 300000),
         });
+        if (continuations.size) drainContinuations();
         return;
       }
       // A reconciliation probe found real work. Pass the probe to one ready
@@ -153,8 +231,14 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
       stats.offers++;
       if (drop("lost-ready")) return;
       waiting.add(socket);
-      if (pendingWakes && stage.wakeMode === "directed") {
+      // Alternate with accumulated ordinary demand when capacity is scarce.
+      if (continuations.size && !(pendingWakes && fifoNext)) {
+        drainContinuations();
+        if (!waiting.has(socket)) fifoNext = true;
+      }
+      if (waiting.size && pendingWakes && stage.wakeMode === "directed") {
         pendingWakes--;
+        fifoNext = false;
         signalWaiting(1, "arrival");
       }
     });
@@ -162,6 +246,8 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
   });
   function reset() {
     clearInterval(timer);
+    clearTimeout(deadlineTimer);
+    continuations.clear();
     for (const socket of connections.values()) socket.terminate();
     connections.clear();
     waiting.clear();
@@ -176,6 +262,7 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
   return {
     port: server.address().port,
     notify,
+    notifySegment,
     notifyStop(id, writer) {
       const socket = connections.get(id);
       if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
@@ -387,7 +474,13 @@ export function connectClaimWorker({
         socket.send("seen:" + writer + ":" + revision);
     },
     advertise(tenant, session, version, action) {
-      if (online && !stopped && stage.cacheMode === "prefer")
+      if (
+        online &&
+        !stopped &&
+        socket.readyState === WebSocket.OPEN &&
+        socket.bufferedAmount < 65536 &&
+        stage.cacheMode === "prefer"
+      )
         socket.send(
           JSON.stringify(action ? [tenant, session, version, action] : [tenant, session, version]),
         );

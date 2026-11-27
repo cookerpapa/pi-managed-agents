@@ -36,9 +36,9 @@ begin
   end if;
   return null;
 end $$;
-create trigger independent_turn_ready after insert or update of state on runs for each row
+create constraint trigger independent_turn_ready after insert or update of state on runs deferrable initially deferred for each row
   when(new.state='queued') execute function notify_segment_work();
-create trigger independent_successor_ready after update of state on runs for each row
+create constraint trigger independent_successor_ready after update of state on runs deferrable initially deferred for each row
   when(old.state is distinct from new.state and new.state in ('completed','failed','cancelled','timed_out'))
   execute function notify_segment_work();
 

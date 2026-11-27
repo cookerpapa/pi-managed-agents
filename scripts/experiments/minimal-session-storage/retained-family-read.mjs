@@ -9,7 +9,7 @@ import { InboxDoc } from "@earendil-works/pi-durable";
 
 import { openingHead, priorState, readPrefix, restoreSettled } from "./session-prefix.mjs";
 
-export async function loadPriorRoot(db, scope, storage) {
+export async function loadPriorRoot(db, scope, storage, { cache, beforeRestore } = {}) {
   const start = performance.now();
   const {
     rows: [row],
@@ -27,7 +27,8 @@ export async function loadPriorRoot(db, scope, storage) {
     inbox_items: [],
   };
   const head = priorState(prior),
-    prefix = await readPrefix(db, prior, head);
+    prefix = await readPrefix(db, prior, head, cache);
+  await beforeRestore?.(prefix, head);
   if (head.version) {
     assert.deepEqual(
       Object.values(row.inbox_routes),

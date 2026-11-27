@@ -156,3 +156,64 @@ test("a cache hit restores entry commit positions and rechecks current Inbox and
     /Incomplete/,
   );
 });
+
+test("a segmented image snapshot requires its exact authority and does not retain waiters or cross a Flow", async () => {
+  const { SegmentWarmHistory } = await import("./segment-warm-history.mjs");
+  let now = 10;
+  const notices = [];
+  const warm = new SegmentWarmHistory({
+    minBytes: 1,
+    maxBytes: 2048,
+    ttlMs: 1000,
+    now: () => now,
+    advertise: (...n) => notices.push(n),
+  });
+  const scope = {
+    tenantId: "tenant",
+    sessionId: "session",
+    runId: "turn",
+    writerId: "writer",
+    fencingToken: 2,
+  };
+  const job = { id: "turn", tenant_id: "tenant", logical_id: "session", flow_id: "flow", scope };
+  const terminal = {
+    scope,
+    factId: "seal",
+    kind: "work_finished",
+    nativeSequence: 5,
+    terminal: { type: "turn.completed" },
+  };
+  try {
+    const builder = warm.capture(job);
+    builder.seed([]);
+    builder.append({
+      seq: 4,
+      writes: [
+        { type: "entry", value: entry(7, "picture") },
+        { type: "task", value: { id: 11 } },
+      ],
+    });
+    builder.finish({ ...terminal, scope: { ...scope, writerId: "retired" } });
+    builder.finish({ ...terminal, terminal: { type: "turn.cancelled" } });
+    assert.equal(builder.get(null, "seal"), undefined);
+    builder.finish(terminal);
+    builder.append({ seq: 6, writes: [{ type: "entry", value: entry(9, "late") }] });
+    assert.deepEqual(
+      builder.get(null, "seal").records.map((r) => r.entry.id),
+      [7],
+    );
+    for (const other of [{ tenant_id: "other" }, { logical_id: "other" }, { flow_id: "new" }])
+      assert.equal(warm.capture({ ...job, ...other }).get(null, "seal"), undefined);
+    assert.equal(builder.get(null, "old"), undefined);
+    now += 1001;
+    warm.cache.expire();
+    assert.equal(builder.get(null, "seal"), undefined);
+    assert.deepEqual(notices.at(-1), ["tenant", "flow", "seal", "drop"]);
+    const huge = warm.capture(job);
+    huge.append({ seq: 4, writes: [{ type: "entry", value: entry(7, "x".repeat(4096)) }] });
+    huge.finish(terminal);
+    assert.equal(warm.cache.bytes, 0);
+  } finally {
+    warm.close();
+  }
+});

@@ -484,14 +484,17 @@ export class ForkStorage {
     const rows = await this.pageWithCursor(t, id, limit);
     return rows.map(({ cursor, ...row }) => row);
   }
-  async coldRecords(tx, t, s, inheritedOnly = false) {
+  async coldRecords(tx, t, s, inheritedOnly = false, onReadBytes, minimum = 1) {
+    let receivedBytes = 0;
     const records = [];
     let cursor = inheritedOnly ? { flow: s.flow_id, segment: 2147483646 } : null,
-      floor = 1,
-      head = false;
+      floor = minimum,
+      head = minimum > 1;
     for (;;) {
       const rows = await this.readPage(tx, t, s, 64, cursor, floor);
       for (const row of rows) {
+        const bytes = Buffer.byteLength(row.content);
+        receivedBytes += bytes;
         const entry = JSON.parse(row.content);
         if (entry.id < floor) continue;
         if (!head && entry.head !== undefined) {
@@ -499,31 +502,40 @@ export class ForkStorage {
           head = true;
         }
         const { byTaskId, ...value } = entry;
-        records.push({ entry: { ...value, conversationId: 1 }, seq: Number(row.commit_seq) });
+        records.push({
+          entry: { ...value, conversationId: 1 },
+          seq: Number(row.commit_seq),
+          bytes,
+        });
       }
       if (rows.length < 64 || Number(rows.at(-1).entry_id) <= floor) break;
       cursor = rows.at(-1).cursor;
     }
+    onReadBytes?.(receivedBytes);
     return records.reverse();
   }
-  async contextPrefix(t, id, inheritedOnly = false) {
+  async contextPrefix(t, id, inheritedOnly = false, onReadBytes, minimum = 1) {
     return this.db
       .transaction()
       .setIsolationLevel("repeatable read")
       .execute(async (tx) => {
         const s = await this.session(tx, t, id);
         assert(s, "Unknown Fork session");
-        return this.coldRecords(tx, t, s, inheritedOnly);
+        return this.coldRecords(tx, t, s, inheritedOnly, onReadBytes, minimum);
       });
   }
-  async hydrate(t, id, store) {
+  async hydrate(t, id, store, onPrefix) {
     return this.db
       .transaction()
       .setIsolationLevel("repeatable read")
       .execute(async (tx) => {
         const s = await this.session(tx, t, id);
         assert(s, "Unknown Fork session");
-        const records = await this.coldRecords(tx, t, s);
+        let received = 0;
+        const records = await this.coldRecords(tx, t, s, false, (bytes) => {
+          received = bytes;
+        });
+        onPrefix?.(records, received);
         if (!records.length) return 0;
         const {
           rows: [base],

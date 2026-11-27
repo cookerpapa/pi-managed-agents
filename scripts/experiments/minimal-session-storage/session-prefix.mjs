@@ -60,7 +60,8 @@ export function priorState(row) {
 }
 
 // Values contain immutable native entries with their original commit positions.
-// Only text can reside across Runs. Byte accounting uses serialized UTF-8 payloads.
+// The older text study uses put(); the segmented runtime retains a verified
+// immutable image-capable snapshot via retain(). Budgets use serialized UTF-8.
 export class PrefixCache {
   constructor({
     minBytes = 256 * 1024,
@@ -112,14 +113,23 @@ export class PrefixCache {
       this.remove(key);
       return false;
     }
+    return this.retain(key, version, { records: Object.freeze(records) }, bytes);
+  }
+  retain(key, version, value, bytes) {
+    if (
+      !Number.isSafeInteger(bytes) ||
+      bytes <= 0 ||
+      bytes < this.minBytes ||
+      bytes > this.maxBytes
+    ) {
+      this.remove(key);
+      return false;
+    }
+    this.expire();
     this.remove(key, false);
-    while (this.bytes + bytes > this.maxBytes) this.remove(this.items.keys().next().value);
-    this.items.set(key, {
-      version,
-      records: Object.freeze(records),
-      bytes,
-      expires: this.now() + this.ttlMs,
-    });
+    while (this.bytes + bytes > this.maxBytes || this.items.size >= 4096)
+      this.remove(this.items.keys().next().value);
+    this.items.set(key, { ...value, version, bytes, expires: this.now() + this.ttlMs });
     this.bytes += bytes;
     return true;
   }
@@ -197,7 +207,14 @@ export function toolEvidence(messages) {
 
 export async function readPrefix(db, row, head, cache) {
   if (!head.version) return { records: [], status: "new", readBytes: 0 };
-  const hit = cache?.get(scopeKey(row.tenant_id, row.session_id), head.version);
+  let hit = cache?.get(scopeKey(row.tenant_id, row.session_id), head.version);
+  if (
+    hit &&
+    (hit.records.length !== head.count ||
+      (hit.localBytes ?? hit.bytes) !== head.bytes ||
+      (hit.seq !== undefined && (hit.seq !== head.seq || hit.floor !== head.floor)))
+  )
+    hit = undefined;
   let records;
   if (hit) records = hit.records;
   else {
@@ -216,9 +233,9 @@ export async function readPrefix(db, row, head, cache) {
     });
   }
   assert.equal(records.length, head.count, "Incomplete stable prefix");
-  const bytes = hit?.bytes ?? records.reduce((n, r) => n + r.bytes, 0);
+  const bytes = hit?.localBytes ?? hit?.bytes ?? records.reduce((n, r) => n + r.bytes, 0);
   assert.equal(bytes, head.bytes, "Inconsistent prefix byte coverage");
-  return { records, status: hit ? "hit" : "cold", readBytes: hit ? 0 : bytes };
+  return { records, status: hit ? "hit" : "cold", readBytes: hit ? 0 : bytes, hit };
 }
 
 // Non-Entry records reconstructed at normal cold open. The recovery fold

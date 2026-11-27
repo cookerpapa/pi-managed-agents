@@ -254,10 +254,12 @@ process.on("message", async (msg) => {
                 },
         occurredAt: new Date().toISOString(),
       };
+      opened.rememberCompletion?.(terminalFact);
       await publish(terminalFact);
       process.send({
         kind: "finished",
         terminalState: terminalFact.terminal.type,
+        historyLoad: opened.load,
         history,
         systemPrompt,
         resumed: opened.resumed,

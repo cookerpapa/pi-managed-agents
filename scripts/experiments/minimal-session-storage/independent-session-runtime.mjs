@@ -424,18 +424,28 @@ export async function openSegmentNative(
   { bashIntentLog = false } = {},
 ) {
   const s = historyScope(job.scope, job.flow_id);
+  const capture =
+    job.recovering || job.started_at != null ? undefined : job.warmHistory?.capture(job);
+  const load = {
+    path: job.recovering ? "recovery" : "cold",
+    pgEntryBytes: job.recovering ? null : 0,
+  };
   class Published extends MemoryStorage {
     async commit(writes) {
       job.authority.assertActive();
       const batch = this.prepareCommit(writes);
       await publish({ seq: batch.seq, nextId: this.nextId, writes: batch.writes });
-      return batch.apply();
+      const applied = batch.apply();
+      capture?.append(batch);
+      return applied;
     }
   }
   const mem = new Published();
   if (job.recovering || Number(job.mailbox_position) > 1) {
-    const inherited = await store.contextPrefix(s.tenantId, job.logical_id, true);
-    const entries = inherited.map((r) => ({ type: "entry", value: r.entry }));
+    let entries = [];
+    const importEntries = (rows) => {
+      entries = rows.map((r) => ({ type: "entry", value: r.entry }));
+    };
     const restored = {
       prepareCommit(writes, seq) {
         const first = entries.length ? [...entries.splice(0), ...writes] : writes;
@@ -450,18 +460,47 @@ export async function openSegmentNative(
       },
     };
     if (job.recovering) {
+      importEntries(await store.contextPrefix(s.tenantId, job.logical_id, true));
       const family = await readSealedFamily(store.db, s, topic, { bashIntentLog });
       await hydrateSealedFamily(family, restored);
-      return { storage: mem, resumed: true, family };
+      return { storage: mem, resumed: true, family, load };
     }
-    await loadPriorRoot(store.pool, s, restored);
-  } else {
-    const imported = [];
-    await store.hydrate(s.tenantId, job.logical_id, {
-      prepareCommit(writes) {
-        return { apply: () => imported.push(...writes) };
+    await loadPriorRoot(store.pool, s, restored, {
+      cache: capture,
+      beforeRestore: async (prefix, head) => {
+        let received = 0;
+        const inherited =
+          prefix.hit?.inherited ??
+          (await store.contextPrefix(
+            s.tenantId,
+            job.logical_id,
+            true,
+            (bytes) => {
+              received = bytes;
+            },
+            head.floor,
+          ));
+        importEntries(inherited);
+        capture?.seed(inherited, prefix.records, head.floor);
+        load.path = prefix.status === "hit" ? "warm" : "cold";
+        load.pgEntryBytes = prefix.readBytes + received;
       },
     });
+  } else {
+    const imported = [];
+    await store.hydrate(
+      s.tenantId,
+      job.logical_id,
+      {
+        prepareCommit(writes) {
+          return { apply: () => imported.push(...writes) };
+        },
+      },
+      (records, received) => {
+        capture?.seed(records);
+        load.pgEntryBytes = received;
+      },
+    );
     if (imported.length) {
       const batch = mem.prepareCommit(imported, 1);
       job.authority.assertActive();
@@ -473,5 +512,10 @@ export async function openSegmentNative(
       batch.apply();
     }
   }
-  return { storage: mem, resumed: false };
+  return {
+    storage: mem,
+    resumed: false,
+    load,
+    rememberCompletion: (fact) => capture?.finish(fact),
+  };
 }

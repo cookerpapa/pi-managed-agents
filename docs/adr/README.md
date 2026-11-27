@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0370](0370-large-history-warm-continuation.md) gives large settled histories a bounded preference for their cached Worker.
+
 [ADR-0369](0369-placed-input-navigation.md) uses adopted inputs for conversation navigation.
 
 [ADR-0368](0368-session-defaults-and-turn-snapshots.md) freezes the model and logical environment on each admitted Turn.
