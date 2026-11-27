@@ -42,8 +42,23 @@ export function isMcpReference(t) {
     t.environment === undefined
   );
 }
+export function isOrdinaryHostReference(t) {
+  return (
+    t?.target === "control" &&
+    !!t.implementation &&
+    !t.implementation.catalogScope &&
+    !t.toolName.startsWith("mcp_") &&
+    !isControlToolName(t.toolName) &&
+    !t.environment &&
+    !t.bindingId &&
+    t.contextAnchor === null &&
+    !t.replyRecovery &&
+    !t.recovery &&
+    !t.sourceDocumentId
+  );
+}
 function logicalControlReference(t) {
-  if (isMcpReference(t)) return true;
+  if (isOrdinaryHostReference(t) || isMcpReference(t)) return true;
   return (
     t?.target === "control" &&
     isControlToolName(t.toolName) &&

@@ -26,6 +26,9 @@ export class ToolHostClient {
     readonly options: {
       baseUrl: string;
       token: string;
+      revokedVersion?(generation: number, releaseId: string, name: string): Promise<boolean>;
+      currentEndpoint?(): Promise<string | undefined>;
+      resolveVersion?(releaseId: string, generation: number): Promise<string | undefined>;
       catalog(toolName: string): ToolCatalogPublication | undefined;
     },
   ) {}
@@ -43,16 +46,46 @@ export class ToolHostClient {
     });
     if (!current() || signal?.aborted || !selected)
       return failure("tool_unavailable: The tool catalog or execution owner is unavailable.");
+    const pinned = !!this.options.resolveVersion && !selected.catalogScope;
     if (
-      catalog?.generation !== selected.generation ||
-      catalog?.releaseId !== selected.releaseId ||
-      catalog?.scope !== (selected.catalogScope ?? "platform")
+      !pinned &&
+      (catalog?.generation !== selected.generation ||
+        catalog?.releaseId !== selected.releaseId ||
+        catalog?.scope !== (selected.catalogScope ?? "platform"))
     )
       return failure(
         "tool_unavailable: The accepted tool implementation has been replaced. This invocation was not submitted.",
       );
+    let url = this.options.baseUrl;
+    if (!pinned && this.options.currentEndpoint) {
+      const endpoint = await this.options.currentEndpoint();
+      if (!endpoint)
+        return failure(
+          "tool_unavailable: The selected Tool host is not available. This invocation was not submitted.",
+        );
+      url = endpoint;
+    }
+    if (pinned) {
+      const endpoint = await this.options.resolveVersion!(selected.releaseId, selected.generation);
+      if (
+        !endpoint &&
+        (await this.options.revokedVersion?.(
+          selected.generation,
+          selected.releaseId,
+          command.toolName,
+        ))
+      )
+        return failure(
+          "tool_disabled: An administrator disabled this tool. This call was not executed.",
+        );
+      if (!endpoint)
+        return failure(
+          "tool_version_expired: The requested implementation is retired. This call was not executed.",
+        );
+      url = endpoint;
+    }
     try {
-      const response = await internalFetch(new URL(TOOL_HOST_EXECUTE_PATH, this.options.baseUrl), {
+      const response = await internalFetch(new URL(TOOL_HOST_EXECUTE_PATH, url), {
         dispatcher: this.#dispatcher,
         method: "POST",
         redirect: "error",
@@ -65,6 +98,14 @@ export class ToolHostClient {
       });
       if (!response.ok) {
         await response.body?.cancel();
+        if (response.status === 423)
+          return failure(
+            "tool_disabled: An administrator disabled this tool. This call was not executed.",
+          );
+        if (response.status === 410)
+          return failure(
+            "tool_version_expired: The requested implementation is retired. This call was not executed.",
+          );
         return failure(
           [409, 412, 503].includes(response.status)
             ? "tool_unavailable: The selected tool implementation did not accept this invocation. Refresh the catalog before another call."

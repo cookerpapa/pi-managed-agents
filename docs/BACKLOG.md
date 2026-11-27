@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) and applies explicit disable at execution admission.
+
 - [x] Connect independent root Sessions to the [HTTP MCP execution path](adr/0373-independent-session-mcp.md) and verify directory changes and Worker handoff against a real server.
 
 - [x] Navigate direct delegations at their adopted inputs. Prune children founded in a removed suffix and preserve independent Forks. [Delegation navigation](adr/0372-delegations-in-input-navigation.md).

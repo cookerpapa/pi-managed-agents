@@ -9,9 +9,20 @@ import {
 import { withToolInvocation } from "@pi-cloud/sandbox-supervisor";
 import { WorkerToolRuntime } from "../../../packages/supervisor-host/src/tools/worker-tool-runtime.ts";
 import { restoreToolReply } from "../../../packages/supervisor-host/src/tool-reply-result.ts";
-import { ControlToolRegistry } from "../../../packages/control-plane/src/control-tool-registry.ts";
+import {
+  controlToolCatalog,
+  ControlToolRegistry,
+} from "../../../packages/control-plane/src/control-tool-registry.ts";
 
-export async function segmentWorkerTools({ job, opened, catalog, mailbox, codec, childAnchor }) {
+export async function segmentWorkerTools({
+  job,
+  opened,
+  catalog,
+  mailbox,
+  codec,
+  childAnchor,
+  versions,
+}) {
   const scope = job.scope;
   const originals = new Map(
     (opened.family?.intents ?? []).filter((r) => r.original).map((r) => [r.taskId, r.original]),
@@ -28,12 +39,45 @@ export async function segmentWorkerTools({ job, opened, catalog, mailbox, codec,
       userId: job.owner_user_id,
       root: !job.parent_session_id,
     }) ?? new ControlToolRegistry();
+  let platform = versions ? catalog.snapshot : undefined;
+  if (versions && opened.resumed) {
+    const saved = opened.family.handoff.state.records.find(
+      (r) => r.write.record?.kind === "pi-cloud.run" && r.write.record.scope.conversationId === 1,
+    )?.write.content.value?.toolHostVersion;
+    // Never substitute a newer handler for an interrupted request.
+    platform = saved ? await versions.versionCatalog(saved.generation, saved.releaseId) : undefined;
+  }
+  let priorLive, priorPlatform, merged;
+  const directory = versions
+    ? {
+        subscribe: allowed.subscribe,
+        read() {
+          const live = allowed.read();
+          if (priorLive !== live || priorPlatform !== platform) {
+            merged = controlToolCatalog([
+              ...live.tools.filter((t) => t.name.startsWith("mcp_")),
+              ...(platform?.catalog.tools ?? []).filter((t) => t.environment.kind === "none"),
+            ]);
+            priorLive = live;
+            priorPlatform = platform;
+          }
+          return merged;
+        },
+      }
+    : allowed;
   const source = await new WorkerToolRuntime({
     namedSubagents: true,
     independentSessions: true,
     maximumDepth: null,
-    catalog: allowed,
-    implementation: (name) => catalog?.implementation(name),
+    catalog: directory,
+    implementation: (name) =>
+      versions && !name.startsWith("mcp_") && platform
+        ? {
+            releaseId: platform.releaseId,
+            generation: platform.generation,
+            replay: platform.replayable.includes(name) ? "safe" : "never",
+          }
+        : catalog?.implementation(name),
     nativeConversations: {
       childAnchor,
       conversationDepth: async () => (job.parent_session_id ? 1 : 0),
@@ -71,9 +115,21 @@ export async function segmentWorkerTools({ job, opened, catalog, mailbox, codec,
         ({ tool }) =>
           tool.name === "send_message" ||
           (tool.name === "subagent" && !job.parent_session_id) ||
-          (tool.name.startsWith("mcp_") && !job.parent_session_id),
+          (tool.name.startsWith("mcp_") && !job.parent_session_id) ||
+          (!!versions &&
+            !!platform?.catalog.tools.some(
+              (t) => t.name === tool.name && t.environment.kind === "none",
+            )),
       );
   return {
+    version: () =>
+      platform ? { releaseId: platform.releaseId, generation: platform.generation } : null,
+    advance() {
+      const latest = catalog?.snapshot;
+      if (!versions || latest === platform) return false;
+      platform = latest;
+      return true;
+    },
     definitions: { current: () => current().map((b) => b.tool), subscribe: source.subscribe },
     offered: () =>
       current()
@@ -108,7 +164,8 @@ export async function segmentControlReferences(commit, effects, scope, replies) 
       operationId: c.operationId,
       replyTopic: replies.replyTopic,
     };
-    if (!c.implementation?.catalogScope) return ref;
+    if (!c.implementation?.catalogScope)
+      return c.implementation ? { ...ref, implementation: c.implementation } : ref;
     const intent = durableControlIntent(commit, ref);
     assert.equal(intent.callId, c.nativeCallId);
     assert.deepEqual(intent.arguments, c.arguments);

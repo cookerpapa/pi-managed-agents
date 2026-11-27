@@ -108,7 +108,7 @@ export class ControlToolDispatcher {
       partitions: number;
       admittedDelegatedReads?: boolean;
       /** The segmented store has already admitted this native execute checkpoint. */
-      admittedMcp?: boolean;
+      admittedHostTools?: boolean;
       namedExecutor?: Pick<
         import("./named-subagent-client.ts").NamedSubagentClient,
         "offer" | "reset" | "close" | "activeCount"
@@ -191,23 +191,23 @@ export class ControlToolDispatcher {
           this.options.namedExecutor.offer(fact, reference);
         continue;
       }
-      const repeatable = reference.implementation
-        ? reference.implementation.replay === "safe"
-        : this.options.replayable?.(reference.toolName) !== false;
+      const hosted = this.options.admittedHostTools && !!reference.implementation;
+      const repeatable = hosted
+        ? false
+        : reference.implementation
+          ? reference.implementation.replay === "safe"
+          : this.options.replayable?.(reference.toolName) !== false;
       if (!repeatable && admitted === undefined) admitted = (await commitBeforeEffect?.()) ?? false;
       if (!current()) return;
-      const admittedCommand =
-        this.options.admittedMcp &&
-        reference.implementation?.catalogScope &&
-        reference.replyRecovery
+      const admittedCommand = hosted
+        ? admittedNativeCommand(fact, reference)
+        : reference.toolName === "subagent" &&
+            this.options.directDelegations &&
+            !reference.implementation
           ? admittedNativeCommand(fact, reference)
-          : reference.toolName === "subagent" &&
-              this.options.directDelegations &&
-              !reference.implementation
-            ? admittedNativeCommand(fact, reference)
-            : this.options.admittedDelegatedReads
-              ? admittedDelegatedQuery(fact, reference)
-              : undefined;
+          : this.options.admittedDelegatedReads
+            ? admittedDelegatedQuery(fact, reference)
+            : undefined;
       if (!current()) return;
       this.#remember(
         reference,
@@ -623,7 +623,7 @@ export class ControlToolDispatcher {
         // Keep only the intent reference until native settlement/seal. Recovery
         // may have conservatively abandoned an intent before its Kafka replay.
         pending.done = true;
-        if (pending.dispatch.implementation?.catalogScope) delete pending.admittedCommand;
+        if (this.options.admittedHostTools) delete pending.admittedCommand;
         this.#replyBytes -= pending.replyBytes;
         pending.replyBytes = 0;
         delete pending.reply;

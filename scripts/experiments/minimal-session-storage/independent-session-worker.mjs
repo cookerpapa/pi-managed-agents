@@ -39,18 +39,19 @@ const producer = cfg.brokers
   ? new KafkaWorkerProducer({ brokers: cfg.brokers, topic: cfg.topic, clientId: cfg.bootId })
   : undefined;
 await producer?.start();
-const catalog = cfg.mcp
-  ? new KafkaToolCatalogConsumer({
-      brokers: cfg.brokers,
-      replicas: 3,
-      instanceId: cfg.bootId,
-      minimumGenerations: () => new ToolCatalogAuthority(storage.db).minimumGenerations(),
-    })
-  : undefined;
+const catalog =
+  cfg.mcp || cfg.versionedTools
+    ? new KafkaToolCatalogConsumer({
+        brokers: cfg.brokers,
+        replicas: 3,
+        instanceId: cfg.bootId,
+        minimumGenerations: () => new ToolCatalogAuthority(storage.db).minimumGenerations(),
+      })
+    : undefined;
 await catalog?.start();
-const images = cfg.mcp ? await configuredImageAttachments(storage.db) : undefined;
-let tools;
-if (cfg.mcp) {
+const images = catalog ? await configuredImageAttachments(storage.db) : undefined;
+let tools, modelGate;
+if (cfg.mcp || cfg.versionedTools) {
   const mailbox = new KafkaToolReplyMailbox({
     brokers: cfg.brokers,
     bootId: cfg.bootId,
@@ -85,7 +86,10 @@ const serving = cfg.scheduler
 serving?.catch((e) => process.send?.({ kind: "error", message: e.stack }));
 process.on("message", async (msg) => {
   try {
-    if (msg.op === "catalog") {
+    if (msg.op === "continue-model") {
+      modelGate?.resolve();
+      process.send({ kind: "continued" });
+    } else if (msg.op === "catalog") {
       process.send({
         kind: "catalog",
         generation: catalog?.view.snapshotFor(msg.scope)?.generation,
@@ -125,6 +129,11 @@ process.on("message", async (msg) => {
         });
       models.setProvider(fake.provider);
       const mcpOffers = [];
+      const hostOffers = [];
+      function captureHostOffer(context) {
+        const t = getCurrentTools(context.messages).find((t) => t.name === msg.hostCall);
+        hostOffers.push(t?.parameters?.required?.[0] ?? null);
+      }
       fake.setResponses([
         async (context, _options, _state, requested) => {
           systemPrompt = getCurrentSystemPrompt(context.messages);
@@ -145,6 +154,23 @@ process.on("message", async (msg) => {
             )
           )
             return fauxAssistantMessage("Original operation settled");
+          if (msg.hostCall) {
+            captureHostOffer(context);
+            if (msg.pauseResponse) {
+              modelGate = Promise.withResolvers();
+              process.send({ kind: "sampling" });
+              await modelGate.promise;
+              modelGate = undefined;
+            }
+            return fauxAssistantMessage(
+              fauxToolCall(
+                msg.hostCall,
+                msg.hostArguments ?? { [hostOffers[0]]: msg.text ?? "report" },
+                { id: "host-" + job.id },
+              ),
+              { stopReason: "toolUse" },
+            );
+          }
           if (msg.mcpCall)
             return fauxAssistantMessage(
               fauxToolCall(msg.mcpCall, { text: msg.text }, { id: "mcp-" + job.id }),
@@ -175,6 +201,7 @@ process.on("message", async (msg) => {
           return fauxAssistantMessage("independent answer: " + job.initial_input);
         },
         (context) => {
+          if (msg.hostCall) captureHostOffer(context);
           if (msg.mcpCall || msg.observeMcp) {
             mcpOffers.push(
               getCurrentTools(context.messages)
@@ -204,6 +231,7 @@ process.on("message", async (msg) => {
         job,
         opened,
         catalog: catalog?.view,
+        versions: cfg.versionedTools ? new ToolCatalogAuthority(storage.db) : undefined,
         mailbox: replies.mailbox,
         codec: images?.codec,
         childAnchor: async (_ref, inherit, lane, callId) =>
@@ -225,8 +253,18 @@ process.on("message", async (msg) => {
           runId: job.id,
           initialRequestId,
           trackFreshDelegationOrigin: true,
+          ...(cfg.versionedTools
+            ? {
+                toolHostVersion: tools.version,
+                beforeYield: async () => {
+                  if (tools.advance())
+                    await runtime.refreshRemoteTools(tools.definitions.current());
+                },
+              }
+            : {}),
           afterToolRound: async (task, context) => {
             await inputPump.postTools(task, context);
+            if (tools.advance()) await runtime.refreshRemoteTools(tools.definitions.current());
             if (msg.holdAfterPlacement) {
               process.send({ kind: "at-boundary" });
               await new Promise(() => {});
@@ -305,6 +343,7 @@ process.on("message", async (msg) => {
       await publish(terminalFact);
       process.send({
         kind: "finished",
+        ...(msg.hostCall ? { hostOffers } : {}),
         ...(msg.observeMcp || msg.mcpCall ? { mcpOffers } : {}),
         terminalState: terminalFact.terminal.type,
         historyLoad: opened.load,
@@ -364,7 +403,7 @@ process.on("message", async (msg) => {
       else await native?.close(ctx);
       runtime = undefined;
       tools?.close();
-      if (!cfg.mcp) {
+      if (!cfg.mcp && !cfg.versionedTools) {
         await replies?.close();
         replies = undefined;
       }

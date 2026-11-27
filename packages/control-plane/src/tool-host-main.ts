@@ -21,6 +21,7 @@ import { SessionScheduleService } from "./session-schedule-service.ts";
 import { createOrdinaryToolRegistry } from "./ordinary-tools/registry.ts";
 import { ImageGenerationClient } from "./ordinary-tools/image-generation-client.ts";
 import { executionToolCatalog } from "./execution-tool-catalog.ts";
+import type { ControlToolRegistry } from "./control-tool-registry.ts";
 import { ToolCatalogAuthority } from "./tool-catalog-authority.ts";
 import { ToolHostResourceClient } from "./tool-host-resource-client.ts";
 import { ControlPlaneQuiescence } from "./control-plane-quiescence.ts";
@@ -33,7 +34,14 @@ import {
 
 /** Trusted platform handlers only. No Pi Harness, Session Kafka consumer,
  * resource owner, native writer, or user extension is constructed here. */
-export async function startToolHost(options: { mcpTurnAdmittedByProjector?: boolean } = {}) {
+export async function startToolHost(
+  options: {
+    mcpTurnAdmittedByProjector?: boolean;
+    ordinaryTools?: ControlToolRegistry;
+    versionRoute?: (serverAddress: string) => string;
+    graceMs?: number;
+  } = {},
+) {
   const config = await loadToolHostConfig();
   const executableId = process.env.PI_CLOUD_TOOL_RELEASE_ID;
   if (!executableId || !/^[a-zA-Z0-9_.:-]{1,256}$/.test(executableId))
@@ -93,28 +101,37 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
       ? new ImageGenerationClient(config.imageGeneration)
       : undefined;
     if (generation) cleanup.push(() => generation.close());
-    const tools = createOrdinaryToolRegistry({
-      database,
-      skills,
-      schedules: new SessionScheduleService({
+    const tools =
+      options.ordinaryTools ??
+      createOrdinaryToolRegistry({
         database,
-        environmentImageRevision: config.environmentImageRevision,
-      }),
-      ...(config.enabledControlTools ? { enabled: config.enabledControlTools } : {}),
-      ...(images ? { images } : {}),
-      ...(generation ? { imageGeneration: generation } : {}),
-      imageIo: (call, action, signal) => data.imageIo(call, action, signal),
-      exportSkill: (call, path, signal) => data.exportPackage(call, path, signal),
-      prepareSkill: (call, content, digest, signal) =>
-        data.preparePackage(call, content, digest, signal),
-      refreshServices: (call) => data.refreshServices(call),
-    });
+        skills,
+        schedules: new SessionScheduleService({
+          database,
+          environmentImageRevision: config.environmentImageRevision,
+        }),
+        ...(config.enabledControlTools ? { enabled: config.enabledControlTools } : {}),
+        ...(images ? { images } : {}),
+        ...(generation ? { imageGeneration: generation } : {}),
+        imageIo: (call, action, signal) => data.imageIo(call, action, signal),
+        exportSkill: (call, path, signal) => data.exportPackage(call, path, signal),
+        prepareSkill: (call, content, digest, signal) =>
+          data.preparePackage(call, content, digest, signal),
+        refreshServices: (call) => data.refreshServices(call),
+      });
     catalog = executionToolCatalog(tools);
     // Availability configuration is part of the selected implementation too.
     // Restarting the same binary with a withdrawn tool is an explicit new release.
     const releaseId = createHash("sha256")
       .update(`${executableId}\0${catalog.read().revision}`)
       .digest("hex");
+    const versioned = !!(options.versionRoute || process.env.PI_CLOUD_TOOL_HOST_VERSION_URL);
+    const graceMs = options.graceMs ?? Number(process.env.PI_CLOUD_TOOL_HOST_GRACE_MS ?? 300000);
+    const route = () => ({
+      endpoint:
+        options.versionRoute?.(app.listeningOrigin) ?? process.env.PI_CLOUD_TOOL_HOST_VERSION_URL!,
+      graceMs,
+    });
     const authority = new ToolCatalogAuthority(database);
     const publisher = new KafkaToolCatalogPublisher({
       brokers: config.kafkaBrokers,
@@ -150,10 +167,23 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
       report: (event) => operationalLog({ service: "pi-cloud-tool-host", level: "warn", event }),
     });
     cleanup.push(() => mcp!.close());
+    let publicationPending = false;
     const publish = async (snapshot: ToolCatalogPublication) => {
-      await mcp!.adoptRelease();
-      await publishScoped(snapshot);
+      publicationPending = true;
+      const publishSelection = async () => {
+        await mcp!.adoptRelease();
+        await publishScoped(snapshot);
+      };
+      try {
+        await publishSelection();
+      } catch (error) {
+        // A reactivated host may still own a publisher fenced by the intervening release.
+        // Republishing the same selected immutable snapshot is idempotent.
+        if (!versioned || !(await authority.current(snapshot))) throw error;
+        await publishSelection();
+      }
       selected = snapshot;
+      publicationPending = false;
     };
     const credentials = Buffer.from(`Bearer ${config.supervisorManagementToken}`);
     app.addHook("onRequest", async (request, reply) => {
@@ -163,12 +193,16 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
         return reply.code(401).send({ error: "unauthorized" });
     });
     app.get("/health/live", async () => ({ live: true }));
-    app.get("/health/ready", async (_request, reply) =>
-      reply.code(accepting && selected && quiescence.status().phase === "open" ? 200 : 503).send({
-        ready: accepting && !!selected && quiescence.status().phase === "open",
-        active: active.size,
-      }),
-    );
+    app.get("/health/ready", async (_request, reply) => {
+      const retention = versioned
+        ? await authority.retention(releaseId, route().endpoint)
+        : undefined;
+      const ready =
+        accepting &&
+        quiescence.status().phase === "open" &&
+        (retention ? !!(retention.current || retention.acceptUntil) : !!selected);
+      return reply.code(ready ? 200 : 503).send({ ready, active: active.size });
+    });
     app.get(TOOL_HOST_MANIFEST_PATH, async () => ({
       releaseId,
       executableId,
@@ -177,6 +211,7 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
       active: active.size,
       accepting,
       selected: await authority.read(),
+      ...(versioned ? { retention: await authority.retention(releaseId, route().endpoint) } : {}),
     }));
     app.get(TOOL_HOST_DRAIN_PATH, async () => quiescence.status());
     app.post<{ Body: { id: string; action: "prepare" | "cancel" } }>(
@@ -203,27 +238,60 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
             catalog: catalog.read(),
             replayable: replayable(),
             expectedGeneration: request.body.expectedGeneration,
+            ...(versioned ? { versioned: route() } : {}),
           });
           await publish(snapshot);
           accepting = true;
-          return { generation: snapshot.generation, revision: snapshot.catalog.revision };
+          return {
+            generation: snapshot.generation,
+            revision: catalog.read().revision,
+            ...(versioned ? { publicationRevision: snapshot.catalog.revision } : {}),
+          };
         } catch {
           return reply.code(409).send({ error: "tool_catalog_activation_unconfirmed" });
         }
       },
     );
+    if (versioned)
+      app.post<{ Body: { name: string; disabled: boolean; expectedGeneration: number } }>(
+        "/internal/v1/tools/availability",
+        async (request, reply) => {
+          const { name, disabled, expectedGeneration } = request.body ?? {};
+          if (
+            typeof name !== "string" ||
+            !/^[a-z][a-z0-9_]{0,63}$/.test(name) ||
+            typeof disabled !== "boolean" ||
+            !Number.isSafeInteger(expectedGeneration)
+          )
+            return reply.code(400).send({ error: "invalid_tool_policy" });
+          try {
+            const next = await authority.select({
+              releaseId,
+              catalog: catalog.read(),
+              replayable: replayable(),
+              expectedGeneration,
+              versioned: { ...route(), availability: { name, disabled } },
+            });
+            await publish(next);
+            return { generation: next.generation, disabled };
+          } catch {
+            return reply.code(409).send({ error: "tool_policy_update_unconfirmed" });
+          }
+        },
+      );
     app.post<{ Body: { releaseId: string; command: AcceptedControlToolCommand } }>(
       TOOL_HOST_EXECUTE_PATH,
       async (request, reply) => {
         const call = request.body?.command;
-        if (!accepting || !selected || quiescence.status().phase !== "open")
+        const retained = versioned && !!call?.implementation && !call.implementation.catalogScope;
+        if (!accepting || (!retained && !selected) || quiescence.status().phase !== "open")
           return reply.code(503).send({ error: "tool_host_draining" });
         const platform = selected;
         const combinedMcpAdmission =
           options.mcpTurnAdmittedByProjector && !!call?.implementation?.catalogScope;
         if (
           request.body.releaseId !== releaseId ||
-          (!combinedMcpAdmission && !(await authority.current(platform)))
+          (!retained && !combinedMcpAdmission && !(await authority.current(platform!)))
         )
           return reply.code(412).send({ error: "tool_release_changed" });
         try {
@@ -239,7 +307,7 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
           if (
             call.implementation?.releaseId !== releaseId ||
             (!call.implementation.catalogScope &&
-              (call.implementation.generation !== selected.generation ||
+              ((!retained && call.implementation.generation !== selected!.generation) ||
                 (call.implementation.replay === "safe") !== replayable().includes(call.toolName)))
           )
             return reply.code(412).send({ error: "tool_implementation_changed" });
@@ -257,6 +325,16 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
           // fixes the implementation release; no duplicate Run lease query here.
         } catch {
           return reply.code(409).send({ error: "tool_invocation_invalid" });
+        }
+        if (retained) {
+          const decision = await authority.admitOrdinary(
+            call.implementation!.generation,
+            releaseId,
+            call.toolName,
+          );
+          if (decision === "disabled") return reply.code(423).send({ error: "tool_disabled" });
+          if (decision !== "accepted")
+            return reply.code(410).send({ error: "tool_version_expired" });
         }
         // Drain can begin while the selection check is awaiting PG. Admission
         // and increment are synchronous with respect to the drain endpoint.
@@ -309,17 +387,23 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
     });
     const restore = async () => {
       let snapshot = await authority.read();
-      if (!snapshot)
+      if (
+        !snapshot ||
+        (versioned &&
+          snapshot.releaseId === releaseId &&
+          snapshot.generation !== selected?.generation)
+      )
         snapshot = await authority.select({
           releaseId,
           catalog: catalog.read(),
           replayable: replayable(),
-          expectedGeneration: 0,
+          expectedGeneration: snapshot?.generation ?? 0,
+          ...(versioned ? { versioned: route() } : {}),
         });
       if (
         snapshot.releaseId === releaseId &&
-        snapshot.catalog.revision === catalog.read().revision &&
-        !selected
+        (versioned || snapshot.catalog.revision === catalog.read().revision) &&
+        selected?.generation !== snapshot.generation
       )
         await publish(snapshot);
     };
@@ -327,7 +411,7 @@ export async function startToolHost(options: { mcpTurnAdmittedByProjector?: bool
     mcp.start();
     let retrying = false;
     retryTimer = setInterval(() => {
-      if (retrying || closing || selected) return;
+      if (retrying || closing || (selected && !publicationPending)) return;
       retrying = true;
       void restore()
         .catch(() =>

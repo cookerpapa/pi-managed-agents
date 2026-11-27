@@ -1,5 +1,7 @@
 // Own the catalog topic as well as the database. This check never uses an operator's brokers.
 import assert from "node:assert/strict";
+import { ControlToolRegistry } from "../../../packages/control-plane/src/control-tool-registry.ts";
+import { Type } from "typebox";
 import { randomBytes, randomUUID } from "node:crypto";
 import { fork } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -31,8 +33,44 @@ import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 
 if (process.argv[2] === "host") {
-  const host = await startToolHost({ mcpTurnAdmittedByProjector: true });
-  process.once("message", async () => {
+  let releaseTool;
+  const registry = new ControlToolRegistry();
+  const version = process.argv[3];
+  if (!["delisted", "short-grace"].includes(version)) {
+    const field = version === "pdf" ? "title" : "sheet";
+    registry.register({
+      definition: {
+        name: "export_report",
+        description: "Export the report",
+        parameters: Type.Object({ [field]: Type.String() }, { additionalProperties: false }),
+        environment: { kind: "none" },
+      },
+      replay: "never",
+      execute: async (call) => {
+        if (call.arguments[field] === "accepted-before-disable") {
+          const held = Promise.withResolvers();
+          releaseTool = held.resolve;
+          process.send({ kind: "accepted" });
+          await held.promise;
+        }
+        return {
+          result: { content: [{ type: "text", text: version + ":" + call.arguments[field] }] },
+        };
+      },
+    });
+  }
+  const host = await startToolHost({
+    mcpTurnAdmittedByProjector: true,
+    ...(version === "standard" ? {} : { ordinaryTools: registry }),
+    versionRoute: (origin) => origin,
+    ...(version === "short-grace" ? { graceMs: 150 } : {}),
+  });
+  process.on("message", async (message) => {
+    if (message.op === "release-tool") {
+      releaseTool();
+      process.send({ kind: "released-tool" });
+      return;
+    }
     await host.close();
     process.disconnect();
   });
@@ -167,22 +205,28 @@ async function run() {
     const secret = randomBytes(32).toString("hex"),
       key = randomBytes(32).toString("base64url");
     await writeFile(join(tmp, "resource"), secret, { mode: 0o600 });
-    const host = owned(
-      processActor(fileURLToPath(import.meta.url), ["host"], {
-        DATABASE_URL: dbFixture.url,
-        PI_CLOUD_ALLOW_INLINE_SECRETS: "true",
-        PI_CLOUD_KAFKA_BROKERS: brokers.join(","),
-        PI_CLOUD_TOOL_RELEASE_ID: "segment-test",
-        PI_CLOUD_IMAGE_REVISION: "fixture",
-        PI_CLOUD_TOOL_HOST_PORT: "0",
-        PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN: secret,
-        PI_CLOUD_SANDBOX_CONTROL_TOKEN_FILE: join(tmp, "resource"),
-        PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY: key,
-        HOST: "127.0.0.1",
-        NO_PROXY: "127.0.0.1,localhost",
-      }),
-    );
-    const { url } = await host.expect("ready");
+    const hosts = new Map();
+    async function launchHost(revision) {
+      const host = owned(
+        processActor(fileURLToPath(import.meta.url), ["host", revision], {
+          DATABASE_URL: dbFixture.url,
+          PI_CLOUD_ALLOW_INLINE_SECRETS: "true",
+          PI_CLOUD_KAFKA_BROKERS: brokers.join(","),
+          PI_CLOUD_TOOL_RELEASE_ID: revision,
+          PI_CLOUD_IMAGE_REVISION: "fixture",
+          PI_CLOUD_TOOL_HOST_PORT: "0",
+          PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN: secret,
+          PI_CLOUD_SANDBOX_CONTROL_TOKEN_FILE: join(tmp, "resource"),
+          PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY: key,
+          HOST: "127.0.0.1",
+          NO_PROXY: "127.0.0.1,localhost",
+        }),
+      );
+      const url = (await host.expect("ready")).url;
+      hosts.set(url, host);
+      return url;
+    }
+    const url = await launchHost("pdf");
     const remote = owned(await httpMcpFixture()),
       echo = remote.state.tools[0],
       hold = { ...echo, name: "hold" };
@@ -198,7 +242,7 @@ async function run() {
       allowedTools: null,
       credential: { kind: "bearer", token: "fixture-token" },
     });
-    const route = owned(await rt.connectMcp({ url, token: secret, brokers }));
+    const route = owned(await rt.connectToolHost({ url, token: secret, brokers, versioned: true }));
     const scope = "mcp:" + id;
     // Public names incorporate the connection label and a digest of the remote name.
     const names = async () =>
@@ -210,7 +254,14 @@ async function run() {
     assert(tools.hold && tools.echo);
     const traces = [],
       consume = rt.consume.bind(rt);
-    rt.consume = (record, ...args) => {
+    let queued;
+    rt.consume = async (record, ...args) => {
+      if (queued && record.fact.tools?.some((r) => r.toolName === "export_report")) {
+        const gate = queued;
+        queued = undefined;
+        gate.enter.resolve();
+        await gate.release.promise;
+      }
       if (record.fact.tools?.some((r) => r.implementation?.catalogScope)) traces.push(record);
       return consume(record, ...args);
     };
@@ -272,6 +323,7 @@ async function run() {
         topic,
         brokers,
         mcp: true,
+        versionedTools: true,
       });
       return proc;
     }
@@ -415,6 +467,188 @@ async function run() {
       (await results(crashed.runId)).some((m) => m.content[0].text === "ORIGINAL_AFTER_HANDOFF"),
     );
     assert.deepEqual(remote.state.calls, ["hold", "lost_write", "hold"]);
+    await childWorker.expect("released", { op: "release" });
+    async function adminCall(base, path, body) {
+      const response = await fetch(new URL("/internal/v1/tools/" + path, base), {
+        method: body ? "POST" : "GET",
+        headers: { authorization: "Bearer " + secret, "content-type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      assert(response.ok, await response.clone().text());
+      return response.json();
+    }
+    async function activate(base) {
+      const manifest = await adminCall(base, "manifest");
+      const result = await adminCall(base, "activate", {
+        expectedGeneration: manifest.selected.generation,
+        revision: manifest.catalog.revision,
+        releaseId: manifest.releaseId,
+      });
+      await synced(result.generation);
+      return result;
+    }
+    async function synced(generation) {
+      await until(
+        "Projector platform generation",
+        () => route.catalog.snapshot?.generation === generation,
+      );
+      await until(
+        "Worker platform generation",
+        async () =>
+          (await childWorker.expect("catalog", { op: "catalog", scope: "platform" })).generation ===
+          generation,
+      );
+    }
+    async function setDisabled(base, disabled) {
+      const result = await adminCall(base, "availability", {
+        name: "export_report",
+        disabled,
+        expectedGeneration: route.catalog.snapshot.generation,
+      });
+      await synced(result.generation);
+    }
+    async function round(options = {}, change) {
+      await input();
+      const work = await claim(childWorker);
+      const accepted = options.acceptedAt
+        ? hosts.get(options.acceptedAt).expect("accepted")
+        : undefined;
+      const entry = options.pauseResponse ? childWorker.expect("sampling") : undefined;
+      const gate = options.queue
+        ? { enter: Promise.withResolvers(), release: Promise.withResolvers() }
+        : undefined;
+      if (gate) queued = gate;
+      const done = childWorker.expect("finished", {
+        op: "execute",
+        hostCall: "export_report",
+        ...options,
+      });
+      void done.catch(() => {});
+      try {
+        if (entry) await entry;
+        if (gate) await gate.enter.promise;
+        if (accepted) await accepted;
+        if (change) await change();
+      } finally {
+        if (entry) await childWorker.expect("continued", { op: "continue-model" });
+        gate?.release.resolve();
+        if (accepted)
+          await hosts.get(options.acceptedAt).expect("released-tool", { op: "release-tool" });
+      }
+      const { hostOffers } = await done;
+      await settled(work.runId);
+      const [result] = await results(work.runId);
+      assert(result);
+      await childWorker.expect("released", { op: "release" });
+      return { offers: hostOffers, text: result.content[0].text };
+    }
+    const xlsx = await launchHost("xlsx");
+    assert.deepEqual(await round({ pauseResponse: true }, () => activate(xlsx)), {
+      offers: ["title", "sheet"],
+      text: "pdf:report",
+    });
+    const delisted = await launchHost("delisted");
+    assert.deepEqual(await round({ queue: true }, () => activate(delisted)), {
+      offers: ["sheet", null],
+      text: "xlsx:report",
+    });
+    await activate(xlsx);
+    const refused = await round({ queue: true }, () => setDisabled(xlsx, true));
+    assert.deepEqual(refused.offers, ["sheet", null]);
+    assert.match(refused.text, /tool_disabled.*not executed/);
+    await setDisabled(xlsx, false);
+    assert.deepEqual(await round(), { offers: ["sheet", "sheet"], text: "xlsx:report" });
+    const delayed = await round({ queue: true }, async () => {
+      await setDisabled(xlsx, true);
+      await setDisabled(xlsx, false);
+    });
+    assert.match(delayed.text, /tool_disabled/);
+    const running = await round({ acceptedAt: xlsx, text: "accepted-before-disable" }, () =>
+      setDisabled(xlsx, true),
+    );
+    assert.deepEqual(running, { offers: ["sheet", null], text: "xlsx:accepted-before-disable" });
+    await setDisabled(xlsx, false);
+    const short = await launchHost("short-grace");
+    const expired = await round({ queue: true }, async () => {
+      const old = route.catalog.snapshot;
+      await activate(short);
+      await until(
+        "old route expiry",
+        async () =>
+          (
+            await pool.query(
+              "select expires_at<=clock_timestamp() as expired from tool_host_versions where generation=$1",
+              [old.generation],
+            )
+          ).rows[0]?.expired,
+      );
+    });
+    assert.match(expired.text, /tool_version_expired/);
+    assert.deepEqual(expired.offers, ["sheet", null]);
+    // A provider request restarted on another Worker keeps its frozen catalog even if the reply had not arrived yet.
+    await activate(xlsx);
+    await input();
+    const crashedModel = await claim(childWorker);
+    const sampling = childWorker.expect("sampling");
+    const orphan = childWorker.expect("finished", {
+      op: "execute",
+      hostCall: "export_report",
+      pauseResponse: true,
+    });
+    void orphan.catch(() => {});
+    await sampling;
+    await activate(url);
+    await childWorker.close();
+    await until(
+      "sampling handoff",
+      async () =>
+        (
+          await pool.query(
+            "select 1 from turns where id=$1 and state='queued' and native_work_handoff is not null",
+            [crashedModel.runId],
+          )
+        ).rowCount,
+    );
+    const freshWorker = await worker();
+    const retry = await claim(freshWorker);
+    assert.equal(retry.runId, crashedModel.runId);
+    const answer = await freshWorker.expect("finished", {
+      op: "execute",
+      hostCall: "export_report",
+    });
+    assert.deepEqual(answer.hostOffers, ["sheet", "title"]);
+    await settled(retry.runId);
+    assert.equal((await results(retry.runId))[0].content[0].text, "xlsx:report");
+    await freshWorker.expect("released", { op: "release" });
+
+    const standard = await launchHost("standard");
+    const manifest = await adminCall(standard, "manifest");
+    const active = await adminCall(standard, "activate", {
+      expectedGeneration: manifest.selected.generation,
+      revision: manifest.catalog.revision,
+      releaseId: manifest.releaseId,
+    });
+    await until(
+      "standard Worker view",
+      async () =>
+        (await freshWorker.expect("catalog", { op: "catalog", scope: "platform" })).generation ===
+        active.generation,
+    );
+    await input();
+    const standardRun = await claim(freshWorker);
+    await freshWorker.expect("finished", {
+      op: "execute",
+      hostCall: "schedule",
+      hostArguments: { action: "list" },
+    });
+    await settled(standardRun.runId);
+    const scheduleResult = (await results(standardRun.runId))[0];
+    assert.equal(scheduleResult.toolName, "schedule");
+    assert(!scheduleResult.isError);
+    assert.deepEqual(JSON.parse(scheduleResult.content[0].text).schedules, []);
+    console.log(
+      "Versioned Tool host acceptance passed: old request schema, original executable, post-delisting delivery, disable refusal and re-enable",
+    );
     console.log(
       "HTTP MCP acceptance passed: scoped catalog, live add/remove, canonical replies, single external write, Worker handoff",
     );

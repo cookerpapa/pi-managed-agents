@@ -1,3 +1,4 @@
+import * as toolHostVersions from "./230_tool_host_versions.ts";
 import * as directoryRecovery from "./229_workspace_directory_recovery.ts";
 import * as nativeUsageAndChatHistory from "./228_native_usage_and_chat_history.ts";
 import * as computeServicePeriods from "./224_compute_service_periods.ts";
@@ -425,6 +426,7 @@ export const migrationProvider: MigrationProvider = {
       "226_model_charge_evidence": modelChargeEvidence,
       "228_native_usage_and_chat_history": nativeUsageAndChatHistory,
       "229_workspace_directory_recovery": directoryRecovery,
+      "230_tool_host_versions": toolHostVersions,
     };
   },
 };

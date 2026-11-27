@@ -28,7 +28,12 @@ import { ToolCatalogAuthority } from "../../../packages/control-plane/src/tool-c
 
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { NamedSubagentExecutor } from "../../../packages/control-plane/src/named-subagent-executor.ts";
-import { operationsFor, decodeWorkspaceFact, isMcpReference } from "./workspace-operations.mjs";
+import {
+  operationsFor,
+  decodeWorkspaceFact,
+  isMcpReference,
+  isOrdinaryHostReference,
+} from "./workspace-operations.mjs";
 import { ChildNameConflict, ForkStorage } from "./fork-storage.mjs";
 import { installSegmentInputApi } from "./segment-input-api.mjs";
 import { SegmentInputs } from "./segment-inputs.mjs";
@@ -138,8 +143,8 @@ export class IndependentSessionRuntime {
   worker(registration) {
     return new SegmentWorker({ database: this.store.db, ...registration });
   }
-  async connectMcp({ url, token, brokers, replicas = 3 }) {
-    if (this.mcp) throw Error("MCP dispatcher already connected");
+  async connectToolHost({ url, token, brokers, replicas = 3, versioned = false }) {
+    if (this.hostTools) throw Error("MCP dispatcher already connected");
     const instanceId = randomUUID(),
       authority = new ToolCatalogAuthority(this.store.db);
     const catalog = new KafkaToolCatalogConsumer({
@@ -148,22 +153,48 @@ export class IndependentSessionRuntime {
       instanceId,
       minimumGenerations: () => authority.minimumGenerations(),
     });
+    let currentRoute;
+    const resolveVersion = async (releaseId, generation) => {
+      const latest = catalog.view.snapshot;
+      if (
+        currentRoute &&
+        currentRoute.generation === generation &&
+        currentRoute.releaseId === releaseId &&
+        latest?.generation === generation
+      )
+        return currentRoute.endpoint;
+      const endpoint = await authority.versionEndpoint(generation, releaseId);
+      if (endpoint && latest?.generation === generation && latest.releaseId === releaseId)
+        currentRoute = { releaseId, generation, endpoint };
+      return endpoint;
+    };
     const client = new ToolHostClient({
       baseUrl: url,
       token,
       catalog: (name) => catalog.view.publicationFor(name),
+      ...(versioned
+        ? {
+            resolveVersion,
+            revokedVersion: async (generation, releaseId, name) =>
+              (await authority.admitOrdinary(generation, releaseId, name)) === "disabled",
+            currentEndpoint: async () => {
+              const p = catalog.view.snapshot;
+              return p && resolveVersion(p.releaseId, p.generation);
+            },
+          }
+        : {}),
     });
     const replies = new KafkaToolReplyPublisher(brokers, "segment-mcp-" + instanceId);
     const dispatcher = new ControlToolDispatcher({
       database: this.store.db,
       partitions: this.partitions,
-      admittedMcp: true,
+      admittedHostTools: true,
       ownsPartition: (p) => this.consumer?.ownsPartition(p) === true,
       execute: (command, current, signal) => client.execute(command, current, signal),
       publish: (topic, reply) => replies.publish(topic, reply),
     });
     const close = async () => {
-      this.mcp = undefined;
+      this.hostTools = undefined;
       try {
         await dispatcher.close();
       } finally {
@@ -173,7 +204,7 @@ export class IndependentSessionRuntime {
     try {
       await catalog.start();
       await replies.start();
-      this.mcp = dispatcher;
+      this.hostTools = dispatcher;
       return { close, catalog: catalog.view };
     } catch (error) {
       await close();
@@ -291,7 +322,7 @@ export class IndependentSessionRuntime {
     };
   }
   reset() {
-    this.mcp?.reset();
+    this.hostTools?.reset();
     this.subagents?.reset();
     this.#owners.clear();
     this.projection.nativeStore.projection.reset();
@@ -386,7 +417,7 @@ export class IndependentSessionRuntime {
         await this.#skip(record);
         return false;
       }
-      await this.mcp?.consume(record, current);
+      await this.hostTools?.consume(record, current);
       this.#owners.delete(s.tenantId + "/" + s.sessionId);
       this.projection.nativeStore.projection.releaseSettled(local);
       this.projection.nativeStore.controlProjected(record);
@@ -423,10 +454,10 @@ export class IndependentSessionRuntime {
     let permit;
     const admit = () => (permit ??= grant());
     await this.projection.dispatch({ ...record, fact: mapped }, current, admit);
-    const mcp = fact.tools.filter(isMcpReference);
-    if (mcp.length && !this.mcp) throw Error("MCP Tool host is not connected");
-    if (mcp.length || this.mcp?.hasPending)
-      await this.mcp.consume({ ...record, fact: { ...fact, tools: mcp } }, current, admit);
+    const hosted = fact.tools.filter((ref) => isMcpReference(ref) || isOrdinaryHostReference(ref));
+    if (hosted.length && !this.hostTools) throw Error("Tool host is not connected");
+    if (hosted.length || this.hostTools?.hasPending)
+      await this.hostTools.consume({ ...record, fact: { ...fact, tools: hosted } }, current, admit);
     for (const ref of fact.tools) {
       if (ref.toolName !== "subagent" && ref.toolName !== "send_message") continue;
       if (!this.subagents) throw Error("Independent subagent admission endpoint is unavailable");

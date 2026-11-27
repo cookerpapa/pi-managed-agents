@@ -124,6 +124,7 @@ export type DurableRunConfiguration = {
   workspaceAvailable?: boolean;
   turnEnvironment?: string;
   remoteTools: () => readonly string[];
+  toolHostVersion?: () => { generation: number; releaseId: string } | null;
   recoveryTools?: () => readonly string[];
   tools: readonly ToolRegistration[];
   assertCurrent(): Promise<void>;
@@ -386,6 +387,11 @@ export class DurableAgentSession {
               ),
               ...run.tools,
             ];
+            if (run.toolHostVersion) {
+              const doc = await tx.doc(CloudRunDocument, conversation.id);
+              const pin = run.toolHostVersion();
+              if (!isDeepStrictEqual(doc.toolHostVersion, pin)) doc.toolHostVersion = pin;
+            }
             const state = await tx.doc(AgentDoc, conversation.id);
             if (
               !isDeepStrictEqual(
@@ -399,6 +405,10 @@ export class DurableAgentSession {
       });
       void this.#selectionUpdate.catch((error) => this.#abort.abort(error));
     }
+  }
+  async refreshRemoteTools(definitions: readonly Omit<ToolRegistration, "execute">[]) {
+    this.#replaceRemoteTools(definitions);
+    await this.#selectionUpdate;
   }
   async #prepareRemote(invocation: RemoteInvocation): Promise<PreparedRemoteInvocation> {
     const id = this.#conversations.get(invocation.conversationId);
@@ -597,6 +607,7 @@ export class DurableAgentSession {
       const { headers: _headers, ...modelDescriptor } = descriptor;
       Object.assign(state, run.context, {
         runId: run.runId,
+        ...(run.toolHostVersion ? { toolHostVersion: run.toolHostVersion() } : {}),
         baseEntry,
         ...(previous?.runId === run.runId && previous.delegationPreparation
           ? { delegationPreparation: previous.delegationPreparation }

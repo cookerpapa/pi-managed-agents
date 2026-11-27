@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) and applies explicit disable at execution admission.
+
 Connect independent root Sessions to the [HTTP MCP execution path](adr/0373-independent-session-mcp.md) and verify directory changes and Worker handoff against a real server.
 
 The #52 candidate opens each delegated Session from the input that led to its creation. Tail pruning uses the original call position to select managed descendants. [Delegation navigation](adr/0372-delegations-in-input-navigation.md).

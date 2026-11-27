@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0374](0374-retained-tool-implementations.md) separates ordinary release replacement from explicit Tool disable on the candidate.
+
 [ADR-0373](0373-independent-session-mcp.md) connects the independent Session candidate to the existing HTTP MCP host and catalog.
 
 [ADR-0372](0372-delegations-in-input-navigation.md) places independent children at the adopted input behind their founding call.
