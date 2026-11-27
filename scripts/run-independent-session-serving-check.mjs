@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID, randomBytes, scryptSync } from "node:crypto";
-import { mkdtemp, chmod, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, chmod, writeFile, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -124,6 +124,29 @@ try {
   clean.push(() => db.destroy());
   const pool = new pg.Pool({ connectionString: pgFix.url });
   clean.push(() => pool.end());
+  const indexStudy = load && process.argv.includes("--index-unsettled");
+  if (indexStudy) {
+    const c = await pool.connect();
+    try {
+      await c.query("begin");
+      await c.query("set local search_path=pma_segments,public");
+      await c.query(
+        await readFile(
+          new URL(
+            "./experiments/minimal-session-storage/claim-selector-index.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+      await c.query("commit");
+    } catch (e) {
+      await c.query("rollback");
+      throw e;
+    } finally {
+      c.release();
+    }
+  }
   const pass = randomBytes(26).toString("base64url"),
     salt = randomBytes(16).toString("base64url"),
     username = "canary-" + suffix;
@@ -231,6 +254,12 @@ try {
         PI_CLOUD_SEGMENT_BOOT_DIR: "/tmp/segment-boot",
         PI_CLOUD_MODEL_GATEWAY_PORT: [modelA, modelB][i],
         PI_CLOUD_SEGMENT_CAPACITY: capacity,
+        ...(profileClaims && process.argv.includes("--selector-cpu")
+          ? { PI_CLOUD_TEST_SELECTOR_CPU: "1" }
+          : {}),
+        ...(profileClaims && process.argv.includes("--prepare-selector")
+          ? { PI_CLOUD_TEST_PREPARE_SELECTOR: "1" }
+          : {}),
         ...(process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH
           ? { PI_CLOUD_SEGMENT_CLAIM_BATCH: process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH }
           : {}),
@@ -258,14 +287,17 @@ try {
     return label;
   };
   if (load) {
-    const count = 192,
+    const rate = Number(process.env.PI_CLOUD_CHECK_ARRIVALS_PER_SECOND ?? 0);
+    const count = Number(process.env.PI_CLOUD_CHECK_TURNS ?? 192),
       parallel = 64;
+    assert(Number.isSafeInteger(count) && count >= 1 && count <= 4096);
+    assert(Number.isSafeInteger(rate) && rate >= 0 && rate <= 1000);
     const workerName = await startWorker(0);
     const sessions = [];
     for (let at = 0; at < count; at += 16)
       sessions.push(
         ...(await Promise.all(
-          Array.from({ length: 16 }, (_, i) =>
+          Array.from({ length: Math.min(16, count - at) }, (_, i) =>
             api.createSession(
               project.projectId,
               project.workspaceId,
@@ -288,6 +320,8 @@ try {
     let cursor = 0;
     const begin = performance.now(),
       ids = [];
+    const lagSamples = [],
+      launchDelays = [];
     let sampling = false,
       peakSampledRawLag = 0,
       sampleError;
@@ -314,7 +348,10 @@ try {
       if (sampling) return;
       sampling = true;
       try {
-        peakSampledRawLag = Math.max(peakSampledRawLag, await measureLag());
+        const lag = await measureLag();
+        peakSampledRawLag = Math.max(peakSampledRawLag, lag);
+        if (rate)
+          lagSamples.push({ ms: Math.round(performance.now() - begin), admitted: ids.length, lag });
       } catch (e) {
         sampleError = e;
       } finally {
@@ -328,6 +365,12 @@ try {
         for (;;) {
           const i = cursor++;
           if (i >= count) return;
+          if (rate) {
+            const due = begin + (i * 1000) / rate,
+              remaining = due - performance.now();
+            if (remaining > 0) await delay(remaining);
+            launchDelays.push(Math.max(0, performance.now() - due));
+          }
           const a = await api.acceptTurn(
             sessions[i].sessionId,
             fake.prompt("turn_" + i),
@@ -363,6 +406,25 @@ try {
      from pma_segments.turns t join pma_segments.session_terminal_events e on e.run_id=t.id where t.id=any($1::uuid[])`,
       [ids],
     );
+    // Reconstruct the stages from recorded clocks after the load. No extra
+    // polling of the Turn tables competes with the timed workload.
+    const stageSamples = rate
+      ? (
+          await pool.query(
+            `with times as materialized (
+      select t.created_at,t.started_at,e.occurred_at,t.settled_at from pma_segments.turns t
+      join pma_segments.session_terminal_events e on e.run_id=t.id where t.id=any($1::uuid[])
+    ), boundaries as (select q,(select min(created_at) from times)+q*($2::float8/$3)*interval '1 second' as at
+      from unnest(array[0.25,0.50,0.75,1.0]::float8[]) q)
+    select q,count(*) filter(where created_at<=at and started_at>at)::int waiting_claim,
+      count(*) filter(where started_at<=at and occurred_at>at)::int running,
+      count(*) filter(where occurred_at<=at and settled_at>at)::int terminal_in_flight,
+      count(*) filter(where settled_at<=at)::int settled
+      from times cross join boundaries group by q order by q`,
+            [ids, count, rate],
+          )
+        ).rows
+      : undefined;
     // Each Session in this fixture starts exactly one Turn. Its persisted
     // physical epoch therefore still carries the granting transaction's xmin.
     const {
@@ -419,6 +481,22 @@ try {
           process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH ?? defaultSessionClaimBatch,
         ),
         count,
+        ...(rate
+          ? {
+              targetPerSecond: rate,
+              launchDelayP95Ms: launchDelays.sort((a, b) => a - b)[Math.ceil(count * 0.95) - 1],
+              lagSamples,
+              stageSamples,
+              drainMs: elapsedMs - admittedMs,
+            }
+          : {}),
+        indexStudy,
+        ...(profileClaims
+          ? {
+              preparedSelector: process.argv.includes("--prepare-selector"),
+              selectorCpu: process.argv.includes("--selector-cpu"),
+            }
+          : {}),
         parallel,
         partitions,
         admittedMs,
@@ -456,10 +534,25 @@ try {
           const part = sample.stages[label],
             first = phases[0],
             last = phases.at(-1);
+          // Extended query phases are Parse, Bind and Execute. A named statement
+          // already parsed on this connection sends only Bind and Execute.
+          if (label === "selectCandidates") {
+            assert.ok(phases.length === 3 || phases.length === 2);
+            if (phases.length === 3) part.parses = (part.parses ?? 0) + 1;
+            part.parseMs = (part.parseMs ?? 0) + (phases.length === 3 ? phases[0].duration : 0);
+            part.bindMs = (part.bindMs ?? 0) + phases.at(-2).duration;
+            part.executeMs = (part.executeMs ?? 0) + phases.at(-1).duration;
+          }
           part.toPgMs = (part.toPgMs ?? 0) + first.end - first.duration - start;
           part.fromPgMs = (part.fromPgMs ?? 0) + end - last.end;
           part.pgSpanMs = (part.pgSpanMs ?? 0) + last.end - first.end + first.duration;
           part.loggedMs = (part.loggedMs ?? 0) + phases.reduce((n, i) => n + i.duration, 0);
+        }
+        if (process.argv.includes("--selector-cpu")) {
+          const part = sample.stages.selectCandidates;
+          assert.equal(part.cpu?.PARSE?.count ?? 0, part.parses ?? 0);
+          assert.equal(part.cpu?.BIND?.count, part.calls);
+          assert.equal(part.cpu?.EXECUTE?.count, part.calls);
         }
         for (const part of Object.values(sample.stages))
           assert.ok(Math.abs(part.loggedMs - part.serverMs) < 0.01, "PG log/notice mismatch");

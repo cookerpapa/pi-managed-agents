@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Profile the exact Session selector under short and long histories, compare an unfinished-Turn index and measure backpressure at fixed arrival rates. [Evidence](reports/session-claim-selector-20261127.md).
+
 - [x] Measure and batch independent Session lease grants; preserve ownership and rollback under concurrent claims. [Claim timings and remaining load tail](reports/session-claim-cost-20261127.md).
 
 - [x] Serve authenticated text from the segmented queue through separate API, Projector and Worker images, then read the result through Web and continue on a replacement Worker. [Evidence](reports/independent-session-serving-20261127.md).

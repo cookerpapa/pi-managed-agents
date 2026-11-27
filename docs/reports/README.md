@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Worker claim selector](session-claim-selector-20261127.md) measures real plan work, client pool contention and fixed-rate Kafka lag.
+
 - [Session claim cost](session-claim-cost-20261127.md) breaks down actual PG, client and post-commit time and compares set-based lease granting with serial grants.
 
 - [Independent Session serving and cutover audit](independent-session-serving-20261127.md) covers real browser/provider continuation, a directed batch claim, the synthetic baseline and the remaining product paths.
