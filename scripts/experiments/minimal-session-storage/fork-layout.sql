@@ -9,6 +9,8 @@ create index fork_stream_agent_base on flows(tenant_id,agent_base_stream,agent_b
 create table sessions (
   tenant_id uuid not null,id uuid not null,flow_id uuid not null,
   family_id uuid not null, parent_session_id uuid,agent_name text not null,creation_hash text,title text not null default '',
+  parent_turn_id uuid,parent_call_entry bigint,parent_call_seq bigint,parent_call_block bigint,parent_call_id text,
+  parent_input_entry bigint,context_mode text check(context_mode in ('branch','fresh')),
   desired_model jsonb, desired_workspace jsonb, owner_user_id uuid,
   primary key(tenant_id,id),unique(tenant_id,flow_id),unique(tenant_id,family_id,id),
   foreign key(tenant_id,flow_id) references flows,
@@ -17,6 +19,8 @@ create table sessions (
     (parent_session_id is not null and id<>parent_session_id and id<>family_id and agent_name<>'root'))
 );
 create unique index fork_child_name on sessions(tenant_id,parent_session_id,agent_name) where parent_session_id is not null;
+create index fork_child_input on sessions(tenant_id,parent_session_id,parent_input_entry,parent_call_seq,parent_call_entry,parent_call_block)
+  where parent_input_entry is not null;
 -- Persist the request fingerprint independently of destination deletion. A retry
 -- can identify a deleted destination, but must never resurrect it.
 create table fork_requests (
@@ -166,33 +170,42 @@ declare own sessions%rowtype; streams uuid[]; total bigint;
 begin
   perform pg_advisory_xact_lock(hashtextextended(t::text,17));
   select * into strict own from sessions where tenant_id=t and id=window_id for update;
-  if dest is null then
-    with recursive tree(id,flow_id) as (
-      select own.id,own.flow_id union all
-      select c.id,c.flow_id from sessions c join tree p on c.parent_session_id=p.id
-      where c.tenant_id=t and c.family_id=own.family_id)
-      select array_agg(id),array_agg(flow_id) into members,streams from tree;
-  else members:=array[window_id]; streams:=array[own.flow_id]; end if;
-  perform id from sessions where tenant_id=t and id=any(members) order by id for update;
-  if dest is null then
-    update runs set state='cancelled',settled_at=now() where tenant_id=t and session_id=any(streams)
-      and state='queued' and started_at is null and lease_id is null;
+  if dest is not null then
+    select coalesce(sum(through_position),0) into total from flow_read_ranges(t,window_id);
+    if not pin_message_fork(t,own.flow_id,dest,target_run,lane,anchor,policy) then
+      raise exception 'Invisible or unfinished prune anchor' using errcode='PZ005';
+    end if;
   end if;
+  -- Each retained segment pins an entry range AND a publication ceiling.
+  -- Compare the original call, even after the parent rotated its local flow.
+  with recursive tree(id,flow_id) as (
+    select c.id,c.flow_id from sessions c where c.tenant_id=t and
+      ((dest is null and c.id=window_id) or
+       (dest is not null and c.parent_session_id=window_id and not exists(
+         select from runs r join flow_segments g on g.tenant_id=r.tenant_id and g.source_flow=r.session_id
+         where r.tenant_id=t and r.id=c.parent_turn_id and g.destination_flow=dest
+           and r.mailbox_position<=g.through_position and
+           (c.parent_call_entry is null or (c.parent_call_entry between g.first_entry and g.last_entry
+            and c.parent_call_seq<=g.through_seq)))))
+    union all select c.id,c.flow_id from sessions c join tree p on c.parent_session_id=p.id
+      where c.tenant_id=t and c.family_id=own.family_id)
+    select coalesce(array_agg(id),'{}'),coalesce(array_agg(flow_id),'{}') into members,streams from tree;
+  perform id from sessions where tenant_id=t and id=any(members) order by id for update;
+  update runs set state='cancelled',settled_at=now() where tenant_id=t and session_id=any(streams)
+    and state='queued' and started_at is null and lease_id is null;
+  if dest is not null then streams:=array_append(streams,own.flow_id); end if;
   if exists(select from runs where tenant_id=t and session_id=any(streams) and
     (state not in ('completed','failed','cancelled','timed_out') or (lease_id is not null and history_head is null) or (output_seal_id is not null and output_sealed_at is null))) then
     raise exception 'Source still running' using errcode='PZ004';
   end if;
   removed_turns:=0;
   if dest is not null then
-    select coalesce(sum(through_position),0) into total from flow_read_ranges(t,window_id);
-    if not pin_message_fork(t,own.flow_id,dest,target_run,lane,anchor,policy) then
-      raise exception 'Invisible or unfinished prune anchor' using errcode='PZ005';
-    end if;
     insert into conversation_worlds(tenant_id,pi_session_id,conversation_id,state)
       select t,dest,1,state from conversation_worlds where tenant_id=t and pi_session_id=own.flow_id and conversation_id=lane;
     update sessions set flow_id=dest where tenant_id=t and id=window_id;
     select total-coalesce(sum(through_position),0) into removed_turns from flow_read_ranges(t,window_id);
-  else delete from sessions where tenant_id=t and id=any(members); end if;
+  end if;
+  delete from sessions where tenant_id=t and id=any(members);
   insert into fork_gc(tenant_id,flow_id) select t,unnest(streams)
     union select tenant_id,source_flow from flow_segments where tenant_id=t and destination_flow=any(streams)
     union select tenant_id,agent_base_stream from flows where tenant_id=t and flow_id=any(streams) and agent_base_stream is not null

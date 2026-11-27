@@ -193,6 +193,7 @@ export async function waitingDelegation(scope, mode, name) {
       ctx,
     );
     const root = await runtime.bind({
+      trackFreshDelegationOrigin: true,
       runId: scope.runId,
       conversationId: 1,
       model: provider.getModel(),

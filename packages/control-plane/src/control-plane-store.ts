@@ -274,6 +274,7 @@ export class ControlPlaneStore {
   readonly #olderHistoryReader: OlderHistoryReader | undefined;
   readonly #delegatedRunHistory: boolean;
   readonly #rootMessageHistory: boolean;
+  readonly #independentSessions: boolean;
   readonly #database: Kysely<Database>;
   readonly #tenantId: string;
   readonly #defaultModelProfileId: string;
@@ -291,6 +292,8 @@ export class ControlPlaneStore {
       options.flowRootHistory,
       options.placedInputHistory,
     );
+    this.#independentSessions =
+      options.placedInputHistory === true && options.flowRootHistory === true;
     this.#rootMessageHistory = options.rootMessageHistory ?? false;
     this.#delegatedRunHistory = options.delegatedRunHistory ?? false;
     this.#database = options.database;
@@ -2040,7 +2043,7 @@ export class ControlPlaneStore {
       .where("session.tenant_id", "=", this.#tenantId)
       .where("session.id", "=", sessionId)
       .executeTakeFirst();
-    if (row === undefined || row.sessionKind !== "conversation") {
+    if (row === undefined || (row.sessionKind !== "conversation" && !this.#independentSessions)) {
       throw new ControlPlaneStoreError("not_found", "Conversation was not found");
     }
     const selection = supportedModelSelection(row.provider, row.modelId);

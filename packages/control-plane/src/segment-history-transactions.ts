@@ -1,5 +1,7 @@
 import { sql, type Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
+import { unbindSessionTargets } from "./unbind-session-targets.ts";
+import { deletePostgresPiSessionsInTransaction } from "@pi-cloud/pi-session-postgres";
 import type { MessageHistoryMutations } from "./conversation-tree-service.ts";
 import { ControlPlaneStoreError } from "./control-plane-store-error.ts";
 
@@ -60,9 +62,25 @@ export function segmentHistoryTransactions(
       }
     },
     async prune(tx, t, s, r) {
-      return Number(
-        (await detach(tx, t, s, crypto.randomUUID(), r.turnId, r.entryId)).removed_turns,
+      const { members, removed_turns } = await detach(
+        tx,
+        t,
+        s,
+        crypto.randomUUID(),
+        r.turnId,
+        r.entryId,
       );
+      if (members.length) {
+        await unbindSessionTargets(tx, t, members);
+        await tx
+          .deleteFrom("sessions")
+          .where("tenant_id", "=", t)
+          .where("session_kind", "=", "subagent")
+          .where("id", "in", members)
+          .execute();
+        await deletePostgresPiSessionsInTransaction(tx, t, members);
+      }
+      return { turns: Number(removed_turns), children: members.length };
     },
     async retire(tx, t, s) {
       return (await detach(tx, t, s, null, null, null)).members;

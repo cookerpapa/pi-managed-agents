@@ -345,7 +345,7 @@ const zhCN = {
   "chat.send": "发送",
   "chat.streamDisconnected": "实时连接已中断，正在等待重新连接。",
   "chat.pruneConfirm":
-    "保留这条回复，删除它之后的对话及相应子 Agent 记录？独立分叉和 Workspace 文件保留。",
+    "保留这条回复，删除后续对话、期间新建的子 Agent 及其后代？独立分叉和 Workspace 文件保留。",
   "chat.selectExclusiveError": "请选择一台可用的云端开发机。",
   "chat.selectWorkspaceError": "请选择一个 Workspace。",
   "chat.deleteConfirm": "永久删除对话“{title}”及其子 Agent 历史？独立分叉和 Workspace 文件保留。",
@@ -365,6 +365,9 @@ const zhCN = {
   "tree.selectConversation": "选择一个对话",
   "tree.syncing": "正在同步…",
   "tree.branches": "{count} 条分支",
+  "tree.backToParent": "返回父会话",
+  "tree.moreChildren": "更多子 Agent",
+  "tree.retryChildren": "重试加载",
   "tree.view": "树视图",
   "tree.focus": "当前分支",
   "tree.full": "整棵树",
@@ -934,7 +937,7 @@ const enUS: Record<UiTextKey, string> = {
   "chat.send": "Send",
   "chat.streamDisconnected": "The live connection was interrupted. Waiting to reconnect.",
   "chat.pruneConfirm":
-    "Keep this response and delete later chat entries and their subagent records? Independent forks and Workspace files are kept.",
+    "Keep this response and delete later messages, agents created there, and their descendants? Independent forks and Workspace files are kept.",
   "chat.selectExclusiveError": "Select an available cloud development machine.",
   "chat.selectWorkspaceError": "Select a Workspace.",
   "chat.deleteConfirm":
@@ -955,6 +958,9 @@ const enUS: Record<UiTextKey, string> = {
   "tree.selectConversation": "Select a chat",
   "tree.syncing": "Syncing…",
   "tree.branches": "{count} branches",
+  "tree.backToParent": "Back to parent",
+  "tree.moreChildren": "More agents",
+  "tree.retryChildren": "Retry loading",
   "tree.view": "Tree view",
   "tree.focus": "Current branch",
   "tree.full": "Full tree",

@@ -1,6 +1,6 @@
 import { sql, type Kysely } from "kysely";
 import type { Database } from "@pi-cloud/database";
-import type { ConversationTreeEntryResource } from "@pi-cloud/protocol";
+import type { ConversationTreeEntryResource, NavigationChildren } from "@pi-cloud/protocol";
 
 /** Page only adopted input Entries in this window's retained history. */
 export async function placedInputNavigation(
@@ -51,4 +51,43 @@ export async function placedInputNavigation(
     ...(hasMore && entries[0] ? { earlierEntryId: entries[0].entryId } : {}),
     ...(before ? { hasLaterEntries: true as const } : {}),
   };
+}
+
+/** One index probe per input on the visible page, independent of family size. */
+export async function childrenAtInputs(
+  db: Kysely<Database>,
+  schema: string,
+  tenant: string,
+  parent: string,
+  entries: string[],
+  limit: number,
+  after?: string,
+) {
+  const pages = new Map<string, NavigationChildren>();
+  if (!entries.length) return pages;
+  const cursor = after?.split(".");
+  const { rows } = await sql<{
+    entry: string;
+    id: string;
+    agent_name: string;
+    cursor: string;
+  }>`select a.entry::text,child.id,child.agent_name,
+    concat_ws('.',child.parent_call_seq,child.parent_call_entry,child.parent_call_block) as cursor
+    from unnest(${entries}::bigint[]) a(entry) cross join lateral (
+      select id,agent_name,parent_call_seq,parent_call_entry,parent_call_block from ${sql.id(schema, "sessions")}
+      where tenant_id=${tenant}::uuid and parent_session_id=${parent}::uuid and parent_input_entry=a.entry
+      ${cursor ? sql`and (parent_call_seq,parent_call_entry,parent_call_block)>(${cursor[0]}::bigint,${cursor[1]}::bigint,${cursor[2]}::bigint)` : sql``}
+      order by parent_call_seq,parent_call_entry,parent_call_block limit ${limit + 1}
+    ) child order by a.entry,child.parent_call_seq,child.parent_call_entry,child.parent_call_block`.execute(
+    db,
+  );
+  let lastCursor = "";
+  for (const row of rows) {
+    const page = pages.get(row.entry) ?? { items: [] };
+    if (page.items.length === limit) page.next = lastCursor;
+    else page.items.push({ sessionId: row.id, name: row.agent_name });
+    pages.set(row.entry, page);
+    lastCursor = row.cursor;
+  }
+  return pages;
 }

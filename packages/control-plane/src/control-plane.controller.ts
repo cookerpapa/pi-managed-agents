@@ -893,6 +893,23 @@ export class ControlPlaneController {
       .getConversationUsage(parseUuidPathParameter(value, "sessionId"));
   }
 
+  @Get("conversations/:sessionId/tree/children")
+  async navigationChildren(
+    @Req() request: FastifyRequest,
+    @Param("sessionId") session: unknown,
+    @Query("entryId") entry: unknown,
+    @Query("after") after: unknown,
+  ) {
+    if (typeof after !== "string" || after.length > 50 || after.split(".").length !== 3)
+      throw new ControlPlaneApiValidationError("Invalid child navigation cursor");
+    const cursor = after.split(".").map(parseNativeEntryPosition).join(".");
+    return this.conversationTrees.navigationChildren(
+      this.tenantRequestContext.resolve(request).tenantId,
+      parseUuidPathParameter(session, "sessionId"),
+      parseNativeEntryPosition(entry),
+      cursor,
+    );
+  }
   @Get("conversations/:sessionId/tree")
   async getConversationTree(
     @Req() request: FastifyRequest,

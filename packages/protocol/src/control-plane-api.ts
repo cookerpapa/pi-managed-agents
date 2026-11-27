@@ -964,9 +964,29 @@ export const SessionViewSnapshotResourceSchema = Type.Object(
 
 export const ConversationTreeViewSchema = Type.Union([Type.Literal("focus"), Type.Literal("full")]);
 
+export const NavigationChildrenSchema = Type.Object(
+  {
+    items: Type.Array(
+      Type.Object(
+        { sessionId: UuidSchema, name: Type.String({ minLength: 1, maxLength: 256 }) },
+        { additionalProperties: false },
+      ),
+      { maxItems: 32 },
+    ),
+    next: Type.Optional(
+      Type.String({ pattern: "^[1-9][0-9]{0,15}[.][1-9][0-9]{0,15}[.][1-9][0-9]{0,15}$" }),
+    ),
+  },
+  { additionalProperties: false },
+);
+export type NavigationChildren = Static<typeof NavigationChildrenSchema>;
+export function parseNavigationChildren(value: unknown): NavigationChildren {
+  return parseSchema(NavigationChildrenSchema, value, "navigation children");
+}
 export const ConversationTreeEntryResourceSchema = Type.Object(
   {
     entryId: PiEntryIdSchema,
+    children: Type.Optional(NavigationChildrenSchema),
     parentEntryId: Type.Union([PiEntryIdSchema, Type.Null()]),
     turnId: UuidSchema,
     role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
@@ -1011,6 +1031,7 @@ export const ConversationTreeBranchResourceSchema = Type.Object(
 
 export const ConversationTreeResourceSchema = Type.Object(
   {
+    inputPath: Type.Optional(Type.Literal(true)),
     rootSessionId: UuidSchema,
     currentSessionId: UuidSchema,
     view: ConversationTreeViewSchema,

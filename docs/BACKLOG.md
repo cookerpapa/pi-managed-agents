@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Navigate direct delegations at their adopted inputs. Prune children founded in a removed suffix and preserve independent Forks. [Delegation navigation](adr/0372-delegations-in-input-navigation.md).
+
 - [x] Reopen settled histories from Worker SSD after RAM expiry or restart, account for delta writes, and verify rollback, quota and PG fallback. [Evidence](reports/worker-ssd-continuation-20261127.md).
 
 - [x] Reuse verified image-bearing histories across normal Turns, give their cache holder bounded scheduling preference, and verify cold fallback after pruning, expiry and missed wakes. [Acceptance](reports/warm-image-continuation-20261127.md).

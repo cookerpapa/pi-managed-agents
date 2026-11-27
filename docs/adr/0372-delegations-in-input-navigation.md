@@ -1,0 +1,13 @@
+# ADR-0372. Navigate delegations at their founding call
+
+Accepted for the isolated #52 candidate. The current Session shows its retained adopted human and Agent inputs. Its own named children appear one level below the input visible to the model request which created them. Opening a child selects that Session. A branch inherits the frozen request prefix and a fresh child starts with its own assignment. Returning to the parent can seek the original input. Web Forks form independent families.
+
+The first successful named creation records its physical calling flow, Turn, assistant Entry and native call identity, plus the source input for navigation. A retry leaves these coordinates untouched. The navigator reads a page of inputs and indexed child links for those inputs only. Wide sibling groups use cursors. A message to an existing child has no effect on ownership.
+
+A tail prune pins the retained prefix and removes directly owned children whose founding calls have fallen outside it, including their management descendants. A full deletion starts at the selected Session. Both mutations serialize with child registration, require live writers to settle, and preserve independent Fork references. Neither operation undoes external effects. These operations run during explicit history management. Ordinary message appends acquire no new navigation index or projection duty.
+
+## Public API on the candidate
+
+`GET /v1/conversations/{sessionId}/tree` returns `inputPath: true` and one branch. A page has up to 80 adopted inputs. Each input may contain `children.items` with the names and Session IDs of its first three children. When more are available, pass `children.next` to `GET /v1/conversations/{sessionId}/tree/children?entryId=…&after=…`. That cursor addresses the last founding call by publication sequence, assistant Entry and tool block position. It fetches up to 32 more siblings in call order, including after the preceding child is deleted. Both views of the existing tree route select the same path on this composition. The parent ID and the founding input's Turn and Entry identify the return destination. An input's position is for presentation. The assistant Entry and its publication sequence govern deletion.
+
+The Session API and SSE readers address an independent child by its own public Session ID and read its frozen history ranges. The public metadata row is registered in the same transaction when the parent belongs to a public project. The candidate lease manager continues to own execution. The existing prune receipt reports the actual number of removed child Sessions, including on retry.

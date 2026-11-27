@@ -193,12 +193,14 @@ export class ConversationReader {
       .orderBy("session_row.id", "desc")
       .execute();
     const visibleRows = rows.slice(0, MAX_CONVERSATION_SUMMARIES);
-    const delegated = await loadDelegatedSessionTreeSummaries(this.#database, {
-      tenantId: this.#tenantId,
-      rootMessageHistory: this.rootMessageHistory,
-      rootParentSessionIds: visibleRows.map((row) => row.sessionId),
-      maximum: MAX_DELEGATED_SESSION_SUMMARIES,
-    });
+    const delegated = this.placedInputHistory
+      ? { items: [], truncated: false }
+      : await loadDelegatedSessionTreeSummaries(this.#database, {
+          tenantId: this.#tenantId,
+          rootMessageHistory: this.rootMessageHistory,
+          rootParentSessionIds: visibleRows.map((row) => row.sessionId),
+          maximum: MAX_DELEGATED_SESSION_SUMMARIES,
+        });
     return {
       conversations: visibleRows.map((row) => ({
         sessionId: row.sessionId,
@@ -372,18 +374,20 @@ export class ConversationReader {
       throw new ControlPlaneStoreError("not_found", "Conversation was not found");
     }
 
-    const childMessages = this.rootMessageHistory && conversation.sessionKind === "subagent";
+    const independent = this.placedInputHistory && this.flowRootHistory;
+    const childMessages =
+      this.rootMessageHistory && conversation.sessionKind === "subagent" && !independent;
     const flows =
       this.flowRootHistory &&
       this.rootMessageHistory &&
-      conversation.sessionKind === "conversation";
+      (conversation.sessionKind === "conversation" || !!independent);
     const rootMessages =
       this.rootMessageHistory &&
-      conversation.sessionKind === "conversation" &&
-      (flows || conversation.parentSessionId === null);
+      (flows ||
+        (conversation.sessionKind === "conversation" && conversation.parentSessionId === null));
     const messages = rootMessages || childMessages;
     let childState = "unknown";
-    if (this.rootMessageHistory && conversation.sessionKind === "subagent") {
+    if (childMessages) {
       const row = await this.#database
         .selectFrom("subagent_executions")
         .select("state")
@@ -664,7 +668,7 @@ export class ConversationReader {
     );
     const environment = await this.#loadActiveProjectEnvironment(conversation.projectId);
     const inheritedContext =
-      conversation.sessionKind === "subagent" && position === undefined
+      conversation.sessionKind === "subagent" && !independent && position === undefined
         ? await this.#delegatedInheritedMessages(sessionId)
         : { inheritedMessages: [] };
     return {

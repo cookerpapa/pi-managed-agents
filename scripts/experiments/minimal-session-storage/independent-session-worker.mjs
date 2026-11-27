@@ -180,6 +180,7 @@ process.on("message", async (msg) => {
         {
           runId: job.id,
           initialRequestId,
+          trackFreshDelegationOrigin: true,
           afterToolRound: async (task, context) => {
             await inputPump.postTools(task, context);
             if (msg.holdAfterPlacement) {

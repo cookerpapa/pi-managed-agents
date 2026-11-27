@@ -112,6 +112,7 @@ type RemoteToolDefinitionsSource = {
 };
 export type DurableRunConfiguration = {
   initialRequestId?: string;
+  trackFreshDelegationOrigin?: boolean;
   metrics?: PiCloudMetrics;
   runId: string;
   conversationId: number;
@@ -302,10 +303,13 @@ export class DurableAgentSession {
             },
             afterResponse: async (message, api, context) => {
               if (message.stopReason !== "toolUse") return;
+              const includeFresh = this.#bindings.get(
+                api.conversationId,
+              )?.trackFreshDelegationOrigin;
               const calls = message.content.flatMap((block) =>
                 block.type === "toolCall" &&
                 block.name === "subagent" &&
-                block.arguments.context === "branch"
+                (block.arguments.context === "branch" || includeFresh)
                   ? [block.id]
                   : [],
               );

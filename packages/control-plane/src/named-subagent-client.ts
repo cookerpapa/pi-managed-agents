@@ -27,6 +27,8 @@ const offerSchema = Type.Object(
     tool: Type.String(),
     anchor: Type.Union([Type.Null(), integer]),
     through: Type.Optional(integer),
+    requestEntry: Type.Optional(integer),
+    assistantEntry: Type.Optional(integer),
     input: Type.Union([
       Type.Object(
         {
@@ -69,6 +71,7 @@ export class NamedSubagentClient {
     fact: Extract<KafkaAcceptedFactRecord["fact"], { kind: "durable_commit" }>,
     ref: DurableControlToolDispatch,
     through?: number,
+    origin?: { requestEntry: number; assistantEntry: number },
   ) {
     if (this.#abort.signal.aborted || this.#active.size >= 1024) return;
     const source = ref.recovery
@@ -86,6 +89,7 @@ export class NamedSubagentClient {
       destination: ref.replyTopic,
       tool: ref.toolName,
       anchor: ref.contextAnchor,
+      ...origin,
       ...(through === undefined ? {} : { through }),
       input:
         "callId" in source

@@ -117,9 +117,14 @@ export async function nativeDelegationIntent(
     conversationId,
     toolName: "subagent",
     nativeCallId: task.intent.callId,
+    assistantEntry: entry.id,
+    ...(frozen.delegationRequest?.calls?.includes(callId) && frozen.delegationRequest.at
+      ? { requestEntry: frozen.delegationRequest.at }
+      : {}),
     arguments: task.intent.arguments,
     contextAnchor,
-    ...(contextAnchor !== null && frozen.delegationRequest?.through !== undefined
+    ...(frozen.delegationRequest?.calls?.includes(callId) &&
+    frozen.delegationRequest.through !== undefined
       ? { contextThrough: frozen.delegationRequest.through }
       : {}),
   };

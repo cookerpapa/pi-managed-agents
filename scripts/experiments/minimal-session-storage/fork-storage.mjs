@@ -165,7 +165,7 @@ export class ForkStorage {
   async fork(t, source, point, key = randomUUID()) {
     return this.createBranch(t, source, point, key, null);
   }
-  async delegate(t, source, point, key, name, task, model, caller, workspace, returnRoute) {
+  async delegate(t, source, point, key, name, task, model, caller, workspace, returnRoute, origin) {
     const normalized = subagentName(name);
     assert(
       normalized !== "root" && task.trim() && model && caller?.run && caller?.writer,
@@ -188,6 +188,7 @@ export class ForkStorage {
       caller,
       workspace: requested,
       returnRoute,
+      origin,
     });
   }
   // Input has already passed the native call/checkpoint matching in
@@ -212,6 +213,16 @@ export class ForkStorage {
           intent.contextThrough <= intent.sequence,
         "Missing original model request position",
       );
+    const origin =
+      intent.assistantEntry && intent.requestEntry && intent.contextThrough
+        ? {
+            assistant: intent.assistantEntry,
+            request: intent.requestEntry,
+            through: intent.contextThrough,
+            call: intent.nativeCallId,
+          }
+        : undefined;
+    if (this.inputs && !origin) throw Error("Missing original delegation placement");
     return this.delegate(
       t,
       source,
@@ -237,6 +248,7 @@ export class ForkStorage {
             source: intent.operationId,
           }
         : undefined,
+      origin,
     );
   }
   async createBranch(t, source, point, key, child) {
@@ -368,9 +380,30 @@ export class ForkStorage {
         grant.cwd === inheritedGrant.cwd)
     )
       await this.copyWorld(tx, t, parent.flow_id, point?.lane ?? 1, target);
-    await sql`insert into sessions(tenant_id,id,flow_id,family_id,parent_session_id,agent_name,creation_hash)
+    await sql`insert into sessions(tenant_id,id,flow_id,family_id,parent_session_id,agent_name,creation_hash,parent_turn_id,context_mode)
         values(${t}::uuid,${target}::uuid,${target}::uuid,${child ? parent.family_id : target}::uuid,
-          ${child ? source : null}::uuid,${child?.name ?? "root"},${creation})`.execute(tx);
+          ${child ? source : null}::uuid,${child?.name ?? "root"},${creation},${child?.caller.run ?? null}::uuid,${child ? (point ? "branch" : "fresh") : null})`.execute(
+      tx,
+    );
+    if (this.inputs && child?.origin) {
+      const o = child.origin;
+      const placed =
+        await sql`update sessions s set parent_call_entry=m.entry_id,parent_call_seq=m.commit_seq,
+        parent_call_id=${o.call},parent_call_block=b.ordinality,parent_input_entry=i.entry_id
+        from messages m cross join lateral (
+          select entry_id from messages where tenant_id=m.tenant_id and pi_session_id=m.pi_session_id
+            and run_id=m.run_id and conversation_id=m.conversation_id and input_display is not null
+            and entry_id<=${o.request}::bigint and commit_seq<=${o.through}::bigint
+            order by entry_id desc limit 1
+        ) i cross join lateral jsonb_array_elements(m.content::jsonb#>'{model,0,content}') with ordinality b(block,ordinality)
+        where s.tenant_id=${t}::uuid and s.id=${target}::uuid and m.tenant_id=s.tenant_id
+          and m.pi_session_id=${parent.flow_id}::uuid and m.conversation_id=1 and m.run_id=s.parent_turn_id
+          and m.entry_id=${o.assistant}::bigint and m.role='assistant'
+          and b.block->>'type'='toolCall' and b.block->>'name'='subagent' and b.block->>'id'=${o.call} returning s.id`.execute(
+          tx,
+        );
+      assert(placed.rows.length, "Delegation must have a committed call and adopted input");
+    }
     if (this.inputs) {
       const logical =
         child && grant
@@ -392,6 +425,20 @@ export class ForkStorage {
         owner_user_id=${parent.owner_user_id}::uuid where tenant_id=${t}::uuid and id=${target}::uuid`.execute(
         tx,
       );
+      if (child) {
+        // Register the public address only for a family attached to a product Workspace.
+        await sql`insert into public.sessions(id,pi_session_id,pi_conversation_id,tenant_id,title,session_kind,
+          project_id,workspace_id,desired_model_profile_id,desired_thinking_level,desired_service_tier,
+          agent_revision_id,created_by_user_id,state,execution_mode,development_environment_id,
+          compute_session_id,sandbox_profile_key,working_directory,tool_capabilities)
+          select ${target}::uuid,${target}::text,1,p.tenant_id,${child.name},'subagent',
+          p.project_id,p.workspace_id,${model.profileId}::uuid,
+          ${model.thinkingLevel},${model.serviceTier ?? null},p.agent_revision_id,p.created_by_user_id,'cold',
+          coalesce(${workspace?.executionMode ?? null},p.execution_mode),${workspace?.developmentEnvironmentId ?? null}::uuid,
+          ${workspace?.computeSessionId ?? null}::uuid,p.sandbox_profile_key,coalesce(${workspace?.cwd ?? null},p.working_directory),
+          ${JSON.stringify(workspace?.tools ?? [])}::jsonb
+          from public.sessions p where p.tenant_id=${t}::uuid and p.id=${source}::uuid`.execute(tx);
+      }
     }
     if (child) {
       const initialTurn = randomUUID();

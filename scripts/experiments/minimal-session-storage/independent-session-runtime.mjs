@@ -200,6 +200,8 @@ export class IndependentSessionRuntime {
             sequence: o.input.seq,
             contextAnchor: o.anchor,
             contextThrough: o.through,
+            requestEntry: o.requestEntry,
+            assistantEntry: o.assistantEntry,
           };
         try {
           await this.store.delegateFromIntent(
@@ -371,8 +373,8 @@ export class IndependentSessionRuntime {
     for (const ref of fact.tools) {
       if (ref.toolName !== "subagent" && ref.toolName !== "send_message") continue;
       if (!this.subagents) throw Error("Independent subagent admission endpoint is unavailable");
-      let through;
-      if (!ref.recovery && ref.contextAnchor !== null) {
+      let through, origin;
+      if (!ref.recovery && ref.toolName === "subagent") {
         const source = durableControlIntent(fact.commit, ref);
         const doc = owner.witness
           .snapshot()
@@ -384,13 +386,19 @@ export class IndependentSessionRuntime {
         const request = doc?.delegationRequest;
         if (
           !request?.calls.includes(source.callId) ||
-          request.at !== ref.contextAnchor ||
+          (ref.contextAnchor !== null && request.at !== ref.contextAnchor) ||
           !Number.isSafeInteger(request.through)
         )
           throw Error("Delegation does not match the accepted model request");
         through = request.through;
+        const task = fact.commit.writes.find((w) => w.type === "task" && w.value.id === ref.taskId);
+        const assistantEntry = task?.value.input?.assistant;
+        if (!Number.isSafeInteger(assistantEntry) || !Number.isSafeInteger(request.at))
+          throw Error("Missing founding delegation coordinates");
+        origin = { assistantEntry, requestEntry: request.at };
       }
-      if (current() && (await grant()) && current()) this.subagents.offer(fact, ref, through);
+      if (current() && (await grant()) && current())
+        this.subagents.offer(fact, ref, through, origin);
     }
     return true;
   }

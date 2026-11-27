@@ -20,6 +20,7 @@ try {
     "scripts/experiments/minimal-session-storage/root-message-history.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/bash-intent.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/segment-fork.integration.spec.mjs",
+    "scripts/experiments/minimal-session-storage/delegation-navigation.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/independent-session-leases.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/segment-wake.integration.spec.mjs",
     "scripts/experiments/minimal-session-storage/segment-warm-history.integration.spec.mjs",

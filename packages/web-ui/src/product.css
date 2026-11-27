@@ -5289,3 +5289,12 @@ body.product-panel-resizing {
 .product-agent-history li + li {
   margin-top: 0.75rem;
 }
+
+.product-tree-child-links {
+  margin-inline-start: 1.25rem;
+}
+
+.product-tree-child-actions {
+  display: flex;
+  align-items: center;
+}

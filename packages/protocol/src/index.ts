@@ -411,6 +411,8 @@ export {
   parseConversationListResource,
   parseConversationTreeView,
   parseConversationTreeResource,
+  parseNavigationChildren,
+  type NavigationChildren,
   parseCreateConversationForkRequest,
   parseConversationForkResource,
   parseCreateConversationPruneRequest,

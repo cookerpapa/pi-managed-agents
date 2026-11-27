@@ -226,13 +226,17 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
   const [delegatedSessions, setDelegatedSessions] = useState<
     readonly DelegatedSessionSummaryResource[]
   >([]);
-  const [selectedDelegatedSession, setSelectedDelegatedSession] =
-    useState<DelegatedSessionSummaryResource | null>(null);
+  const [selectedDelegatedSession, setSelectedDelegatedSession] = useState<
+    | (Pick<DelegatedSessionSummaryResource, "rootSessionId"> &
+        Partial<Pick<DelegatedSessionSummaryResource, "contextMode" | "sandboxMode">>)
+    | null
+  >(null);
   const [conversationTree, setConversationTree] = useState<ConversationTreeResource | null>(null);
   const [treeView, setTreeView] = useState<ConversationTreeView>("focus");
   const currentTreeView = useRef(treeView);
   currentTreeView.current = treeView;
   const treeRequest = useRef(0);
+  const returnTreePage = useRef<{ session: string; before: string } | null>(null);
   const treeNavigation = useRef<{ branchSessionId?: string; beforeEntryId?: string }>({});
   const [treeLoading, setTreeLoading] = useState(false);
   const [workspaces, setWorkspaces] = useState<readonly WorkspaceSummaryResource[]>([]);
@@ -763,7 +767,12 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
       return;
     }
     let cancelled = false;
-    treeNavigation.current = {};
+    const returning = returnTreePage.current;
+    treeNavigation.current =
+      returning?.session === sessionId
+        ? { branchSessionId: sessionId, beforeEntryId: returning.before }
+        : {};
+    returnTreePage.current = null;
     void refreshConversationTree(sessionId, treeView).catch((error: unknown) => {
       if (!cancelled) update({ type: "api.error", message: errorMessage(error, t) });
     });
@@ -1028,7 +1037,7 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
     sessionId: string,
     jumpTarget?: { turnId: string; entryId?: string },
     allowDuringOperation = false,
-    delegatedSession: DelegatedSessionSummaryResource | null = null,
+    delegatedSession: typeof selectedDelegatedSession = null,
   ): Promise<void> {
     if (conversationLoading !== null || (!allowDuringOperation && operation !== null)) return;
     setConversationLoading(sessionId);
@@ -1307,7 +1316,9 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
     }
   }
 
-  async function deleteConversation(conversation: ConversationSummaryResource): Promise<void> {
+  async function deleteConversation(
+    conversation: Pick<ConversationSummaryResource, "title" | "sessionId">,
+  ): Promise<void> {
     if (
       operation !== null ||
       !window.confirm(t("chat.deleteConfirm", { title: conversation.title }))
@@ -2081,6 +2092,12 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
       </aside>
 
       <ConversationTreeNavigator
+        onDeleteChild={
+          canMutate && !operation
+            ? (sessionId, title) => void deleteConversation({ sessionId, title })
+            : undefined
+        }
+        loadChildren={(session, entry, after) => api.getNavigationChildren(session, entry, after)}
         onPage={(branchSessionId, beforeEntryId) => {
           const sessionId = state.session?.sessionId;
           if (!sessionId) return;
@@ -2091,10 +2108,23 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
         }}
         loading={treeLoading}
         onNavigate={(sessionId, target) => {
+          if (conversationTree?.inputPath && target && currentStreamSession.current !== sessionId)
+            returnTreePage.current = {
+              session: sessionId,
+              before: (BigInt(target.entryId) + 1n).toString(),
+            };
           const delegated = conversationTree?.delegatedSessions.find(
             (candidate) => candidate.sessionId === sessionId,
           );
-          void openConversationSession(sessionId, target, false, delegated ?? null);
+          const current = conversationTree?.branches[0];
+          const child = conversationTree?.inputPath && sessionId !== conversationTree.rootSessionId;
+          void openConversationSession(
+            sessionId,
+            target,
+            false,
+            delegated ??
+              (child && current ? { rootSessionId: conversationTree.rootSessionId } : null),
+          );
         }}
         onViewChange={setTreeView}
         scrollerRef={chatScrollerRef}
@@ -2135,8 +2165,10 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
             {selectedDelegatedSession === null ? null : (
               <span className="product-delegated-title">
                 {t("chat.subagentTitle")} ·{" "}
-                {delegatedContextLabel(selectedDelegatedSession.contextMode, t)} ·{" "}
-                {delegatedSandboxLabel(selectedDelegatedSession.sandboxMode, t)} ·{" "}
+                {selectedDelegatedSession.contextMode &&
+                  delegatedContextLabel(selectedDelegatedSession.contextMode, t) + " · "}
+                {selectedDelegatedSession.sandboxMode &&
+                  delegatedSandboxLabel(selectedDelegatedSession.sandboxMode, t) + " · "}
                 {t("chat.readOnly")}
               </span>
             )}
@@ -2787,13 +2819,15 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
                       connected={state.connection.phase === "live"}
                       canFork={
                         canMutate &&
-                        selectedDelegatedSession === null &&
+                        (selectedDelegatedSession === null ||
+                          conversationTree?.inputPath === true) &&
                         operation === null &&
                         target !== undefined
                       }
                       canPrune={
                         canMutate &&
-                        selectedDelegatedSession === null &&
+                        (selectedDelegatedSession === null ||
+                          conversationTree?.inputPath === true) &&
                         operation === null &&
                         currentTurn === undefined &&
                         target !== undefined &&

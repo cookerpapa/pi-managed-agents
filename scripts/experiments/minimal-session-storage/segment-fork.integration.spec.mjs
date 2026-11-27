@@ -396,9 +396,19 @@ it.skipIf(!url)(
       );
       assert.equal((await api.pruneConversation(q, a, "10", replayKey)).replayed, true);
       assert(!JSON.stringify((await api.getConversation(q, {})).turns).includes("visible-F"));
+      assert.equal(pruned.prunedSessionCount, 3);
+      assert.equal(
+        (
+          await pool.query("select 1 from sessions where tenant_id=$1 and id=any($2::uuid[])", [
+            t,
+            [r, isolated, scoped],
+          ])
+        ).rowCount,
+        0,
+      );
       assert.deepEqual(
-        (await store.page(t, r)).map((x) => Number(x.entry_id)),
-        [40, 20, 15, 10],
+        (await store.page(t, rootFork)).map((x) => Number(x.entry_id)),
+        [10],
       );
       await api.deleteConversation(q);
       await store.collect(t);

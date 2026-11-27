@@ -28,6 +28,7 @@ import {
   parseConversationDetailResource,
   parseConversationListResource,
   parseConversationTreeResource,
+  parseNavigationChildren,
   parseConversationForkResource,
   parseConversationPruneResource,
   parseModelCatalogResource,
@@ -312,6 +313,17 @@ export class SessionApi {
       signal,
     );
   }
+  async getNavigationChildren(sessionId: string, entryId: string, after: string) {
+    return parseNavigationChildren(
+      await request(
+        this.#fetch,
+        `/v1/conversations/${encodeURIComponent(sessionId)}/tree/children?${new URLSearchParams({ entryId, after })}`,
+        { method: "GET" },
+        this.#authorizationToken,
+      ),
+    );
+  }
+
   async getConversationTree(
     sessionId: string,
     view: ConversationTreeView,

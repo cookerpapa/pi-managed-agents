@@ -3,6 +3,7 @@ import type {
   ConversationTreeBranchResource,
   ConversationTreeResource,
   ConversationTreeView,
+  NavigationChildren,
 } from "@pi-cloud/protocol";
 import { selectActiveTurn } from "./active-turn-selection.ts";
 import { useI18n, type Translate } from "./i18n.tsx";
@@ -88,6 +89,74 @@ function sandboxLabel(
   return t("chat.sandbox.none");
 }
 
+type LoadChildren = (
+  sessionId: string,
+  entryId: string,
+  after: string,
+) => Promise<NavigationChildren>;
+
+function ChildLinks({
+  group,
+  session,
+  entry,
+  open,
+  load,
+}: {
+  group: NavigationChildren;
+  session: string;
+  entry: string;
+  open: (id: string) => void;
+  load: LoadChildren;
+}) {
+  const { t } = useI18n();
+  const [extra, setExtra] = useState<NavigationChildren | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const items = [...group.items, ...(extra?.items ?? [])];
+  const next = extra ? extra.next : group.next;
+  const more = async () => {
+    if (!next || busy) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      const page = await load(session, entry, next);
+      setExtra({
+        items: [...(extra?.items ?? []), ...page.items],
+        ...(page.next ? { next: page.next } : {}),
+      });
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="product-tree-child-links">
+      {items.map((item) => (
+        <button
+          className="product-tree-entry"
+          type="button"
+          key={item.sessionId}
+          onClick={() => open(item.sessionId)}
+        >
+          <span aria-hidden="true">↳</span>
+          <span>{item.name}</span>
+        </button>
+      ))}
+      {next && (
+        <button
+          className="product-tree-page"
+          type="button"
+          disabled={busy}
+          onClick={() => void more()}
+        >
+          {failed ? t("tree.retryChildren") : t("tree.moreChildren")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TreeBranch({
   branch,
   children,
@@ -95,7 +164,11 @@ function TreeBranch({
   activeEntryKey,
   navigate,
   page,
+  loadChildren,
+  inputPath,
 }: {
+  loadChildren?: LoadChildren | undefined;
+  inputPath?: boolean | undefined;
   page?: ((sessionId: string, before?: string) => void) | undefined;
   branch: ConversationTreeBranchResource;
   children: ReadonlyMap<string, readonly ConversationTreeBranchResource[]>;
@@ -107,7 +180,7 @@ function TreeBranch({
   const unanchoredChildren = children.get(`${branch.sessionId}:__root__`) ?? [];
   return (
     <div className="product-tree-branch" style={{ "--tree-depth": depth } as React.CSSProperties}>
-      {branch.parentSessionId === null && branch.kind === "conversation" ? null : (
+      {inputPath || (branch.parentSessionId === null && branch.kind === "conversation") ? null : (
         <button
           className={`product-tree-branch-label ${branch.kind}${branch.current ? " current" : ""}`}
           onClick={() => navigate(branch.sessionId)}
@@ -176,6 +249,22 @@ function TreeBranch({
                 </span>
                 <span>{compact(entry.text, 76, t("tree.emptyMessage"))}</span>
               </button>
+              {entry.children && loadChildren && (
+                <ChildLinks
+                  key={
+                    branch.sessionId +
+                    ":" +
+                    entry.entryId +
+                    ":" +
+                    entry.children.items.map((c) => c.sessionId).join(",")
+                  }
+                  group={entry.children}
+                  session={branch.sessionId}
+                  entry={entry.entryId}
+                  open={navigate}
+                  load={loadChildren}
+                />
+              )}
               {nested.map((child) => (
                 <TreeBranch
                   activeEntryKey={activeEntryKey}
@@ -200,6 +289,8 @@ export function ConversationTreeNavigator({
   loading,
   scrollerRef,
   onViewChange,
+  onDeleteChild,
+  loadChildren,
   onNavigate,
   onPage,
   onJump,
@@ -208,6 +299,8 @@ export function ConversationTreeNavigator({
   view: ConversationTreeView;
   loading: boolean;
   scrollerRef: RefObject<HTMLElement | null>;
+  loadChildren?: LoadChildren | undefined;
+  onDeleteChild?: ((sessionId: string, title: string) => void) | undefined;
   onViewChange: (view: ConversationTreeView) => void;
   onPage?: ((sessionId: string, before?: string) => void) | undefined;
   onNavigate: (sessionId: string, target?: { turnId: string; entryId: string }) => void;
@@ -330,30 +423,64 @@ export function ConversationTreeNavigator({
         <header className="product-tree-header">
           <div>
             <strong>{t("tree.title")}</strong>
-            <span>
-              {tree === null
-                ? t("tree.selectConversation")
-                : loading
-                  ? t("tree.syncing")
-                  : t("tree.branches", { count: tree.branches.length })}
-            </span>
+            {!tree?.inputPath && (
+              <span>
+                {tree === null
+                  ? t("tree.selectConversation")
+                  : loading
+                    ? t("tree.syncing")
+                    : t("tree.branches", { count: tree.branches.length })}
+              </span>
+            )}
           </div>
-          <div className="product-tree-view-switch" role="group" aria-label={t("tree.view")}>
-            <button
-              className={view === "focus" ? "active" : ""}
-              onClick={() => onViewChange("focus")}
-              type="button"
-            >
-              {t("tree.focus")}
-            </button>
-            <button
-              className={view === "full" ? "active" : ""}
-              onClick={() => onViewChange("full")}
-              type="button"
-            >
-              {t("tree.full")}
-            </button>
-          </div>
+          {tree?.inputPath ? (
+            root?.parentSessionId && (
+              <div className="product-tree-child-actions">
+                <button
+                  type="button"
+                  className="product-tree-page"
+                  onClick={() =>
+                    navigate(
+                      root.parentSessionId!,
+                      root.forkedFromTurnId && root.forkedFromEntryId
+                        ? { turnId: root.forkedFromTurnId, entryId: root.forkedFromEntryId }
+                        : undefined,
+                    )
+                  }
+                >
+                  {t("tree.backToParent")}
+                </button>
+                {onDeleteChild && (
+                  <button
+                    type="button"
+                    className="product-delete-conversation"
+                    title={t("chat.deleteConversation", { title: root.title })}
+                    aria-label={t("chat.deleteConversation", { title: root.title })}
+                    onClick={() => onDeleteChild(root.sessionId, root.title)}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )
+          ) : (
+            <div className="product-tree-view-switch" role="group" aria-label={t("tree.view")}>
+              <button
+                className={view === "focus" ? "active" : ""}
+                onClick={() => onViewChange("focus")}
+                type="button"
+              >
+                {t("tree.focus")}
+              </button>
+              <button
+                className={view === "full" ? "active" : ""}
+                onClick={() => onViewChange("full")}
+                type="button"
+              >
+                {t("tree.full")}
+              </button>
+            </div>
+          )}
         </header>
         <nav aria-busy={loading} className="product-tree-nav" aria-label={t("tree.sessionTree")}>
           {loading && root === null ? (
@@ -367,6 +494,8 @@ export function ConversationTreeNavigator({
               children={children}
               depth={0}
               navigate={navigate}
+              inputPath={tree?.inputPath}
+              loadChildren={loadChildren}
               page={onPage}
             />
           )}

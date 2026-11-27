@@ -47,14 +47,18 @@ async function actor(db, url, capacity = 1, transport = {}) {
     { execArgv: ["--import", "tsx"], stdio: ["ignore", "inherit", "inherit", "ipc"] },
   );
   const ended = once(child, "exit");
-  async function receive() {
-    const incoming = once(child, "message", { signal: AbortSignal.timeout(12000) });
-    const [r] = await Promise.race([incoming, ended]);
+  async function receive(stage = "next worker event") {
+    const timeout = AbortSignal.timeout(12000);
+    const incoming = once(child, "message", { signal: timeout });
+    const [r] = await Promise.race([incoming, ended]).catch((error) => {
+      if (timeout.aborted) throw new Error("Worker IPC deadline during " + stage, { cause: error });
+      throw error;
+    });
     assert(r && r.kind !== "error", r?.message ?? "Worker exited");
     return r;
   }
   function ask(m) {
-    const result = receive();
+    const result = receive(m.op ?? "worker startup");
     child.send(m);
     return result;
   }
@@ -415,6 +419,21 @@ it.skipIf(!endpoint || !brokers).each(["branch", "fresh", "parent-handoff", "tur
       await registerTestWorker(db, workerId);
       parent = rt.worker({ workerId, bootId, capacity: 1, leaseDurationMs: 12000 });
       const job = await parent.claimNext();
+      // This harness submits the first input itself. Reserve the corresponding
+      // mailbox row as the normal independent Worker does before Pi placement.
+      await rt.store.db.transaction().execute((tx) =>
+        rt.inputs.admitIn(tx, {
+          tenant: t,
+          session: parentSession,
+          sender: tenant.ownerUserId,
+          id: parentRun,
+          source: "user",
+          mode: "input",
+          text: "Delegate",
+          initialTurn: parentRun,
+        }),
+      );
+      assert.equal((await rt.inputs.selectAt(job.scope, "start")).id, parentRun);
       nativeParent = await waitingDelegation(
         job.scope,
         mode === "parent-handoff" ? "branch" : mode,

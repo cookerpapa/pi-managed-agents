@@ -1,4 +1,4 @@
-import { placedInputNavigation } from "./placed-input-navigation.ts";
+import { childrenAtInputs, placedInputNavigation } from "./placed-input-navigation.ts";
 import {
   flowRootMessageTurns,
   rootMessageNavigation,
@@ -274,7 +274,7 @@ export type MessageHistoryMutations = {
     tenant: string,
     source: string,
     request: CreateConversationPruneRequest,
-  ): Promise<number>;
+  ): Promise<{ turns: number; children: number }>;
   retire(tx: Transaction<Database>, tenant: string, source: string): Promise<string[]>;
 };
 
@@ -329,28 +329,107 @@ export class ConversationTreeService {
       .transaction()
       .setIsolationLevel("repeatable read")
       .execute(async (database) => {
-        const tree = await this.#readTree(database, tenantId, currentSessionId, view, navigation);
-        if (!this.#messageHistory?.placedInputNavigation) return tree;
-        const target = navigation.branchSessionId ?? currentSessionId;
-        for (const branch of tree.branches) {
-          const page = await placedInputNavigation(
-            database,
-            this.#messageHistory.schema,
-            tenantId,
-            branch.sessionId,
-            branch.current || branch.sessionId === target ? 80 : 8,
-            branch.sessionId === target ? navigation.beforeEntryId : undefined,
-            view === "full" && branch.parentSessionId !== null ? branch.forkedFromEntryId : null,
-          );
-          branch.answerAnchors = branch.entries
-            .filter((e) => e.finalAssistant)
-            .map(({ turnId, entryId }) => ({ turnId, entryId }));
-          delete branch.earlierEntryId;
-          delete branch.hasLaterEntries;
-          Object.assign(branch, page);
+        const store = this.#messageHistory;
+        if (!store?.placedInputNavigation)
+          return this.#readTree(database, tenantId, currentSessionId, view, navigation);
+        if (navigation.branchSessionId && navigation.branchSessionId !== currentSessionId)
+          throw new ControlPlaneStoreError("not_found", "Navigation belongs to another Session");
+        const {
+          rows: [session],
+        } = await sql<{
+          family_id: string;
+          parent_session_id: string | null;
+          parent_input_entry: string | null;
+          parent_turn_id: string | null;
+          context_mode: "branch" | "fresh" | null;
+          title: string;
+        }>`select s.family_id,s.parent_session_id,s.parent_input_entry,
+          s.parent_turn_id,s.context_mode,coalesce(nullif(p.title,''),s.agent_name) title from ${sql.id(store.schema, "sessions")} s
+          join public.sessions p on p.tenant_id=s.tenant_id and p.id=s.id and p.pruned_at is null
+          where s.tenant_id=${tenantId}::uuid and s.id=${currentSessionId}::uuid`.execute(database);
+        if (!session) throw new ControlPlaneStoreError("not_found", "Conversation was not found");
+        const page = await placedInputNavigation(
+          database,
+          store.schema,
+          tenantId,
+          currentSessionId,
+          80,
+          navigation.beforeEntryId,
+        );
+        const children = await childrenAtInputs(
+          database,
+          store.schema,
+          tenantId,
+          currentSessionId,
+          page.entries.map((e) => e.entryId),
+          3,
+        );
+        for (const entry of page.entries) {
+          const group = children.get(entry.entryId);
+          if (group) entry.children = group;
         }
-        return tree;
+        // Only completed, fully visible Turns can offer history mutation targets.
+        const turnIds = [...new Set(page.entries.map((e) => e.turnId))];
+        const { rows: answerAnchors } = await sql<{
+          turnId: string;
+          entryId: string;
+        }>`select t.id as "turnId",answer.entry_id as "entryId"
+          from ${sql.id(store.schema, "flow_read_ranges")}(${tenantId}::uuid,${currentSessionId}::uuid) f
+          join ${sql.id(store.schema, "turns")} t on t.tenant_id=${tenantId}::uuid and t.session_id=f.physical
+            and t.id=any(${turnIds}::uuid[]) and t.mailbox_position<=f.through_position and t.state='completed'
+            and (f.tail_coverage is null or t.mailbox_position<>f.through_position)
+            and (t.output_seal_id is null or t.output_sealed_at is not null)
+          cross join lateral (select m.entry_id from ${sql.id(store.schema, "messages")} m where
+            m.tenant_id=t.tenant_id and m.pi_session_id=f.physical and m.run_id=t.id and m.conversation_id=f.source_lane
+            and m.role='assistant' and m.navigation_caption is not null
+            and (f.cut_seq is null or m.commit_seq<=f.cut_seq) and m.entry_id between coalesce(f.entry_lo,1) and coalesce(f.entry_hi,9007199254740991)
+            order by m.commit_seq desc,m.ordinal desc limit 1) answer`.execute(database);
+        return {
+          rootSessionId: session.family_id,
+          currentSessionId,
+          view,
+          inputPath: true,
+          delegatedSessions: [],
+          branches: [
+            {
+              kind: session.parent_session_id ? "subagent" : "conversation",
+              sessionId: currentSessionId,
+              title: session.title,
+              parentSessionId: session.parent_session_id,
+              ...(session.context_mode ? { contextMode: session.context_mode } : {}),
+              forkedFromTurnId: session.parent_turn_id,
+              forkedFromEntryId: session.parent_input_entry,
+              current: true,
+              ...page,
+              answerAnchors,
+            },
+          ],
+        };
       });
+  }
+
+  async navigationChildren(tenant: string, session: string, entry: string, after: string) {
+    if (!this.#messageHistory?.placedInputNavigation)
+      throw new ControlPlaneStoreError("not_found", "Unknown navigation");
+    const visible = await this.#readDatabase
+      .withSchema("public")
+      .selectFrom("sessions")
+      .select("id")
+      .where("tenant_id", "=", tenant)
+      .where("id", "=", session)
+      .where("pruned_at", "is", null)
+      .executeTakeFirst();
+    if (!visible) throw new ControlPlaneStoreError("not_found", "Conversation was not found");
+    const pages = await childrenAtInputs(
+      this.#readDatabase,
+      this.#messageHistory.schema,
+      tenant,
+      session,
+      [entry],
+      32,
+      after,
+    );
+    return pages.get(entry) ?? { items: [] };
   }
 
   async #readTree(
@@ -881,7 +960,7 @@ export class ConversationTreeService {
         if (
           session === undefined ||
           session.prunedAt !== null ||
-          session.sessionKind !== "conversation"
+          (session.sessionKind !== "conversation" && !this.#messageHistory?.placedInputNavigation)
         ) {
           throw new ControlPlaneStoreError("not_found", "Conversation was not found");
         }
@@ -944,8 +1023,8 @@ export class ConversationTreeService {
               request_sha256: requestSha256,
               anchor_turn_id: request.turnId,
               anchor_entry_id: request.entryId,
-              pruned_turn_count: count,
-              pruned_session_count: 0,
+              pruned_turn_count: count.turns,
+              pruned_session_count: count.children,
               created_at: now,
             })
             .executeTakeFirstOrThrow();
@@ -953,8 +1032,8 @@ export class ConversationTreeService {
             sessionId,
             anchorTurnId: request.turnId,
             anchorEntryId: request.entryId,
-            prunedTurnCount: count,
-            prunedSessionCount: 0,
+            prunedTurnCount: count.turns,
+            prunedSessionCount: count.children,
             replayed: false,
             createdAt: now.toISOString(),
           };
