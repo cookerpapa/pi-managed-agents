@@ -207,7 +207,7 @@ export function toolEvidence(messages) {
 
 export async function readPrefix(db, row, head, cache) {
   if (!head.version) return { records: [], status: "new", readBytes: 0 };
-  let hit = cache?.get(scopeKey(row.tenant_id, row.session_id), head.version);
+  let hit = await cache?.get(scopeKey(row.tenant_id, row.session_id), head.version, head);
   if (
     hit &&
     (hit.records.length !== head.count ||

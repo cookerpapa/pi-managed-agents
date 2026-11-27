@@ -1,9 +1,13 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 // Explicit isolated RF3/PG coverage for cases skipped by the default suite.
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { testKafka } from "./lib/test-kafka.mjs";
 import { testPostgres } from "./lib/test-postgres.mjs";
 
+const historyRoot = await mkdtemp(join(tmpdir(), "pma-worker-ssd-"));
 let kafka, postgres;
 try {
   kafka = await testKafka({});
@@ -56,6 +60,8 @@ try {
       cwd: fileURLToPath(new URL("..", import.meta.url)),
       env: {
         ...process.env,
+        PI_CLOUD_WORKER_HISTORY_CACHE_DIR: "",
+        PI_CLOUD_WORKER_HISTORY_CACHE_ROOT: historyRoot,
         TSX_TSCONFIG_PATH:
           process.env.TSX_TSCONFIG_PATH ??
           fileURLToPath(new URL("../packages/control-plane/tsconfig.json", import.meta.url)),
@@ -71,7 +77,11 @@ try {
     child.once("exit", (code) => resolve(code ?? 1));
   });
 } finally {
-  const closed = await Promise.allSettled([kafka?.close(), postgres?.close()]);
+  const closed = await Promise.allSettled([
+    kafka?.close(),
+    postgres?.close(),
+    rm(historyRoot, { recursive: true, force: true }),
+  ]);
   const errors = closed.filter((value) => value.status === "rejected").map((value) => value.reason);
   if (errors.length) throw new AggregateError(errors, "Owned transport fixture cleanup failed");
 }

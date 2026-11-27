@@ -1,5 +1,7 @@
 # ADR-0370. Prefer a warm Worker for large settled Session histories
 
+[ADR-0371](0371-worker-local-ssd-history.md) adds a persistent local tier for valid settled histories after memory eviction or Worker restart.
+
 Accepted for the isolated #52 composition. Use the existing directed wake socket, normal PG claims and disposable Worker-local cache. The earlier [continuation experiment](../reports/session-continuation-throughput-20261119.md) and its [Temporal sticky execution comparison](../reports/worker-claim-sizing-20261119.md) support bounded affinity with cold fallback.
 
 Each normal completion may offer immutable native Entries, including image blocks, under the tenant, logical Session, writable Flow and terminal fact ID. Only a PG-confirmed predecessor of the newly leased Turn may consume that snapshot. Fresh model, tools, workspace, mailbox and ownership always come from the new Turn. A change of Flow or version, pruning, expiry, process loss, or an active handoff selects the cold path. The cache has a byte budget and an idle expiry and occupies no execution slots.

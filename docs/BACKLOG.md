@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Reopen settled histories from Worker SSD after RAM expiry or restart, account for delta writes, and verify rollback, quota and PG fallback. [Evidence](reports/worker-ssd-continuation-20261127.md).
+
 - [x] Reuse verified image-bearing histories across normal Turns, give their cache holder bounded scheduling preference, and verify cold fallback after pruning, expiry and missed wakes. [Acceptance](reports/warm-image-continuation-20261127.md).
 
 - [x] Freeze the model and authorized Workspace on Turn admission, including the successor after late mail. [Turn semantics](adr/0368-session-defaults-and-turn-snapshots.md).

@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { testPostgres } from "./lib/test-postgres.mjs";
 
@@ -13,8 +16,10 @@ const interrupt = () => stop("SIGINT"),
   terminate = () => stop("SIGTERM");
 process.on("SIGINT", interrupt);
 process.on("SIGTERM", terminate);
-const fixture = await testPostgres();
+let fixture;
+const historyRoot = await mkdtemp(join(tmpdir(), "pma-worker-ssd-"));
 try {
+  fixture = await testPostgres();
   process.exitCode = stopping
     ? 1
     : await new Promise((resolve, reject) => {
@@ -22,6 +27,8 @@ try {
           stdio: "inherit",
           env: {
             ...process.env,
+            PI_CLOUD_WORKER_HISTORY_CACHE_DIR: "",
+            PI_CLOUD_WORKER_HISTORY_CACHE_ROOT: historyRoot,
             PI_CLOUD_POSTGRES_INTEGRATION_URL: fixture.url,
             PI_CLOUD_PI_SESSION_CONFORMANCE_DATABASE_URL:
               process.env.PI_CLOUD_PI_SESSION_CONFORMANCE_DATABASE_URL ?? fixture.url,
@@ -33,5 +40,9 @@ try {
 } finally {
   process.off("SIGINT", interrupt);
   process.off("SIGTERM", terminate);
-  await fixture.close();
+  try {
+    await fixture?.close();
+  } finally {
+    await rm(historyRoot, { recursive: true, force: true });
+  }
 }

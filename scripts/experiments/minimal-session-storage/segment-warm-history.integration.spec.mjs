@@ -3,6 +3,9 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
 import pg from "pg";
 import { it } from "vitest";
@@ -50,9 +53,13 @@ function png() {
 }
 
 const endpoint = process.env.PI_CLOUD_POSTGRES_INTEGRATION_URL;
-it.skipIf(!endpoint)(
-  "prefers verified image history, then falls back within a bounded delay",
-  async () => {
+it.skipIf(!endpoint).each(["memory", "ssd"])(
+  "uses verified %s image history and bounds Worker affinity",
+  async (tier) => {
+    const directory = await mkdtemp(join(tmpdir(), "segment-disk-integration-"));
+    let clockOffset = 0;
+    const now = () => Date.now() + clockOffset;
+    const controls = new Map();
     const admin = createDatabase({ connectionString: endpoint }),
       schema = "warm_" + randomUUID().replaceAll("-", "");
     const url = new URL(endpoint);
@@ -98,7 +105,7 @@ it.skipIf(!endpoint)(
       }
       throw Error("Timed out waiting for a warm Session claim");
     }
-    async function worker() {
+    async function worker(diskDirectory = false) {
       const workerId = randomUUID(),
         bootId = randomUUID(),
         capacity = 1;
@@ -118,14 +125,16 @@ it.skipIf(!endpoint)(
         bootId,
         capacity,
         leaseDurationMs: 30000,
-        historyCache: { minBytes: 1 },
+        historyCache: { minBytes: 1, diskDirectory, now },
       });
       workers.push(w);
+      const stop = new AbortController();
+      controls.set(w, stop);
       loops.push(
         w
           .serve({
             scheduler: { url: scheduler.url, token },
-            signal: abort.signal,
+            signal: AbortSignal.any([abort.signal, stop.signal]),
             onError: (e) => {
               failure = e;
             },
@@ -213,6 +222,7 @@ it.skipIf(!endpoint)(
           bytes,
           images,
           digest: modelContext,
+          diskReadBytes: opened.load.diskEntryBytes,
           ms: loadMs,
         };
         if (sample) {
@@ -268,8 +278,9 @@ it.skipIf(!endpoint)(
             terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
             occurredAt: new Date().toISOString(),
           };
-          opened.rememberCompletion(fact);
+          const writing = opened.rememberCompletion(fact);
           await publish(fact);
+          result.diskWrite = await writing;
         }
         return result;
       } finally {
@@ -351,7 +362,7 @@ it.skipIf(!endpoint)(
         [tenant, root],
       );
       scheduler = await rt.serveScheduler({ connectionString: url.href, token, tickMs: 100 });
-      const a = await worker();
+      const a = await worker(tier === "ssd" ? directory : false);
       await until(() => scheduler.snapshot().waiting === 1);
       const second = await enqueue(root, 2),
         two = await until(() => gates.get(second));
@@ -360,6 +371,147 @@ it.skipIf(!endpoint)(
       assert.equal(initial.images, count - 1);
       const b = await worker();
       await until(() => scheduler.snapshot().waiting === 1);
+      if (tier === "ssd") {
+        assert(initial.diskWrite && !initial.diskWrite.delta);
+        // Advance only the cache clock. Queue and PG lease timing stay real.
+        clockOffset += 31 * 60 * 1000;
+        a.warmHistory.cache.expire();
+        assert.equal(a.warmHistory.cache.bytes, 0);
+        const third = await enqueue(root, 3);
+        await delay(120);
+        assert(!gates.has(third), "disk-only owner lost large-history affinity");
+        two.gate.resolve();
+        const three = await until(() => gates.get(third));
+        assert.equal(three.w.workerId, a.workerId);
+        const cold = await run(three.job, { coldCopy: true });
+        const diskBefore = await a.warmHistory.disk.usage();
+        const ssd = await run(three.job, { sample: true });
+        const diskAfter = await a.warmHistory.disk.usage();
+        const turnWriteBytes =
+          diskBefore.threadWriteBytes === null || diskAfter.threadWriteBytes === null
+            ? null
+            : diskAfter.threadWriteBytes - diskBefore.threadWriteBytes;
+        assert(turnWriteBytes === null || turnWriteBytes < 1024 * 1024);
+        assert.equal(ssd.path, "disk");
+        assert.equal(ssd.bytes, 0);
+        assert.equal(ssd.images, count);
+        assert.equal(ssd.digest, cold.digest);
+        assert(ssd.diskWrite.delta && ssd.diskWrite.payloadBytes < 65536);
+        assert(
+          ssd.diskWrite.deviceWriteBytes === null || ssd.diskWrite.deviceWriteBytes < 1024 * 1024,
+        );
+        three.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 2);
+        const fourth = await enqueue(root, 4),
+          four = await until(() => gates.get(fourth));
+        assert.equal(four.w.workerId, a.workerId);
+        const memory = await run(four.job, { sample: true });
+        assert.equal(memory.path, "warm");
+        assert.equal(memory.diskReadBytes, 0);
+        four.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 2);
+        controls.get(a).abort();
+        await loops[0];
+        await a.close();
+        const restarted = await worker(directory);
+        await restarted.warmHistory.disk.tail;
+        await until(() => scheduler.snapshot().waiting === 2);
+        const fifth = await enqueue(root, 5),
+          five = await until(() => gates.get(fifth));
+        assert.equal(five.w.workerId, restarted.workerId);
+        const beforeCompact = await run(five.job, { coldCopy: true }),
+          afterRestart = await run(five.job, { sample: true, compact: true });
+        assert.equal(afterRestart.path, "disk");
+        assert.equal(afterRestart.bytes, 0);
+        assert.equal(afterRestart.digest, beforeCompact.digest);
+        five.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 2);
+        // This next prefix is under 1 KiB; ordinary FIFO can legitimately
+        // claim it ahead of a cache notice. Isolate the disk reader here;
+        // both Workers competed for the preceding large restart claim.
+        controls.get(b).abort();
+        await loops[1];
+        await b.close();
+        await until(() => scheduler.snapshot().waiting === 1);
+        clockOffset += 31 * 60 * 1000;
+        restarted.warmHistory.cache.expire();
+        const sixth = await enqueue(root, 6),
+          six = await until(() => gates.get(sixth));
+        assert.equal(six.w.workerId, restarted.workerId);
+        const compacted = await run(six.job, { sample: true });
+        assert.equal(compacted.images, 0);
+        assert.equal(compacted.path, "disk");
+        assert(compacted.diskReadBytes < 65536);
+        six.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 1);
+        // The Fork's immutable inherited range belongs to its own directory key.
+        const anchor = Number(
+          (
+            await pool.query(
+              "select max(entry_id) id from messages where run_id=$1 and role='assistant'",
+              [second],
+            )
+          ).rows[0].id,
+        );
+        const peer = await rt.store.fork(tenant, root, { lane: 1, run: second, entry: anchor });
+        const p1 = await enqueue(peer, 1),
+          claimedPeer = await until(() => gates.get(p1));
+        const firstPeer = await run(claimedPeer.job, { sample: true });
+        assert.equal(firstPeer.path, "cold");
+        assert.equal(firstPeer.images, count);
+        claimedPeer.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 1);
+        clockOffset += 31 * 60 * 1000;
+        restarted.warmHistory.cache.expire();
+        const p2 = await enqueue(peer, 2),
+          continuePeer = await until(() => gates.get(p2));
+        const peerCold = await run(continuePeer.job, { coldCopy: true }),
+          peerDisk = await run(continuePeer.job, { sample: true });
+        assert.equal(peerDisk.path, "disk");
+        assert.equal(peerCold.digest, peerDisk.digest);
+        assert.equal(peerDisk.bytes, 0);
+        assert.equal(peerDisk.images, count);
+        assert(peerDisk.diskWrite.delta && peerDisk.diskWrite.payloadBytes < 65536);
+        continuePeer.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 1);
+        clockOffset += 24 * 60 * 60 * 1000 + 1;
+        restarted.warmHistory.cache.expire();
+        await restarted.warmHistory.disk.refresh();
+        const seventh = await enqueue(root, 7),
+          seven = await until(() => gates.get(seventh));
+        const expired = await run(seven.job, { sample: true });
+        assert.equal(expired.path, "cold");
+        assert(expired.bytes > 0);
+        seven.gate.resolve();
+        await rt.store.retire(tenant, root, { lane: 1, run: second, entry: anchor });
+        const prunedTurn = await enqueue(root, 1),
+          prunedJob = await until(() => gates.get(prunedTurn));
+        const clipped = await run(prunedJob.job, { sample: true });
+        assert.equal(clipped.path, "cold");
+        assert.equal(clipped.digest, firstPeer.digest);
+        prunedJob.gate.resolve();
+        process.stdout.write(
+          "ssd-image-continuation " +
+            JSON.stringify({
+              count,
+              coldPgBytes: cold.bytes,
+              coldMs: cold.ms,
+              diskPgBytes: ssd.bytes,
+              diskReadBytes: ssd.diskReadBytes,
+              diskMs: ssd.ms,
+              bootstrapBytes: initial.diskWrite.payloadBytes,
+              turnDeviceWriteBytes: turnWriteBytes,
+              mainFileGrowth: diskAfter.mainBytes - diskBefore.mainBytes,
+              deltaPayloadBytes: ssd.diskWrite.payloadBytes,
+              deltaDeviceWriteBytes: ssd.diskWrite.deviceWriteBytes,
+              restartPgBytes: afterRestart.bytes,
+              compactedDiskBytes: compacted.diskReadBytes,
+              forkDiskPgBytes: peerDisk.bytes,
+            }) +
+            "\n",
+        );
+        return;
+      }
       const start = performance.now(),
         third = await enqueue(root, 3);
       await delay(150);
@@ -367,12 +519,12 @@ it.skipIf(!endpoint)(
       const sideStart = performance.now();
       const unrelated = await enqueue(side, 1),
         other = await until(() => gates.get(unrelated));
-      assert.equal(other.w, b);
+      assert.equal(other.w.workerId, b.workerId);
       two.gate.resolve();
       await run(other.job, { sample: true });
       other.gate.resolve();
       const three = await until(() => gates.get(third));
-      assert.equal(three.w, a);
+      assert.equal(three.w.workerId, a.workerId);
       const cold = await run(three.job, { coldCopy: true }),
         warm = await run(three.job, { sample: true });
       assert.equal(warm.path, "warm");
@@ -383,7 +535,7 @@ it.skipIf(!endpoint)(
       const delayed = performance.now(),
         fourth = await enqueue(root, 4),
         four = await until(() => gates.get(fourth));
-      assert.equal(four.w, b);
+      assert.equal(four.w.workerId, b.workerId);
       assert(
         four.at - delayed >= 1850 && four.at - delayed < 4500,
         "fallback exceeded its test window",
@@ -408,7 +560,7 @@ it.skipIf(!endpoint)(
       const evictedAt = performance.now();
       b.warmHistory.cache.remove(tenant + "/" + root);
       const afterEvict = await until(() => gates.get(fifth));
-      assert.equal(afterEvict.w, a);
+      assert.equal(afterEvict.w.workerId, a.workerId);
       assert(afterEvict.at - evictedAt < 1200);
       assert.equal((await run(afterEvict.job, { sample: true })).path, "cold");
       afterEvict.gate.resolve();
@@ -435,7 +587,7 @@ it.skipIf(!endpoint)(
       assert(!gates.has(branch2), "inherited image bytes also deserve affinity");
       firstBranch.gate.resolve();
       const secondBranch = await until(() => gates.get(branch2));
-      assert.equal(secondBranch.w, firstBranch.w);
+      assert.equal(secondBranch.w.workerId, firstBranch.w.workerId);
       const forkCold = await run(secondBranch.job, { coldCopy: true }),
         forkWarm = await run(secondBranch.job, { sample: true, compact: true });
       assert.equal(forkWarm.digest, forkCold.digest);
@@ -502,6 +654,7 @@ it.skipIf(!endpoint)(
       await pool.query("drop schema if exists " + schema + " cascade");
       await rt.store.db.destroy();
       await admin.destroy();
+      await rm(directory, { recursive: true, force: true });
     }
   },
   180000,

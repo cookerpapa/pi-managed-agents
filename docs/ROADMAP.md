@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The #52 candidate retains settled history on Worker-local SSD across memory expiry and same-directory restart. [Acceptance and configuration](reports/worker-ssd-continuation-20261127.md).
+
 The #52 candidate now prefers Workers with confirmed large histories and can reuse inline image Entries across ordinary Turns. [Bounded waiting and PG read measurements](reports/warm-image-continuation-20261127.md).
 
 The #52 candidate freezes each Turn’s model and logical environment before scheduling. Its navigator follows retained input Entries. Unread Agent mail waits across a user Stop. [Session acceptance](reports/turn-input-navigation-20261126.md).

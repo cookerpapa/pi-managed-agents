@@ -1,5 +1,7 @@
 # Minimal Session lifecycle load test
 
+For disk-backed continuation see the [SSD cache test and configuration](../../../docs/reports/worker-ssd-continuation-20261127.md).
+
 The independent Session [warm continuation acceptance](../../../docs/reports/warm-image-continuation-20261127.md) compares cold and hot Pi input for image-heavy history, including bounded scheduling delay and fallback.
 
 For the isolated root-only Session and delegated-Run schema, see the [design, cold-read measurements and reproduction commands](../../../docs/reports/delegated-runs-20261122.md).

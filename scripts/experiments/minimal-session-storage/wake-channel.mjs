@@ -59,23 +59,36 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
   let deadlineTimer,
     fifoNext = false;
   const versionKey = (tenant, flow, version) => tenant + "/" + flow + "/" + version;
+  function segmentHolder(hint) {
+    const holders = directory.get(versionKey(hint[0], hint[4], hint[3]));
+    let best,
+      rank = Infinity;
+    for (const h of holders?.values() ?? []) {
+      if (
+        h.expires <= Date.now() ||
+        connections.get(h.id) !== h.socket ||
+        h.socket.readyState !== WebSocket.OPEN
+      )
+        continue;
+      const priority = waiting.has(h.socket) ? (h.disk ? 1 : 0) : h.large ? 2 : 3;
+      if (priority < rank) {
+        best = h;
+        rank = priority;
+      }
+    }
+    return best;
+  }
   function drainContinuations() {
     clearTimeout(deadlineTimer);
     let earliest = Infinity;
     for (const [turn, hint] of continuations) {
       if (!waiting.size) break;
-      const holder = directory.get(versionKey(hint[0], hint[4], hint[3]));
-      const live =
-        holder &&
-        holder.version === hint[3] &&
-        holder.expires > Date.now() &&
-        connections.get(holder.id) === holder.socket &&
-        holder.socket.readyState === WebSocket.OPEN;
+      const holder = segmentHolder(hint);
       let socket;
-      if (live && waiting.has(holder.socket)) {
+      if (holder && waiting.has(holder.socket)) {
         socket = holder.socket;
         stats.preferred++;
-      } else if (live && holder.large && hint[5] > Date.now()) {
+      } else if (holder && holder.large && hint[5] > Date.now()) {
         earliest = Math.min(earliest, hint[5], holder.expires);
         continue;
       } else socket = waiting.values().next().value;
@@ -98,7 +111,7 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
       !Number.isSafeInteger(hint[5])
     )
       return;
-    const holder = directory.get(versionKey(hint[0], hint[4], hint[3]));
+    const holder = segmentHolder(hint);
     if (hint[5] <= Date.now() && (!holder || !waiting.has(holder.socket))) {
       notify(stage.label, 1);
       return;
@@ -196,28 +209,40 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
         }
         if (
           !Array.isArray(offer) ||
-          ![3, 4].includes(offer.length) ||
+          ![3, 4, 5].includes(offer.length) ||
           !offer.slice(0, 3).every((v) => typeof v === "string") ||
-          (offer.length === 4 && !["keep", "large", "drop"].includes(offer[3]))
+          (offer.length >= 4 &&
+            !["keep", "large", "drop", "disk", "disk-large"].includes(offer[3])) ||
+          (offer.length === 5 && !Number.isSafeInteger(offer[4]))
         )
           return socket.close(1008);
-        const [tenant, session, version, action] = offer;
+        const [tenant, session, version, action, expiresAt] = offer;
         const key = stage.perTurn ? versionKey(tenant, session, version) : tenant + "/" + session;
+        const old = directory.get(key);
         if (action === "drop") {
-          const held = directory.get(key);
-          if (held?.socket === socket && held.version === version) directory.delete(key);
-          if (continuations.size) drainContinuations();
-          return;
+          if (stage.perTurn) {
+            if (old?.get(id)?.socket === socket) old.delete(id);
+            if (!old?.size) directory.delete(key);
+          } else if (old?.socket === socket && old.version === version) directory.delete(key);
+        } else {
+          const holder = {
+            id,
+            socket,
+            version,
+            large: action === "large" || action === "disk-large",
+            disk: action === "disk" || action === "disk-large",
+            expires: expiresAt ?? Date.now() + (stage.cacheTtlMs ?? 300000),
+          };
+          directory.delete(key);
+          if (directory.size >= 4096) directory.delete(directory.keys().next().value);
+          if (stage.perTurn) {
+            const holders = old ?? new Map();
+            holders.delete(id);
+            if (holders.size >= 4) holders.delete(holders.keys().next().value);
+            holders.set(id, holder);
+            directory.set(key, holders);
+          } else directory.set(key, holder);
         }
-        directory.delete(key);
-        if (directory.size >= 4096) directory.delete(directory.keys().next().value);
-        directory.set(key, {
-          id,
-          socket,
-          large: action === "large",
-          version,
-          expires: Date.now() + (stage.cacheTtlMs ?? 300000),
-        });
         if (continuations.size) drainContinuations();
         return;
       }
@@ -345,6 +370,21 @@ export function connectClaimWorker({
     offered = false,
     running = 0,
     reconnectMs = 100;
+  const offers = new Map();
+  let offerTimer;
+  function pumpOffers() {
+    clearTimeout(offerTimer);
+    offerTimer = undefined;
+    if (!online || stopped || socket.readyState !== WebSocket.OPEN) return;
+    let sent = 0;
+    for (const [key, frame] of offers) {
+      if (sent >= 64 || socket.bufferedAmount >= 65536) break;
+      offers.delete(key);
+      socket.send(frame);
+      sent++;
+    }
+    if (offers.size) offerTimer = setTimeout(pumpOffers, 20);
+  }
   function offer() {
     if (!online || stopped || checking || running >= slots) return;
     offered = true;
@@ -453,6 +493,9 @@ export function connectClaimWorker({
     current.on("close", () => {
       if (socket !== current) return;
       online = false;
+      clearTimeout(offerTimer);
+      offerTimer = undefined;
+      offers.clear();
       offered = false;
       clearTimeout(renew);
       if (!stopped) {
@@ -473,17 +516,21 @@ export function connectClaimWorker({
       )
         socket.send("seen:" + writer + ":" + revision);
     },
-    advertise(tenant, session, version, action) {
+    advertise(tenant, session, version, action, expires) {
       if (
-        online &&
-        !stopped &&
-        socket.readyState === WebSocket.OPEN &&
-        socket.bufferedAmount < 65536 &&
-        stage.cacheMode === "prefer"
+        !online ||
+        stopped ||
+        socket.readyState !== WebSocket.OPEN ||
+        stage.cacheMode !== "prefer"
       )
-        socket.send(
-          JSON.stringify(action ? [tenant, session, version, action] : [tenant, session, version]),
-        );
+        return;
+      const fields = [tenant, session, version];
+      if (action) fields.push(action);
+      if (expires !== undefined) fields.push(expires);
+      const key = fields.slice(0, 3).join("/");
+      if (!offers.has(key) && offers.size >= 8192) offers.delete(offers.keys().next().value);
+      offers.set(key, JSON.stringify(fields));
+      if (!offerTimer) pumpOffers();
     },
     get busy() {
       return running > 0 || checking;
@@ -493,6 +540,8 @@ export function connectClaimWorker({
       online = false;
       clearTimeout(renew);
       clearTimeout(reconnect);
+      clearTimeout(offerTimer);
+      offers.clear();
       socket?.terminate();
       finishDrain();
       return drained.promise;

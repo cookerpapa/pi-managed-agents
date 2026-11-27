@@ -428,6 +428,7 @@ export async function openSegmentNative(
     job.recovering || job.started_at != null ? undefined : job.warmHistory?.capture(job);
   const load = {
     path: job.recovering ? "recovery" : "cold",
+    diskEntryBytes: 0,
     pgEntryBytes: job.recovering ? null : 0,
   };
   class Published extends MemoryStorage {
@@ -481,8 +482,14 @@ export async function openSegmentNative(
             head.floor,
           ));
         importEntries(inherited);
-        capture?.seed(inherited, prefix.records, head.floor);
-        load.path = prefix.status === "hit" ? "warm" : "cold";
+        capture?.seed(inherited, prefix.records, head.floor, prefix.hit ? head.version : null);
+        load.diskEntryBytes = prefix.hit?.diskReadBytes ?? 0;
+        load.path =
+          prefix.hit?.diskReadBytes !== undefined
+            ? "disk"
+            : prefix.status === "hit"
+              ? "warm"
+              : "cold";
         load.pgEntryBytes = prefix.readBytes + received;
       },
     });

@@ -1,5 +1,6 @@
 // Each cache contains only immutable Entry bodies. PG confirms the terminal
 // version before restoring any of them into a freshly authorized Pi instance.
+import { SegmentDiskHistory } from "./segment-disk-history.mjs";
 import { PrefixCache } from "./session-prefix.mjs";
 export const expensiveHistoryBytes = 16 * 1024 * 1024;
 // Count the exact PG wire representation without allocating a second giant
@@ -24,45 +25,89 @@ export class SegmentWarmHistory {
     minBytes = 256 * 1024,
     maxBytes = 256 * 1024 * 1024,
     ttlMs = 300000,
-    now,
+    now = Date.now,
+    diskDirectory,
+    diskMaxBytes = 20 * 1024 ** 3,
+    diskTtlMs = 24 * 60 * 60 * 1000,
     advertise,
   } = {}) {
     if (
-      ![minBytes, maxBytes].every((v) => Number.isSafeInteger(v) && v >= 0) ||
+      ![minBytes, maxBytes, diskMaxBytes].every((v) => Number.isSafeInteger(v) && v >= 0) ||
       !Number.isSafeInteger(ttlMs) ||
-      ttlMs <= 0
+      ttlMs <= 0 ||
+      !Number.isSafeInteger(diskTtlMs) ||
+      diskTtlMs <= 0
     )
       throw Error("Invalid warm history cache limits");
     this.closed = false;
     this.advertise = advertise;
+    this.now = now;
     this.cache = new PrefixCache({
       minBytes,
       maxBytes,
       ttlMs,
       now,
-      onEvict: (key, v) => this.notice(key, v, "drop"),
+      onEvict: (key, v) => this.notice(key, v),
     });
-    this.timer = setInterval(() => this.cache.expire(), Math.min(ttlMs, 60000));
+    if (diskDirectory && diskMaxBytes)
+      this.disk = new SegmentDiskHistory({
+        directory: diskDirectory,
+        maxBytes: diskMaxBytes,
+        ttlMs: diskTtlMs,
+        now,
+        changed: (key, version) => this.notice(key, version),
+      });
+    this.timer = setInterval(
+      () => {
+        this.cache.expire();
+        this.disk?.refresh();
+      },
+      Math.min(ttlMs, diskTtlMs, 60000),
+    );
     this.timer.unref();
   }
-  notice(key, version, action) {
+  notice(key, version) {
     const [tenant, flow] = key.split("/");
-    this.advertise?.(tenant, flow, version, action);
+    const memory = this.cache.items.get(key),
+      disk = this.disk?.heads.get(key);
+    if (!this.closed && memory?.version === version && memory.expires > this.now())
+      this.advertise?.(
+        tenant,
+        flow,
+        version,
+        memory.bytes >= expensiveHistoryBytes ? "large" : "keep",
+        memory.expires,
+      );
+    else if (!this.closed && disk?.version === version && disk.expires > this.now())
+      this.advertise?.(
+        tenant,
+        flow,
+        version,
+        disk.bytes >= expensiveHistoryBytes ? "disk-large" : "disk",
+        disk.expires,
+      );
+    else this.advertise?.(tenant, flow, version, "drop");
   }
   advertiseAll() {
     this.cache.expire();
-    for (const [key, item] of this.cache.items)
-      this.notice(key, item.version, item.bytes >= expensiveHistoryBytes ? "large" : "keep");
+    for (const [key, item] of this.cache.items) this.notice(key, item.version);
+    for (const [key, item] of this.disk?.heads ?? [])
+      if (this.cache.items.get(key)?.version !== item.version) this.notice(key, item.version);
   }
   close() {
     this.closed = true;
     clearInterval(this.timer);
     for (const key of this.cache.items.keys()) this.cache.remove(key);
+    for (const [key, item] of this.disk?.heads ?? []) this.notice(key, item.version);
+    return this.disk?.close();
   }
   capture(job) {
-    if (this.closed || this.cache.maxBytes === 0) return;
+    const disk = this.disk?.disabled ? undefined : this.disk;
+    if (this.closed || (!disk && this.cache.maxBytes === 0)) return;
     const key = job.tenant_id + "/" + job.flow_id;
-    const budget = this.cache.maxBytes;
+    const budget = Math.max(this.cache.maxBytes, disk?.maxBytes ?? 0);
+    let base = null,
+      additions = [];
     let inherited = [],
       local = [],
       localBytes = 0,
@@ -76,14 +121,18 @@ export class SegmentWarmHistory {
         oversize = true;
         local = [];
         inherited = [];
+        additions = [];
       }
     };
     return {
-      get: (_, version) => {
+      get: (_, version, head) => {
+        base = version;
         const item = this.cache.get(key, version);
         if (item?.session === job.logical_id) return item;
+        return disk?.get(key, job.logical_id, version, head);
       },
-      seed(ancestors, previous = [], initialFloor = 1) {
+      seed(ancestors, previous = [], initialFloor = 1, acceptedBase = base) {
+        base = acceptedBase;
         floor = initialFloor;
         inherited = ancestors;
         local = [...previous];
@@ -101,17 +150,21 @@ export class SegmentWarmHistory {
               oversize = true;
               local = [];
               inherited = [];
+              additions = [];
               return;
             }
             floor = entry.head;
             inherited = inherited.filter((r) => r.entry.id >= floor);
             inheritedBytes = measure(inherited);
+            additions = additions.filter((r) => r.entry.id >= floor);
             local = local.filter((r) => r.entry.id >= floor);
             localBytes = measure(local);
           }
           if (entry.id < floor) continue;
           const bytes = entryBytes(entry, budget - localBytes - inheritedBytes);
-          local.push({ entry, seq: batch.seq, bytes });
+          const record = { entry, seq: batch.seq, bytes };
+          local.push(record);
+          if (disk) additions.push(record);
           localBytes += bytes;
           bound();
           if (oversize) return;
@@ -120,7 +173,6 @@ export class SegmentWarmHistory {
       finish: (fact) => {
         if (
           finished ||
-          oversize ||
           this.closed ||
           fact.kind !== "work_finished" ||
           fact.terminal.type !== "turn.completed" ||
@@ -133,6 +185,10 @@ export class SegmentWarmHistory {
           return;
         finished = true;
         this.cache.remove(key);
+        if (oversize || localBytes + inheritedBytes < this.cache.minBytes) {
+          if (base) return disk?.forget(key, base);
+          return;
+        }
         if (
           this.cache.retain(
             key,
@@ -148,10 +204,26 @@ export class SegmentWarmHistory {
             localBytes + inheritedBytes,
           )
         ) {
-          this.notice(
-            key,
-            fact.factId,
-            localBytes + inheritedBytes >= expensiveHistoryBytes ? "large" : "keep",
+          this.notice(key, fact.factId);
+        }
+        if (disk) {
+          return disk.put(
+            {
+              k: key,
+              session: job.logical_id,
+              version: fact.factId,
+              fence: job.scope.fencingToken,
+              seq: fact.nativeSequence,
+              floor,
+              bytes: inheritedBytes + localBytes,
+              localBytes,
+              locals: local.length,
+              ancestors: inherited.length,
+            },
+            base,
+            inherited,
+            local,
+            additions,
           );
         }
       },

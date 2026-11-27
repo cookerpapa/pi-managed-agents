@@ -1,5 +1,7 @@
 # Warm continuation for image-heavy Session histories
 
+The subsequent [Worker SSD acceptance](worker-ssd-continuation-20261127.md) covers disk hits, incremental writes and restart with a retained directory.
+
 [ADR-0370](../adr/0370-large-history-warm-continuation.md) applies to the isolated #52 runtime. The first Turn of a new window or Fork loads its visible prefix from PG. A Worker can then hold the immutable, parsed native Entries after a normal completion. On a matching successor it constructs a fresh Pi instance using these Entries and their original commit positions. The new claim and the predecessor metadata are still read from PG. Image blocks in user messages and tool results share these rules.
 
 The Worker advertises a small tenant/Flow/version hint over the existing management socket. Reuse also checks the logical Session and the confirmed predecessor’s version, native sequence, active lower bound, local Entry count and byte coverage. Writer replacement follows the ordered handoff. A changed Flow after pruning misses the old cache. A new head prunes the cached range, including inherited Entries below that head. A fresh model, Workspace, working directory, mailbox, Turn lease and fencing token are selected through the existing paths.

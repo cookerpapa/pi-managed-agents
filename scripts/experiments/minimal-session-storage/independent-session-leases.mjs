@@ -1,6 +1,8 @@
 import { installPhysicalTurnProjection } from "./ready-projection-sql.mjs";
 // Ownership adapter for the #52 segmented Run queue. Public Worker identities,
 // renewable leases and the on-disk epoch are the same ones the serving coordinator uses.
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { SegmentWarmHistory } from "./segment-warm-history.mjs";
 import { SteerHint } from "./steer-hint.mjs";
 import { connectSegmentWorker } from "./segment-wake.mjs";
@@ -39,7 +41,15 @@ export class SegmentWorker {
   constructor({ database, workerId, bootId, capacity, leaseDurationMs, historyCache }) {
     if (!Number.isSafeInteger(capacity) || capacity < 1) throw Error("Invalid Worker capacity");
     this.db = database;
+    const diskRoot =
+      process.env.PI_CLOUD_WORKER_HISTORY_CACHE_ROOT ??
+      join(
+        process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"),
+        "pi-managed-agents",
+        "worker-history",
+      );
     this.warmHistory = new SegmentWarmHistory({
+      diskDirectory: process.env.PI_CLOUD_WORKER_HISTORY_CACHE_DIR || join(diskRoot, workerId),
       ...historyCache,
       advertise: (...args) => this.#control?.advertise(...args),
     });
@@ -305,12 +315,13 @@ export class SegmentWorker {
   }
   async close() {
     this.#closed = true;
-    this.warmHistory.close();
+    const diskClosed = this.warmHistory.close();
     this.#stop.abort();
     clearTimeout(this.#timer);
     await this.#renewing;
     await this.#hintRepair;
     await this.#observer.close();
+    await diskClosed;
     this.#active.clear();
   }
 }
