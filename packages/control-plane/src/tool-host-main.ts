@@ -126,7 +126,8 @@ export async function startToolHost(
       .update(`${executableId}\0${catalog.read().revision}`)
       .digest("hex");
     const versioned = !!(options.versionRoute || process.env.PI_CLOUD_TOOL_HOST_VERSION_URL);
-    const graceMs = options.graceMs ?? Number(process.env.PI_CLOUD_TOOL_HOST_GRACE_MS ?? 300000);
+    const graceMs =
+      options.graceMs ?? Number(process.env.PI_CLOUD_TOOL_HOST_GRACE_MS ?? 7 * 24 * 60 * 60 * 1000);
     const route = () => ({
       endpoint:
         options.versionRoute?.(app.listeningOrigin) ?? process.env.PI_CLOUD_TOOL_HOST_VERSION_URL!,

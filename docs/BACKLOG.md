@@ -2,7 +2,7 @@
 
 ## Minimal Session storage feasibility
 
-- [x] Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) and applies explicit disable at execution admission.
+- [x] Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) for seven days by default and applies explicit disable at execution admission.
 
 - [x] Connect independent root Sessions to the [HTTP MCP execution path](adr/0373-independent-session-mcp.md) and verify directory changes and Worker handoff against a real server.
 

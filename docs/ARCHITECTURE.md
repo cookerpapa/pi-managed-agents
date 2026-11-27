@@ -195,7 +195,7 @@ On the #52 candidate, the model sees an interrupted Bash wait with an unconfirme
 
 On #52, Workers may retain the settled, read-only Entry prefix, including images. The Session queue gives an eligible cached Worker first access to a large continuation, then permits an ordinary claim at the recorded ready time. The new Turn still establishes its own lease and model/environment binding. [Warm continuation](adr/0370-large-history-warm-continuation.md). A Worker can also retain versioned Entry bodies in a local SQLite file. Reconnects advertise RAM and SSD availability with their individual expiries. [Incremental disk cache](adr/0371-worker-local-ssd-history.md).
 
-In the #52 candidate, ordinary Tool-host calls carry a generation selected for the model round. The old host remains an eligible destination during the configured grace period. Explicit disable revokes all generations through the disable decision. See [retained Tool implementations](adr/0374-retained-tool-implementations.md).
+In the #52 candidate, ordinary Tool-host calls carry a generation selected for the model round. The old host remains an eligible destination during the configured grace period, which defaults to seven days from supersession. Explicit disable revokes all generations through the disable decision. See [retained Tool implementations](adr/0374-retained-tool-implementations.md).
 
 On #52, independent root Sessions consume the scoped Kafka catalog and submit HTTP MCP tools to the existing Tool host. [Dispatch and recovery](adr/0373-independent-session-mcp.md).
 

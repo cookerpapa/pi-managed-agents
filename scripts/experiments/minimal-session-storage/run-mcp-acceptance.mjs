@@ -543,10 +543,28 @@ async function run() {
       return { offers: hostOffers, text: result.content[0].text };
     }
     const xlsx = await launchHost("xlsx");
-    assert.deepEqual(await round({ pauseResponse: true }, () => activate(xlsx)), {
-      offers: ["title", "sheet"],
-      text: "pdf:report",
+    // Bracket the actual cutover with the database clock, so this also checks
+    // the default chosen by the incoming executable without sleeping for a week.
+    const firstUpgrade = await round({ pauseResponse: true }, async () => {
+      const old = route.catalog.snapshot;
+      const {
+        rows: [start],
+      } = await pool.query("select clock_timestamp()::text as at");
+      await activate(xlsx);
+      const {
+        rows: [retired],
+      } = await pool.query(
+        `select expires_at - interval '168 hours' between $2::timestamptz and clock_timestamp() as seven_days
+         from tool_host_versions where generation=$1`,
+        [old.generation, start.at],
+      );
+      assert.equal(
+        retired?.seven_days,
+        true,
+        "The default grace window starts at supersession and lasts seven days",
+      );
     });
+    assert.deepEqual(firstUpgrade, { offers: ["title", "sheet"], text: "pdf:report" });
     const delisted = await launchHost("delisted");
     assert.deepEqual(await round({ queue: true }, () => activate(delisted)), {
       offers: ["sheet", null],
