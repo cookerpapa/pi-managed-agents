@@ -28,18 +28,37 @@ The isolated upgrade check used the previous migrator image and two pending Turn
 
 The same captured fixed-Pi trace was used for both queue implementations. Each of 48 fresh Sessions emitted 20 calls, 20 formal results and one final answer, yielding 1,968 completed visible Kafka records. The synthetic Worker used its normal PG claim, input adoption, fenced Kafka producer and ordered projection. A test-only entry supplied the tape with a 50 ms delay per simulated result. Model inference, Guest execution and external Tool routing were outside this comparison. A separate ordinary model Stop check followed every arm. Each trial used four RF3 partitions, a two-CPU PG, 64 Worker slots and four offered Turns/s (164 visible messages/s). Elapsed time includes admission, input pacing and final drain.
 
-| Image in execution order | Completed visible messages/s | Peak sampled raw Kafka lag | Drain after last admission | Terminal-to-PG p99 |
-| --- | ---: | ---: | ---: | ---: |
-| Previous | 115.1 | 261 | 5.32 s | 652 ms |
-| Candidate | 140.7 | 50 | 2.22 s | 60 ms |
-| Candidate, repeat | 140.6 | 41 | 2.23 s | 45 ms |
-| Previous, repeat | 127.5 | 456 | 3.66 s | 998 ms |
+| Image in execution order | Timed duration | Turn creation to grant p95 | Completed visible messages/s | Peak sampled raw Kafka lag | Drain after last admission | Terminal-to-PG p99 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Previous | 17.105 s | 48.8 ms | 115.1 | 261 | 5.32 s | 652 ms |
+| Candidate | 13.991 s | 19.1 ms | 140.7 | 50 | 2.22 s | 60 ms |
+| Candidate, repeat | 13.995 s | 18.1 ms | 140.6 | 41 | 2.23 s | 45 ms |
+| Previous, repeat | 15.441 s | 47.9 ms | 127.5 | 456 | 3.66 s | 998 ms |
+
+The four timed windows totaled 60.532 s. Input pacing and admission acknowledgements occupied 11.765–11.784 s per trial. Each trial had 48 successful claim transactions with one Session apiece. The larger batch timings below come from a separate ready-queue microbenchmark.
 
 All four arms checked the same tape digest, ordered IDs for every call and result, all 48 final answers, all leases sealed and zero final Kafka lag. The reverse pair measured approximately 274,112 WAL bytes/Turn on the candidate and 279,455 on the previous installation over the full pipeline. These short, co-located trials include queueing and projection. Production fleet capacity and isolated per-index write cost require separate measurements.
 
-A separate alternating claim-only comparison ran the previous and new Worker against their respective schemas on the same disposable PG. Five samples per size gave medians of 17.69→15.42 ms for one Session, 19.50→17.91 ms for eight and 28.40→27.15 ms for 32. Ordinary successful claim paths went from 12 to 11 SQL calls including transaction control and post-commit bootstrap. The long-history selector used the ready FIFO and predecessor indexes and returned eight of 4,105 ready Sessions in 0.58 ms of PG execution in this sample. These eligibility and source-cache measurements cover the candidate gate.
+A separate alternating claim-only comparison ran the previous and new Worker against their respective schemas on the same disposable PG. Each size and version ran once for warm-up and five times for measurement (30 measured batches). Five samples per size gave medians of 17.69→15.42 ms for one Session, 19.50→17.91 ms for eight and 28.40→27.15 ms for 32. Ordinary successful claim paths went from 12 to 11 SQL calls including transaction control and post-commit bootstrap. The long-history selector used the ready FIFO and predecessor indexes and returned eight of 4,105 ready Sessions in 0.58 ms of PG execution in this sample. These eligibility and source-cache measurements cover the candidate gate.
 
 Validation included the mixed workload, browser placement and refresh on the real provider, the schema upgrade guard, workspace-wide TypeScript checks, router and disk unit tests, Web/client regressions and the RF3/PG transport suite. The original browser take-back test expected the older Sending label; it passed on rerun with the new Delivered contract, including repair of a lost steer notification and return to the draft.
+
+## Admission acknowledgement and longer candidate run
+
+A separate candidate run extended the same mixed workload to 480 fresh Sessions at four Turn submissions/s. Each client timed its own HTTP call from immediately before `acceptTurn` until the Session API acknowledgement was decoded. This includes authentication, local transport and durable input/Turn admission. It excludes Session creation, client pacing before the call, and waiting for a Worker to run the model. The earlier four runs recorded the aggregate input window only.
+
+| Measurement | Result |
+| --- | ---: |
+| HTTP admission acknowledgement, p50 / p95 / p99 | 37.2 / 96.3 / 139.3 ms |
+| Turn row creation to Worker grant timestamp, p95 | 104.0 ms |
+| First scheduled arrival to last acknowledgement | 119.79 s |
+| First scheduled arrival to all 480 sealed | 131.51 s |
+| Visible output, including drain | 19,680 records at 149.6/s |
+| Peak sampled raw lag / final lag | 6,454 / 0 |
+| Drain after last acknowledgement | 11.72 s |
+| Worker terminal fact timestamp to PG settlement, p99 | 11.13 s |
+
+All 480 admissions and grants completed, with one Session per successful claim in this paced run. Admission and grant metrics use different clocks and start points and should be interpreted separately. Near 30, 60, 90 and 120 seconds the sampled raw lag was 15, 15, 4,701 and 4,799 records respectively. At the end of the offered window the recorded Turn timestamps placed zero Turns waiting for a claim, twelve between grant and terminal, twenty-eight between terminal and settlement and 440 already settled. The longer trial surfaced downstream backlog that the shorter two candidate arms did not expose to the same extent. The four comparison arms and this supplement have a combined measured duration of 192.04 s. This workload measures first inputs on independent idle Sessions. Busy-session steer/follow-up latency and maximum admission capacity require separate measurements.
 
 ## Reproduce
 
@@ -52,6 +71,7 @@ PMA_WARM_LARGE=1 node scripts/run-with-test-postgres.mjs -- node_modules/.bin/vi
 PMA_SEGMENT_BROWSER=1 npm run test:transport
 PI_CLOUD_CHECK_QUEUE_UPGRADE_FROM="$PREVIOUS_TAG" PI_CLOUD_CHECK_TURNS=16 node --import tsx scripts/run-independent-session-serving-check.mjs "$IMAGE_TAG" --load
 PI_CLOUD_CHECK_MIXED_TAPE="$TAPE" PI_CLOUD_CHECK_ARRIVALS_PER_SECOND=4 PI_CLOUD_CHECK_TURNS=48 node --import tsx scripts/run-independent-session-serving-check.mjs "$IMAGE_TAG" --load --mixed
+PI_CLOUD_CHECK_MIXED_TAPE="$TAPE" PI_CLOUD_CHECK_ARRIVALS_PER_SECOND=4 PI_CLOUD_CHECK_TURNS=480 node --import tsx scripts/run-independent-session-serving-check.mjs "$IMAGE_TAG" --load --mixed
 ```
 
 The optional tape file contains frames and requestId from nativeBashTrace with callsPerRun=20 and call IDs call-0 through call-19. Without that file the fixture captures a trace locally. The real browser test uses the configured CLIProxyAPI URL and a read-only credential mount as described in the [serving gate](independent-session-serving-20261127.md).

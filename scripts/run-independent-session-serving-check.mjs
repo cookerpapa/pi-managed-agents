@@ -16,6 +16,7 @@ import { createPrivateTenant } from "../packages/control-plane/src/tenant-admini
 import { PiCloudApi } from "../packages/web-ui/src/api.ts";
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { testPostgres } from "./lib/test-postgres.mjs";
+import { distribution } from "./lib/runtime-load-scheduler.mjs";
 import { createUnsettledTurnIndex } from "./experiments/minimal-session-storage/independent-session-leases.mjs";
 import { defaultSessionClaimBatch } from "./experiments/minimal-session-storage/segment-wake.mjs";
 import { servingLoadFixture } from "./serving/independent-session/load-fixture.mjs";
@@ -506,7 +507,8 @@ try {
     const begin = performance.now(),
       ids = [];
     const lagSamples = [],
-      launchDelays = [];
+      launchDelays = [],
+      admissionAckSamples = [];
     let sampling = false,
       peakSampledRawLag = 0,
       sampleError;
@@ -556,16 +558,18 @@ try {
             if (remaining > 0) await delay(remaining);
             launchDelays.push(Math.max(0, performance.now() - due));
           }
-          const a = await api.acceptTurn(
-            sessions[i].sessionId,
-            mixed ? "Run the fixed test tool." : fake.prompt("turn_" + i),
-            "turn:" + randomUUID(),
-          );
+          const prompt = mixed ? "Run the fixed test tool." : fake.prompt("turn_" + i);
+          const key = "turn:" + randomUUID();
+          const sentAt = performance.now();
+          const a = await api.acceptTurn(sessions[i].sessionId, prompt, key);
+          admissionAckSamples.push(performance.now() - sentAt);
           ids.push(a.turnId);
         }
       }),
     );
     const admittedMs = performance.now() - begin;
+    const admissionAckMs = distribution(admissionAckSamples);
+    assert.equal(admissionAckMs.count, count);
     await until(
       "all load Turns sealed",
       async () =>
@@ -724,6 +728,7 @@ try {
         parallel,
         partitions,
         admittedMs,
+        admissionAckMs,
         elapsedMs,
         visible: visible.n,
         visiblePerSecond: (visible.n * 1000) / elapsedMs,
