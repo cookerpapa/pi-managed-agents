@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0375](0375-independent-session-serving-entry.md) stages the independent Session serving roles and a real-provider conversation.
+
 [ADR-0374](0374-retained-tool-implementations.md) separates ordinary release replacement from explicit Tool disable on the candidate.
 
 [ADR-0373](0373-independent-session-mcp.md) connects the independent Session candidate to the existing HTTP MCP host and catalog.

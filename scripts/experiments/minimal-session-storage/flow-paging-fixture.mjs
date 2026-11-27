@@ -1,7 +1,7 @@
+import { installSessionTables } from "./segment-schema.mjs";
 // The public application reads control metadata and candidate history in the same snapshot.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { preview } from "vite";
 import pg from "pg";
 import { createDatabase, runMigrations } from "@pi-cloud/database";
@@ -23,11 +23,8 @@ import { installBashIntentLog, setBashLogReader } from "./bash-intent-log.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 
 export async function installPagingProjection(db) {
-  await db.query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
-  await db.query(`alter table runs add output_first_topic text,add output_first_partition int,add output_first_offset bigint,add output_display_seq bigint default 0,add output_display_native_seq bigint default 0,
-   add turn_id uuid generated always as(id) stored,add input_text text generated always as(initial_input) stored,add input_uploads jsonb default '[]',
-   add pruned_at timestamptz,add operation_kind text default 'chat',add stop_reason text,add scheduled_origin jsonb,add output_seal_id uuid,add output_sealed_at timestamptz;
-   create function fixture_run(f uuid,n integer) returns uuid language sql immutable as $$
+  await installSessionTables(db);
+  await db.query(`   create function fixture_run(f uuid,n integer) returns uuid language sql immutable as $$
       select overlay(overlay(md5(f::text||n) placing '4' from 13 for 1) placing '8' from 17 for 1)::uuid
    $$;
 `);

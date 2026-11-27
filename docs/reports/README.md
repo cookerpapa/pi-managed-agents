@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Independent Session serving and cutover audit](independent-session-serving-20261127.md) covers real browser/provider continuation, a directed batch claim, the synthetic baseline and the remaining product paths.
+
 - [Worker-confirmed steer hints](worker-steer-hints-20261126.md) covers empty tool boundaries, UI acknowledgements, missed notices and lease takeover.
 
 - [PG input adoption at native boundaries](pg-input-boundaries-20261126.md) covers editing, crash cuts and indexed queue checks in #52.

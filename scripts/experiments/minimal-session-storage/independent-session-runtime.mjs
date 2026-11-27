@@ -3,7 +3,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import { MemoryStorage } from "@earendil-works/pi-durable";
 import Fastify from "fastify";
 import { durableControlIntent } from "@pi-cloud/protocol";
 import { installNamedSubagentEndpoint } from "../../../packages/control-plane/src/named-subagent-endpoint.ts";
@@ -11,8 +10,6 @@ import { NamedSubagentClient } from "../../../packages/control-plane/src/named-s
 import { SubagentAdmissionRefused } from "../../../packages/control-plane/src/named-subagent-store.ts";
 import {
   AcceptedFamilyCheckpoint,
-  hydrateSealedFamily,
-  readSealedFamily,
   readSealedDelegationIntent,
   resumeFamilyCheckpoint,
   saveSealedFamily,
@@ -41,14 +38,8 @@ import { serveSegmentScheduler } from "./segment-wake.mjs";
 import { SegmentLeaseProjection, SegmentWorker } from "./independent-session-leases.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { settledFamilyBase } from "./settled-family-base.mjs";
-import { loadPriorRoot } from "./retained-family-read.mjs";
 
-const historyScope = (s, flow) => ({
-  ...s,
-  piSessionId: flow,
-  sessionId: flow,
-  leaseSessionId: s.sessionId,
-});
+import { historyScope } from "./open-segment-native.mjs";
 const matches = (s, r) =>
   r.writer === s.writerId &&
   r.epoch === s.fencingToken &&
@@ -325,6 +316,7 @@ export class IndependentSessionRuntime {
     this.hostTools?.reset();
     this.subagents?.reset();
     this.#owners.clear();
+    this.browser?.reset();
     this.projection.nativeStore.projection.reset();
   }
   async #admitted(s) {
@@ -382,6 +374,7 @@ export class IndependentSessionRuntime {
     }
     const local = historyScope(s, owner.flow_id);
     if (boundary) {
+      let terminalEvent;
       const changed = await this.leases.projectBoundary(record, async (tx, r) => {
         if (fact.kind === "execution_seal") {
           let state = owner.witness?.snapshot();
@@ -410,6 +403,8 @@ export class IndependentSessionRuntime {
           );
           await this.projection.nativeStore.settle(tx, { ...fact, scope: local }, record);
         }
+        if (this.browser && fact.kind === "work_finished")
+          terminalEvent = await this.browser.terminal(tx, fact, r.flow_id);
         if (!current()) throw Error("Session partition revoked");
         await this.#advance(tx, record);
       });
@@ -417,6 +412,7 @@ export class IndependentSessionRuntime {
         await this.#skip(record);
         return false;
       }
+      if (terminalEvent) this.browser.accept(s.tenantId, terminalEvent);
       await this.hostTools?.consume(record, current);
       this.#owners.delete(s.tenantId + "/" + s.sessionId);
       this.projection.nativeStore.projection.releaseSettled(local);
@@ -451,6 +447,10 @@ export class IndependentSessionRuntime {
     );
     if (result.admitted || covered) owner.witness.observe(mapped);
     if (!result.admitted) return false;
+    if (this.browser) {
+      for (const event of result.events) this.browser.accept(s.tenantId, event);
+      for (const cover of result.covers) this.browser.cover(s.tenantId, s.sessionId, cover.through);
+    }
     let permit;
     const admit = () => (permit ??= grant());
     await this.projection.dispatch({ ...record, fact: mapped }, current, admit);
@@ -510,115 +510,4 @@ export class IndependentSessionRuntime {
   }
 }
 
-// Imported messages remain physically in their ancestor. Only the destination's
-// native roots/documents and its subsequent writes enter its own Kafka stream.
-export async function openSegmentNative(
-  store,
-  job,
-  topic,
-  publish,
-  { bashIntentLog = false } = {},
-) {
-  const s = historyScope(job.scope, job.flow_id);
-  const capture =
-    job.recovering || job.started_at != null ? undefined : job.warmHistory?.capture(job);
-  const load = {
-    path: job.recovering ? "recovery" : "cold",
-    diskEntryBytes: 0,
-    pgEntryBytes: job.recovering ? null : 0,
-  };
-  class Published extends MemoryStorage {
-    async commit(writes) {
-      job.authority.assertActive();
-      const batch = this.prepareCommit(writes);
-      await publish({ seq: batch.seq, nextId: this.nextId, writes: batch.writes });
-      const applied = batch.apply();
-      capture?.append(batch);
-      return applied;
-    }
-  }
-  const mem = new Published();
-  if (job.recovering || Number(job.mailbox_position) > 1) {
-    let entries = [];
-    const importEntries = (rows) => {
-      entries = rows.map((r) => ({ type: "entry", value: r.entry }));
-    };
-    const restored = {
-      prepareCommit(writes, seq) {
-        const first = entries.length ? [...entries.splice(0), ...writes] : writes;
-        return mem.prepareCommit(first, seq);
-      },
-      mintId: () => mem.mintId(),
-      get nextId() {
-        return mem.nextId;
-      },
-      set nextId(value) {
-        mem.nextId = value;
-      },
-    };
-    if (job.recovering) {
-      importEntries(await store.contextPrefix(s.tenantId, job.logical_id, true));
-      const family = await readSealedFamily(store.db, s, topic, { bashIntentLog });
-      await hydrateSealedFamily(family, restored);
-      return { storage: mem, resumed: true, family, load };
-    }
-    await loadPriorRoot(store.pool, s, restored, {
-      cache: capture,
-      beforeRestore: async (prefix, head) => {
-        let received = 0;
-        const inherited =
-          prefix.hit?.inherited ??
-          (await store.contextPrefix(
-            s.tenantId,
-            job.logical_id,
-            true,
-            (bytes) => {
-              received = bytes;
-            },
-            head.floor,
-          ));
-        importEntries(inherited);
-        capture?.seed(inherited, prefix.records, head.floor, prefix.hit ? head.version : null);
-        load.diskEntryBytes = prefix.hit?.diskReadBytes ?? 0;
-        load.path =
-          prefix.hit?.diskReadBytes !== undefined
-            ? "disk"
-            : prefix.status === "hit"
-              ? "warm"
-              : "cold";
-        load.pgEntryBytes = prefix.readBytes + received;
-      },
-    });
-  } else {
-    const imported = [];
-    await store.hydrate(
-      s.tenantId,
-      job.logical_id,
-      {
-        prepareCommit(writes) {
-          return { apply: () => imported.push(...writes) };
-        },
-      },
-      (records, received) => {
-        capture?.seed(records);
-        load.pgEntryBytes = received;
-      },
-    );
-    if (imported.length) {
-      const batch = mem.prepareCommit(imported, 1);
-      job.authority.assertActive();
-      const nextId =
-        Math.max(
-          ...imported.filter((w) => w.type !== "entry").map((w) => (w.record ?? w.value).id),
-        ) + 1;
-      await publish({ seq: 1, nextId, writes: batch.writes.filter((w) => w.type !== "entry") });
-      batch.apply();
-    }
-  }
-  return {
-    storage: mem,
-    resumed: false,
-    load,
-    rememberCompletion: (fact) => capture?.finish(fact),
-  };
-}
+export { openSegmentNative } from "./open-segment-native.mjs";

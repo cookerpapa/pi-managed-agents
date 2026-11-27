@@ -2,7 +2,7 @@ import { worldBaseWrite, worldToken } from "./conversation-world.mjs";
 import { agentBaseWrite } from "./agent-configuration.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { claimBatchSql, hintedClaimSql } from "./fixture.mjs";
+import { claimBatchSql, hintedClaimSql } from "./legacy-claim-sql.mjs";
 
 // The same statement that claims a successor reads its already settled predecessor
 // and the authoritative current Inbox. A warm hint can promote at most one Run.

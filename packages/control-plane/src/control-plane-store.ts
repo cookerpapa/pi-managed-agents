@@ -83,6 +83,7 @@ export type OlderHistoryReader = (
 ) => Promise<ConversationDetailResource | undefined>;
 
 export type ControlPlaneStoreOptions = {
+  registerSessionHistory?: (tx: Transaction<Database>, tenant: string, id: string) => Promise<void>;
   olderHistoryReader?: OlderHistoryReader;
   database: Kysely<Database>;
   conversationReadDatabase?: Kysely<Database>;
@@ -274,6 +275,7 @@ export class ControlPlaneStore {
   readonly #olderHistoryReader: OlderHistoryReader | undefined;
   readonly #delegatedRunHistory: boolean;
   readonly #rootMessageHistory: boolean;
+  readonly #registerSessionHistory: ControlPlaneStoreOptions["registerSessionHistory"];
   readonly #independentSessions: boolean;
   readonly #database: Kysely<Database>;
   readonly #tenantId: string;
@@ -283,6 +285,7 @@ export class ControlPlaneStore {
   readonly #metrics: PiCloudMetrics | undefined;
 
   constructor(options: ControlPlaneStoreOptions) {
+    this.#registerSessionHistory = options.registerSessionHistory;
     this.#olderHistoryReader = options.olderHistoryReader;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
     this.#conversations = new ConversationReader(
@@ -645,6 +648,7 @@ export class ControlPlaneStore {
           id: session.id,
         })
         .executeTakeFirstOrThrow();
+      await this.#registerSessionHistory?.(transaction, this.#tenantId, session.id);
       return {
         sessionId: session.id,
         title: session.title,

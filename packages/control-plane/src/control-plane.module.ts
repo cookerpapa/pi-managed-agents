@@ -19,6 +19,7 @@ import { SkillMarketController } from "./skill-market-controller.ts";
 import { SessionScheduleService } from "./session-schedule-service.ts";
 import { ConversationCompactService } from "./conversation-compact-service.ts";
 import { Module, type DynamicModule } from "@nestjs/common";
+import { SessionInputController } from "./session-input.controller.ts";
 import { ControlPlaneController } from "./control-plane.controller.ts";
 import { WorkspaceUploadService, type WorkspaceUploader } from "./workspace-upload-service.ts";
 import { SessionAttachmentReader } from "./session-attachment-reader.ts";
@@ -65,6 +66,7 @@ export type ControlPlaneModuleOptions = Omit<
   ControlPlaneStoreOptions,
   "tenantId" | "defaultModelProfileId"
 > & {
+  mountSessionInputs?: (app: import("fastify").FastifyInstance) => void;
   messageHistoryMutations?: MessageHistoryMutations;
   delegatedRunHistory?: boolean;
   mcp?: McpConnectionService;
@@ -120,6 +122,9 @@ export class ControlPlaneModule {
       ...(options.idGenerator === undefined ? {} : { idGenerator: options.idGenerator }),
     });
     const controlPlaneStores = new ControlPlaneStoreFactory({
+      ...(options.registerSessionHistory
+        ? { registerSessionHistory: options.registerSessionHistory }
+        : {}),
       ...(options.messageHistoryMutations?.placedInputNavigation
         ? { placedInputHistory: true }
         : {}),
@@ -151,6 +156,7 @@ export class ControlPlaneModule {
     return {
       module: ControlPlaneModule,
       controllers: [
+        ...(options.mountSessionInputs ? [] : [SessionInputController]),
         ...(options.delegatedRunHistory ? [DelegatedHistoryController] : []),
         McpConnectionController,
         ResourceBackendController,

@@ -10,6 +10,8 @@ This document describes the current runtime, not its release chronology.
 record evidence at named revisions, and [BACKLOG](BACKLOG.md) lists unresolved
 limits. Historical migrations and reports are not alternate production modes.
 
+The segmented Session candidate has [separate serving processes](adr/0375-independent-session-serving-entry.md) in a dedicated installation. Its [integration audit](reports/independent-session-serving-20261127.md) tracks the ports still required for a production cutover.
+
 [ADR-0313](adr/0313-alternate-runtime-production-integration.md) implements
 explicit stock BoxLite and Android integration beyond the earlier ADR-0312
 operator experiments. The BoxLite native SDK lives in its own trusted node,

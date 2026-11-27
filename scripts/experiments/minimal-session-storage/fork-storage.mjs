@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { Kysely, PostgresDialect, sql } from "kysely";
+import { sql } from "kysely";
 import { prepareNamedSubagentArguments, subagentName } from "@pi-cloud/protocol";
 import { TOOL_REPLY_TOPIC_PATTERN } from "@pi-cloud/event-log";
 import { initializeRoots } from "./session-defaults.mjs";
 import { childWorkspaceGrant } from "@pi-cloud/subagent-control/delegated-workspace-grant";
-import { restoreForkPrefix } from "./session-prefix.mjs";
+import { SegmentHistoryReader } from "./segment-history-reader.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 
 export async function installForkStudy(pool, token) {
@@ -54,30 +54,7 @@ export async function setForkLayout(pool, enabled, cover = true) {
     await c.query(
       "truncate flow_input_assets,conversation_worlds,messages,inboxes,runs,fork_requests,sessions,flow_segments,fork_gc,flows",
     );
-    await c.query(
-      "alter table messages drop constraint if exists messages_run_id_fkey, drop constraint if exists retained_message_stream",
-    );
-    await c.query("alter table runs drop constraint if exists admitting_session");
-    await c.query("drop index if exists fork_message_coordinates");
-    await c.query(
-      enabled
-        ? `alter table messages add constraint retained_message_stream foreign key(tenant_id,pi_session_id) references flows(tenant_id,flow_id);
-      alter table runs add constraint admitting_session foreign key(tenant_id,session_id) references flows(tenant_id,flow_id)`
-        : "alter table messages add constraint messages_run_id_fkey foreign key(run_id) references runs(id)",
-    );
-    await c.query("drop trigger if exists new_flow_run on runs");
-    if (enabled)
-      await c.query(
-        "create trigger new_flow_run before insert on runs for each row execute function guard_new_flow_run()",
-      );
-    if (enabled && cover)
-      await c.query(
-        "create index fork_message_coordinates on messages(tenant_id,pi_session_id,conversation_id,entry_id) include(commit_seq,ordinal,role,run_id)",
-      );
-    const body = projectionTemplates.finishAndRelease;
-    await c.query(
-      `create or replace function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${body} $fn$`,
-    );
+    await installForkLayout(c, enabled, cover);
     await c.query("commit");
   } catch (e) {
     await c.query("rollback");
@@ -87,47 +64,64 @@ export async function setForkLayout(pool, enabled, cover = true) {
   }
 }
 
+export async function installForkLayout(c, enabled = true, cover = false) {
+  await c.query(
+    "alter table messages drop constraint if exists messages_run_id_fkey, drop constraint if exists retained_message_stream",
+  );
+  await c.query("alter table runs drop constraint if exists admitting_session");
+  await c.query("drop index if exists fork_message_coordinates");
+  await c.query(
+    enabled
+      ? `alter table messages add constraint retained_message_stream foreign key(tenant_id,pi_session_id) references flows(tenant_id,flow_id);
+      alter table runs add constraint admitting_session foreign key(tenant_id,session_id) references flows(tenant_id,flow_id)`
+      : "alter table messages add constraint messages_run_id_fkey foreign key(run_id) references runs(id)",
+  );
+  await c.query("drop trigger if exists new_flow_run on runs");
+  if (enabled)
+    await c.query(
+      "create trigger new_flow_run before insert on runs for each row execute function guard_new_flow_run()",
+    );
+  if (enabled && cover)
+    await c.query(
+      "create index fork_message_coordinates on messages(tenant_id,pi_session_id,conversation_id,entry_id) include(commit_seq,ordinal,role,run_id)",
+    );
+  const body = projectionTemplates.finishAndRelease;
+  await c.query(
+    `create or replace function prefix_finish(uuid,uuid,uuid,uuid,text) returns setof uuid language sql volatile as $fn$ ${body} $fn$`,
+  );
+}
+
 export class ChildNameConflict extends Error {
   constructor(id) {
     super("Existing child has different creation arguments");
     this.childId = id;
   }
 }
-export class ForkStorage {
-  constructor(pool) {
-    this.db = new Kysely({ dialect: new PostgresDialect({ pool }) });
-    this.pool = pool;
-  }
+export class ForkStorage extends SegmentHistoryReader {
   async register(tenant, ids, templateFlow = null, settings) {
-    await this.db.transaction().execute(async (tx) => {
-      await this.lock(tx, tenant);
-      await sql`insert into flows select ${tenant}::uuid,x from unnest(${ids}::uuid[]) x`.execute(
-        tx,
-      );
-      await sql`insert into sessions(tenant_id,id,flow_id,family_id,agent_name)
+    return this.db
+      .transaction()
+      .execute((tx) => this.registerIn(tx, tenant, ids, templateFlow, settings));
+  }
+  async registerIn(tx, tenant, ids, templateFlow = null, settings) {
+    await this.lock(tx, tenant);
+    await sql`insert into flows select ${tenant}::uuid,x from unnest(${ids}::uuid[]) x`.execute(tx);
+    await sql`insert into sessions(tenant_id,id,flow_id,family_id,agent_name)
         select ${tenant}::uuid,x,x,x,'root' from unnest(${ids}::uuid[]) x`.execute(tx);
-      if (this.inputs) await initializeRoots(tx, tenant, ids, settings);
-      if (templateFlow) {
-        await sql`update flows f set native_id_floor=b.native_id_floor,agent_base_stream=b.agent_base_stream,
+    if (this.inputs) await initializeRoots(tx, tenant, ids, settings);
+    if (templateFlow) {
+      await sql`update flows f set native_id_floor=b.native_id_floor,agent_base_stream=b.agent_base_stream,
           agent_base_seq=b.agent_base_seq,agent_base_ordinal=b.agent_base_ordinal from flows b where f.tenant_id=${tenant}::uuid and
           f.flow_id=any(${ids}::uuid[]) and b.tenant_id=f.tenant_id and b.flow_id=${templateFlow}::uuid`.execute(
-          tx,
-        );
-        await sql`insert into flow_segments
+        tx,
+      );
+      await sql`insert into flow_segments
           select g.tenant_id,x,g.segment_no,g.source_flow,g.conversation_id,g.first_entry,g.last_entry,g.through_seq,g.through_position,g.tail_coverage
           from flow_segments g cross join unnest(${ids}::uuid[]) x
           where g.tenant_id=${tenant}::uuid and g.destination_flow=${templateFlow}::uuid`.execute(
-          tx,
-        );
-      }
-    });
-  }
-  async session(tx, t, id) {
-    return (
-      await sql`select * from sessions where tenant_id=${t}::uuid and id=${id}::uuid for share`.execute(
         tx,
-      )
-    ).rows[0];
+      );
+    }
   }
   async freeze(tx, t, s, dest, point, requestCut = false) {
     const kind = requestCut ? "request" : "entry";
@@ -479,44 +473,6 @@ export class ForkStorage {
     return r.content === null ? null : JSON.parse(r.content);
   }
   // Keyset pagination traverses only the segments needed for this page.
-  async readPage(tx, t, s, limit, cursor, floor = 1) {
-    assert(Number.isSafeInteger(limit) && limit > 0, "Invalid page size");
-    if (cursor) assert(cursor.flow === s.flow_id, "History cursor is obsolete");
-    const local = 2147483647;
-    const rows = [];
-    let segment = cursor?.segment ?? local;
-    while (segment > 0 && rows.length < limit) {
-      const range =
-        segment === local
-          ? {
-              source_flow: s.flow_id,
-              conversation_id: 1,
-              first_entry: 1,
-              last_entry: Number.MAX_SAFE_INTEGER,
-              through_seq: Number.MAX_SAFE_INTEGER,
-              segment_no: local,
-            }
-          : (
-              await sql`select * from flow_segments where tenant_id=${t}::uuid and destination_flow=${s.flow_id}::uuid
-             and segment_no<=${segment} order by segment_no desc limit 1`.execute(tx)
-            ).rows[0];
-      if (!range) break;
-      const before = cursor?.segment === range.segment_no ? cursor.entry : null;
-      const page = await sql`select entry_id,commit_seq,ordinal,run_id,content from message_entries
-        where tenant_id=${t}::uuid and pi_session_id=${range.source_flow}::uuid and conversation_id=${range.conversation_id}
-        and entry_id between ${Math.max(floor, Number(range.first_entry))} and ${range.last_entry}
-        and commit_seq<=${range.through_seq} ${before == null ? sql`` : sql`and entry_id<${before}`}
-        order by entry_id desc limit ${limit - rows.length}`.execute(tx);
-      for (const r of page.rows)
-        rows.push({
-          ...r,
-          cursor: { flow: s.flow_id, segment: range.segment_no, entry: r.entry_id },
-        });
-      if (segment === local) segment = local - 1;
-      else segment = range.segment_no - 1;
-    }
-    return rows;
-  }
   async pageWithCursor(t, id, limit = 30, cursor = null) {
     return this.db
       .transaction()
@@ -530,75 +486,6 @@ export class ForkStorage {
   async page(t, id, limit = 30) {
     const rows = await this.pageWithCursor(t, id, limit);
     return rows.map(({ cursor, ...row }) => row);
-  }
-  async coldRecords(tx, t, s, inheritedOnly = false, onReadBytes, minimum = 1) {
-    let receivedBytes = 0;
-    const records = [];
-    let cursor = inheritedOnly ? { flow: s.flow_id, segment: 2147483646 } : null,
-      floor = minimum,
-      head = minimum > 1;
-    for (;;) {
-      const rows = await this.readPage(tx, t, s, 64, cursor, floor);
-      for (const row of rows) {
-        const bytes = Buffer.byteLength(row.content);
-        receivedBytes += bytes;
-        const entry = JSON.parse(row.content);
-        if (entry.id < floor) continue;
-        if (!head && entry.head !== undefined) {
-          floor = entry.head;
-          head = true;
-        }
-        const { byTaskId, ...value } = entry;
-        records.push({
-          entry: { ...value, conversationId: 1 },
-          seq: Number(row.commit_seq),
-          bytes,
-        });
-      }
-      if (rows.length < 64 || Number(rows.at(-1).entry_id) <= floor) break;
-      cursor = rows.at(-1).cursor;
-    }
-    onReadBytes?.(receivedBytes);
-    return records.reverse();
-  }
-  async contextPrefix(t, id, inheritedOnly = false, onReadBytes, minimum = 1) {
-    return this.db
-      .transaction()
-      .setIsolationLevel("repeatable read")
-      .execute(async (tx) => {
-        const s = await this.session(tx, t, id);
-        assert(s, "Unknown Fork session");
-        return this.coldRecords(tx, t, s, inheritedOnly, onReadBytes, minimum);
-      });
-  }
-  async hydrate(t, id, store, onPrefix) {
-    return this.db
-      .transaction()
-      .setIsolationLevel("repeatable read")
-      .execute(async (tx) => {
-        const s = await this.session(tx, t, id);
-        assert(s, "Unknown Fork session");
-        let received = 0;
-        const records = await this.coldRecords(tx, t, s, false, (bytes) => {
-          received = bytes;
-        });
-        onPrefix?.(records, received);
-        if (!records.length) return 0;
-        const {
-          rows: [base],
-        } = await sql`select f.native_id_floor,a.content,w.state from flows f
-        left join lateral fork_agent_at(f.tenant_id,f.flow_id,1,9223372036854775807) a on true
-        left join conversation_worlds w on w.tenant_id=f.tenant_id and w.pi_session_id=f.flow_id and w.conversation_id=1
-        where f.tenant_id=${t}::uuid and f.flow_id=${s.flow_id}::uuid`.execute(tx);
-        restoreForkPrefix(
-          store,
-          records,
-          base.content == null ? null : JSON.parse(base.content),
-          base.state,
-          Number(base.native_id_floor),
-        );
-        return records.length;
-      });
   }
   async retire(t, id, point) {
     const fresh = point ? randomUUID() : null;

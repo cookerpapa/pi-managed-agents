@@ -3,7 +3,7 @@
 	auto_https off
 }
 
-:8080, :8081 {
+{$PI_CLOUD_WEB_LISTEN::8080}, {$PI_CLOUD_ADMIN_LISTEN::8081} {
 	encode zstd gzip
 
 	@preview expression "{http.request.host}.matches('^p-[0-9a-f]{24}[.].+$')"
@@ -63,7 +63,7 @@
 	}
 }
 
-:8318 {
+{$PI_CLOUD_PROVIDER_LISTEN::8318} {
 	encode zstd gzip
 	reverse_proxy cli-proxy-api:8317
 }

@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The [isolated segmented serving gate](reports/independent-session-serving-20261127.md) takes an authenticated browser conversation through the real provider and a replacement Worker. The next vertical slice attaches the Guest tool path and measures its effect on projection.
+
 Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) and applies explicit disable at execution admission.
 
 Connect independent root Sessions to the [HTTP MCP execution path](adr/0373-independent-session-mcp.md) and verify directory changes and Worker handoff against a real server.

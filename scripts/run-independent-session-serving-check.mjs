@@ -1,0 +1,618 @@
+// Isolated database and RF3 brokers; the only external dependency is the
+// explicitly configured provider. No credentials, prompts or responses are reported.
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { randomUUID, randomBytes, scryptSync } from "node:crypto";
+import { mkdtemp, chmod, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { setTimeout as delay } from "node:timers/promises";
+import { createServer } from "node:net";
+import pg from "pg";
+import kafkaNative from "@confluentinc/kafka-javascript";
+import { createDatabase } from "@pi-cloud/database";
+import { createPrivateTenant } from "../packages/control-plane/src/tenant-administration.ts";
+import { PiCloudApi } from "../packages/web-ui/src/api.ts";
+import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
+import { testPostgres } from "./lib/test-postgres.mjs";
+import { defaultSessionClaimBatch } from "./experiments/minimal-session-storage/segment-wake.mjs";
+import { servingLoadFixture } from "./serving/independent-session/load-fixture.mjs";
+import { withChromePage } from "./lib/chrome-cdp.mjs";
+import { testKafka } from "./lib/test-kafka.mjs";
+const tag = process.argv[2],
+  load = process.argv[3] === "--load",
+  capacity = load ? 64 : 4;
+let provider = process.env.PI_CLOUD_PROVIDER_GATEWAY_URL,
+  keyFile = process.env.PI_CLOUD_PROVIDER_GATEWAY_API_KEY_FILE;
+if (!tag || (!load && (!provider || !keyFile)))
+  throw Error("Specify the image tag and upstream URL/key file");
+const clean = [],
+  names = [],
+  suffix = randomUUID().slice(0, 8),
+  topic = "pma.segment." + suffix,
+  partitions = 4;
+async function port() {
+  const s = createServer();
+  await new Promise((r) => s.listen(0, "127.0.0.1", r));
+  const p = s.address().port;
+  await new Promise((r) => s.close(r));
+  return p;
+}
+async function until(label, fn, ms = 120000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const v = await fn();
+    if (v) return v;
+    await delay(200);
+  }
+  throw Error("Timed out: " + label);
+}
+const docker = (args, options = {}) =>
+  execFileSync("docker", args, { encoding: "utf8", ...options });
+try {
+  const pgFix = await testPostgres({});
+  clean.push(() => pgFix.close());
+  const kafka = await testKafka({});
+  clean.push(() => kafka.close());
+  const tmp = await mkdtemp(join(tmpdir(), "pma-serving-"));
+  clean.push(() => rm(tmp, { recursive: true, force: true }));
+  await chmod(tmp, 0o711);
+  const config = {
+    DATABASE_URL_FILE: "/run/pma/database",
+    PI_CLOUD_SEGMENT_TOPIC: topic,
+    PI_CLOUD_SEGMENT_PARTITIONS: String(partitions),
+    PI_CLOUD_KAFKA_BROKERS: kafka.brokers.join(","),
+  };
+  async function file(name, contents) {
+    const f = join(tmp, name);
+    await writeFile(f, contents, { mode: 0o400 });
+    return f;
+  }
+  const dbFile = await file("database", pgFix.url),
+    management = await file("management", randomBytes(40).toString("base64url")),
+    enroll = await file("enroll", randomBytes(40).toString("base64url"));
+  let fake;
+  if (load) {
+    const key = randomBytes(32).toString("hex");
+    fake = await servingLoadFixture(key);
+    clean.push(() => fake.close());
+    provider = fake.url;
+    keyFile = await file("load-key", key);
+  }
+  const mount = (host, name) => [
+    "--mount",
+    "type=bind,src=" + host + ",dst=/run/pma/" + name + ",readonly",
+  ];
+  const mgEnv = { PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN_FILE: "/run/pma/management" },
+    enEnv = { PI_CLOUD_SUPERVISOR_ENROLLMENT_TOKEN_FILE: "/run/pma/enroll" };
+  function role(name, roleName, env, files) {
+    const label = "pma-" + name + "-" + suffix;
+    docker([
+      "run",
+      "-d",
+      "--network",
+      "host",
+      "--add-host",
+      "pma-segment-" + suffix + "-0:127.0.0.1",
+      "--add-host",
+      "pma-segment-" + suffix + "-1:127.0.0.1",
+      "--name",
+      label,
+      "--user",
+      process.getuid() + ":" + process.getgid(),
+      ...Object.entries({ ...config, ...env }).flatMap(([k, v]) => ["-e", k + "=" + v]),
+      ...mount(dbFile, "database"),
+      ...files,
+      "pi-managed-agents/segment-" + roleName + ":" + tag,
+    ]);
+    names.push(label);
+    clean.push(() => docker(["rm", "-f", label]));
+    return label;
+  }
+  const migration = role("migration", "migrate", {}, []);
+  const exit = docker(["wait", migration]).trim();
+  assert.equal(exit, "0", "migration failed");
+  const db = createDatabase({ connectionString: pgFix.url });
+  clean.push(() => db.destroy());
+  const pool = new pg.Pool({ connectionString: pgFix.url });
+  clean.push(() => pool.end());
+  const pass = randomBytes(26).toString("base64url"),
+    salt = randomBytes(16).toString("base64url"),
+    username = "canary-" + suffix;
+  const identity = await createPrivateTenant(db, {
+    slug: "serving-" + suffix,
+    ownerDisplayName: "Staging",
+    webAccount: {
+      username,
+      role: "owner",
+      passwordSalt: salt,
+      passwordHash: scryptSync(pass, salt, 32, { N: 16384, r: 8, p: 1 }).toString("base64url"),
+      scryptN: 16384,
+      scryptR: 8,
+      scryptP: 1,
+    },
+    initialModel: {
+      provider: "openai-codex",
+      modelId: process.env.PI_CLOUD_CHECK_MODEL ?? "gpt-6.1-sol",
+    },
+  });
+  const admin = new kafkaNative.KafkaJS.Kafka({
+    kafkaJS: { brokers: kafka.brokers, logLevel: kafkaNative.KafkaJS.logLevel.NOTHING },
+  }).admin();
+  await admin.connect();
+  clean.push(() => admin.disconnect());
+  await admin.createTopics({
+    topics: [
+      {
+        topic,
+        numPartitions: partitions,
+        replicationFactor: 3,
+        configEntries: [
+          { name: "min.insync.replicas", value: "2" },
+          { name: "retention.ms", value: "604800000" },
+        ],
+      },
+    ],
+  });
+  const [projectorPort, apiPort, wakePort, managementA, managementB, modelA, modelB] =
+    await Promise.all(Array.from({ length: 7 }, () => port()));
+  const url = (p) => "http://127.0.0.1:" + p;
+  const runtimeUrl = url(projectorPort),
+    apiUrl = url(apiPort),
+    hostPorts = [managementA, managementB];
+  const health = (p) =>
+    fetch(url(p) + "/health/ready", { signal: AbortSignal.timeout(1000) }).then(
+      (r) => r.ok,
+      () => false,
+    );
+  const started = Date.now();
+  role(
+    "projector",
+    "projector",
+    {
+      ...mgEnv,
+      ...enEnv,
+      PORT: projectorPort,
+      PI_CLOUD_SEGMENT_WAKE_PORT: wakePort,
+      PI_CLOUD_SEGMENT_MANAGEMENT_TEMPLATES: JSON.stringify(
+        hostPorts.map((p) => "http://{supervisorId}:" + p),
+      ),
+      PI_CLOUD_SEGMENT_CAPACITY: capacity,
+    },
+    [...mount(management, "management"), ...mount(enroll, "enroll")],
+  );
+  await until("Projector ready", () => health(projectorPort), 45000);
+  role(
+    "api",
+    "api",
+    { ...mgEnv, PORT: apiPort, PI_CLOUD_SESSION_RUNTIME_URL: runtimeUrl },
+    mount(management, "management"),
+  );
+  await until("API ready", () => health(apiPort), 45000);
+  const api = new PiCloudApi((p, o) => fetch(new URL(p, apiUrl), o), identity.credential.token);
+  const project = await api.createProject("Serving check");
+  let session, title;
+  for (let i = 0; i < 16; i++) {
+    title = "Serving " + i;
+    session = (await api.createSession(project.projectId, project.workspaceId, title, "elastic"))
+      .sessionId;
+    if (kafkaProducerLane(session, partitions) !== 0) break;
+  }
+  assert.notEqual(kafkaProducerLane(session, partitions), 0);
+  const denied = await fetch(apiUrl + "/v1/sessions/" + session + "/queued-inputs");
+  assert.equal(denied.status, 401, "Queue reads require authentication");
+  const pendingUsage = await fetch(apiUrl + "/v1/conversations/" + session + "/usage", {
+    headers: { authorization: "Bearer " + identity.credential.token },
+  });
+  assert.equal(pendingUsage.status, 501, "An unmapped usage source cannot return a zero balance");
+  const repeat = role("migration-check", "migrate", {}, []);
+  assert.equal(docker(["wait", repeat]).trim(), "0", "Migration retry with an existing Session");
+  const startWorker = async (i) => {
+    const label = role(
+      "worker-" + i,
+      "worker",
+      {
+        ...mgEnv,
+        ...enEnv,
+        HOST: "127.0.0.1",
+        PI_CLOUD_SUPERVISOR_ID: "pma-segment-" + suffix + "-" + i,
+        PI_CLOUD_SEGMENT_MANAGEMENT_URL:
+          "http://pma-segment-" + suffix + "-" + i + ":" + hostPorts[i],
+        PI_CLOUD_SESSION_RUNTIME_URL: runtimeUrl,
+        PI_CLOUD_SEGMENT_WAKE_URL: "ws://127.0.0.1:" + wakePort + "/internal/segment-work",
+        PI_CLOUD_SEGMENT_BOOT_DIR: "/tmp/segment-boot",
+        PI_CLOUD_MODEL_GATEWAY_PORT: [modelA, modelB][i],
+        PI_CLOUD_SEGMENT_CAPACITY: capacity,
+        ...(process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH
+          ? { PI_CLOUD_SEGMENT_CLAIM_BATCH: process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH }
+          : {}),
+        PI_CLOUD_PROVIDER_GATEWAY_URL: provider,
+        PI_CLOUD_PROVIDER_GATEWAY_API_KEY_FILE: "/run/pma/provider",
+      },
+      [
+        ...mount(management, "management"),
+        ...mount(enroll, "enroll"),
+        ...mount(keyFile, "provider"),
+      ],
+    );
+    await until("Worker ready", () => health(hostPorts[i]), 45000);
+    return label;
+  };
+  if (load) {
+    const count = 192,
+      parallel = 64;
+    await startWorker(0);
+    const sessions = [];
+    for (let at = 0; at < count; at += 16)
+      sessions.push(
+        ...(await Promise.all(
+          Array.from({ length: 16 }, (_, i) =>
+            api.createSession(
+              project.projectId,
+              project.workspaceId,
+              "Load " + (at + i),
+              "elastic",
+            ),
+          ),
+        )),
+      );
+    let cursor = 0;
+    const begin = performance.now(),
+      ids = [];
+    let sampling = false,
+      peakSampledRawLag = 0,
+      sampleError;
+    const measureLag = async () => {
+      const offsets = await admin.fetchTopicOffsets(topic),
+        positions = await pool.query(
+          "select partition,next_offset from pma_segments.accepted_fact_projection_offsets where topic=$1",
+          [topic],
+        );
+      return offsets.reduce(
+        (n, o) =>
+          n +
+          Math.max(
+            0,
+            Number(
+              BigInt(o.high) -
+                BigInt(positions.rows.find((p) => p.partition === o.partition)?.next_offset ?? 0),
+            ),
+          ),
+        0,
+      );
+    };
+    const timer = setInterval(async () => {
+      if (sampling) return;
+      sampling = true;
+      try {
+        peakSampledRawLag = Math.max(peakSampledRawLag, await measureLag());
+      } catch (e) {
+        sampleError = e;
+      } finally {
+        sampling = false;
+      }
+    }, 250);
+    timer.unref();
+    clean.push(() => clearInterval(timer));
+    await Promise.all(
+      Array.from({ length: parallel }, async () => {
+        for (;;) {
+          const i = cursor++;
+          if (i >= count) return;
+          const a = await api.acceptTurn(
+            sessions[i].sessionId,
+            fake.prompt("turn_" + i),
+            "turn:" + randomUUID(),
+          );
+          ids.push(a.turnId);
+        }
+      }),
+    );
+    const admittedMs = performance.now() - begin;
+    await until(
+      "all load Turns sealed",
+      async () =>
+        (
+          await pool.query(
+            "select count(*)::int n from pma_segments.turns where id=any($1::uuid[]) and output_sealed_at is not null",
+            [ids],
+          )
+        ).rows[0].n === count,
+      300000,
+    );
+    const elapsedMs = performance.now() - begin;
+    clearInterval(timer);
+    if (sampleError) throw sampleError;
+    const {
+      rows: [timing],
+    } = await pool.query(
+      `select count(*) filter(where t.state='completed')::int completed,
+     percentile_cont(0.95) within group(order by extract(epoch from t.started_at-t.created_at)*1000) queue_to_grant_p95_ms,
+     percentile_cont(0.95) within group(order by extract(epoch from e.occurred_at-t.started_at)*1000) grant_to_terminal_p95_ms,
+     percentile_cont(0.99) within group(order by extract(epoch from t.settled_at-e.occurred_at)*1000) terminal_projection_p99_ms
+     from pma_segments.turns t join pma_segments.session_terminal_events e on e.run_id=t.id where t.id=any($1::uuid[])`,
+      [ids],
+    );
+    // Each Session in this fixture starts exactly one Turn. Its persisted
+    // physical epoch therefore still carries the granting transaction's xmin.
+    const {
+      rows: [claims],
+    } = await pool.query(
+      `
+      select count(*)::int claim_transactions,max(n)::int largest_claim,
+        max(spread_ms) grant_spread_max_ms
+      from (select p.xmin::text,count(*) n,
+        extract(epoch from max(t.started_at)-min(t.started_at))*1000 as spread_ms
+        from pma_segments.turns t join public.pi_sessions p on p.tenant_id=t.tenant_id
+          and p.id::text=t.session_id::text where t.id=any($1::uuid[]) group by p.xmin::text) b`,
+      [ids],
+    );
+    if (timing.completed !== count) {
+      const { rows } = await pool.query(
+        "select content::jsonb #>> '{model,0,errorMessage}' as model_error, count(*) from pma_segments.messages where role='assistant' group by 1 limit 3",
+      );
+      const { completed, rejected, errors, diagnostics } = fake.metrics();
+      console.error("Synthetic load diagnostic", {
+        completed,
+        rejected,
+        errors,
+        diagnostics,
+        rows,
+      });
+    }
+    assert.equal(timing.completed, count);
+    const {
+      rows: [visible],
+    } = await pool.query(
+      "select count(*)::int n from pma_segments.messages where run_id=any($1::uuid[]) and role='assistant' and navigation_caption is not null",
+      [ids],
+    );
+    assert.equal(visible.n, count);
+    const offsets = await admin.fetchTopicOffsets(topic),
+      { rows: positions } = await pool.query(
+        "select partition,next_offset from pma_segments.accepted_fact_projection_offsets where topic=$1",
+        [topic],
+      );
+    const finalLag = offsets.reduce(
+      (sum, o) =>
+        sum +
+        Number(
+          BigInt(o.high) - BigInt(positions.find((v) => v.partition === o.partition).next_offset),
+        ),
+      0,
+    );
+    assert.equal(finalLag, 0);
+    console.log(
+      JSON.stringify({
+        mode: "text-load",
+        claimBatchLimit: Number(
+          process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH ?? defaultSessionClaimBatch,
+        ),
+        count,
+        parallel,
+        partitions,
+        admittedMs,
+        elapsedMs,
+        visible: visible.n,
+        visiblePerSecond: (visible.n * 1000) / elapsedMs,
+        finalLag,
+        peakSampledRawLag,
+        ...timing,
+        ...claims,
+        upstreamRequests: fake.metrics().completed,
+      }),
+    );
+    const held = await api.acceptTurn(
+      session,
+      fake.prompt("stop_test", { firstByteMs: 30000 }),
+      "turn:" + randomUUID(),
+    );
+    await until("model in flight", () => fake.metrics().inflight > 0);
+    await api.cancelTurn(session, held.turnId, "stop:" + randomUUID());
+    await until(
+      "cancelled and sealed",
+      async () =>
+        (
+          await pool.query(
+            "select 1 from pma_segments.turns where id=$1 and state='cancelled' and output_sealed_at is not null",
+            [held.turnId],
+          )
+        ).rowCount,
+    );
+    console.log("Active text Stop sealed the original Turn.");
+  } else {
+    const token = "PMA-" + randomBytes(5).toString("hex");
+    const [webPort, adminPort, unusedProviderPort] = await Promise.all([port(), port(), port()]);
+    const web = url(webPort),
+      webName = "pma-web-" + suffix;
+    // Bind the staging ingress to loopback, and supply only web-facing settings.
+    docker([
+      "run",
+      "-d",
+      "--network",
+      "host",
+      "--name",
+      webName,
+      "-e",
+      "PI_CLOUD_WEB_LISTEN=http://127.0.0.1:" + webPort,
+      "-e",
+      "PI_CLOUD_ADMIN_LISTEN=http://127.0.0.1:" + adminPort,
+      "-e",
+      "PI_CLOUD_PROVIDER_LISTEN=http://127.0.0.1:" + unusedProviderPort,
+      "-e",
+      "PI_CLOUD_CONTROL_PLANE_UPSTREAM=127.0.0.1:" + apiPort,
+      "-e",
+      "PI_CLOUD_ADMIN_ORIGIN_BASE_URL=" + web,
+      "-e",
+      "PI_CLOUD_PUBLIC_ORIGIN_BASE_URL=" + web,
+      "pi-managed-agents/segment-web:" + tag,
+    ]);
+    names.push(webName);
+    clean.push(() => docker(["rm", "-f", webName]));
+    await until("web ingress", () =>
+      fetch(web + "/healthz").then(
+        (r) => r.ok,
+        () => false,
+      ),
+    );
+    const first = await startWorker(0);
+    async function terminal(number) {
+      const row = await until(
+        "committed Turn " + number,
+        async () =>
+          (
+            await pool.query(
+              "select id,state,output_seal_id from pma_segments.turns where session_id=$1 and mailbox_position=$2 and output_seal_id is not null",
+              [session, number],
+            )
+          ).rows[0],
+        180000,
+      );
+      assert.equal(row.state, "completed", "Model Turn failed");
+      return row.id;
+    }
+    let t1, t2;
+    const seenTerminals = new Set(),
+      seenDeltas = new Set();
+    const observe = new AbortController(),
+      snapshot = Promise.withResolvers();
+    const observing = api.streamSession({
+      sessionId: session,
+      signal: observe.signal,
+      onStatus() {},
+      onSnapshot: () => snapshot.resolve(),
+      onEvent: (e) => {
+        if (e.type === "turn.completed") seenTerminals.add(e.turnId);
+        if (e.type === "assistant.text.delta") seenDeltas.add(e.turnId);
+      },
+    });
+    observing.catch((e) => snapshot.reject(e));
+    try {
+      await until(
+        "initial live snapshot",
+        () => Promise.race([snapshot.promise.then(() => true), delay(200, false)]),
+        15000,
+      );
+      await withChromePage({ profilePrefix: "pma-serving-" }, async (page) => {
+        await page.navigate(web);
+        const logged = await page.evaluate(
+          `fetch('/v1/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(${JSON.stringify({ username, password: pass })})}).then(r=>r.status)`,
+        );
+        assert(logged < 300, "Browser login failed");
+        const link = web + "/?session=" + session;
+        await page.navigate(link);
+        const heading =
+          "document.querySelector('.product-conversation-heading strong')?.textContent===" +
+          JSON.stringify(title);
+        try {
+          await page.waitFor(heading, 15000);
+        } catch {
+          await page.evaluate(
+            "[...document.querySelectorAll('.product-conversation-row button')].find(b=>b.querySelector('strong')?.textContent===" +
+              JSON.stringify(title) +
+              ")?.click()",
+          );
+          await page.waitFor(heading, 15000);
+        }
+        const posts = [];
+        page.onNetworkEvent((method, m) => {
+          if (
+            method === "Network.responseReceived" &&
+            new URL(m.response.url).pathname.endsWith("/turns")
+          )
+            posts.push({ path: new URL(m.response.url).pathname, status: m.response.status });
+        });
+        const hasCount = (num) =>
+          `[...document.querySelectorAll('.product-assistant-content')].filter(e=>e.textContent.includes(${JSON.stringify(token)})).length>=${num}`;
+        async function send(prompt) {
+          const selector = "document.querySelector('.product-composer textarea')";
+          await page.waitFor(selector + " && !" + selector + ".disabled");
+          await page.evaluate(
+            `{const a=${selector};Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(a,${JSON.stringify(prompt)});a.dispatchEvent(new Event('input',{bubbles:true}));}`,
+          );
+          await page.waitFor(
+            "document.querySelector('.product-send-button') && !document.querySelector('.product-send-button').disabled",
+          );
+          const at = posts.length;
+          await page.evaluate("document.querySelector('.product-send-button').click()");
+          const ack = await until("browser input acknowledgement", () => posts[at], 12000);
+          assert.equal(ack.path, "/v1/sessions/" + session + "/turns");
+          assert(ack.status < 300, "Browser admission status " + ack.status);
+        }
+        await send("Reply with exactly this code: " + token);
+        t1 = await terminal(1);
+        await page.waitFor(hasCount(1));
+        await page.navigate(link);
+        await page.waitFor(hasCount(1));
+        docker(["stop", "-t", "10", first]);
+        await startWorker(1);
+        await send("Repeat just the code from my previous message.");
+        t2 = await terminal(2);
+        await page.waitFor(hasCount(2));
+        await page.navigate(link);
+        await page.waitFor(hasCount(2));
+      });
+      await until(
+        "two live terminal events",
+        () => seenTerminals.has(t1) && seenTerminals.has(t2),
+        10000,
+      );
+      assert(
+        seenDeltas.has(t1) && seenDeltas.has(t2),
+        "Expected streamed assistant text on both Turns",
+      );
+    } finally {
+      observe.abort();
+      await observing.catch((e) => {
+        if (!observe.signal.aborted) throw e;
+      });
+    }
+    for (const turnId of [t1, t2]) {
+      const detail = await api.getConversation(session, { turnId });
+      assert(
+        JSON.stringify(
+          detail.turns.flatMap((t) => t.transcript?.items.filter((i) => i.kind === "text") ?? []),
+        ).includes(token),
+        "Missing saved reply",
+      );
+    }
+    const {
+      rows: [n],
+    } = await pool.query(
+      "select count(distinct worker_id)::int n from public.session_leases where pi_session_id=$1 and released_at is not null",
+      [session],
+    );
+    assert.equal(n.n, 2);
+    console.log(
+      JSON.stringify({
+        result: "passed",
+        turns: [t1, t2].length,
+        workers: n.n,
+        browserRefreshes: 2,
+        sseTurnCompletions: seenTerminals.size,
+        streamedTurns: seenDeltas.size,
+        partition: kafkaProducerLane(session, partitions),
+        elapsedMs: Date.now() - started,
+      }),
+    );
+  }
+} catch (error) {
+  for (const name of names) {
+    try {
+      const log = spawnSync("docker", ["logs", "--tail", "25", name], { encoding: "utf8" });
+      const lines = log.stdout + "\n" + log.stderr;
+      console.error(
+        name,
+        lines
+          .split("\n")
+          .filter((l) => !l.startsWith("{"))
+          .slice(-12)
+          .join("\n")
+          .slice(0, 1100),
+      );
+    } catch {}
+  }
+  throw error;
+} finally {
+  for (const close of clean.reverse()) await close();
+}

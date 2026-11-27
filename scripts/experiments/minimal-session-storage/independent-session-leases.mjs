@@ -60,12 +60,17 @@ export class SegmentWorker {
     this.#observer = new PostgresSessionLeaseObserver({ database });
   }
   async claimNext(hint) {
-    if (this.#closed || this.#pending + this.#active.size >= this.capacity) return;
-    this.#pending++;
+    return (await this.claimBatch(1, hint))[0];
+  }
+  async claimBatch(limit, hint) {
+    if (!Number.isSafeInteger(limit) || limit < 1) throw Error("Invalid claim limit");
+    const reserved = Math.min(limit, this.capacity - this.#pending - this.#active.size);
+    if (this.#closed || reserved <= 0) return [];
+    this.#pending += reserved;
     try {
-      const job = await this.db.transaction().execute(async (tx) => {
+      const jobs = await this.db.transaction().execute(async (tx) => {
         await sql`set local synchronous_commit=on`.execute(tx);
-        const selectJob = (target) => {
+        const selectJobs = (count, target, skip) => {
           let eligible = sql`q.ready_at<=statement_timestamp()`;
           if (target) {
             const [tenant, session, turn, version, flow] = target;
@@ -74,22 +79,28 @@ export class SegmentWorker {
                 and prev.mailbox_position=r.mailbox_position-1 and prev.history_head->>'version'=${version})`;
           }
           return sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
-          s.parent_session_id,s.agent_name,s.family_id,s.owner_user_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
+          s.parent_session_id,s.agent_name,s.family_id,s.owner_user_id,
+          greatest(r.output_display_seq,coalesce((select p.output_display_seq from turns p
+            where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position
+              and p.output_display_seq>0 order by p.mailbox_position desc limit 1),0)) as display_base,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
           (select prev.workspace_grant from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id and prev.mailbox_position=r.mailbox_position-1) previous_workspace,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.starts_turn desc,m.position limit 1) as first_message,
           exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs
           from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
           join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
-          where ${eligible} and r.state='queued' and r.lease_id is null and r.output_seal_id is null
+          where ${eligible} ${skip ? sql`and r.id <>${skip}::uuid` : sql``} and r.state='queued' and r.lease_id is null and r.output_seal_id is null
             and not exists(select from session_leases l where l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.released_at is null)
             and not exists(select from turns p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position and
               (p.state not in ('completed','failed','timed_out','cancelled') or (p.output_seal_id is not null and p.output_sealed_at is null)))
-          order by q.ready_at,q.session_id,r.mailbox_position limit 1 for update of r,s skip locked`.execute(
+          order by q.ready_at,q.session_id,r.mailbox_position limit ${count} for update of r,s skip locked`.execute(
             tx,
           );
         };
-        let job = (await selectJob(hint)).rows[0];
-        if (!job && hint) job = (await selectJob()).rows[0];
-        if (!job) return;
+        const candidates = hint ? (await selectJobs(1, hint)).rows : [];
+        if (candidates.length < reserved)
+          candidates.push(
+            ...(await selectJobs(reserved - candidates.length, undefined, candidates[0]?.id)).rows,
+          );
+        if (!candidates.length) return [];
         const worker = await tx
           .selectFrom("workers")
           .select(["state", "boot_id", "max_concurrent_sessions"])
@@ -110,87 +121,98 @@ export class SegmentWorker {
           await sql`select count(*)::int used from session_leases where worker_id=${this.workerId}::uuid and released_at is null`.execute(
             tx,
           );
-        if (used >= this.capacity) return;
-        await sql`insert into pi_sessions(tenant_id,id) values(${job.tenant_id}::uuid,${job.logical_id}) on conflict do nothing`.execute(
-          tx,
-        );
-        const {
-          rows: [physical],
-        } =
-          await sql`select lease_epoch from pi_sessions where tenant_id=${job.tenant_id}::uuid and id=${job.logical_id} for update`.execute(
+        const jobs = [];
+        for (const job of candidates.slice(0, Math.max(0, this.capacity - used))) {
+          await sql`insert into pi_sessions(tenant_id,id) values(${job.tenant_id}::uuid,${job.logical_id}) on conflict do nothing`.execute(
             tx,
           );
-        const lease = await this.#coordinator.grantLockedPhysicalSession(
-          tx,
-          job.tenant_id,
-          job.logical_id,
-          physical.lease_epoch,
-        );
-        const claim =
-          await sql`update turns set state=case when stop_on_resume then 'cancel_requested' else 'running' end,lease_id=${lease.lease_id}::uuid,fencing_token=${lease.fencing_token},
+          const {
+            rows: [physical],
+          } =
+            await sql`select lease_epoch from pi_sessions where tenant_id=${job.tenant_id}::uuid and id=${job.logical_id} for update`.execute(
+              tx,
+            );
+          const lease = await this.#coordinator.grantLockedPhysicalSession(
+            tx,
+            job.tenant_id,
+            job.logical_id,
+            physical.lease_epoch,
+          );
+          const claim =
+            await sql`update turns set state=case when stop_on_resume then 'cancel_requested' else 'running' end,lease_id=${lease.lease_id}::uuid,fencing_token=${lease.fencing_token},
           started_at=coalesce(started_at,clock_timestamp()) where id=${job.id}::uuid and exists(select from supervisor_connections c join workers w on w.id=c.worker_id
             and w.boot_id=c.boot_id and w.supervisor_id=c.supervisor_id where w.id=${this.workerId}::uuid and w.state='ready'
             and c.state='active' and c.expires_at>clock_timestamp()) returning id`.execute(tx);
-        if (!claim.rows.length) throw Error("Worker management connection is unavailable");
-        await sql`delete from ready_agent_sessions where tenant_id=${job.tenant_id}::uuid and session_id=${job.logical_id}::uuid`.execute(
-          tx,
-        );
+          if (!claim.rows.length) throw Error("Worker management connection is unavailable");
+          await sql`delete from ready_agent_sessions where tenant_id=${job.tenant_id}::uuid and session_id=${job.logical_id}::uuid`.execute(
+            tx,
+          );
+          jobs.push({
+            ...job,
+            turnId: job.id,
+            scope: {
+              tenantId: job.tenant_id,
+              sessionId: job.logical_id,
+              piSessionId: job.logical_id,
+              runId: job.id,
+              turnId: job.id,
+              writerId: lease.lease_id,
+              fencingToken: Number(lease.fencing_token),
+            },
+          });
+        }
+        return jobs;
+      });
+      if (!jobs.length || this.#closed) return [];
+      const claimed = jobs.map((job) => {
+        const s = job.scope,
+          identity = {
+            tenantId: s.tenantId,
+            piSessionId: s.piSessionId,
+            writerId: s.writerId,
+            leaseId: s.writerId,
+            fencingToken: s.fencingToken,
+          };
+        const guard = this.#observer.open(identity);
+        const release = async () => {
+          this.#active.delete(identity.leaseId);
+          await guard.close();
+        };
+        const steerHint = new SteerHint();
+        const stop = new AbortController();
+        if (job.stop_on_resume) stop.abort();
+        const active = { identity, guard, steerHint, stop };
+        this.#active.set(identity.leaseId, active);
         return {
           ...job,
           turnId: job.id,
-          scope: {
-            tenantId: job.tenant_id,
-            sessionId: job.logical_id,
-            piSessionId: job.logical_id,
-            runId: job.id,
-            turnId: job.id,
-            writerId: lease.lease_id,
-            fencingToken: Number(lease.fencing_token),
-          },
+          authority: guard,
+          warmHistory: this.warmHistory,
+          steerHint,
+          stopSignal: stop.signal,
+          release,
         };
       });
-      if (!job || this.#closed) return;
-      const s = job.scope,
-        identity = {
-          tenantId: s.tenantId,
-          piSessionId: s.piSessionId,
-          writerId: s.writerId,
-          leaseId: s.writerId,
-          fencingToken: s.fencingToken,
-        };
-      const guard = this.#observer.open(identity);
-      const release = async () => {
-        this.#active.delete(identity.leaseId);
-        await guard.close();
-      };
-      const steerHint = new SteerHint();
-      const stop = new AbortController();
-      if (job.stop_on_resume) stop.abort();
-      const active = { identity, guard, steerHint, stop };
-      this.#active.set(identity.leaseId, active);
       try {
-        await guard.assertCurrent();
-        guard.start();
-        this.#schedule();
-        // The initial ticket remains conservative if bootstrap is unavailable.
-        await this.#syncSteers([active], true).catch(() =>
-          console.warn("segment.steer_bootstrap_deferred"),
+        // Open every handle before the observer performs its coalesced PG refresh.
+        await Promise.all(
+          claimed.map(async (job) => {
+            await job.authority.assertCurrent();
+            job.authority.start();
+          }),
         );
+        this.#schedule();
+        await this.#syncSteers(
+          claimed.map((j) => this.#active.get(j.scope.writerId)).filter(Boolean),
+          true,
+        ).catch(() => console.warn("segment.steer_bootstrap_deferred"));
+        return claimed;
       } catch (error) {
-        await release();
+        await Promise.all(claimed.map((job) => job.release()));
         throw error;
       }
-      return {
-        ...job,
-        turnId: job.id,
-        authority: guard,
-        warmHistory: this.warmHistory,
-        steerHint,
-        stopSignal: stop.signal,
-        release,
-      };
     } finally {
-      this.#pending--;
+      this.#pending -= reserved;
     }
   }
   #notice(writer, revision) {
@@ -265,7 +287,7 @@ export class SegmentWorker {
         for (const active of this.#active.values()) active.steerHint.mark();
         this.#repairHints(true);
       },
-      claim: (hint) => this.claimNext(hint),
+      claim: (limit, hint) => this.claimBatch(limit, hint),
       execute: async (job) => {
         try {
           await execute(job);

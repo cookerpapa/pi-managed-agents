@@ -1,6 +1,10 @@
 import type { Database } from "@pi-cloud/database";
 import type { Kysely } from "kysely";
-import { ControlPlaneStore, type OlderHistoryReader } from "./control-plane-store.ts";
+import {
+  ControlPlaneStore,
+  type ControlPlaneStoreOptions,
+  type OlderHistoryReader,
+} from "./control-plane-store.ts";
 import type { TenantRequestIdentity } from "./tenant-identity.ts";
 import type { PiCloudMetrics } from "@pi-cloud/observability";
 
@@ -11,12 +15,14 @@ export class ControlPlaneStoreFactory {
   readonly #conversationReadDatabase: Kysely<Database>;
   readonly #placedInputHistory: boolean;
   readonly #rootMessageHistory: boolean;
+  readonly #registerSessionHistory: ControlPlaneStoreOptions["registerSessionHistory"];
   readonly #flowRootHistory: boolean;
   readonly #idGenerator: (() => string) | undefined;
   readonly #environmentImageRevision: string | undefined;
   readonly #metrics: PiCloudMetrics | undefined;
 
   constructor(options: {
+    registerSessionHistory?: NonNullable<ControlPlaneStoreOptions["registerSessionHistory"]>;
     database: Kysely<Database>;
     conversationReadDatabase?: Kysely<Database>;
     olderHistoryReader?: OlderHistoryReader;
@@ -29,6 +35,7 @@ export class ControlPlaneStoreFactory {
     metrics?: PiCloudMetrics;
   }) {
     this.#delegatedRunHistory = options.delegatedRunHistory ?? false;
+    this.#registerSessionHistory = options.registerSessionHistory;
     this.#database = options.database;
     this.#olderHistoryReader = options.olderHistoryReader;
     this.#conversationReadDatabase = options.conversationReadDatabase ?? options.database;
@@ -42,6 +49,9 @@ export class ControlPlaneStoreFactory {
 
   forIdentity(identity: TenantRequestIdentity): ControlPlaneStore {
     return new ControlPlaneStore({
+      ...(this.#registerSessionHistory
+        ? { registerSessionHistory: this.#registerSessionHistory }
+        : {}),
       database: this.#database,
       conversationReadDatabase: this.#conversationReadDatabase,
       ...(this.#olderHistoryReader ? { olderHistoryReader: this.#olderHistoryReader } : {}),

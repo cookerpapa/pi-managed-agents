@@ -4,11 +4,12 @@ import { PostgresNotificationWake } from "@pi-cloud/database";
 import { openWakeRouter, connectClaimWorker } from "./wake-channel.mjs";
 
 const path = "/internal/segment-work";
+export const defaultSessionClaimBatch = 8;
 const stage = {
   label: "segments",
   wakeMode: "directed",
   perTurn: true,
-  batch: 1,
+  batch: defaultSessionClaimBatch,
   cacheMode: "prefer",
 };
 function checkToken(token) {
@@ -134,12 +135,9 @@ export function connectSegmentWorker({
     url: scheduler.url,
     token: scheduler.token,
     id,
-    stage,
+    stage: { ...stage, batch: scheduler.batch ?? stage.batch },
     slots,
-    claim: async (_limit, hint) => {
-      const job = await claim(hint);
-      return job ? [job] : [];
-    },
+    claim,
     execute,
     fail,
     onSteer,

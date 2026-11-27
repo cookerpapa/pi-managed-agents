@@ -37,6 +37,7 @@ export type ControlPlaneApplicationOptions = Omit<
   ControlPlaneStoreOptions,
   "tenantId" | "defaultModelProfileId"
 > & {
+  mountSessionInputs?: (app: import("fastify").FastifyInstance) => void;
   delegatedRunHistory?: boolean;
   mcp?: import("./mcp/connection-service.ts").McpConnectionService;
   executionTargets?: import("./execution-target-service.ts").ExecutionTargetService;
@@ -79,6 +80,7 @@ export async function createControlPlaneApplication(
   const adapter = new FastifyAdapter({ logger: false });
   installBinaryBodyParser(adapter.getInstance());
   options.productionHttpGateway?.install(adapter.getInstance());
+  options.mountSessionInputs?.(adapter.getInstance());
   options.toolProgressIngress?.install(adapter.getInstance());
   options.runActivityIngress?.install(adapter.getInstance());
   options.sessionPublicationService?.install(adapter.getInstance());

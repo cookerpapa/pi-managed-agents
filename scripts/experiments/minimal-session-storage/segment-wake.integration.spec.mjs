@@ -75,8 +75,7 @@ it.skipIf(!endpoint)(
         );
         return id;
       }
-      async function finish(id) {
-        const { job, gate } = executions.get(id);
+      async function settle(job) {
         const fact = {
           kind: "work_finished",
           factId: randomUUID(),
@@ -93,8 +92,65 @@ it.skipIf(!endpoint)(
             async () => {},
           ),
         );
+      }
+      async function finish(id) {
+        const { job, gate } = executions.get(id);
+        await settle(job);
         executions.get(id).closed = true;
         gate.resolve();
+      }
+      // Both claimants see the same ready Sessions. Each claim transaction can
+      // fill a Worker, and a concurrent claimant must skip the locked Sessions.
+      const queued = Array.from({ length: 13 }, () => randomUUID());
+      await runtime.store.register(t, queued);
+      const turnIds = await Promise.all(queued.map((id) => enqueue(id)));
+      const bulk = [];
+      try {
+        for (let i = 0; i < 2; i++) {
+          const workerId = randomUUID(),
+            bootId = randomUUID();
+          await control
+            .insertInto("workers")
+            .values({
+              id: workerId,
+              supervisor_id: workerId,
+              boot_id: bootId,
+              state: "ready",
+              max_concurrent_sessions: 8,
+            })
+            .execute();
+          await registerTestWorker(control, workerId);
+          bulk.push(
+            runtime.worker({
+              database: workerDb,
+              workerId,
+              bootId,
+              capacity: 8,
+              leaseDurationMs: 30000,
+            }),
+          );
+        }
+        const before = reads;
+        const batches = await Promise.all(bulk.map((w) => w.claimBatch(32)));
+        assert.deepEqual(
+          batches.map((batch) => batch.length).sort((a, b) => a - b),
+          [5, 8],
+        );
+        assert.deepEqual(
+          batches
+            .flat()
+            .map((job) => job.id)
+            .sort(),
+          turnIds.sort(),
+        );
+        assert.equal(new Set(batches.flat().map((job) => job.scope.writerId)).size, 13);
+        assert.equal(reads - before, 2, "one candidate selection per Worker");
+        for (const job of batches.flat()) {
+          await settle(job);
+          await job.release();
+        }
+      } finally {
+        for (const w of bulk) await w.close();
       }
       const registration = Array.from({ length: size }, () => ({
         workerId: randomUUID(),

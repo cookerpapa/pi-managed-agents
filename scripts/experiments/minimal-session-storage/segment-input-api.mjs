@@ -40,6 +40,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
           if (req.params.id !== undefined) parseUuidPathParameter(req.params.id, "inputId");
           const a = await authorize(req, session);
           if (!a) return res.code(403).send();
+          if (method === "POST" && path === "/turns") res.code(202);
           return await handle(req, { ...a, session }, res);
         } catch (e) {
           if (e instanceof ControlPlaneApiValidationError)

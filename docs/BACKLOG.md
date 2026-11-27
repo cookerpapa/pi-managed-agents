@@ -2,6 +2,9 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Serve authenticated text from the segmented queue through separate API, Projector and Worker images, then read the result through Web and continue on a replacement Worker. [Evidence](reports/independent-session-serving-20261127.md).
+- [ ] Connect a real Guest round through these images and measure mixed traffic with batched projection. Reconcile the remaining read, recovery and deployment gates in the [integration audit](reports/independent-session-serving-20261127.md).
+
 - [x] Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) for seven days by default and applies explicit disable at execution admission.
 
 - [x] Connect independent root Sessions to the [HTTP MCP execution path](adr/0373-independent-session-mcp.md) and verify directory changes and Worker handoff against a real server.
