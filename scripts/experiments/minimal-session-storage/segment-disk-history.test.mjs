@@ -235,14 +235,14 @@ test("the scheduler retains disk advertisements beyond the RAM TTL and selects t
     const offer = (client, kind) =>
       client.send(JSON.stringify([tenant, flow, version, kind, Date.now() + 30000]));
     const ready = async (socket, count) => {
-      socket.send("ready");
+      socket.send("ready:1");
       for (let i = 0; i < 200 && router.snapshot().waiting !== count; i++) await delay(5);
       assert.equal(router.snapshot().waiting, count);
     };
     const claim = async (socket) => {
       const turn = randomUUID(),
         msg = once(socket, "message", { signal: AbortSignal.timeout(1500) });
-      router.notifySegment([tenant, flow, turn, version, flow, Date.now() + 2000]);
+      router.notifySegment([tenant, flow, turn, version, flow, flow]);
       assert.equal(JSON.parse((await msg)[0])[2], turn);
     };
     offer(b, "disk-large");

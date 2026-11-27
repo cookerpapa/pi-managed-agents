@@ -74,7 +74,7 @@ createRoot(document.getElementById("root")).render(h(Editor));
       };
       await until("Boolean(document.querySelector('.pending-input-row'))");
       await until(
-        '["发送中","Sending"].includes(document.querySelector(".pending-input-status")?.textContent)',
+        '["已送达","Delivered"].includes(document.querySelector(".pending-input-row [data-receipt=delivered]")?.textContent)',
       );
       await repairSteerReceipt();
       await until(

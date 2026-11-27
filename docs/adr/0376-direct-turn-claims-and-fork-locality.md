@@ -1,0 +1,9 @@
+# ADR-0376. Claim ready Turns and reuse authorized Fork prefixes
+
+Accepted for the isolated independent Session candidate. A queued Turn carries a nullable ready_at. Only the head of a writable Flow may be offered. PG makes a new head eligible on admission, predecessor retirement or ordered recovery. A deferred notice names the committed head. Claims still lock both logical Session and Turn and grant distinct fenced leases. Switching the candidate schema requires drained old writers and a matched restart.
+
+A human or agent input carries a stable ID and the sender's delivery intent. Ordinary completion promotes unused mail under the Session lock. The first promoted input starts a newly created successor. Explicit Stop and writer loss retain their separate policies. A committed inbox row proves delivery. Canonical placement proves read. The client displays the latest read receipt for the authenticated sender and keeps unplaced inputs delivered across reassignment.
+
+Remove the two-second preference window. Exact available cache holders take priority. For ordinary work sample two available Workers, prefer more free slots and break equal-load ties in favor of the Worker without a live large cache. A lone available Worker is eligible immediately. Slots and cache advertisements are advisory and expire with the connection.
+
+A first-Turn Fork hint may refer to a source Flow. Only the authorized destination lease can open the Fork. PG supplies its frozen source ranges and publication ceilings; confirmed source snapshots can supply immutable Entry bodies. Validate complete coverage in the same database snapshot as the frozen range read. Compaction gaps, unconfirmed versions and misses use the existing cold loader. Destination agent configuration, workspace, inbox and authority come from the destination. The scheduler holds bounded volatile metadata.

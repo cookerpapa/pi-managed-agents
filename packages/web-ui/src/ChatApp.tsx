@@ -808,7 +808,8 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
           !["queued", "running", "cancelling"].includes(turn.status) ||
           (turn.status !== "queued" && queue.activeTurnId === turn.turnId) ||
           (turn.status === "queued" &&
-            (queue.hasMore || queue.items.some((item) => item.inputId === turn.turnId))) ||
+            (queue.hasMore ||
+              queue.items.some((item) => (item.initialTurnId ?? item.inputId) === turn.turnId))) ||
           reconcilingRuns.has(turn.runId)
         )
           continue;
@@ -956,6 +957,12 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
               }
             }
           }
+        },
+        onInputPlaced(placement) {
+          if (controller.signal.aborted || currentStreamSession.current !== sessionId) return;
+          update({ type: "input.placed", placement });
+          setQueueRefreshGeneration((n) => n + 1);
+          refreshTreeSoon();
         },
         onInputQueue(queue) {
           if (controller.signal.aborted || currentStreamSession.current !== sessionId) return;
@@ -2765,11 +2772,11 @@ export default function ChatApp({ configuration }: { configuration: WebConfigura
               update({
                 type: "turn.admission.observed",
                 sessionId: state.session.sessionId,
-                turnId: item.inputId,
+                turnId: item.initialTurnId ?? item.inputId,
                 runId: item.runId,
                 state: "withdrawn",
               });
-              restoreInputDraft(item.text, item.uploads ?? []);
+              if (!item.initialTurnId) restoreInputDraft(item.text, item.uploads ?? []);
             }}
           >
             <div className={`product-content ${inspectorOpen ? "with-inspector" : ""}`}>

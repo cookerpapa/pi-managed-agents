@@ -448,6 +448,7 @@ export class IndependentSessionRuntime {
     if (result.admitted || covered) owner.witness.observe(mapped);
     if (!result.admitted) return false;
     if (this.browser) {
+      await this.browser.placements?.(s, owner.flow_id, fact.commit);
       for (const event of result.events) this.browser.accept(s.tenantId, event);
       for (const cover of result.covers) this.browser.cover(s.tenantId, s.sessionId, cover.through);
     }

@@ -31,6 +31,11 @@ export async function installIndependentSessionLeases(db) {
   await installPhysicalTurnProjection(db);
   await db.query(await readFile(new URL("session-inputs.sql", import.meta.url), "utf8"));
   await createUnsettledTurnIndex(db);
+  await installTurnQueue(db);
+}
+
+export async function installTurnQueue(db) {
+  await db.query(await readFile(new URL("turn-ready.sql", import.meta.url), "utf8"));
 }
 
 export class SegmentWorker {
@@ -79,12 +84,10 @@ export class SegmentWorker {
       const jobs = await this.db.transaction().execute(async (tx) => {
         await sql`set local synchronous_commit=on`.execute(tx);
         const selectJobs = (count, target, skip) => {
-          let eligible = sql`q.ready_at<=statement_timestamp()`;
+          let eligible = sql`r.ready_at<=statement_timestamp()`;
           if (target) {
-            const [tenant, session, turn, version, flow] = target;
-            eligible = sql`r.tenant_id=${tenant}::uuid and s.id=${session}::uuid and r.id=${turn}::uuid and r.session_id=${flow}::uuid
-              and exists(select from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id
-                and prev.mailbox_position=r.mailbox_position-1 and prev.history_head->>'version'=${version})`;
+            const [tenant, session, turn, , flow] = target;
+            eligible = sql`r.ready_at is not null and r.tenant_id=${tenant}::uuid and s.id=${session}::uuid and r.id=${turn}::uuid and r.session_id=${flow}::uuid`;
           }
           return sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
           s.parent_session_id,s.agent_name,s.family_id,s.owner_user_id,
@@ -93,15 +96,12 @@ export class SegmentWorker {
               and p.output_display_seq>0 order by p.mailbox_position desc limit 1),0)) as display_base,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
           (select prev.workspace_grant from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id and prev.mailbox_position=r.mailbox_position-1) previous_workspace,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.starts_turn desc,m.position limit 1) as first_message,
           coalesce((select true from user_or_agent_messages m where m.turn_id=r.id limit 1),false) as has_inputs
-          from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
-          join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
+          from turns r join sessions s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id
           where ${eligible} ${skip ? sql`and r.id <>${skip}::uuid` : sql``} and r.state='queued' and r.lease_id is null and r.output_seal_id is null
             and not exists(select from session_leases l where l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.released_at is null)
             and not exists(select from turns p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position and
               (p.state not in ('completed','failed','timed_out','cancelled') or (p.output_seal_id is not null and p.output_sealed_at is null)))
-          order by q.ready_at,q.session_id,r.mailbox_position limit ${count} for update of r,s skip locked`.execute(
-            tx,
-          );
+          order by r.ready_at,r.id limit ${count} for update of r,s skip locked`.execute(tx);
         };
         const candidates = hint ? (await selectJobs(1, hint)).rows : [];
         if (candidates.length < reserved)
@@ -152,9 +152,6 @@ export class SegmentWorker {
             and c.state='active' and c.expires_at>clock_timestamp())`.execute(tx);
         if (Number(attached.numAffectedRows) !== selected.length)
           throw Error("Worker management connection is unavailable");
-        await sql`delete from ready_agent_sessions q using unnest(${tenants}::uuid[],
-          ${selected.map((job) => job.logical_id)}::uuid[]) as s(tenant,id)
-          where q.tenant_id=s.tenant and q.session_id=s.id`.execute(tx);
         return selected.map((job, i) => ({
           ...job,
           turnId: job.id,

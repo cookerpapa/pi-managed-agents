@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0376](0376-direct-turn-claims-and-fork-locality.md) moves readiness onto Turns, defines input receipts and enables immediate cache-aware routing and frozen prefix reuse.
+
 [ADR-0375](0375-independent-session-serving-entry.md) stages the independent Session serving roles and a real-provider conversation.
 
 [ADR-0374](0374-retained-tool-implementations.md) separates ordinary release replacement from explicit Tool disable on the candidate.

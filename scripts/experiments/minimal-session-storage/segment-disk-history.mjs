@@ -128,7 +128,7 @@ export class SegmentDiskHistory {
       if (this.heads.get(key)?.version === version) this.discard(key);
     });
   }
-  get(key, session, version, head) {
+  get(key, session, version, head, range) {
     if (
       this.closed ||
       (!this.opening &&
@@ -149,6 +149,7 @@ export class SegmentDiskHistory {
           session,
           version,
           now: this.now(),
+          range,
           expected: head
             ? { seq: head.seq, floor: head.floor, locals: head.count, localBytes: head.bytes }
             : null,
@@ -176,10 +177,11 @@ export class SegmentDiskHistory {
           if (bytes > this.maxBytes) throw Error("Cache coverage invalid");
         }
         if (
-          bytes !== h.bytes ||
-          localBytes !== h.localBytes ||
-          records.length !== h.locals ||
-          inherited.length !== h.ancestors
+          !range &&
+          (bytes !== h.bytes ||
+            localBytes !== h.localBytes ||
+            records.length !== h.locals ||
+            inherited.length !== h.ancestors)
         )
           throw Error("Cache coverage invalid");
         return { ...h, records, inherited, diskReadBytes: readBytes };

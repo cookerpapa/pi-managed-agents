@@ -31,7 +31,7 @@ const db = new Kysely({
   log: (e) => {
     if (
       e.level === "query" &&
-      e.query.sql.includes("ready_agent_sessions") &&
+      e.query.sql.includes("r.ready_at") &&
       e.query.sql.includes("skip locked")
     )
       captured.push(e.query);
@@ -60,7 +60,7 @@ try {
   const head = randomUUID(),
     hot = Array.from({ length: 8 }, () => randomUUID()),
     first = randomUUID(),
-    hint = [t, head, first, "version", head];
+    hint = [t, head, first, "version", head, head];
   await worker.claimBatch(8);
   await worker.claimBatch(1, hint);
   const point = captured[0],
@@ -196,13 +196,7 @@ try {
     );
   }
   async function analyze() {
-    for (const table of [
-      "sessions",
-      "turns",
-      "ready_agent_sessions",
-      "user_or_agent_messages",
-      "public.session_leases",
-    ])
+    for (const table of ["sessions", "turns", "user_or_agent_messages", "public.session_leases"])
       await pool.query("analyze " + table);
   }
   const fresh = Array.from({ length: 192 }, () => randomUUID());
@@ -232,7 +226,10 @@ try {
     "update user_or_agent_messages set state='placed',native_id=2 where state='pending'",
   );
   await pool.query("update turns set state='completed',output_display_seq=4");
-  assert.equal((await pool.query("select count(*)::int n from ready_agent_sessions")).rows[0].n, 0);
+  assert.equal(
+    (await pool.query("select count(*)::int n from turns where ready_at is not null")).rows[0].n,
+    0,
+  );
   await rt.store.register(t, [head, ...hot]);
   await pool.query(
     `insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state,output_display_seq,history_head)

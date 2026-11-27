@@ -136,6 +136,7 @@ it.skipIf(!endpoint)(
       const inputsPage = (limit = 80, before) =>
         placedInputNavigation(rt.store.db, schema, tenant, session, limit, before);
       assert.deepEqual((await inputsPage()).entries, [], "queued input has no navigation entry");
+      assert.equal((await api.getInputQueue(session)).latestRead, null);
       const put = (text, mode = "follow_up", key = "turn:" + randomUUID()) =>
         api.acceptTurn(session, text, key, undefined, undefined, mode);
       const withdraw = async (id) =>
@@ -582,6 +583,9 @@ it.skipIf(!endpoint)(
           ])
           .then((r) => r.rowCount),
       );
+      await wait(
+        async () => (await api.getInputQueue(session)).latestRead?.inputId === keep.inputId,
+      );
       const readUrl = new URL(endpoint);
       readUrl.searchParams.set("options", "-c search_path=" + web + "," + schema + ",public");
       fullServer = await openPageApi(
@@ -844,6 +848,10 @@ it.skipIf(!endpoint)(
         const late = await agentMail("while closing again");
         const newer = (await api.acceptTurn(session, "next instruction", "turn:" + randomUUID()))
           .turnId;
+        assert.equal(
+          (await pool.query("select ready_at from turns where id=$1", [newer])).rows[0].ready_at,
+          null,
+        );
         // This lease-only claimant has no native harness or model.
         assert(
           await rt.leases.projectBoundary(
@@ -877,6 +885,79 @@ it.skipIf(!endpoint)(
           ).rows,
           [{ turn_id: newer, state: "pending" }],
         );
+        assert(
+          (await pool.query("select ready_at from turns where id=$1", [newer])).rows[0].ready_at,
+        );
+        await nextJob.release();
+        // A message arrives after the Worker's last empty read, before its
+        // ordered normal seal. All unadopted inputs share one successor.
+        const sid = randomUUID();
+        await rt.store.register(tenant, [sid]);
+        const t17 = randomUUID();
+        await pool.query(
+          "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) values($1,$2,$3,1,$1,'previous','queued')",
+          [t17, tenant, sid],
+        );
+        const active = await racer.claimNext([tenant, sid, t17, randomUUID(), sid, sid]);
+        assert.equal(active.id, t17);
+        assert.equal(await rt.inputs.selectAt(active.scope, "idle"), undefined);
+        const admit = (id, text, mode) =>
+          rt.inputs.admit({ id, session: sid, tenant, sender, source: "user", text, mode });
+        const m = await admit(randomUUID(), "late message", "follow_up"),
+          n = await admit(randomUUID(), "urgent", "steer");
+        assert.equal(m.turn_id, t17);
+        assert.equal(n.turn_id, t17);
+        assert.equal(
+          (await pool.query("select count(*)::int n from turns where session_id=$1", [sid])).rows[0]
+            .n,
+          1,
+        );
+        assert(
+          await rt.leases.projectBoundary(
+            {
+              topic: "mail",
+              partition: 0,
+              offset: offset++,
+              fact: {
+                kind: "work_finished",
+                scope: active.scope,
+                factId: randomUUID(),
+                agentId: "root",
+                baseSequence: 0,
+                nativeSequence: 0,
+                terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
+                occurredAt: new Date().toISOString(),
+              },
+            },
+            async () => {},
+          ),
+        );
+        const { rows: mail } = await pool.query(
+          "select id,turn_id,starts_turn,state,mode from user_or_agent_messages where session_id=$1 order by position",
+          [sid],
+        );
+        assert.equal(mail.length, 2);
+        assert.notEqual(mail[0].turn_id, t17);
+        assert.deepEqual(
+          mail.map((i) => [i.id, i.turn_id === mail[0].turn_id, i.starts_turn, i.mode, i.state]),
+          [
+            [m.id, true, true, "follow_up", "pending"],
+            [n.id, true, false, "steer", "pending"],
+          ],
+        );
+        assert(
+          (await pool.query("select ready_at from turns where id=$1", [mail[0].turn_id])).rows[0]
+            .ready_at,
+        );
+        await rt.inputs.withdraw(tenant, sid, sender, m.id);
+        const {
+          rows: [promoted],
+        } = await pool.query(
+          "select m.starts_turn,t.initial_input from user_or_agent_messages m join turns t on t.id=m.turn_id where m.id=$1",
+          [n.id],
+        );
+        assert.deepEqual(promoted, { starts_turn: true, initial_input: "urgent" });
+        await active.release();
       } finally {
         await racer.close();
       }

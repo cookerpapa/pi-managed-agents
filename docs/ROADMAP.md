@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The [direct Turn queue and Fork cache gate](reports/turn-queue-fork-receipts-20261128.md) covers the independent Session scheduler and placement receipts in the candidate images.
+
 The [isolated segmented serving gate](reports/independent-session-serving-20261127.md) takes an authenticated browser conversation through the real provider and a replacement Worker. The next vertical slice attaches the Guest tool path and measures its effect on projection.
 
 Pin ordinary Tool implementations during model sampling. The independent candidate routes pending calls to [retained Tool implementations](adr/0374-retained-tool-implementations.md) and applies explicit disable at execution admission.

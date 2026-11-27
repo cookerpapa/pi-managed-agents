@@ -1149,6 +1149,35 @@ it("keeps consumed human messages in the same Run and deduplicates them on recon
   expect(state.turns[0]?.items.filter((i) => i.kind === "user")).toHaveLength(1);
 });
 
+it("places a receipt on the actual successor Turn and deduplicates a replay by input ID", () => {
+  const state = preparedState(),
+    sessionId = state.session!.sessionId,
+    turnId = state.turns[0]!.turnId;
+  const inputId = "20000000-0000-4000-8000-000000000001";
+  const placement = {
+    type: "input.placed" as const,
+    sessionId,
+    turnId,
+    inputId,
+    entryId: 9,
+    sequence: 12,
+    initial: false,
+    text: "follow-up",
+    uploads: [],
+  };
+  const initial = sessionViewReducer(state, {
+    type: "input.placed",
+    placement: { ...placement, initial: true, text: "opening" },
+  });
+  expect(initial.turns[0]!.prompt).toBe("opening");
+  expect(initial.turns[0]!.items.filter((i) => i.kind === "user")).toHaveLength(0);
+  const placed = sessionViewReducer(initial, { type: "input.placed", placement });
+  expect(
+    sessionViewReducer(placed, { type: "input.placed", placement }).turns[0]!.items.filter(
+      (i) => i.kind === "user",
+    ),
+  ).toHaveLength(1);
+});
 it("settles a recovered partial under its canonical identity before the same native task restarts", () => {
   const events = [
     envelope(1, {

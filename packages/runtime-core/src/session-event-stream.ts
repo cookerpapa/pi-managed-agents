@@ -117,6 +117,10 @@ export class OpenSessionEventStream {
           continue;
         }
         if (item === undefined) return;
+        if (item.placement) {
+          if (!(await this.#sendValue(response, item.placement, "event", "input.placed"))) return;
+          continue;
+        }
         if (item.inputQueue) {
           const version = BigInt(item.inputQueue.viewVersion);
           if (version <= lastQueueVersion) continue;

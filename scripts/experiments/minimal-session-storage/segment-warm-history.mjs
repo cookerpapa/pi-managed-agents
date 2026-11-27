@@ -101,6 +101,28 @@ export class SegmentWarmHistory {
     for (const [key, item] of this.disk?.heads ?? []) this.notice(key, item.version);
     return this.disk?.close();
   }
+  get hasSnapshots() {
+    return this.cache.items.size > 0 || Boolean(this.disk?.heads.size);
+  }
+  async sourceSnapshot(tenant, flow, head, range) {
+    if (this.closed || !head?.version) return;
+    const key = tenant + "/" + flow;
+    let hit = this.cache.get(key, head.version);
+    if (!hit && this.disk) {
+      const diskHead = this.disk.heads.get(key);
+      if (diskHead?.version === head.version)
+        hit = await this.disk.get(key, diskHead.session, head.version, head, range);
+    }
+    if (
+      !hit ||
+      hit.seq !== head.seq ||
+      hit.floor !== head.floor ||
+      (hit.locals ?? hit.records.length) !== head.count ||
+      hit.localBytes !== head.bytes
+    )
+      return;
+    return hit;
+  }
   capture(job) {
     const disk = this.disk?.disabled ? undefined : this.disk;
     if (this.closed || (!disk && this.cache.maxBytes === 0)) return;

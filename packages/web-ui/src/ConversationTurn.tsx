@@ -1,3 +1,4 @@
+import { useInputQueue } from "./PendingInputQueue.tsx";
 import { InitialInputMessage } from "./InitialInputMessage.tsx";
 import { HistoryDisclosureContext } from "./history-disclosure.tsx";
 import { CompactStatus } from "./ConversationUsage.tsx";
@@ -389,6 +390,7 @@ export function ConversationTurn({
   onOpenChild?: (child: DelegatedSessionSummaryResource) => void;
 }) {
   const { t } = useI18n();
+  const latestRead = useInputQueue()?.queue?.latestRead;
   const showHeader = fragment?.header ?? true;
   const showFooter = (fragment?.footer ?? true) && !turn.continuesAfter;
   const working =
@@ -471,6 +473,14 @@ export function ConversationTurn({
                         />
                         {row.item.text ? (
                           <div className="product-user-bubble">{row.item.text}</div>
+                        ) : null}
+                        {latestRead &&
+                        !latestRead.initial &&
+                        latestRead.turnId === turn.turnId &&
+                        latestRead.inputId === row.item.inputId ? (
+                          <small data-receipt="read" className="input-delivery-receipt">
+                            {t("queue.read")}
+                          </small>
                         ) : null}
                         <div className="product-user-message-actions">
                           <MessageCopyButton

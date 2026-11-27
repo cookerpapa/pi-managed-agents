@@ -25,23 +25,6 @@ end $$;
 create trigger independent_turn_owner before insert or update of state,lease_id,fencing_token on runs
   for each row execute function guard_segment_owner();
 
--- NOTIFY folds identical payloads within one transaction. Distinct Session
--- flows represent independently claimable work. Private schemas have separate
--- channels, including when the candidate shares PG with the serving layout.
-create function notify_segment_work() returns trigger language plpgsql set search_path from current as $$
-begin
-  if new.state='queued' or exists(select from runs r where r.tenant_id=new.tenant_id and r.session_id=new.session_id
-      and r.mailbox_position>new.mailbox_position and r.state='queued') then
-    perform pg_notify('pma_segment_ready_'||md5(tg_table_schema),new.session_id::text);
-  end if;
-  return null;
-end $$;
-create constraint trigger independent_turn_ready after insert or update of state on runs deferrable initially deferred for each row
-  when(new.state='queued') execute function notify_segment_work();
-create constraint trigger independent_successor_ready after update of state on runs deferrable initially deferred for each row
-  when(old.state is distinct from new.state and new.state in ('completed','failed','cancelled','timed_out'))
-  execute function notify_segment_work();
-
 -- Closing the caller retires undeliverable acknowledgements. Child completion has no callback.
 create function wake_segment_returns() returns trigger language plpgsql set search_path from current as $$
 begin

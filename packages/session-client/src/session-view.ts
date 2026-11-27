@@ -230,6 +230,7 @@ export type SessionViewAction =
   | { type: "compact.accepted"; compact: import("@pi-cloud/protocol").ConversationCompactResource }
   | { type: "turn.cancellation.requested"; turnId: string }
   | { type: "stream.status"; status: SessionStreamStatus }
+  | { type: "input.placed"; placement: import("@pi-cloud/protocol").InputPlaced }
   | { type: "stream.event"; event: PiCloudEvent }
   | { type: "api.error"; message: string }
   | { type: "api.error.cleared" };
@@ -773,6 +774,34 @@ function applyEvent(state: SessionViewState, event: PiCloudEvent): SessionViewSt
 }
 
 function reduceSessionView(state: SessionViewState, action: SessionViewAction): SessionViewState {
+  if (action.type === "input.placed") {
+    const p = action.placement;
+    if (state.session?.sessionId !== p.sessionId) return state;
+    return {
+      ...state,
+      turns: updateTurn(state.turns, p.turnId, (turn) => {
+        if (p.initial) return { ...turn, prompt: p.text, uploads: p.uploads };
+        if (turn.items.some((i) => i.kind === "user" && i.inputId === p.inputId)) return turn;
+        const seq = p.sequence;
+        return {
+          ...turn,
+          items: [
+            ...turn.items,
+            {
+              kind: "user",
+              key: "user:" + p.inputId,
+              messageId: "entry:" + p.entryId,
+              inputId: p.inputId,
+              text: p.text,
+              uploads: p.uploads,
+              firstSequence: seq,
+              lastSequence: seq,
+            },
+          ],
+        };
+      }),
+    };
+  }
   if (action.type === "turn.discovered") {
     if (state.session?.sessionId !== action.sessionId) return state;
     return {
@@ -927,7 +956,8 @@ function reduceSessionView(state: SessionViewState, action: SessionViewAction): 
     let turns = state.turns;
     for (const item of action.queue.items) {
       if (item.runMailboxPosition === undefined) continue;
-      const previous = turns.find((turn) => turn.turnId === item.inputId);
+      const initialId = item.initialTurnId ?? item.inputId;
+      const previous = turns.find((turn) => turn.turnId === initialId);
       if (previous && (previous.status !== "queued" || previous.operation)) continue;
       const position = item.runMailboxPosition ?? previous?.mailboxPosition ?? null;
       if (
@@ -937,7 +967,7 @@ function reduceSessionView(state: SessionViewState, action: SessionViewAction): 
         JSON.stringify(previous.uploads ?? []) === JSON.stringify(item.uploads ?? [])
       )
         continue;
-      turns = updateTurn(turns, item.inputId, (turn) => ({
+      turns = updateTurn(turns, initialId, (turn) => ({
         ...turn,
         runId: item.runId,
         mailboxPosition: position,

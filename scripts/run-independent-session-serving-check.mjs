@@ -2,8 +2,8 @@
 // explicitly configured provider. No credentials, prompts or responses are reported.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { randomUUID, randomBytes, scryptSync } from "node:crypto";
-import { mkdtemp, chmod, writeFile, rm } from "node:fs/promises";
+import { randomUUID, randomBytes, scryptSync, createHash } from "node:crypto";
+import { mkdtemp, chmod, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -26,6 +26,7 @@ const tag = process.argv[2],
   capacity = load ? Number(process.env.PI_CLOUD_CHECK_WORKER_SLOTS ?? 64) : 4;
 if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 64)
   throw Error("Invalid load Worker capacity");
+const mixed = load && process.argv.includes("--mixed");
 const profileClaims = load && process.argv.includes("--profile-claims");
 const probe = "scripts/experiments/minimal-session-storage/claim-timing-probe.mjs";
 let provider = process.env.PI_CLOUD_PROVIDER_GATEWAY_URL,
@@ -93,7 +94,7 @@ try {
   ];
   const mgEnv = { PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN_FILE: "/run/pma/management" },
     enEnv = { PI_CLOUD_SUPERVISOR_ENROLLMENT_TOKEN_FILE: "/run/pma/enroll" };
-  function role(name, roleName, env, files, command = []) {
+  function role(name, roleName, env, files, command = [], imageTag = tag) {
     const label = "pma-" + name + "-" + suffix;
     docker([
       "run",
@@ -111,14 +112,16 @@ try {
       ...Object.entries({ ...config, ...env }).flatMap(([k, v]) => ["-e", k + "=" + v]),
       ...mount(dbFile, "database"),
       ...files,
-      "pi-managed-agents/segment-" + roleName + ":" + tag,
+      "pi-managed-agents/segment-" + roleName + ":" + imageTag,
       ...command,
     ]);
     names.push(label);
     clean.push(() => docker(["rm", "-f", label]));
     return label;
   }
-  const migration = role("migration", "migrate", {}, []);
+  const priorImage = process.env.PI_CLOUD_CHECK_QUEUE_UPGRADE_FROM;
+  if (priorImage) assert(/^[a-z0-9][a-z0-9_.-]{0,90}$/.test(priorImage));
+  const migration = role("migration", "migrate", {}, [], [], priorImage ?? tag);
   const exit = docker(["wait", migration]).trim();
   assert.equal(exit, "0", "migration failed");
   const db = createDatabase({ connectionString: pgFix.url });
@@ -166,6 +169,84 @@ try {
       modelId: process.env.PI_CLOUD_CHECK_MODEL ?? "gpt-6.1-sol",
     },
   });
+  if (priorImage) {
+    const { registerTestWorker } =
+      await import("../packages/control-plane/test/fixtures/registered-worker.ts");
+    const owner = randomUUID(),
+      boot = randomUUID(),
+      logical = randomUUID(),
+      first = randomUUID(),
+      second = randomUUID(),
+      input = randomUUID();
+    await db
+      .insertInto("workers")
+      .values({
+        id: owner,
+        supervisor_id: owner,
+        boot_id: boot,
+        state: "ready",
+        max_concurrent_sessions: 1,
+      })
+      .execute();
+    await registerTestWorker(db, owner);
+    const c = await pool.connect();
+    try {
+      await c.query("set search_path=pma_segments,public");
+      await c.query("insert into flows(tenant_id,flow_id) values($1,$2)", [
+        identity.tenantId,
+        logical,
+      ]);
+      await c.query(
+        "insert into sessions(tenant_id,id,flow_id,family_id,agent_name,desired_model) values($1,$2,$2,$2,'root','{}')",
+        [identity.tenantId, logical],
+      );
+      for (const [i, id] of [first, second].entries())
+        await c.query(
+          "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) values($1,$2,$3,$4,$1,'upgrade','queued')",
+          [id, identity.tenantId, logical, i + 1],
+        );
+      await c.query(
+        "insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,fingerprint,turn_id,request_key) values($1,$2,$3,$4,'user','follow_up','upgrade','fixture',$5,'stable')",
+        [identity.tenantId, logical, input, owner, first],
+      );
+      const denied = role("old-boot-guard", "migrate", {}, []);
+      assert.notEqual(docker(["wait", denied]).trim(), "0");
+      assert.equal((await c.query("select version from installation")).rows[0].version, 1);
+      await c.query(
+        "update public.supervisor_connections set state='expired',close_reason='heartbeat_timeout',closed_at=clock_timestamp() where worker_id=$1",
+        [owner],
+      );
+      const upgrade = role("queue-upgrade", "migrate", {}, []);
+      assert.equal(docker(["wait", upgrade]).trim(), "0");
+      assert.equal(
+        (
+          await c.query(
+            "select version,to_regclass('pma_segments.ready_agent_sessions') as retired from installation",
+          )
+        ).rows[0].retired,
+        null,
+      );
+      const { rows } = await c.query(
+        "select id,ready_at is not null as ready from turns where session_id=$1 order by mailbox_position",
+        [logical],
+      );
+      assert.deepEqual(rows, [
+        { id: first, ready: true },
+        { id: second, ready: false },
+      ]);
+      assert(
+        (await c.query("select starts_turn from user_or_agent_messages where id=$1", [input]))
+          .rows[0].starts_turn,
+      );
+      await c.query("delete from turns where session_id=$1", [logical]);
+      console.log(
+        "Matched queue upgrade rejected an active old boot, preserved both Turns and their input, and promoted only the head.",
+      );
+    } finally {
+      await c.query("reset search_path");
+      c.release();
+    }
+  }
   const admin = new kafkaNative.KafkaJS.Kafka({
     kafkaJS: { brokers: kafka.brokers, logLevel: kafkaNative.KafkaJS.logLevel.NOTHING },
   }).admin();
@@ -310,6 +391,27 @@ try {
       "Existing installation accepted a concurrent Turn insert, recovered the interrupted index build and retained the valid index on retry.",
     );
   }
+  let mixedFile, tapeHash;
+  const mixedEntry = "scripts/experiments/minimal-session-storage/claim-mixed-probe.mjs";
+  if (mixed) {
+    assert(!profileClaims);
+    const { nativeBashTrace } =
+      await import("./experiments/minimal-session-storage/native-bash-trace.mjs");
+    const requestId = "11111111-1111-4111-8111-111111111111";
+    const tape = process.env.PI_CLOUD_CHECK_MIXED_TAPE
+      ? await readFile(process.env.PI_CLOUD_CHECK_MIXED_TAPE)
+      : Buffer.from(
+          JSON.stringify({
+            requestId,
+            frames: await nativeBashTrace({ runId: requestId }, undefined, {
+              callsPerRun: 20,
+              callIdAt: (i) => "call-" + i,
+            }),
+          }),
+        );
+    tapeHash = createHash("sha256").update(tape).digest("hex");
+    mixedFile = await file("mixed-trace", tape);
+  }
   const startWorker = async (i) => {
     const label = role(
       "worker-" + i,
@@ -342,6 +444,17 @@ try {
         ...mount(management, "management"),
         ...mount(enroll, "enroll"),
         ...mount(keyFile, "provider"),
+        ...(mixed
+          ? [
+              ...mount(mixedFile, "mixed-trace"),
+              "--mount",
+              "type=bind,src=" +
+                fileURLToPath(new URL("../" + mixedEntry, import.meta.url)) +
+                ",dst=/app/" +
+                mixedEntry +
+                ",readonly",
+            ]
+          : []),
         ...(profileClaims
           ? [
               "--mount",
@@ -353,7 +466,7 @@ try {
             ]
           : []),
       ],
-      profileClaims ? ["/app/" + probe] : [],
+      mixed ? ["/app/" + mixedEntry] : profileClaims ? ["/app/" + probe] : [],
     );
     await until("Worker ready", () => health(hostPorts[i]), 45000);
     return label;
@@ -383,7 +496,7 @@ try {
       const {
         rows: [r],
       } = await pool.query(`select
-        substring(body from 'usage_usec ([0-9]+)')::float8/1000 cpu_ms,
+        pg_current_wal_insert_lsn() as lsn, substring(body from 'usage_usec ([0-9]+)')::float8/1000 cpu_ms,
         substring(body from 'nr_throttled ([0-9]+)')::int periods
         from pg_read_file('/sys/fs/cgroup/cpu.stat') body`);
       return r;
@@ -445,7 +558,7 @@ try {
           }
           const a = await api.acceptTurn(
             sessions[i].sessionId,
-            fake.prompt("turn_" + i),
+            mixed ? "Run the fixed test tool." : fake.prompt("turn_" + i),
             "turn:" + randomUUID(),
           );
           ids.push(a.turnId);
@@ -467,6 +580,12 @@ try {
     const elapsedMs = performance.now() - begin;
     clearInterval(timer);
     const finalCpu = await pgCpu();
+    const {
+      rows: [wal],
+    } = await pool.query("select pg_wal_lsn_diff($1::pg_lsn,$2::pg_lsn)::float8 bytes", [
+      finalCpu.lsn,
+      initialCpu.lsn,
+    ]);
     if (sampleError) throw sampleError;
     const {
       rows: [timing],
@@ -525,13 +644,37 @@ try {
       });
     }
     assert.equal(timing.completed, count);
-    const {
-      rows: [visible],
-    } = await pool.query(
-      "select count(*)::int n from pma_segments.messages where run_id=any($1::uuid[]) and role='assistant' and navigation_caption is not null",
-      [ids],
-    );
-    assert.equal(visible.n, count);
+    let visible;
+    if (mixed) {
+      const { rows } = await pool.query(
+        `with outputs as (
+        select run_id,commit_seq,role,content::jsonb#>'{model,0}' as msg from pma_segments.messages
+        where run_id=any($1::uuid[]) and role in ('assistant','toolResult'))
+        select run_id,count(distinct commit_seq)::int n,
+          array_agg(msg#>>'{content,0,id}' order by commit_seq) filter(where msg#>>'{content,0,type}'='toolCall') calls,
+          array_agg(msg->>'toolCallId' order by commit_seq) filter(where role='toolResult') results,
+          count(*) filter(where msg#>>'{content,0,text}'='ok')::int finals
+        from outputs group by run_id`,
+        [ids],
+      );
+      assert.equal(rows.length, count);
+      const expected = Array.from({ length: 20 }, (_, i) => "call-" + i);
+      for (const r of rows) {
+        assert.deepEqual(r.calls, expected);
+        assert.deepEqual(r.results, expected);
+        assert.equal(r.finals, 1);
+      }
+      visible = { n: rows.reduce((n, r) => n + r.n, 0) };
+    } else {
+      const {
+        rows: [answer],
+      } = await pool.query(
+        "select count(*)::int n from pma_segments.messages where run_id=any($1::uuid[]) and role='assistant' and navigation_caption is not null",
+        [ids],
+      );
+      assert.equal(answer.n, count);
+      visible = answer;
+    }
     const offsets = await admin.fetchTopicOffsets(topic),
       { rows: positions } = await pool.query(
         "select partition,next_offset from pma_segments.accepted_fact_projection_offsets where topic=$1",
@@ -548,7 +691,15 @@ try {
     assert.equal(finalLag, 0);
     console.log(
       JSON.stringify({
-        mode: "text-load",
+        mode: mixed ? "mixed-claim-replay" : "text-load",
+        ...(mixed
+          ? {
+              tapeHash,
+              completeCalls: count * 20,
+              completeResults: count * 20,
+              completeAnswers: count,
+            }
+          : {}),
         claimBatchLimit: Number(
           process.env.PI_CLOUD_SEGMENT_CLAIM_BATCH ?? defaultSessionClaimBatch,
         ),
@@ -582,6 +733,7 @@ try {
         ...claims,
         workerSlots: capacity,
         pgCpuLimit: Number(process.env.PI_CLOUD_CHECK_PG_CPUS ?? 2),
+        pgWalBytesPerTurn: wal.bytes / count,
         pgCpuMs: finalCpu.cpu_ms - initialCpu.cpu_ms,
         pgThrottledPeriods: finalCpu.periods - initialCpu.periods,
         peakModelRequests: fake.metrics().maximumInflight,
@@ -686,7 +838,7 @@ try {
         () => false,
       ),
     );
-    const first = await startWorker(0);
+    let first;
     async function terminal(number) {
       const row = await until(
         "committed Turn " + number,
@@ -703,6 +855,7 @@ try {
       return row.id;
     }
     let t1, t2;
+    const placements = new Set();
     const seenTerminals = new Set(),
       seenDeltas = new Set();
     const observe = new AbortController(),
@@ -712,6 +865,7 @@ try {
       signal: observe.signal,
       onStatus() {},
       onSnapshot: () => snapshot.resolve(),
+      onInputPlaced: (p) => placements.add(p.turnId),
       onEvent: (e) => {
         if (e.type === "turn.completed") seenTerminals.add(e.turnId);
         if (e.type === "assistant.text.delta") seenDeltas.add(e.turnId);
@@ -771,6 +925,12 @@ try {
           assert(ack.status < 300, "Browser admission status " + ack.status);
         }
         await send("Reply with exactly this code: " + token);
+        await page.waitFor(
+          "document.querySelector('[data-receipt=delivered]') && !document.querySelector('[data-receipt=read]')",
+          12000,
+        );
+        first = await startWorker(0);
+        await page.waitFor("document.querySelector('[data-receipt=read]')", 45000);
         t1 = await terminal(1);
         await page.waitFor(hasCount(1));
         await page.navigate(link);
@@ -782,11 +942,19 @@ try {
         await page.waitFor(hasCount(2));
         await page.navigate(link);
         await page.waitFor(hasCount(2));
+        await page.waitFor(
+          "document.querySelectorAll('[data-receipt=read]').length===1 && document.querySelector('[data-receipt=read]').closest('[data-conversation-turn-id]').dataset.conversationTurnId===" +
+            JSON.stringify(t2),
+        );
       });
       await until(
         "two live terminal events",
         () => seenTerminals.has(t1) && seenTerminals.has(t2),
         10000,
+      );
+      assert(
+        placements.has(t1) && placements.has(t2),
+        "Both Turns should publish canonical input placement",
       );
       assert(
         seenDeltas.has(t1) && seenDeltas.has(t2),

@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Turn queue, Fork cache and delivered/read receipts](turn-queue-fork-receipts-20261128.md) includes a matched migration and a fixed 20-tool throughput comparison.
+
 - [Integrated Turn selector](session-claim-selector-integration-20261127.md) covers the online index migration, steady write cost and matched serving measurements.
 
 - [Worker claim selector](session-claim-selector-20261127.md) measures real plan work, client pool contention and fixed-rate Kafka lag.

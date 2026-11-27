@@ -3,6 +3,7 @@ import type {
   ToolProgress,
   RunObservation,
   InputQueueResource,
+  InputPlaced,
   NativeInputConfirmation,
 } from "@pi-cloud/protocol";
 import {
@@ -20,6 +21,7 @@ export type SessionEventWake = {
   progress?: ToolProgress;
   observation?: RunObservation;
   inputQueue?: InputQueueResource;
+  placement?: InputPlaced;
 };
 
 type PendingRead = {
@@ -80,7 +82,7 @@ export class SessionEventSubscription {
             preview.header.toolCallId === event.payload.toolCallId)
         )
           this.#progress.delete(id);
-    this.#push(event, encodedBytes);
+    this.#push({ throughSequence: event.seq, event }, encodedBytes);
   }
 
   notifyProgress(progress: ToolProgress): void {
@@ -159,8 +161,13 @@ export class SessionEventSubscription {
     this.#inputQueue = undefined;
   }
 
-  #push(event: PiCloudEvent, encodedBytes: () => number): void {
-    const wake = { throughSequence: event.seq, event };
+  notifyPlacement(placement: InputPlaced): void {
+    if (this.#closed || this.#resync) return;
+    this.#push({ throughSequence: null, placement }, () =>
+      Buffer.byteLength(JSON.stringify(placement)),
+    );
+  }
+  #push(wake: SessionEventWake, encodedBytes: () => number): void {
     if (this.#pendingRead !== undefined) {
       const pending = this.#pendingRead;
       this.#pendingRead = undefined;
@@ -344,6 +351,10 @@ export class SessionEventHub {
   }
   hasSubscribers(tenant: string, session: string): boolean {
     return (this.#subscriptions.get(this.#key(tenant, session))?.size ?? 0) > 0;
+  }
+  publishPlacement(tenant: string, placement: InputPlaced): void {
+    for (const sub of this.#subscriptions.get(this.#key(tenant, placement.sessionId)) ?? [])
+      sub.notifyPlacement(placement);
   }
   publishInputQueue(tenant: string, queue: InputQueueResource): void {
     for (const subscriber of this.#subscriptions.get(this.#key(tenant, queue.sessionId)) ?? [])

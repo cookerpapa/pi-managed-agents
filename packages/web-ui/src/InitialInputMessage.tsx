@@ -19,18 +19,26 @@ export function InitialInputMessage({
 }) {
   const { t } = useI18n();
   const queue = useInputQueue();
-  const item =
-    turn.status === "queued"
-      ? queue?.queue?.items.find(
-          (input) => input.inputId === turn.turnId && input.runMailboxPosition !== undefined,
-        )
-      : undefined;
-  const editing = queue?.editing?.initial && queue.editing.inputId === turn.turnId;
-  const menuOpen = queue?.menuInputId === turn.turnId;
+  const snapshot = queue?.queue;
+  const pending = snapshot?.items.find(
+    (i) =>
+      i.initialTurnId === turn.turnId ||
+      (i.inputId === turn.turnId && i.runMailboxPosition !== undefined),
+  );
+  const item = turn.status === "queued" || pending?.initialTurnId ? pending : undefined;
+  const inputId = pending?.inputId ?? turn.turnId;
+  const editing = queue?.editing?.initial && queue.editing.inputId === inputId;
+  const menuOpen = queue?.menuInputId === inputId;
+  const receipt =
+    snapshot?.latestRead?.initial && snapshot.latestRead.turnId === turn.turnId
+      ? "read"
+      : pending && snapshot?.latestRead !== undefined && pending.status !== "withdrawing"
+        ? "delivered"
+        : null;
   return (
     <div
       className="product-user-message-body initial-input-message"
-      data-input-id={turn.turnId}
+      data-input-id={inputId}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget) && menuOpen)
           queue?.setMenuInputId(null);
@@ -79,6 +87,11 @@ export function InitialInputMessage({
             {...(turn.uploads ? { uploads: turn.uploads } : {})}
           />
           {turn.prompt ? <div className="product-user-bubble">{turn.prompt}</div> : null}
+          {receipt && !turn.localSubmission ? (
+            <small className="input-delivery-receipt" data-receipt={receipt}>
+              {t(receipt === "read" ? "queue.read" : "queue.delivered")}
+            </small>
+          ) : null}
           {turn.localSubmission?.input.uploadIds.length ? (
             <small className="initial-input-attachments">
               {t("composer.sendingAttachments", {
@@ -108,7 +121,7 @@ export function InitialInputMessage({
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 disabled={!queue.canMutate || queue.busy !== null}
-                onClick={() => queue.setMenuInputId(menuOpen ? null : turn.turnId)}
+                onClick={() => queue.setMenuInputId(menuOpen ? null : inputId)}
               >
                 ⋯
               </button>

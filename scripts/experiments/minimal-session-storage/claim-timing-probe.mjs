@@ -36,7 +36,11 @@ pg.Client.prototype.getStartupConf = function () {
   return config;
 };
 function stage(sql) {
-  if (sql.includes("from ready_agent_sessions q join sessions")) return "selectCandidates";
+  if (
+    sql.includes("from ready_agent_sessions q join sessions") ||
+    (sql.includes("r.ready_at") && sql.includes("skip locked"))
+  )
+    return "selectCandidates";
   if (sql.includes('from "workers"') && sql.includes("for update")) return "lockWorker";
   if (sql.includes("count(*)::int used")) return "countLeases";
   if (sql.includes("insert into pi_sessions")) return "preparePhysical";

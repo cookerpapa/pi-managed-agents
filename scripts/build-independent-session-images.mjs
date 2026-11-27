@@ -26,6 +26,7 @@ const sqlAssets = [
   "independent-session-leases",
   "turn-snapshots",
   "session-inputs",
+  "turn-ready",
 ].map((n) => segment + n + ".sql");
 const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const dirty = !!execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim();
@@ -36,7 +37,12 @@ for (const [role, base, entry, assets] of [
   ["migrate", control, "scripts/serving/independent-session/migrate.mjs", sqlAssets],
   ["api", control, "packages/control-plane/src/independent-session-api-main.mjs", []],
   ["projector", control, "packages/control-plane/src/independent-session-projector-main.mjs", []],
-  ["worker", worker, "packages/supervisor-host/src/independent-session-worker-main.mjs", []],
+  [
+    "worker",
+    worker,
+    "packages/supervisor-host/src/independent-session-worker-main.mjs",
+    [segment + "segment-history-sqlite.mjs"],
+  ],
 ]) {
   const out = await mkdtemp(join(tmpdir(), "pma-role-"));
   try {

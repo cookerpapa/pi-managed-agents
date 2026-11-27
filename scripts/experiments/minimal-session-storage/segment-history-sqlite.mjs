@@ -237,11 +237,16 @@ function handle(op, m) {
       return;
     }
     db.prepare("update heads set touched=? where k=?").run(m.now, m.key);
-    iterator = db
-      .prepare(
-        "select ord,native,inherited,seq,weight,body,digest from entries where k=? order by ord",
-      )
-      .iterate(m.key);
+    const columns = "select ord,native,inherited,seq,weight,body,digest from entries where k=?";
+    iterator = m.range
+      ? db
+          .prepare(
+            columns +
+              ` and ((inherited=0 and native between ? and ? and seq<=?)
+      or (inherited=1 and native<=?)) order by ord`,
+          )
+          .iterate(m.key, m.range.first, m.range.last, m.range.through, m.range.ancestorLast)
+      : db.prepare(columns + " order by ord").iterate(m.key);
     return h;
   }
   if (op === "batch") {

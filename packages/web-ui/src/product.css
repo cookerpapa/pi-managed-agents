@@ -1233,6 +1233,12 @@ body.product-panel-resizing {
   white-space: pre-wrap;
 }
 
+.input-delivery-receipt {
+  display: block;
+  text-align: end;
+  color: var(--muted, #a1a1a1);
+  font-size: 0.75rem;
+}
 .product-user-message-actions {
   min-height: 27px;
   padding-top: 3px;

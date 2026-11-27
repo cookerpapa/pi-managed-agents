@@ -16,6 +16,8 @@ The isolated Worker now grants a selected Session batch with set-based SQL while
 
 The candidate selects unsettled Turns using a partial index and probes the per-Turn mailbox index for input presence. Existing candidate installations can build the index while accepting writes. [Installation and measurements](reports/session-claim-selector-integration-20261127.md).
 
+The segmented candidate now claims ready Turns directly, immediately routes continuations and imports verified cached Fork ranges. [Decision](adr/0376-direct-turn-claims-and-fork-locality.md) · [Acceptance](reports/turn-queue-fork-receipts-20261128.md).
+
 [ADR-0313](adr/0313-alternate-runtime-production-integration.md) implements
 explicit stock BoxLite and Android integration beyond the earlier ADR-0312
 operator experiments. The BoxLite native SDK lives in its own trusted node,

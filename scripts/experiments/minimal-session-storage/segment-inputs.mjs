@@ -100,7 +100,7 @@ export class SegmentInputs extends SegmentMailReader {
       rows: [row],
     } =
       await sql`insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,uploads,fingerprint,turn_id,starts_turn,request_key,state)
-      values(${tenant}::uuid,${session}::uuid,${id}::uuid,${sender}::uuid,${source},${!open && !initialTurn && source === "user" ? "input" : mode},${text},${JSON.stringify(uploads)}::jsonb,${hash},${turn}::uuid,${!held && (Boolean(initialTurn) || !open)},${requestKey},${held ? "held" : "pending"}) returning *`.execute(
+      values(${tenant}::uuid,${session}::uuid,${id}::uuid,${sender}::uuid,${source},${mode},${text},${JSON.stringify(uploads)}::jsonb,${hash},${turn}::uuid,${!held && (Boolean(initialTurn) || !open)},${requestKey},${held ? "held" : "pending"}) returning *`.execute(
         tx,
       );
     return row;
@@ -241,7 +241,7 @@ export class SegmentInputs extends SegmentMailReader {
   }
   async queue(tenant, session, sender, tx = this.db, after = 0, limit = 64) {
     return (
-      await sql`select m.id,m.mode,m.body,m.uploads,m.state,m.withdrawing,m.position,m.turn_id,m.accepted_at,
+      await sql`select m.id,m.mode,m.body,m.uploads,m.state,m.withdrawing,m.position,m.turn_id,m.accepted_at,m.starts_turn,
      case when m.starts_turn and r.state='queued' then r.mailbox_position end as initial_position,
      (m.steer_seen_epoch=r.fencing_token and r.state='running' and r.output_seal_id is null and l.released_at is null and l.writer_failed_at is null and l.valid_until>statement_timestamp()) as owner_notified
      from user_or_agent_messages m join turns r on r.id=m.turn_id left join session_leases l on l.lease_id=r.lease_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
@@ -277,11 +277,14 @@ export class SegmentInputs extends SegmentMailReader {
         );
       if (!changed.withdrawing) {
         if (m.starts_turn) {
-          await sql`update turns r set initial_input=coalesce(next.body,''),input_uploads=coalesce(next.uploads,'[]'::jsonb)
-            from (select n.body,n.uploads from (values(1)) first_input(dummy) left join lateral
-              (select body,uploads from user_or_agent_messages where turn_id=${m.turn_id}::uuid and state='pending' order by position limit 1) n on true) next where r.id=${m.turn_id}::uuid and r.state='queued' and r.started_at is null`.execute(
-            tx,
-          );
+          await sql`with first_pending as (
+              select id from user_or_agent_messages where turn_id=${m.turn_id}::uuid and state='pending' order by position limit 1
+            ), promoted as (
+              update user_or_agent_messages u set starts_turn=true from first_pending p
+              where u.turn_id=${m.turn_id}::uuid and u.id=p.id returning u.body,u.uploads
+            ) update turns set initial_input=coalesce((select body from promoted),''),
+                input_uploads=coalesce((select uploads from promoted),'[]'::jsonb)
+              where id=${m.turn_id}::uuid and state='queued' and started_at is null`.execute(tx);
         }
         await sql`update turns set state=case when state='running' then 'cancel_requested' else 'cancelled' end,
           settled_at=case when state='queued' then clock_timestamp() else settled_at end where id=${m.turn_id}::uuid and state in ('queued','running') and exists(select from user_or_agent_messages where turn_id=${m.turn_id}::uuid and starts_turn) and

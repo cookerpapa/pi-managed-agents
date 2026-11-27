@@ -1,46 +1,3 @@
--- Session readiness is independent of mailbox length. The Turn remains a
--- history and fencing anchor and is selected only after a Session is picked.
-create table ready_agent_sessions (
-  tenant_id uuid not null, session_id uuid not null, ready_at timestamptz not null default clock_timestamp(),
-  primary key(tenant_id,session_id),
-  foreign key(tenant_id,session_id) references sessions(tenant_id,id) on delete cascade
-);
-create index ready_agent_sessions_fifo on ready_agent_sessions(ready_at,session_id);
-create or replace function notify_segment_work() returns trigger language plpgsql set search_path from current as $$
-declare target uuid; job record; fallback timestamptz; payload text;
-begin
-  select id into target from sessions where tenant_id=new.tenant_id and flow_id=new.session_id;
-  if not found then return null; end if;
-  -- Deferred ready triggers see the predecessor's final projected head, even
-  -- when closure promotes late mail to a successor in the same transaction.
-  select r.id,r.created_at,r.started_at,p.history_head,p.settled_at into job
-    from turns r left join turns p on p.tenant_id=r.tenant_id and p.session_id=r.session_id
-      and p.mailbox_position=r.mailbox_position-1 and p.state='completed'
-    where r.tenant_id=new.tenant_id and r.session_id=new.session_id and r.state='queued'
-    order by r.mailbox_position limit 1;
-  if not found then
-    delete from ready_agent_sessions where tenant_id=new.tenant_id and session_id=target;
-    return null;
-  end if;
-  fallback:=job.created_at;
-  payload:=target::text;
-  if job.started_at is null and job.history_head->>'version' is not null then
-    -- Local bytes exclude inherited Fork ranges. The connected Worker knows
-    -- their actual resident size; an exact cold wake bypasses this window too.
-    if (job.history_head->>'bytes')::bigint>=16777216 or exists(select from flow_segments
-      where tenant_id=new.tenant_id and destination_flow=new.session_id) then
-      fallback:=greatest(job.created_at,job.settled_at)+interval '2 seconds';
-    end if;
-    payload:=json_build_array(new.tenant_id,target,job.id,job.history_head->>'version',new.session_id,
-      floor(extract(epoch from fallback)*1000)::bigint)::text;
-  end if;
-  insert into ready_agent_sessions(tenant_id,session_id,ready_at) values(new.tenant_id,target,fallback)
-    on conflict(tenant_id,session_id) do update set ready_at=excluded.ready_at
-    where ready_agent_sessions.ready_at<>excluded.ready_at;
-  perform pg_notify('pma_segment_ready_'||md5(tg_table_schema),payload);
-  return null;
-end $$;
-
 alter table turns add column stop_request jsonb;
 create unique index session_stop_request on turns(tenant_id,session_id,(stop_request->>'key')) where stop_request is not null;
 alter table sessions add column agent_mail_paused boolean not null default false;
@@ -181,38 +138,6 @@ end $$;
 create trigger agent_mail_stop after update of state on turns for each row
  when(old.state<>new.state and (new.state='cancel_requested' or (new.state='cancelled' and old.state<>'cancel_requested')))
  execute function pause_agent_mail();
-
--- Inputs that missed the final boundary move to the successor under the Session lock.
-create function finish_session_mail() returns trigger language plpgsql set search_path from current as $$
-declare next_turn uuid; first_input user_or_agent_messages%rowtype;
-begin
-  perform id from sessions where tenant_id=new.tenant_id and flow_id=new.session_id for no key update;
-  if new.state='cancelled' or old.state='cancel_requested' then
-    select id into next_turn from turns where tenant_id=new.tenant_id and session_id=new.session_id
-      and mailbox_position>new.mailbox_position and state='queued' order by mailbox_position limit 1;
-    update user_or_agent_messages set state='withdrawn',withdrawing=false,return_requested=true
-      where turn_id=new.id and source='user' and state in ('pending','sending');
-    update user_or_agent_messages set turn_id=next_turn,state=case when next_turn is null then 'held' else 'pending' end,
-      starts_turn=false,boundary_task=null,steer_notice=null,steer_seen_epoch=null
-      where turn_id=new.id and source='agent' and state in ('pending','sending');
-    return null;
-  end if;
-  update user_or_agent_messages set state='withdrawn',withdrawing=false where turn_id=new.id and withdrawing and state in ('pending','sending');
-  select * into first_input from user_or_agent_messages where turn_id=new.id and state in ('pending','sending') order by position limit 1;
-  if found then
-    select id into next_turn from turns where tenant_id=new.tenant_id and session_id=new.session_id and state='queued' order by mailbox_position limit 1;
-    if next_turn is null then
-      next_turn:=gen_random_uuid();
-      insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,input_uploads,state)
-        select next_turn,new.tenant_id,new.session_id,max(mailbox_position)+1,gen_random_uuid(),first_input.body,first_input.uploads,'queued'
-        from turns where tenant_id=new.tenant_id and session_id=new.session_id;
-    end if;
-    update user_or_agent_messages set turn_id=next_turn,state='pending',boundary_task=null where turn_id=new.id and state in ('pending','sending');
-  end if;
-  return null;
-end $$;
-create trigger finish_agent_session_inputs after update of state on turns for each row
- when(old.state is distinct from new.state and new.state in ('completed','cancelled','failed','timed_out')) execute function finish_session_mail();
 
 -- The same accepted projection transaction records native placement and
 -- withdrawal before the Session API can report either operation as successful.

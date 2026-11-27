@@ -37,8 +37,51 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
     stats.faults++;
     return true;
   }
+  // Dense available list permits uniform two-choice sampling without a fleet scan.
+  const available = [],
+    positions = new WeakMap(),
+    spare = new WeakMap(),
+    largeOffers = new WeakMap();
+  function offerSocket(socket, free) {
+    spare.set(socket, free);
+    if (!waiting.has(socket)) {
+      positions.set(socket, available.length);
+      available.push(socket);
+      waiting.add(socket);
+    }
+  }
+  function removeOffer(socket) {
+    if (!waiting.delete(socket)) return;
+    const pos = positions.get(socket),
+      tail = available.pop();
+    positions.delete(socket);
+    if (tail !== socket) {
+      available[pos] = tail;
+      positions.set(tail, pos);
+    }
+  }
+  function protectsCache(socket) {
+    const entries = largeOffers.get(socket);
+    if (entries)
+      for (const [key, expires] of entries) {
+        if (expires > Date.now()) return true;
+        entries.delete(key);
+      }
+    return false;
+  }
+  function ordinary() {
+    if (!stage.perTurn || available.length < 2) return waiting.values().next().value;
+    const i = Math.floor(Math.random() * available.length);
+    let j = Math.floor(Math.random() * (available.length - 1));
+    if (j >= i) j++;
+    const a = available[i],
+      b = available[j],
+      delta = spare.get(a) - spare.get(b);
+    if (delta !== 0) return delta > 0 ? a : b;
+    return protectsCache(a) && !protectsCache(b) ? b : a;
+  }
   function signal(socket, reason, hint) {
-    waiting.delete(socket);
+    removeOffer(socket);
     if (reason === "arrival" && drop("disconnect")) return socket.terminate();
     if (reason === "arrival" && drop("lost-wake")) return;
     if (stage.perTurn && reason === "tick") probes.add(socket);
@@ -47,30 +90,30 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
   }
   function signalWaiting(count, reason) {
     let sent = 0;
-    for (const socket of waiting) {
-      signal(socket, reason);
-      if (++sent >= count) break;
+    while (sent < count && waiting.size) {
+      signal(ordinary(), reason);
+      sent++;
     }
     return sent;
   }
   // Only exact continuation notices occupy this bounded directory. Plain
-  // queue wakes retain their count. Each large job has a fixed PG deadline.
+  // queue wakes retain their count. Eligible Turns have no cache grace period.
   const continuations = new Map();
-  let deadlineTimer,
-    fifoNext = false;
+  let fifoNext = false;
   const versionKey = (tenant, flow, version) => tenant + "/" + flow + "/" + version;
   function segmentHolder(hint) {
-    const holders = directory.get(versionKey(hint[0], hint[4], hint[3]));
+    const holders = directory.get(versionKey(hint[0], hint[5], hint[3]));
     let best,
       rank = Infinity;
     for (const h of holders?.values() ?? []) {
       if (
         h.expires <= Date.now() ||
         connections.get(h.id) !== h.socket ||
-        h.socket.readyState !== WebSocket.OPEN
+        h.socket.readyState !== WebSocket.OPEN ||
+        !waiting.has(h.socket)
       )
         continue;
-      const priority = waiting.has(h.socket) ? (h.disk ? 1 : 0) : h.large ? 2 : 3;
+      const priority = h.disk ? 1 : 0;
       if (priority < rank) {
         best = h;
         rank = priority;
@@ -79,50 +122,29 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
     return best;
   }
   function drainContinuations() {
-    clearTimeout(deadlineTimer);
-    let earliest = Infinity;
     for (const [turn, hint] of continuations) {
       if (!waiting.size) break;
       const holder = segmentHolder(hint);
-      let socket;
-      if (holder && waiting.has(holder.socket)) {
-        socket = holder.socket;
-        stats.preferred++;
-      } else if (holder && holder.large && hint[5] > Date.now()) {
-        earliest = Math.min(earliest, hint[5], holder.expires);
-        continue;
-      } else socket = waiting.values().next().value;
+      if (holder) stats.preferred++;
       continuations.delete(turn);
-      signal(socket, "arrival", hint);
+      signal(holder?.socket ?? ordinary(), "arrival", hint);
     }
-    if (Number.isFinite(earliest))
-      deadlineTimer = setTimeout(drainContinuations, Math.max(1, earliest - Date.now()));
   }
   function notifySegment(hint) {
     if (
       !stage?.perTurn ||
       !Array.isArray(hint) ||
       hint.length !== 6 ||
-      !hint
-        .slice(0, 5)
-        .every(
-          (v) => typeof v === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(v),
-        ) ||
-      !Number.isSafeInteger(hint[5])
+      !hint.every(
+        (v) => typeof v === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(v),
+      )
     )
       return;
-    const holder = segmentHolder(hint);
-    if (hint[5] <= Date.now() && (!holder || !waiting.has(holder.socket))) {
+    stats.notifications++;
+    if (continuations.size >= 1024 && !continuations.has(hint[2])) {
       notify(stage.label, 1);
       return;
     }
-    stats.notifications++;
-    if (continuations.size >= 1024 && !continuations.has(hint[2])) {
-      // Ordinary FIFO probes can take forgotten turns after their PG deadline.
-      signalWaiting(1, "arrival");
-      return;
-    }
-    hint[5] = Math.min(hint[5], Date.now() + 2000);
     continuations.set(hint[2], hint);
     drainContinuations();
   }
@@ -179,14 +201,14 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
     }
     const previous = connections.get(id);
     if (previous) {
-      waiting.delete(previous);
+      removeOffer(previous);
       previous.terminate();
     }
     connections.set(id, socket);
     stats.joins++;
     socket.on("error", () => socket.terminate());
     socket.on("close", () => {
-      waiting.delete(socket);
+      removeOffer(socket);
       if (connections.get(id) === socket) connections.delete(id);
       if (continuations.size) drainContinuations();
     });
@@ -219,6 +241,15 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
         const [tenant, session, version, action, expiresAt] = offer;
         const key = stage.perTurn ? versionKey(tenant, session, version) : tenant + "/" + session;
         const old = directory.get(key);
+        if (stage.perTurn) {
+          if (!largeOffers.has(socket)) largeOffers.set(socket, new Map());
+          const entries = largeOffers.get(socket);
+          entries.delete(key);
+          if (action === "large" || action === "disk-large") {
+            if (entries.size >= 4096) entries.delete(entries.keys().next().value);
+            entries.set(key, expiresAt ?? Date.now() + (stage.cacheTtlMs ?? 300000));
+          }
+        }
         if (action === "drop") {
           if (stage.perTurn) {
             if (old?.get(id)?.socket === socket) old.delete(id);
@@ -234,11 +265,21 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
             expires: expiresAt ?? Date.now() + (stage.cacheTtlMs ?? 300000),
           };
           directory.delete(key);
-          if (directory.size >= 4096) directory.delete(directory.keys().next().value);
+          if (directory.size >= 4096) {
+            const oldest = directory.keys().next().value;
+            if (stage.perTurn)
+              for (const h of directory.get(oldest).values())
+                largeOffers.get(h.socket)?.delete(oldest);
+            directory.delete(oldest);
+          }
           if (stage.perTurn) {
             const holders = old ?? new Map();
             holders.delete(id);
-            if (holders.size >= 4) holders.delete(holders.keys().next().value);
+            if (holders.size >= 4) {
+              const oldest = holders.keys().next().value;
+              largeOffers.get(holders.get(oldest).socket)?.delete(key);
+              holders.delete(oldest);
+            }
             holders.set(id, holder);
             directory.set(key, holders);
           } else directory.set(key, holder);
@@ -252,10 +293,15 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
         if (probes.delete(socket)) signalWaiting(1, "tick");
         return;
       }
-      if (frame !== "ready") return;
+      const free = stage.perTurn
+        ? Number(/^ready:(\d+)$/.exec(frame)?.[1])
+        : frame === "ready"
+          ? 1
+          : 0;
+      if (!Number.isSafeInteger(free) || free < 1 || free > 65535) return;
       stats.offers++;
       if (drop("lost-ready")) return;
-      waiting.add(socket);
+      offerSocket(socket, free);
       // Alternate with accumulated ordinary demand when capacity is scarce.
       if (continuations.size && !(pendingWakes && fifoNext)) {
         drainContinuations();
@@ -271,7 +317,7 @@ export async function openWakeRouter(host, path, fail, port = 0, token, onSteerA
   });
   function reset() {
     clearInterval(timer);
-    clearTimeout(deadlineTimer);
+    available.length = 0;
     continuations.clear();
     for (const socket of connections.values()) socket.terminate();
     connections.clear();
@@ -389,7 +435,7 @@ export function connectClaimWorker({
     if (!online || stopped || checking || running >= slots) return;
     offered = true;
     stats.offers++;
-    socket.send("ready");
+    socket.send(stage.perTurn ? "ready:" + (slots - running) : "ready");
     clearTimeout(renew);
     const timeout = (stage.reofferMs ?? 4000) * (0.8 + 0.4 * Math.random());
     renew = setTimeout(offer, timeout);
@@ -424,6 +470,7 @@ export function connectClaimWorker({
           .finally(() => {
             const wasFull = running === slots;
             running--;
+            if (stage.perTurn && offered) offer();
             if (wasFull && !offered) {
               if (stage.perTurn) offer();
               else request("freed-slot");

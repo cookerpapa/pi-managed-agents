@@ -12,6 +12,7 @@ import {
 import {
   createUnsettledTurnIndex,
   installIndependentSessionLeases,
+  installTurnQueue,
 } from "../../experiments/minimal-session-storage/independent-session-leases.mjs";
 import { installWorkspaceRoutes } from "../../experiments/minimal-session-storage/workspace-route-spans.mjs";
 import { pathToFileURL } from "node:url";
@@ -29,7 +30,11 @@ export async function migrate(config) {
       const {
         rows: [row],
       } = await c.query("select * from pma_segments.installation");
-      if (row?.version !== 1 || row.topic !== config.topic || row.partitions !== config.partitions)
+      if (
+        ![1, 2].includes(row?.version) ||
+        row.topic !== config.topic ||
+        row.partitions !== config.partitions
+      )
         throw Error("Mismatched installation");
       // The advisory lock serializes installers. Both Worker revisions can use
       // the same data while PG builds this additive index outside a transaction.
@@ -45,6 +50,43 @@ export async function migrate(config) {
         // Cancellation can leave an invalid index with the final name.
         if (index) await c.query("drop index concurrently pma_segments.turns_unsettled_by_session");
         await createUnsettledTurnIndex(c, true);
+      }
+      if (row.version === 1) {
+        await c.query("begin");
+        await c.query("lock table turns,sessions in access exclusive mode");
+        if (
+          (await c.query("select 1 from public.session_leases where released_at is null limit 1"))
+            .rowCount ||
+          (
+            await c.query(
+              "select 1 from public.supervisor_connections where state='active' and expires_at>clock_timestamp() limit 1",
+            )
+          ).rowCount
+        )
+          throw Error("Drain old Session Workers before the matched Turn queue upgrade");
+        await c.query(`create temporary table prior_ready_heads on commit drop as
+          select r.id from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id
+          join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
+          where r.state='queued' and r.lease_id is null and r.output_seal_id is null and not exists
+          (select from turns p where p.tenant_id=r.tenant_id and p.session_id=r.session_id and p.mailbox_position<r.mailbox_position
+          and (p.state not in ('completed','failed','timed_out','cancelled') or (p.output_seal_id is not null and p.output_sealed_at is null)))`);
+        await c.query(`update user_or_agent_messages m set starts_turn=true from (
+          select distinct on(r.id) r.id as turn_id,p.id from turns r join user_or_agent_messages p on p.turn_id=r.id
+          where r.state='queued' and r.started_at is null and p.state='pending' and not exists(
+            select from user_or_agent_messages z where z.turn_id=r.id and z.state<>'withdrawn' and z.starts_turn)
+          order by r.id,p.position) first where m.turn_id=first.turn_id and m.id=first.id`);
+        await c.query(`drop trigger independent_turn_ready on pma_segments.turns;
+          drop trigger independent_successor_ready on pma_segments.turns;
+          drop function pma_segments.notify_segment_work();
+          drop trigger finish_agent_session_inputs on pma_segments.turns`);
+        await installTurnQueue(c);
+        const mismatch = await c.query(`select 1 from prior_ready_heads p full join
+          (select id from turns where ready_at is not null) n using(id) where p.id is null or n.id is null limit 1`);
+        if (mismatch.rowCount)
+          throw Error("Turn queue backfill differs from eligible Session heads");
+        await c.query("drop table pma_segments.ready_agent_sessions");
+        await c.query("update installation set version=2");
+        await c.query("commit");
       }
       return;
     }
@@ -87,7 +129,7 @@ export async function migrate(config) {
     await c.query(
       "create table installation(singleton boolean primary key default true check(singleton),version int not null,topic text not null,partitions int not null)",
     );
-    await c.query("insert into installation(version,topic,partitions) values(1,$1,$2)", [
+    await c.query("insert into installation(version,topic,partitions) values(2,$1,$2)", [
       config.topic,
       config.partitions,
     ]);

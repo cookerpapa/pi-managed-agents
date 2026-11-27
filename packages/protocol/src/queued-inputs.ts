@@ -52,6 +52,7 @@ export const QueuedInputResourceSchema = Type.Object(
     uploads: Type.Optional(UserUploadsSchema),
     mailboxPosition: PositiveSafeIntegerSchema,
     /** Absolute Run ordering; only present for unclaimed initial messages. */
+    initialTurnId: Type.Optional(UuidSchema),
     runMailboxPosition: Type.Optional(PositiveSafeIntegerSchema),
     acceptedAt: UtcTimestampSchema,
     status: Type.Union([
@@ -67,6 +68,12 @@ export const InputQueueResourceSchema = Type.Object(
   {
     sessionId: UuidSchema,
     revision: Revision,
+    latestRead: Type.Optional(
+      Type.Union([
+        Type.Null(),
+        Type.Object({ inputId: UuidSchema, turnId: UuidSchema, initial: Type.Boolean() }, options),
+      ]),
+    ),
     activeTurnId: Type.Union([UuidSchema, Type.Null()]),
     hasReturnedInputs: Type.Boolean(),
     takeBackToEdit: Type.Optional(Type.Boolean()),
@@ -78,12 +85,32 @@ export const InputQueueResourceSchema = Type.Object(
   options,
 );
 export const QueuedInputActionResultSchema = Type.Object(
-  { queue: InputQueueResourceSchema, replayed: Type.Boolean() },
+  {
+    queue: InputQueueResourceSchema,
+    replayed: Type.Boolean(),
+    withdrawnTurnId: Type.Optional(UuidSchema),
+  },
   options,
 );
 export type QueuedInputAction = Static<typeof QueuedInputActionSchema>;
 export type QueuedInputResource = Static<typeof QueuedInputResourceSchema>;
 export type InputQueueResource = Static<typeof InputQueueResourceSchema>;
+export const InputPlacedSchema = Type.Object(
+  {
+    type: Type.Literal("input.placed"),
+    sessionId: UuidSchema,
+    turnId: UuidSchema,
+    inputId: UuidSchema,
+    initial: Type.Boolean(),
+    entryId: PositiveSafeIntegerSchema,
+    sequence: PositiveSafeIntegerSchema,
+    text: Text,
+    uploads: UserUploadsSchema,
+  },
+  options,
+);
+export type InputPlaced = Static<typeof InputPlacedSchema>;
+export const parseInputPlaced = (value: unknown): InputPlaced => parse(InputPlacedSchema, value);
 export const InputQueueObservationSchema = Type.Object(
   { type: Type.Literal("input.queue"), queue: InputQueueResourceSchema },
   options,

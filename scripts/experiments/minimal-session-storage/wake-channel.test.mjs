@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { WebSocket } from "ws";
@@ -175,4 +176,47 @@ test("a rejected internal wake credential does not issue a claim", async (t) => 
   });
   assert.match((await failed.promise).message, /authentication/);
   assert.equal(router.snapshot().online, 0);
+});
+
+test("ordinary wake uses spare slots then a live large-cache tie break; exact and cold continuations proceed immediately", async (t) => {
+  const router = await openWakeRouter("127.0.0.1", "/soft", assert.fail);
+  router.configure({ ...stage, perTurn: true, cacheMode: "prefer", tickMs: 60000 });
+  t.after(() => router.close());
+  const tenant = randomUUID(),
+    flow = randomUUID(),
+    version = randomUUID();
+  async function join(id) {
+    const c = new WebSocket("ws://127.0.0.1:" + router.port + "/soft?stage=unit&id=" + id);
+    await once(c, "message");
+    t.after(() => c.terminate());
+    return c;
+  }
+  const a = await join("a"),
+    b = await join("b"),
+    c = await join("c");
+  const received = [];
+  for (const [s, id] of [
+    [a, "a"],
+    [b, "b"],
+    [c, "c"],
+  ])
+    s.on("message", () => received.push(id));
+  a.send(JSON.stringify([tenant, flow, version, "large", Date.now() + 60000]));
+  for (const s of [a, b, c]) s.send("ready:10");
+  await waitFor(() => router.snapshot().waiting === 3);
+  router.notify("unit", 1);
+  await waitFor(() => received.length === 1);
+  assert.notEqual(received[0], "a");
+  router.notifySegment([tenant, flow, randomUUID(), version, flow, flow]);
+  await waitFor(() => received.length === 2);
+  assert.equal(received[1], "a");
+  router.notifySegment([tenant, flow, randomUUID(), version, flow, flow]);
+  await waitFor(() => received.length === 3);
+  assert.notEqual(received[2], "a");
+  a.send("ready:8");
+  b.send("ready:1");
+  await waitFor(() => router.snapshot().waiting === 2);
+  router.notify("unit", 1);
+  await waitFor(() => received.length === 4);
+  assert.equal(received[3], "a");
 });

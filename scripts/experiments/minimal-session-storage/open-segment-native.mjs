@@ -96,10 +96,15 @@ export async function openSegmentNative(
           return { apply: () => imported.push(...writes) };
         },
       },
-      (records, received) => {
+      (records, received, hit) => {
+        if (hit) {
+          load.path = hit.diskBytes ? "fork-disk" : "fork-warm";
+          load.diskEntryBytes = hit.diskBytes;
+        }
         capture?.seed(records);
         load.pgEntryBytes = received;
       },
+      job.warmHistory,
     );
     if (imported.length) {
       const batch = mem.prepareCommit(imported, 1);

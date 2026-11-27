@@ -84,6 +84,42 @@ export async function startIndependentProjector() {
     accept: (t, e) => live.accept(t, e),
     cover: (t, s, n) => live.cover(t, s, n),
     reset: () => live.reset(),
+    async placements(scope, flow, commit) {
+      if (!live.eventHub.hasSubscribers(scope.tenantId, scope.sessionId)) return;
+      const ids = commit.writes
+        .filter(
+          (w) =>
+            w.type === "submission" &&
+            w.value.type === "input" &&
+            w.value.status === "placed" &&
+            w.value.entry !== undefined,
+        )
+        .map((w) => w.value.entry);
+      if (!ids.length) return;
+      try {
+        const { rows } =
+          await sql`select m.entry_id,m.commit_seq,m.source_input_id as id,m.input_display ? 'initial' as initial,u.body,u.uploads
+          from messages m join user_or_agent_messages u on u.tenant_id=m.tenant_id and u.session_id=${scope.sessionId}::uuid and u.turn_id=m.run_id and u.id::text=m.source_input_id
+          where m.tenant_id=${scope.tenantId}::uuid and m.pi_session_id=${flow}::uuid and m.conversation_id=1 and m.run_id=${scope.runId}::uuid
+          and m.entry_id=any(${ids}::bigint[]) and u.state='placed' and u.source='user' order by m.commit_seq,m.ordinal`.execute(
+            rt.store.db,
+          );
+        for (const r of rows)
+          live.eventHub.publishPlacement(scope.tenantId, {
+            type: "input.placed",
+            sessionId: scope.sessionId,
+            turnId: scope.turnId,
+            inputId: r.id,
+            entryId: Number(r.entry_id),
+            sequence: Number(r.commit_seq),
+            initial: r.initial,
+            text: r.body,
+            uploads: r.uploads,
+          });
+      } catch {
+        live.eventHub.resyncSession(scope.tenantId, scope.sessionId);
+      }
+    },
     async terminal(tx, fact, flow) {
       const s = fact.scope;
       const {

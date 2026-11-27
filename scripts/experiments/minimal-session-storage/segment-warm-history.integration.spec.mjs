@@ -86,13 +86,15 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         typeof args[0] === "string" &&
         args[0].includes("select entry_id,commit_seq,content from messages")
       )
-        for (const row of result.rows) observedBytes += Buffer.byteLength(row.content);
+        for (const row of result.rows)
+          if (row.content !== undefined) observedBytes += Buffer.byteLength(row.content);
       return result;
     };
     const readPage = rt.store.readPage.bind(rt.store);
     rt.store.readPage = async (...args) => {
       const rows = await readPage(...args);
-      for (const row of rows) observedBytes += Buffer.byteLength(row.content);
+      for (const row of rows)
+        if (row.content !== undefined) observedBytes += Buffer.byteLength(row.content);
       return rows;
     };
     async function until(read) {
@@ -150,11 +152,11 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
       );
       return w;
     }
-    async function enqueue(session, n) {
+    async function enqueue(session, n, prompt = "Continue " + n) {
       const id = randomUUID();
       await pool.query(
-        "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) select $1,$2,s.flow_id,$4,$1,'Continue '||$4::bigint,'queued' from sessions s where s.id=$3 and s.tenant_id=$2",
-        [id, tenant, session, n],
+        "insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,state) select $1,$2,s.flow_id,$4,$1,$5,'queued' from sessions s where s.id=$3 and s.tenant_id=$2",
+        [id, tenant, session, n, prompt],
       );
       return id;
     }
@@ -181,7 +183,10 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         coldCopy ? { ...job, warmHistory: undefined } : job,
         topic,
         async (commit) => {
-          assert(sample, "Read-only context comparison published a native write");
+          if (!sample) {
+            assert(commit.writes.every((w) => w.type !== "entry"));
+            return;
+          }
           seq = commit.seq;
           await publish({
             kind: "durable_commit",
@@ -227,6 +232,17 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         };
         if (sample) {
           if (addImage)
+            for (const label of ["4", "5", "6"]) {
+              await convo.commit(
+                (tx) =>
+                  tx.appendEntry(convo.id, {
+                    kind: "pi.user",
+                    model: [{ role: "user", timestamp: 1, content: label }],
+                  }),
+                ctx,
+              );
+            }
+          if (addImage)
             await convo.commit(
               (tx) =>
                 tx.appendEntry(convo.id, {
@@ -257,8 +273,13 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
           await convo.configure({ model: { provider: m.provider, modelId: m.id } }, ctx);
           const answer = fauxAssistantMessage("Done");
           fake.setResponses([answer]);
+          const mail = job.has_inputs ? await rt.inputs.selectAt(job.scope, "start") : null;
           const sub = await convo.submit(
-            { type: "input", requestId: job.id, content: job.initial_input },
+            {
+              type: "input",
+              requestId: mail?.id ?? job.id,
+              content: mail?.body ?? job.initial_input,
+            },
             ctx,
           );
           await convo.waitForIdle(ctx);
@@ -268,6 +289,16 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
             "done",
             settled.reason + ": " + String(settled.detail ?? "").slice(0, 300),
           );
+          if (job.initial_input === "X") {
+            const labels = (await convo.context(ctx)).messages
+              .flatMap((m) =>
+                typeof m.content === "string"
+                  ? [m.content]
+                  : m.content.filter((b) => b.type === "text").map((b) => b.text),
+              )
+              .filter((text) => ["1", "2", "3", "4", "5", "6", "X"].includes(text));
+            assert.deepEqual(labels, ["1", "2", "3", "X"]);
+          }
           const fact = {
             kind: "work_finished",
             scope: job.scope,
@@ -346,6 +377,10 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
           });
         }
       }
+      await add("pi.user", { role: "user", content: "1", timestamp: 1 });
+      await add("pi.assistant", fauxAssistantMessage("2"));
+      await add("pi.assistant", fauxAssistantMessage("3"));
+      const cutThree = id - 1;
       await pool.query("update turns set history_head=$2 where id=$1", [
         first,
         JSON.stringify({
@@ -361,7 +396,7 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         "update flows set native_inbox_id=2,native_inbox_created=1,native_inbox_seq=1,native_inbox_ordinal=0 where tenant_id=$1 and flow_id=$2",
         [tenant, root],
       );
-      scheduler = await rt.serveScheduler({ connectionString: url.href, token, tickMs: 100 });
+      scheduler = await rt.serveScheduler({ connectionString: url.href, token, tickMs: 60000 });
       const a = await worker(tier === "ssd" ? directory : false);
       await until(() => scheduler.snapshot().waiting === 1);
       const second = await enqueue(root, 2),
@@ -377,10 +412,9 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         clockOffset += 31 * 60 * 1000;
         a.warmHistory.cache.expire();
         assert.equal(a.warmHistory.cache.bytes, 0);
-        const third = await enqueue(root, 3);
-        await delay(120);
-        assert(!gates.has(third), "disk-only owner lost large-history affinity");
         two.gate.resolve();
+        await until(() => scheduler.snapshot().waiting === 2);
+        const third = await enqueue(root, 3);
         const three = await until(() => gates.get(third));
         assert.equal(three.w.workerId, a.workerId);
         const cold = await run(three.job, { coldCopy: true });
@@ -419,6 +453,28 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         const fifth = await enqueue(root, 5),
           five = await until(() => gates.get(fifth));
         assert.equal(five.w.workerId, restarted.workerId);
+        const diskFork = await rt.store.fork(tenant, root, {
+          lane: 1,
+          run: first,
+          entry: cutThree,
+        });
+        let verified;
+        await rt.store.hydrate(
+          tenant,
+          diskFork,
+          {
+            prepareCommit() {
+              return { apply() {} };
+            },
+          },
+          (records, bytes, hit) => {
+            verified = { bytes, disk: hit?.diskBytes, ids: records.map((r) => r.entry.id) };
+          },
+          restarted.warmHistory,
+        );
+        assert.equal(verified.bytes, 0);
+        assert(verified.disk > 0);
+        assert.equal(Math.max(...verified.ids), cutThree);
         const beforeCompact = await run(five.job, { coldCopy: true }),
           afterRestart = await run(five.job, { sample: true, compact: true });
         assert.equal(afterRestart.path, "disk");
@@ -512,17 +568,14 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         );
         return;
       }
-      const start = performance.now(),
-        third = await enqueue(root, 3);
-      await delay(150);
-      assert(!gates.has(third), "a FIFO probe stole the large Turn before its grace expired");
-      const sideStart = performance.now();
-      const unrelated = await enqueue(side, 1),
+      const sideStart = performance.now(),
+        unrelated = await enqueue(side, 1),
         other = await until(() => gates.get(unrelated));
       assert.equal(other.w.workerId, b.workerId);
       two.gate.resolve();
-      await run(other.job, { sample: true });
-      other.gate.resolve();
+      await until(() => scheduler.snapshot().waiting === 1);
+      const start = performance.now(),
+        third = await enqueue(root, 3);
       const three = await until(() => gates.get(third));
       assert.equal(three.w.workerId, a.workerId);
       const cold = await run(three.job, { coldCopy: true }),
@@ -532,14 +585,14 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
       assert(cold.bytes >= totalBytes);
       assert.equal(warm.digest, cold.digest);
       assert.equal(warm.images, count);
+      await run(other.job, { sample: true });
+      other.gate.resolve();
+      await until(() => scheduler.snapshot().waiting === 1);
       const delayed = performance.now(),
         fourth = await enqueue(root, 4),
         four = await until(() => gates.get(fourth));
       assert.equal(four.w.workerId, b.workerId);
-      assert(
-        four.at - delayed >= 1850 && four.at - delayed < 4500,
-        "fallback exceeded its test window",
-      );
+      assert(four.at - delayed < 1500, "fallback exceeded its test window");
       const fallback = await run(four.job, { sample: true });
       assert.equal(fallback.path, "cold");
       assert(fallback.bytes >= totalBytes);
@@ -551,20 +604,51 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
           )
         ).rows[0].n === 1,
       );
-      // A real eviction releases the preferred window before its deadline.
+      // A missing advertisement also permits immediate FIFO acquisition.
       three.gate.resolve();
       await until(() => scheduler.snapshot().waiting === 1);
-      const fifth = await enqueue(root, 5);
-      await delay(80);
-      assert(!gates.has(fifth));
-      const evictedAt = performance.now();
       b.warmHistory.cache.remove(tenant + "/" + root);
+      const evictedAt = performance.now(),
+        fifth = await enqueue(root, 5);
       const afterEvict = await until(() => gates.get(fifth));
       assert.equal(afterEvict.w.workerId, a.workerId);
       assert(afterEvict.at - evictedAt < 1200);
+      const child = await rt.store.delegate(
+        tenant,
+        root,
+        { lane: 1, entry: cutThree, through: cutThree },
+        randomUUID(),
+        "prefix-check",
+        "X",
+        "fixture",
+        { run: fifth, writer: afterEvict.job.scope.writerId },
+      );
       assert.equal((await run(afterEvict.job, { sample: true })).path, "cold");
       afterEvict.gate.resolve();
-      // A peer's first Turn reads only the frozen path even if the source is warm.
+      const childGate = await until(() =>
+        [...gates.values()].find((g) => g.job.logical_id === child),
+      );
+      assert.equal(childGate.w.workerId, a.workerId);
+      const childCold = await run(childGate.job, { coldCopy: true }),
+        childHot = await run(childGate.job, { sample: true });
+      assert.equal(childHot.path, "fork-warm");
+      assert.equal(childHot.bytes, 0);
+      assert.equal(childCold.digest, childHot.digest);
+      childGate.gate.resolve();
+      const markerPeer = await rt.store.fork(tenant, root, {
+        lane: 1,
+        run: first,
+        entry: cutThree,
+      });
+      const markerTurn = await enqueue(markerPeer, 1, "X"),
+        markerGate = await until(() => gates.get(markerTurn));
+      const markerCold = await run(markerGate.job, { coldCopy: true }),
+        markerWarm = await run(markerGate.job, { sample: true });
+      assert.equal(markerWarm.path, "fork-warm");
+      assert.equal(markerWarm.bytes, 0);
+      assert.equal(markerCold.digest, markerWarm.digest);
+      markerGate.gate.resolve();
+      // A warm Fork reads only its frozen path.
       const entry = Number(
         (
           await pool.query(
@@ -579,13 +663,41 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
       await until(() => scheduler.snapshot().waiting === 2);
       const branch1 = await enqueue(branch, 1),
         firstBranch = await until(() => gates.get(branch1));
+      assert.equal(firstBranch.w.workerId, a.workerId);
+      const branchCold = await run(firstBranch.job, { coldCopy: true });
       const inherited = await run(firstBranch.job, { sample: true });
-      assert.equal(inherited.path, "cold");
+      assert.equal(inherited.path, "fork-warm");
+      assert.equal(inherited.bytes, 0);
+      assert.equal(inherited.digest, branchCold.digest);
       assert.equal(inherited.images, count);
-      const branch2 = await enqueue(branch, 2);
-      await delay(120);
-      assert(!gates.has(branch2), "inherited image bytes also deserve affinity");
       firstBranch.gate.resolve();
+      await until(() => scheduler.snapshot().waiting === 2);
+      // The intermediate Fork carries its own frozen ancestors. Drop the
+      // original Flow so only the intermediate snapshot can serve a nested Fork.
+      for (const w of workers) w.warmHistory.cache.remove(tenant + "/" + root);
+      const lastInParent = Number(
+        (
+          await pool.query(
+            "select max(entry_id) id from messages where run_id=$1 and role='assistant'",
+            [branch1],
+          )
+        ).rows[0].id,
+      );
+      const nested = await rt.store.fork(tenant, branch, {
+        lane: 1,
+        run: branch1,
+        entry: lastInParent,
+      });
+      const nestedTurn = await enqueue(nested, 1),
+        ng = await until(() => gates.get(nestedTurn));
+      const nestedCold = await run(ng.job, { coldCopy: true }),
+        nestedHot = await run(ng.job, { sample: true });
+      assert.equal(nestedHot.digest, nestedCold.digest);
+      assert.equal(nestedHot.path, "fork-warm");
+      assert.equal(nestedHot.bytes, 0);
+      ng.gate.resolve();
+      await until(() => scheduler.snapshot().waiting === 2);
+      const branch2 = await enqueue(branch, 2);
       const secondBranch = await until(() => gates.get(branch2));
       assert.equal(secondBranch.w.workerId, firstBranch.w.workerId);
       const forkCold = await run(secondBranch.job, { coldCopy: true }),
@@ -610,21 +722,18 @@ it.skipIf(!endpoint).each(["memory", "ssd"])(
         newFlow = await until(() => gates.get(pruned));
       assert.notEqual(newFlow.job.flow_id, root);
       const clipped = await run(newFlow.job, { sample: true });
-      assert.equal(clipped.path, "cold");
       assert.equal(clipped.digest, inherited.digest);
       newFlow.gate.resolve();
       await until(() => scheduler.snapshot().waiting === 2);
-      // With no scheduler to deliver the exact hint, the PG deadline still
-      // permits an ordinary claimant after the grace period.
+      // Even without a scheduler or hint, an ordinary claim can proceed immediately.
       await scheduler.close();
       scheduler = undefined;
       const missedAt = performance.now(),
         missed = await enqueue(root, 2);
-      assert.equal(await b.claimNext(), undefined);
       const recovered = await until(() => b.claimNext());
       assert.equal(recovered.id, missed);
       const missedMs = Math.round(performance.now() - missedAt);
-      assert(missedMs >= 1850 && missedMs < 4500);
+      assert(missedMs < 1500);
       await recovered.release();
       process.stdout.write(
         "warm-image-continuation " +

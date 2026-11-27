@@ -19,50 +19,48 @@ import { installPagingProjection } from "./flow-paging-fixture.mjs";
 
 const baseline =
   process.argv[2] &&
-  (
-    await import(
-      pathToFileURL(
-        resolve(
-          process.argv[2],
-          "scripts/experiments/minimal-session-storage/independent-session-leases.mjs",
-        ),
-      ).href
-    )
-  ).SegmentWorker;
+  (await import(
+    pathToFileURL(
+      resolve(
+        process.argv[2],
+        "scripts/experiments/minimal-session-storage/independent-session-leases.mjs",
+      ),
+    ).href
+  ));
 const fixture = await testPostgres({}),
   endpoint = fixture.url;
 const cache = await mkdtemp(join(tmpdir(), "claim-cost-"));
-const schema = "claim_" + randomUUID().replaceAll("-", ""),
-  url = new URL(endpoint);
-url.searchParams.set("options", "-c search_path=" + schema + ",public");
-const control = createDatabase({ connectionString: endpoint }),
-  pool = new pg.Pool({ connectionString: url.href });
-const runtime = new IndependentSessionRuntime({ pool, topic: "cost" });
+const control = createDatabase({ connectionString: endpoint });
 let queries = 0,
   offset = 0n;
-const db = new Kysely({
-  dialect: new PostgresDialect({ pool: new pg.Pool({ connectionString: url.href }) }),
-  log: (event) => {
-    if (event.level === "query") queries++;
-  },
-});
 const arms = [];
 try {
   await runMigrations(control, "up");
   const { tenantId } = await createPrivateTenant(control, {
-    slug: schema.replace("_", "-"),
+    slug: "claim-cost",
     ownerDisplayName: "Claim measurement",
   });
-  await pool.query("create schema " + schema);
-  await installPagingProjection(pool);
-  await installForkTables(pool);
-  await setForkLayout(pool, true, false);
-  await installIndependentSessionLeases(pool);
-  for (const [label, Worker] of [
-    ["candidate", SegmentWorker],
-    ["baseline", baseline],
+  for (const [label, Worker, install] of [
+    ["candidate", SegmentWorker, installIndependentSessionLeases],
+    ["baseline", baseline?.SegmentWorker, baseline?.installIndependentSessionLeases],
   ]) {
     if (!Worker) continue;
+    const schema = "claim_" + label,
+      url = new URL(endpoint);
+    url.searchParams.set("options", "-c search_path=" + schema + ",public");
+    const pool = new pg.Pool({ connectionString: url.href }),
+      runtime = new IndependentSessionRuntime({ pool, topic: "cost" });
+    const db = new Kysely({
+      dialect: new PostgresDialect({ pool: new pg.Pool({ connectionString: url.href }) }),
+      log: (e) => {
+        if (e.level === "query") queries++;
+      },
+    });
+    await pool.query("create schema " + schema);
+    await installPagingProjection(pool);
+    await installForkTables(pool);
+    await setForkLayout(pool, true, false);
+    await install(pool);
     const workerId = randomUUID(),
       bootId = randomUUID();
     await control
@@ -78,6 +76,9 @@ try {
     await registerTestWorker(control, workerId);
     arms.push({
       label,
+      pool,
+      runtime,
+      db,
       worker: new Worker({
         database: db,
         workerId,
@@ -91,6 +92,7 @@ try {
   for (let round = 0; round < 6; round++) {
     for (const size of round % 2 ? [32, 8, 1] : [1, 8, 32]) {
       for (const arm of round % 2 ? arms.toReversed() : arms) {
+        const { pool, runtime } = arm;
         const ids = Array.from({ length: size }, () => randomUUID());
         await runtime.store.register(tenantId, ids);
         await pool.query(
@@ -126,9 +128,11 @@ try {
     }
   }
 } finally {
-  for (const { worker } of arms) await worker.close();
-  await db.destroy();
-  await runtime.store.db.destroy();
+  for (const { worker, db, runtime } of arms) {
+    await worker.close();
+    await db.destroy();
+    await runtime.store.db.destroy();
+  }
   await control.destroy();
   await fixture.close();
   await rm(cache, { recursive: true, force: true });

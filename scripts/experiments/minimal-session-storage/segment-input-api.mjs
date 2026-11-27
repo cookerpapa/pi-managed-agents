@@ -74,7 +74,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
   );
   const status = async (a, id) =>
     (
-      await sql`select m.*,r.mailbox_position from user_or_agent_messages m join turns r on r.id=m.turn_id
+      await sql`select m.*,r.mailbox_position,r.idempotency_key as opening_key from user_or_agent_messages m join turns r on r.id=m.turn_id
     where m.id=${id}::uuid and m.tenant_id=${a.tenant}::uuid and m.session_id=${a.session}::uuid and m.sender_id=${a.sender}::uuid and m.source='user'`.execute(
         inputs.db,
       )
@@ -130,12 +130,23 @@ export function installSegmentInputApi(app, inputs, authorize) {
         );
         const revision = hash(version) + "." + hash(a.session);
         if (expected && expected !== revision) throw new InputConflict("Queue changed");
+        const {
+          rows: [latest],
+        } =
+          await sql`select m.source_input_id as "inputId",m.run_id as "turnId",m.input_display ? 'initial' as initial
+          from sessions s join messages m on m.tenant_id=s.tenant_id and m.pi_session_id=s.flow_id and m.conversation_id=1
+          join user_or_agent_messages u on u.tenant_id=s.tenant_id and u.session_id=s.id and u.turn_id=m.run_id and u.id::text=m.source_input_id
+          where s.tenant_id=${a.tenant}::uuid and s.id=${a.session}::uuid and u.sender_id=${a.sender}::uuid and u.source='user'
+          and u.state='placed' and m.input_display is not null order by m.entry_id desc limit 1`.execute(
+            tx,
+          );
         const page = rows.filter((r) => Number(r.position) > after);
         return {
           sessionId: a.session,
           revision,
           activeTurnId: rows[0]?.turn_id ?? null,
           takeBackToEdit: true,
+          latestRead: latest ?? null,
           hasReturnedInputs: Boolean(await returns(a, undefined, tx)),
           viewVersion: version,
           afterPosition: after,
@@ -143,6 +154,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
           items: page.slice(0, INPUT_QUEUE_PAGE_SIZE).map((r) => ({
             inputId: r.id,
             runId: r.turn_id,
+            ...(r.starts_turn ? { initialTurnId: r.turn_id } : {}),
             ...(r.initial_position ? { runMailboxPosition: Number(r.initial_position) } : {}),
             text: r.body,
             uploads: r.uploads,
@@ -197,13 +209,14 @@ export function installSegmentInputApi(app, inputs, authorize) {
       uploads,
     });
     const at = m.accepted_at.toISOString();
-    if (m.starts_turn)
+    const opening = m.starts_turn && (await status(a, id));
+    if (opening && opening.opening_key === id)
       return {
         kind: "run",
         sessionId: a.session,
         runId: m.turn_id,
         turnId: m.turn_id,
-        mailboxPosition: Number((await status(a, id)).mailbox_position),
+        mailboxPosition: Number(opening.mailbox_position),
         state: "queued",
         acceptedAt: at,
         replayed: Boolean(m.replayed),
@@ -224,6 +237,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
     const id = req.params.id,
       action = parseQueuedInputAction(req.body),
       op = identity(req.headers["idempotency-key"], a.sender, a.session);
+    let withdrawnTurnId;
     if (action.action === "cancel") {
       let item = await inputs.withdraw(a.tenant, a.session, a.sender, id);
       const until = Date.now() + 6500;
@@ -234,6 +248,13 @@ export function installSegmentInputApi(app, inputs, authorize) {
       if (item?.withdrawing) return { queue: await snapshot(a), replayed: false };
       if (item?.state !== "withdrawn")
         throw new InputConflict("Input already entered the conversation");
+      if (item.starts_turn) {
+        const cancelled =
+          await sql`select id from turns where tenant_id=${a.tenant}::uuid and id=${item.turn_id}::uuid and state='cancelled' and started_at is null`.execute(
+            inputs.db,
+          );
+        withdrawnTurnId = cancelled.rows[0]?.id;
+      }
     } else {
       if (action.action === "edit" || action.text !== undefined || action.uploadIds !== undefined)
         throw new InputConflict("Take back the message before rewriting");
@@ -263,6 +284,10 @@ export function installSegmentInputApi(app, inputs, authorize) {
         });
       }
     }
-    return { queue: await snapshot(a), replayed: false };
+    return {
+      queue: await snapshot(a),
+      replayed: false,
+      ...(withdrawnTurnId ? { withdrawnTurnId } : {}),
+    };
   });
 }

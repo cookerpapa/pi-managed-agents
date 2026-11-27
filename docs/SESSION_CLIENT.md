@@ -49,3 +49,10 @@ a second queue. Run/Tool observations remain disposable stream data.
 This package does not install a desktop application or expose a user's computer
 for Tool execution. Cloud Workers retain the Agent loop; device transport is a
 separate explicit integration tracked by #38.
+
+
+## Independent Session placement receipts
+
+The segmented queue snapshot includes latestRead, either null or the authenticated sender’s latest canonical input ID, Turn ID and initial-message flag. Initial queue items carry initialTurnId, which may differ from the stable input ID. The client reconciles snapshots using the monotonic queue version. Committed outstanding input is delivered. A placed canonical user Entry is read.
+
+The Session SSE stream emits input.placed after accepted PG projection, with the Session, Turn, stable input ID, canonical Entry ID and commit sequence, initial flag, original text and upload metadata. Subscribers can render a follow-up immediately and refresh the sender-scoped queue snapshot. Reconnect recovers from canonical history and the queue. The observation uses the existing ordered SSE connection and does not advance its Kafka/display cursor. [Decision](adr/0376-direct-turn-claims-and-fork-locality.md).

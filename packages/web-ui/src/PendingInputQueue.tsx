@@ -143,6 +143,8 @@ export function InputQueueProvider({
         current.current?.revision === next.revision &&
         current.current.viewVersion === next.viewVersion &&
         current.current.activeTurnId === next.activeTurnId &&
+        current.current.latestRead?.inputId === next.latestRead?.inputId &&
+        (current.current.latestRead === undefined) === (next.latestRead === undefined) &&
         current.current.hasReturnedInputs === next.hasReturnedInputs &&
         current.current.hasMore === next.hasMore &&
         current.current.items.length === next.items.length &&
@@ -282,7 +284,11 @@ export function InputQueueProvider({
       apply(result.queue);
       if (mounted.current && action.action === "cancel") {
         const item = snapshot.items.find((item) => item.inputId === inputId);
-        if (item?.runMailboxPosition !== undefined) callbacks.current.onInitialWithdrawn?.(item);
+        if (
+          item?.runMailboxPosition !== undefined &&
+          (result.queue.latestRead === undefined || result.withdrawnTurnId === item.initialTurnId)
+        )
+          callbacks.current.onInitialWithdrawn?.(item);
       }
       succeeded = true;
       return mounted.current;
@@ -580,7 +586,9 @@ export function PendingInputQueue() {
     returnStatus,
     retryReturns,
   } = model;
-  const nativeItems = queue?.items.filter((item) => item.runMailboxPosition === undefined) ?? [];
+  const nativeItems =
+    queue?.items.filter((item) => item.runMailboxPosition === undefined && !item.initialTurnId) ??
+    [];
   const nativeEditing = editing && !editing.initial ? editing : null;
   const editingItem =
     nativeEditing && nativeItems.find((item) => item.inputId === nativeEditing.inputId);
@@ -685,12 +693,19 @@ export function PendingInputQueue() {
                     {item.text.length > 240 ? "…" : ""}
                   </p>
                   <UploadCards api={api} uploads={item.uploads ?? []} compact />
+                  {queue?.latestRead !== undefined && item.status !== "withdrawing" ? (
+                    <small className="input-delivery-receipt" data-receipt="delivered">
+                      {t("queue.delivered")}
+                    </small>
+                  ) : null}
                 </div>
                 <div className="pending-input-actions" aria-busy={busy === item.inputId}>
                   {item.status === "sending" || item.status === "withdrawing" ? (
-                    <span className="pending-input-status">
-                      {t(item.status === "sending" ? "queue.sending" : "queue.withdrawing")}
-                    </span>
+                    item.status === "withdrawing" || queue?.latestRead === undefined ? (
+                      <span className="pending-input-status">
+                        {t(item.status === "sending" ? "queue.sending" : "queue.withdrawing")}
+                      </span>
+                    ) : null
                   ) : item.status === "steering" ? (
                     <span className="pending-input-status">{t("queue.steering")}</span>
                   ) : (

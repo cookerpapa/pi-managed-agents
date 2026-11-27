@@ -153,7 +153,7 @@ it.skipIf(!endpoint)(
           } = await pool.query(
             `select
             (select count(*)::int from turns where tenant_id=$1 and state='queued') queued,
-            (select count(*)::int from ready_agent_sessions where tenant_id=$1) ready,
+            (select count(*)::int from turns where ready_at is not null and tenant_id=$1) ready,
             (select count(*)::int from session_leases where tenant_id=$1) leases`,
             [t],
           );
@@ -173,7 +173,7 @@ it.skipIf(!endpoint)(
         const {
           rows: [first],
         } = await pool.query(
-          "select session_id from ready_agent_sessions where tenant_id=$1 order by ready_at,session_id limit 1",
+          "select session_id from turns where ready_at is not null and tenant_id=$1 order by ready_at,id limit 1",
           [t],
         );
         await pool.query(
@@ -330,7 +330,10 @@ it.skipIf(!endpoint)(
       // An early hint for an already-busy Session may be consumed before its
       // predecessor seals. The terminal transaction must signal again.
       const next = await enqueue(sessions[1], 2);
-      await until(() => reads > beforeBurst + ids.length, "checked busy Session");
+      assert.equal(
+        (await pool.query("select ready_at from turns where id=$1", [next])).rows[0].ready_at,
+        null,
+      );
       assert(!executions.has(next));
       await finish(single);
       await until(() => executions.has(next), "successor after seal");

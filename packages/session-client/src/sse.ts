@@ -4,6 +4,8 @@ import {
   type PiCloudEvent,
   type SessionViewSnapshotResource,
   parseInputQueueObservation,
+  parseInputPlaced,
+  type InputPlaced,
   type InputQueueResource,
 } from "@pi-cloud/protocol";
 import { SESSION_STREAM_MAX_FRAME_BYTES } from "@pi-cloud/protocol";
@@ -101,6 +103,7 @@ export type StreamSessionEventsOptions = {
   onEvent(event: PiCloudEvent): void;
   onToolProgress?(progress: ToolProgress): void;
   onRunObservation?(observation: RunObservation): void;
+  onInputPlaced?(placement: InputPlaced): void;
   onInputQueue?(queue: InputQueueResource): void;
   onStatus(status: SessionStreamStatus): void;
   fetchImplementation?: FetchImplementation;
@@ -194,6 +197,16 @@ async function consumeResponse(
       }
       if (!snapshotReceived) {
         throw new SessionStreamError("SSE live event arrived before its Session snapshot", false);
+      }
+      if (
+        frame.event === "input.placed" ||
+        (framed && (value as { type?: unknown })?.type === "input.placed")
+      ) {
+        const p = parseInputPlaced(value);
+        if (p.sessionId !== options.sessionId)
+          throw new SessionStreamError("Placement belongs to another Session", false);
+        options.onInputPlaced?.(p);
+        continue;
       }
       if (
         frame.event === "input.queue" ||
