@@ -36,6 +36,7 @@ export class McpToolHostRuntime {
       database: Kysely<Database>;
       databaseUrl: string;
       releaseId: string;
+      turnAdmittedByProjector?: boolean;
       vault?: McpCredentialVault;
       fetch: typeof globalThis.fetch;
       publish(snapshot: ToolCatalogPublication): Promise<void>;
@@ -220,6 +221,7 @@ export class McpToolHostRuntime {
     command: AcceptedControlToolCommand,
     current: () => boolean,
     signal: AbortSignal,
+    platform?: ToolCatalogPublication,
   ): Promise<Extract<ControlToolOutcome, { result: unknown }>> {
     const identity = command.implementation,
       scope = identity?.catalogScope;
@@ -229,13 +231,19 @@ export class McpToolHostRuntime {
       throw new McpInvocationRefused();
     signal = AbortSignal.any([signal, AbortSignal.timeout(remaining)]);
     // Business ownership and current connection admission, never a Run lease check.
+    // The independent Projector has already authenticated the Turn/Session pair.
+    // Keep connection ownership, root visibility and revision admission at the host.
+    const turnCheck = this.options.turnAdmittedByProjector
+      ? sql``
+      : sql`join runs r on r.id=${command.scope.runId}::uuid and r.session_id=s.id and r.tenant_id=s.tenant_id`;
     const { rows } = await sql<McpConnectionRow>`select c.* from mcp_connections c
       join tool_catalog_publication p on p.scope='mcp:'||c.id::text
       join tool_catalog_publication a on a.scope='platform' and a.release_id=p.release_id
-      join runs r on r.id=${command.scope.runId}::uuid and r.tenant_id=c.tenant_id
-      join sessions s on s.id=r.session_id and s.tenant_id=r.tenant_id
+        ${platform ? sql`and a.generation=${platform.generation} and a.catalog::jsonb->>'revision'=${platform.catalog.revision}` : sql``}
+      join sessions s on s.tenant_id=c.tenant_id and s.id=${command.scope.sessionId}::uuid
+      ${turnCheck}
       where c.id=${scope.slice(4)}::uuid and c.tenant_id=${command.scope.tenantId}::uuid
-        and s.id=${command.scope.sessionId}::uuid and s.pi_session_id=${command.scope.piSessionId}
+        and s.pi_session_id=${command.scope.piSessionId}
         and s.pi_conversation_id=${command.conversationId} and s.session_kind='conversation'
         and s.created_by_user_id is not null
         and (c.visibility='organization' or c.owner_user_id=s.created_by_user_id)

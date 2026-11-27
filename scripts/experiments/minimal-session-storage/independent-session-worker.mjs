@@ -2,11 +2,17 @@
 // parent ID or target hint. SIGKILL stops direct renewal without releasing PG.
 import pg from "pg";
 import { randomUUID } from "node:crypto";
-import { KafkaWorkerProducer } from "@pi-cloud/event-log";
-import { bootMailbox, workerDelegationTool } from "./direct-delegation-worker.mjs";
+import {
+  KafkaWorkerProducer,
+  KafkaToolCatalogConsumer,
+  KafkaToolReplyMailbox,
+} from "@pi-cloud/event-log";
+import { bootMailbox } from "./direct-delegation-worker.mjs";
 import { DurableAgentSession } from "../../../packages/sandbox-supervisor/src/durable/agent-session.ts";
-import { withToolInvocation } from "@pi-cloud/sandbox-supervisor";
-import { infrastructureToolDefinitions } from "@pi-cloud/protocol";
+import { segmentWorkerTools, segmentControlReferences } from "./segment-worker-tools.mjs";
+import { ToolCatalogAuthority } from "../../../packages/control-plane/src/tool-catalog-authority.ts";
+import { configuredImageAttachments } from "@pi-cloud/session-attachments";
+
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 import { turnBinding } from "./turn-binding.mjs";
 import { openSegmentNative } from "./independent-session-runtime.mjs";
@@ -15,7 +21,7 @@ import { connectSessionInputs } from "./segment-input-worker.mjs";
 import { ForkStorage } from "./fork-storage.mjs";
 import { SegmentWorker } from "./independent-session-leases.mjs";
 import { MemoryStorage, Harness, createRegistry } from "@earendil-works/pi-durable";
-import { getCurrentSystemPrompt } from "@earendil-works/pi-ai/utils/transcript";
+import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import { createModels } from "@earendil-works/pi-ai/models";
 import {
   fauxProvider,
@@ -33,6 +39,26 @@ const producer = cfg.brokers
   ? new KafkaWorkerProducer({ brokers: cfg.brokers, topic: cfg.topic, clientId: cfg.bootId })
   : undefined;
 await producer?.start();
+const catalog = cfg.mcp
+  ? new KafkaToolCatalogConsumer({
+      brokers: cfg.brokers,
+      replicas: 3,
+      instanceId: cfg.bootId,
+      minimumGenerations: () => new ToolCatalogAuthority(storage.db).minimumGenerations(),
+    })
+  : undefined;
+await catalog?.start();
+const images = cfg.mcp ? await configuredImageAttachments(storage.db) : undefined;
+let tools;
+if (cfg.mcp) {
+  const mailbox = new KafkaToolReplyMailbox({
+    brokers: cfg.brokers,
+    bootId: cfg.bootId,
+    replicas: 3,
+  });
+  await mailbox.start();
+  replies = { mailbox, replyTopic: mailbox.topic, close: () => mailbox.shutdown() };
+}
 async function publish(fact) {
   await producer.append(0, {
     factId: fact.factId,
@@ -59,7 +85,12 @@ const serving = cfg.scheduler
 serving?.catch((e) => process.send?.({ kind: "error", message: e.stack }));
 process.on("message", async (msg) => {
   try {
-    if (msg.op === "claim") {
+    if (msg.op === "catalog") {
+      process.send({
+        kind: "catalog",
+        generation: catalog?.view.snapshotFor(msg.scope)?.generation,
+      });
+    } else if (msg.op === "claim") {
       job = await worker.claimNext();
       process.send({ kind: "claim", scope: job?.scope ?? null, flow: job?.flow_id ?? null });
     } else if (msg.op === "claimed") {
@@ -80,16 +111,7 @@ process.on("message", async (msg) => {
           occurredAt: new Date().toISOString(),
           origins: [],
           display: [],
-          tools: (effects?.tools ?? []).map(({ taskId, command: c }) => ({
-            target: c.target,
-            taskId,
-            scope,
-            conversationId: c.conversationId,
-            toolName: c.toolName,
-            contextAnchor: c.contextAnchor,
-            operationId: c.operationId,
-            replyTopic: replies.replyTopic,
-          })),
+          tools: await segmentControlReferences(commit, effects, scope, replies),
           cancellations: [],
         });
         effects?.confirmed();
@@ -102,12 +124,32 @@ process.on("message", async (msg) => {
           tokensPerSecond: 0,
         });
       models.setProvider(fake.provider);
+      const mcpOffers = [];
       fake.setResponses([
         async (context, _options, _state, requested) => {
           systemPrompt = getCurrentSystemPrompt(context.messages);
           history = context.messages.map((m) =>
             typeof m.content === "string" ? m.content : m.content.map((v) => v.text ?? "").join(""),
           );
+          if (msg.observeMcp || msg.mcpCall)
+            mcpOffers.push(
+              getCurrentTools(context.messages)
+                .map((t) => t.name)
+                .filter((n) => n.startsWith("mcp_")),
+            );
+          if (
+            msg.mcpCall &&
+            opened.resumed &&
+            context.messages.some(
+              (m) => m.role === "toolResult" && m.toolCallId === "mcp-" + job.id,
+            )
+          )
+            return fauxAssistantMessage("Original operation settled");
+          if (msg.mcpCall)
+            return fauxAssistantMessage(
+              fauxToolCall(msg.mcpCall, { text: msg.text }, { id: "mcp-" + job.id }),
+              { stopReason: "toolUse" },
+            );
           if (msg.hold) {
             process.send({
               kind: "in-model",
@@ -133,6 +175,17 @@ process.on("message", async (msg) => {
           return fauxAssistantMessage("independent answer: " + job.initial_input);
         },
         (context) => {
+          if (msg.mcpCall || msg.observeMcp) {
+            mcpOffers.push(
+              getCurrentTools(context.messages)
+                .map((t) => t.name)
+                .filter((n) => n.startsWith("mcp_")),
+            );
+            const answer = context.messages.findLast((m) => m.role === "toolResult");
+            return fauxAssistantMessage(
+              "MCP result: " + (answer?.content?.find((c) => c.type === "text")?.text ?? "missing"),
+            );
+          }
           if (msg.captureInputs)
             history = context.messages
               .filter((m) => m.role === "user")
@@ -147,32 +200,23 @@ process.on("message", async (msg) => {
           return fauxAssistantMessage("Report delivered");
         },
       ]);
-      const tools = infrastructureToolDefinitions(true, true).filter(
-        (def) => def.name === "send_message" || (!job.parent_session_id && def.name === "subagent"),
-      );
+      tools = await segmentWorkerTools({
+        job,
+        opened,
+        catalog: catalog?.view,
+        mailbox: replies.mailbox,
+        codec: images?.codec,
+        childAnchor: async (_ref, inherit, lane, callId) =>
+          inherit ? String(await runtime.childAnchor(lane, callId)) : null,
+      });
       runtime = await DurableAgentSession.open(opened.storage, {
         models,
-        remoteTools: tools,
+        remoteTools: tools.definitions.current(),
+        remoteToolUpdates: tools.definitions,
         settings: { compaction: { enabled: false } },
       });
       native = runtime.harness;
       const binding = turnBinding(job, models);
-      const bindings = new Map();
-      for (const definition of tools)
-        bindings.set(
-          definition.name,
-          await workerDelegationTool(
-            scope,
-            replies.mailbox,
-            {
-              childAnchor: async (_ref, inherit, lane, callId) =>
-                inherit ? String(await runtime.childAnchor(lane, callId)) : null,
-            },
-            true,
-            definition.name,
-            true,
-          ),
-        );
       const initialRequestId = job.first_message ?? job.id;
       const attached =
         opened.resumed && (await opened.storage.submissionByRequest(1, initialRequestId, ctx));
@@ -195,7 +239,12 @@ process.on("message", async (msg) => {
           turnEnvironment: binding.turnEnvironment,
           workspaceAvailable: binding.workspaceAvailable,
           autoCompactTokenLimit: binding.autoCompactTokenLimit,
-          remoteTools: () => [...bindings.keys()],
+          remoteTools: tools.offered,
+          recoveryTools: () =>
+            tools.definitions
+              .current()
+              .filter((t) => t.recoveryOnly)
+              .map((t) => t.name),
           tools: [],
           assertCurrent: () => job.authority.assertCurrent(),
           openModel: async (r, nativeRequest) => {
@@ -206,10 +255,7 @@ process.on("message", async (msg) => {
               release() {},
             };
           },
-          prepareRemote: async (v) =>
-            withToolInvocation({ id: "task:" + v.taskId, nativeToolCallId: v.callId }, () =>
-              bindings.get(v.toolName).prepareExecution(v.callId, v.args, v.context.abortSignal),
-            ),
+          prepareRemote: tools.prepare,
         },
         attached ? "reattach" : "initialize",
       );
@@ -259,6 +305,7 @@ process.on("message", async (msg) => {
       await publish(terminalFact);
       process.send({
         kind: "finished",
+        ...(msg.observeMcp || msg.mcpCall ? { mcpOffers } : {}),
         terminalState: terminalFact.terminal.type,
         historyLoad: opened.load,
         history,
@@ -283,6 +330,7 @@ process.on("message", async (msg) => {
           tokensPerSecond: 0,
         });
       models.setProvider(fake.provider);
+      const mcpOffers = [];
       fake.setResponses([
         (context) => {
           history = context.messages.map((m) =>
@@ -315,8 +363,11 @@ process.on("message", async (msg) => {
       if (runtime) await runtime.close();
       else await native?.close(ctx);
       runtime = undefined;
-      await replies?.close();
-      replies = undefined;
+      tools?.close();
+      if (!cfg.mcp) {
+        await replies?.close();
+        replies = undefined;
+      }
       native = undefined;
       if (releaseScheduled) {
         acquired = Promise.withResolvers();
@@ -329,12 +380,15 @@ process.on("message", async (msg) => {
       await inputPump?.close();
       if (runtime) await runtime.close();
       else await native?.close(ctx);
+      tools?.close();
       await replies?.close();
       stopServing.abort();
       releaseScheduled?.resolve();
       await serving;
       await worker.close();
       await producer?.close();
+      await catalog?.close();
+      await images?.blobs.close();
       await storage.db.destroy();
       process.disconnect();
     }

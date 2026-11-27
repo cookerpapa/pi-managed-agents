@@ -31,7 +31,19 @@ function checkShape(op) {
     fields(op, ["action", "operationId", "taskId", "conversationId"]);
   }
 }
-function delegationReference(t) {
+export function isMcpReference(t) {
+  return (
+    t?.target === "control" &&
+    t.implementation?.catalogScope?.startsWith("mcp:") &&
+    t.implementation.replay === "never" &&
+    t.replyRecovery &&
+    t.contextAnchor === null &&
+    t.bindingId === undefined &&
+    t.environment === undefined
+  );
+}
+function logicalControlReference(t) {
+  if (isMcpReference(t)) return true;
   return (
     t?.target === "control" &&
     isControlToolName(t.toolName) &&
@@ -43,7 +55,7 @@ function delegationReference(t) {
 export function encodeWorkspaceFact(fact) {
   const { workspaceOperations, ...base } = fact;
   assert(
-    (base.tools ?? []).every(delegationReference) &&
+    (base.tools ?? []).every(logicalControlReference) &&
       !base.cancellations?.length &&
       !(base.kind === "path_probe" && base.execution),
     "Worker cannot publish a routed operation",
@@ -56,7 +68,7 @@ export function encodeWorkspaceFact(fact) {
 export function decodeWorkspaceFact(bytes) {
   const { workspaceOperations = [], ...wire } = JSON.parse(bytes.toString());
   assert(
-    (wire.tools ?? []).every(delegationReference) &&
+    (wire.tools ?? []).every(logicalControlReference) &&
       !wire.cancellations?.length &&
       !(wire.kind === "path_probe" && wire.execution),
     "Worker sent a routed command",

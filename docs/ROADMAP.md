@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+Connect independent root Sessions to the [HTTP MCP execution path](adr/0373-independent-session-mcp.md) and verify directory changes and Worker handoff against a real server.
+
 The #52 candidate opens each delegated Session from the input that led to its creation. Tail pruning uses the original call position to select managed descendants. [Delegation navigation](adr/0372-delegations-in-input-navigation.md).
 
 The #52 candidate retains settled history on Worker-local SSD across memory expiry and same-directory restart. [Acceptance and configuration](reports/worker-ssd-continuation-20261127.md).

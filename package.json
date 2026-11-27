@@ -136,6 +136,7 @@
     "local:connect": "tsx packages/local-executor/src/launch.ts",
     "local:check": "PI_CLOUD_LOCAL_EXECUTION_CHECK=1 npm run test --workspace @pi-cloud/local-executor",
     "browser:mcp:check": "node scripts/run-browser-mcp-check.mjs",
+    "test:segment-mcp": "TSX_TSCONFIG_PATH=packages/control-plane/tsconfig.json node --import tsx scripts/experiments/minimal-session-storage/run-mcp-acceptance.mjs",
     "production:mcp-check": "node --import tsx scripts/run-live-mcp-check.mjs"
   },
   "devDependencies": {

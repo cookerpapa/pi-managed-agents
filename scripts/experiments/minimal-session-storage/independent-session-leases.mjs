@@ -74,7 +74,7 @@ export class SegmentWorker {
                 and prev.mailbox_position=r.mailbox_position-1 and prev.history_head->>'version'=${version})`;
           }
           return sql`select r.id,r.tenant_id,r.session_id as flow_id,s.id as logical_id,
-          s.parent_session_id,s.agent_name,s.family_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
+          s.parent_session_id,s.agent_name,s.family_id,s.owner_user_id,r.native_work_handoff is not null as recovering,r.mailbox_position,r.stop_on_resume,r.started_at,r.initial_input,r.model_snapshot,r.workspace_grant,r.environment_snapshot,
           (select prev.workspace_grant from turns prev where prev.tenant_id=r.tenant_id and prev.session_id=r.session_id and prev.mailbox_position=r.mailbox_position-1) previous_workspace,(select m.id from user_or_agent_messages m where m.turn_id=r.id and m.state <> 'withdrawn' order by m.native_id nulls last,m.starts_turn desc,m.position limit 1) as first_message,
           exists(select from user_or_agent_messages m where m.turn_id=r.id) as has_inputs
           from ready_agent_sessions q join sessions s on s.tenant_id=q.tenant_id and s.id=q.session_id

@@ -195,6 +195,8 @@ On the #52 candidate, the model sees an interrupted Bash wait with an unconfirme
 
 On #52, Workers may retain the settled, read-only Entry prefix, including images. The Session queue gives an eligible cached Worker first access to a large continuation, then permits an ordinary claim at the recorded ready time. The new Turn still establishes its own lease and model/environment binding. [Warm continuation](adr/0370-large-history-warm-continuation.md). A Worker can also retain versioned Entry bodies in a local SQLite file. Reconnects advertise RAM and SSD availability with their individual expiries. [Incremental disk cache](adr/0371-worker-local-ssd-history.md).
 
+On #52, independent root Sessions consume the scoped Kafka catalog and submit HTTP MCP tools to the existing Tool host. [Dispatch and recovery](adr/0373-independent-session-mcp.md).
+
 On #52, the navigator reads one Session’s retained inputs and a bounded page of its direct children at each input. Child creation records the model request’s visible input and the founding call. History pruning checks that call against the retained range and requires affected writers to settle before removing their windows. [Delegation navigation](adr/0372-delegations-in-input-navigation.md).
 
 On #52, a queued Turn owns its frozen model, Workspace and directory. Model selection on an active Session applies at its next Turn admission. An ordered Worker handoff resumes the existing Turn. [Decision](adr/0368-session-defaults-and-turn-snapshots.md). The conversation navigator reads adopted inputs from canonical history within each Fork’s retained range. A stopped Session holds unread Agent mail for the next human Turn. [Read contract](adr/0369-placed-input-navigation.md).

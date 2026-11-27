@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { operationalLog } from "@pi-cloud/observability";
 import { parseToolSandboxOperationRequest } from "@pi-cloud/protocol";
 import { WorkspaceRouteSpans } from "./workspace-route-spans.mjs";
-import { operationsFor } from "./workspace-operations.mjs";
+import { isMcpReference, operationsFor } from "./workspace-operations.mjs";
 import { plainExecution, matchingToolStart, resolveToolStart } from "./tool-grant-prefix.mjs";
 import { projectRecord } from "./project-record.mjs";
 
@@ -118,7 +118,7 @@ export class WorkspaceOperationRouter {
     const f = record.fact,
       ops = record.decodedOperations ?? operationsFor(f);
     const covered = record.offset < this.view.next.get(record.partition);
-    const tools = [],
+    const tools = (f.tools ?? []).filter(isMcpReference),
       cancels = [],
       commands = [];
     for (const op of ops) {

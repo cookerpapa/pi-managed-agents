@@ -1,7 +1,7 @@
 // Compose the segmented candidate with the ordinary native projection and the
 // existing named return dispatcher. Kafka still orders every writer boundary.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { MemoryStorage } from "@earendil-works/pi-durable";
 import Fastify from "fastify";
@@ -17,11 +17,18 @@ import {
   resumeFamilyCheckpoint,
   saveSealedFamily,
 } from "@pi-cloud/pi-session-postgres/durable";
-import { KafkaLogConsumer } from "@pi-cloud/event-log";
+import {
+  KafkaLogConsumer,
+  KafkaToolCatalogConsumer,
+  KafkaToolReplyPublisher,
+} from "@pi-cloud/event-log";
+import { ToolHostClient } from "../../../packages/control-plane/src/tool-host-client.ts";
+import { ControlToolDispatcher } from "../../../packages/control-plane/src/control-tool-dispatcher.ts";
+import { ToolCatalogAuthority } from "../../../packages/control-plane/src/tool-catalog-authority.ts";
 
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { NamedSubagentExecutor } from "../../../packages/control-plane/src/named-subagent-executor.ts";
-import { operationsFor, decodeWorkspaceFact } from "./workspace-operations.mjs";
+import { operationsFor, decodeWorkspaceFact, isMcpReference } from "./workspace-operations.mjs";
 import { ChildNameConflict, ForkStorage } from "./fork-storage.mjs";
 import { installSegmentInputApi } from "./segment-input-api.mjs";
 import { SegmentInputs } from "./segment-inputs.mjs";
@@ -95,7 +102,7 @@ export class IndependentSessionRuntime {
     return starts;
   }
   reader({ brokers, clientId, groupId, onError }) {
-    return new KafkaLogConsumer({
+    return (this.consumer = new KafkaLogConsumer({
       brokers,
       topic: this.topic,
       clientId,
@@ -120,7 +127,7 @@ export class IndependentSessionRuntime {
           throw error;
         }
       },
-    });
+    }));
   }
   installInputApi(app, authorize) {
     installSegmentInputApi(app, this.inputs, authorize);
@@ -130,6 +137,48 @@ export class IndependentSessionRuntime {
   }
   worker(registration) {
     return new SegmentWorker({ database: this.store.db, ...registration });
+  }
+  async connectMcp({ url, token, brokers, replicas = 3 }) {
+    if (this.mcp) throw Error("MCP dispatcher already connected");
+    const instanceId = randomUUID(),
+      authority = new ToolCatalogAuthority(this.store.db);
+    const catalog = new KafkaToolCatalogConsumer({
+      brokers,
+      replicas,
+      instanceId,
+      minimumGenerations: () => authority.minimumGenerations(),
+    });
+    const client = new ToolHostClient({
+      baseUrl: url,
+      token,
+      catalog: (name) => catalog.view.publicationFor(name),
+    });
+    const replies = new KafkaToolReplyPublisher(brokers, "segment-mcp-" + instanceId);
+    const dispatcher = new ControlToolDispatcher({
+      database: this.store.db,
+      partitions: this.partitions,
+      admittedMcp: true,
+      ownsPartition: (p) => this.consumer?.ownsPartition(p) === true,
+      execute: (command, current, signal) => client.execute(command, current, signal),
+      publish: (topic, reply) => replies.publish(topic, reply),
+    });
+    const close = async () => {
+      this.mcp = undefined;
+      try {
+        await dispatcher.close();
+      } finally {
+        await Promise.all([client.close(), replies.close(), catalog.close()]);
+      }
+    };
+    try {
+      await catalog.start();
+      await replies.start();
+      this.mcp = dispatcher;
+      return { close, catalog: catalog.view };
+    } catch (error) {
+      await close();
+      throw error;
+    }
   }
   connectDelegations(url, token) {
     if (this.subagents) throw Error("Subagent admission endpoint already configured");
@@ -242,6 +291,7 @@ export class IndependentSessionRuntime {
     };
   }
   reset() {
+    this.mcp?.reset();
     this.subagents?.reset();
     this.#owners.clear();
     this.projection.nativeStore.projection.reset();
@@ -336,6 +386,7 @@ export class IndependentSessionRuntime {
         await this.#skip(record);
         return false;
       }
+      await this.mcp?.consume(record, current);
       this.#owners.delete(s.tenantId + "/" + s.sessionId);
       this.projection.nativeStore.projection.releaseSettled(local);
       this.projection.nativeStore.controlProjected(record);
@@ -369,7 +420,13 @@ export class IndependentSessionRuntime {
     );
     if (result.admitted || covered) owner.witness.observe(mapped);
     if (!result.admitted) return false;
-    await this.projection.dispatch({ ...record, fact: mapped }, current, grant);
+    let permit;
+    const admit = () => (permit ??= grant());
+    await this.projection.dispatch({ ...record, fact: mapped }, current, admit);
+    const mcp = fact.tools.filter(isMcpReference);
+    if (mcp.length && !this.mcp) throw Error("MCP Tool host is not connected");
+    if (mcp.length || this.mcp?.hasPending)
+      await this.mcp.consume({ ...record, fact: { ...fact, tools: mcp } }, current, admit);
     for (const ref of fact.tools) {
       if (ref.toolName !== "subagent" && ref.toolName !== "send_message") continue;
       if (!this.subagents) throw Error("Independent subagent admission endpoint is unavailable");
@@ -397,7 +454,7 @@ export class IndependentSessionRuntime {
           throw Error("Missing founding delegation coordinates");
         origin = { assistantEntry, requestEntry: request.at };
       }
-      if (current() && (await grant()) && current())
+      if (current() && (await admit()) && current())
         this.subagents.offer(fact, ref, through, origin);
     }
     return true;

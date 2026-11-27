@@ -1,0 +1,7 @@
+# ADR-0373. Dispatch HTTP MCP from independent Sessions
+
+The #52 candidate uses the existing Tool host, compacted Kafka tool catalog and Worker reply mailbox. Each Worker boot consumes directory snapshots. Each Turn filters them by the claimed Session's tenant, owner and root status. Pi's request hook observes changes at the next model request. The Worker publishes a logical Tool identity, its pinned catalog generation and its original reply reference. Connection endpoints and credentials stay at the host.
+
+The partition owner admits the native commit, projects its Tool reference, and confirms the Kafka dispatch position before starting the HTTP operation. The ordinary control dispatcher consumes the accepted native task directly and never reissues an uncertain external call. Task settlement, Stop and partition revocation release its state. The Tool host checks connection access against the authenticated command's public root Session. The existing query uses the tenant, Session owner and current connection revision. The Projector owns the Turn-to-Session check. Flow rotation does not change the identity of a root Session.
+
+A pending MCP reference shares the existing pending Tool record and ordered seal. A replacement attaches a reply-only proxy to the original mailbox and deadline. It can settle an invocation after the catalog withdraws the tool. Bash and named child admission retain their existing recovery policies. The serving cutover remains under #48.

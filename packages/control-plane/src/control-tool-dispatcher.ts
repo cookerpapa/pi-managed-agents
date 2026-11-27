@@ -73,7 +73,7 @@ function admittedDelegatedQuery(
       nativeSequence: fact.commit.seq,
     };
 }
-function admittedDelegation(
+function admittedNativeCommand(
   fact: Extract<KafkaAcceptedFactRecord["fact"], { kind: "durable_commit" }>,
   ref: DurableControlToolDispatch,
 ): AcceptedControlToolCommand | undefined {
@@ -107,6 +107,8 @@ export class ControlToolDispatcher {
       images?: ImageAttachmentCodec;
       partitions: number;
       admittedDelegatedReads?: boolean;
+      /** The segmented store has already admitted this native execute checkpoint. */
+      admittedMcp?: boolean;
       namedExecutor?: Pick<
         import("./named-subagent-client.ts").NamedSubagentClient,
         "offer" | "reset" | "close" | "activeCount"
@@ -195,13 +197,17 @@ export class ControlToolDispatcher {
       if (!repeatable && admitted === undefined) admitted = (await commitBeforeEffect?.()) ?? false;
       if (!current()) return;
       const admittedCommand =
-        reference.toolName === "subagent" &&
-        this.options.directDelegations &&
-        !reference.implementation
-          ? admittedDelegation(fact, reference)
-          : this.options.admittedDelegatedReads
-            ? admittedDelegatedQuery(fact, reference)
-            : undefined;
+        this.options.admittedMcp &&
+        reference.implementation?.catalogScope &&
+        reference.replyRecovery
+          ? admittedNativeCommand(fact, reference)
+          : reference.toolName === "subagent" &&
+              this.options.directDelegations &&
+              !reference.implementation
+            ? admittedNativeCommand(fact, reference)
+            : this.options.admittedDelegatedReads
+              ? admittedDelegatedQuery(fact, reference)
+              : undefined;
       if (!current()) return;
       this.#remember(
         reference,
@@ -617,11 +623,15 @@ export class ControlToolDispatcher {
         // Keep only the intent reference until native settlement/seal. Recovery
         // may have conservatively abandoned an intent before its Kafka replay.
         pending.done = true;
+        if (pending.dispatch.implementation?.catalogScope) delete pending.admittedCommand;
         this.#replyBytes -= pending.replyBytes;
         pending.replyBytes = 0;
         delete pending.reply;
       }
     }
+  }
+  get hasPending(): boolean {
+    return this.#pending.size > 0;
   }
   async close(): Promise<void> {
     this.#closed = true;

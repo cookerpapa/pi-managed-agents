@@ -13,6 +13,8 @@ import {
   parseToolReplyRecovery,
   type DurableSessionCommit,
   type ToolReplyRecovery,
+  type OriginalRemoteToolIntent,
+  type ToolImplementation,
 } from "@pi-cloud/protocol";
 import { sql, type Kysely, type Transaction } from "kysely";
 import { nativeDelegationIntent } from "./task-delegation.ts";
@@ -40,6 +42,11 @@ type Handoff = {
   state: SealedNativeState;
 };
 type PendingNativeTool = {
+  seq?: number;
+  mcp?: {
+    scope: Extract<OriginalRemoteToolIntent["command"], { kind: "control_tool" }>["scope"];
+    implementation: ToolImplementation;
+  };
   taskId: number;
   conversationId: number;
   operationId: string;
@@ -66,7 +73,31 @@ function pendingReferences(state: SealedNativeState, refs: Record<string, Pendin
     )
       throw Error("Unmatched pending native tool at seal");
     operations.add(op.operationId);
+    const original: OriginalRemoteToolIntent | undefined = op.mcp
+      ? {
+          sequence: op.seq!,
+          taskId: op.taskId,
+          conversationId: op.conversationId,
+          reply,
+          command: {
+            kind: "control_tool",
+            target: "control",
+            scope: op.mcp.scope,
+            implementation: op.mcp.implementation,
+            taskId: op.taskId,
+            operationId: op.operationId,
+            conversationId: op.conversationId,
+            toolName: reply.toolName,
+            nativeCallId: reply.toolCallId,
+            arguments: durableToolState(task)!.intent!.arguments,
+            contextAnchor: null,
+            replyTopic: reply.topic,
+            replyRecovery: reply,
+          },
+        }
+      : undefined;
     return {
+      ...(original ? { original } : {}),
       taskId: op.taskId,
       conversationId: op.conversationId,
       operationId: op.operationId,

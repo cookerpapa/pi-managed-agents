@@ -184,8 +184,14 @@ export function foldToolReferences(
     scope = [s.tenantId, s.piSessionId, s.runId, s.writerId];
   let registered = 0;
   for (const ref of fact.tools ?? []) {
-    if (ref.target !== "cube" || ref.request?.operation !== "tool.execute" || !ref.replyRecovery)
+    const mcp = ref.target === "control" && ref.implementation?.catalogScope;
+    if (
+      (!mcp && (ref.target !== "cube" || ref.request?.operation !== "tool.execute")) ||
+      !ref.replyRecovery
+    )
       continue;
+    const toolName = mcp ? ref.toolName : ref.request.toolName;
+    const operationId = mcp ? ref.operationId : ref.request.operationId;
     const task = writes.find((t) => t.id === ref.taskId);
     const reply = parseToolReplyRecovery(ref.replyRecovery);
     assert(
@@ -193,17 +199,18 @@ export function foldToolReferences(
         task.state.checkpoint?.phase === "execute" &&
         task.input.callId === reply.toolCallId &&
         ref.replyTopic === reply.topic &&
-        ref.request.toolName === reply.toolName &&
+        toolName === reply.toolName &&
         ref.scope.writerId === s.writerId &&
         ref.scope.runId === s.runId &&
-        typeof ref.request.operationId === "string",
+        typeof operationId === "string",
       "Unmatched native sandbox intent",
     );
     const value = {
       ...(ref.allocationSpanStart !== undefined
         ? { allocationSpanStart: ref.allocationSpanStart }
         : {}),
-      operationId: ref.request.operationId,
+      operationId,
+      ...(mcp ? { mcp: { scope: ref.scope, implementation: ref.implementation } } : {}),
       taskId: task.id,
       conversationId: task.conversationId,
       offset: String(offset),

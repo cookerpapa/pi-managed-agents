@@ -33,7 +33,7 @@ import {
 
 /** Trusted platform handlers only. No Pi Harness, Session Kafka consumer,
  * resource owner, native writer, or user extension is constructed here. */
-export async function startToolHost() {
+export async function startToolHost(options: { mcpTurnAdmittedByProjector?: boolean } = {}) {
   const config = await loadToolHostConfig();
   const executableId = process.env.PI_CLOUD_TOOL_RELEASE_ID;
   if (!executableId || !/^[a-zA-Z0-9_.:-]{1,256}$/.test(executableId))
@@ -134,6 +134,7 @@ export async function startToolHost() {
       await authority.confirmPublished(snapshot);
     };
     mcp = new McpToolHostRuntime({
+      ...(options.mcpTurnAdmittedByProjector ? { turnAdmittedByProjector: true } : {}),
       database,
       databaseUrl: config.databaseUrl,
       releaseId,
@@ -217,7 +218,13 @@ export async function startToolHost() {
         const call = request.body?.command;
         if (!accepting || !selected || quiescence.status().phase !== "open")
           return reply.code(503).send({ error: "tool_host_draining" });
-        if (request.body.releaseId !== releaseId || !(await authority.current(selected)))
+        const platform = selected;
+        const combinedMcpAdmission =
+          options.mcpTurnAdmittedByProjector && !!call?.implementation?.catalogScope;
+        if (
+          request.body.releaseId !== releaseId ||
+          (!combinedMcpAdmission && !(await authority.current(platform)))
+        )
           return reply.code(412).send({ error: "tool_release_changed" });
         try {
           const {
@@ -266,7 +273,12 @@ export async function startToolHost() {
         reply.raw.once("close", abort);
         try {
           const outcome = call.implementation?.catalogScope
-            ? await mcp!.execute(call, () => !controller.signal.aborted, controller.signal)
+            ? await mcp!.execute(
+                call,
+                () => !controller.signal.aborted,
+                controller.signal,
+                combinedMcpAdmission ? platform : undefined,
+              )
             : await tools.execute(call, () => !controller.signal.aborted, controller.signal);
           const result = parseToolResultPayload({
             toolName: call.replyMode === "hostcall" ? "subagent-control" : call.toolName,
