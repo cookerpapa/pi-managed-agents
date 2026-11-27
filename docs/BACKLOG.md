@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Connect mixed native ready-prefix projection, receipt-based usage and named child creation to the independent Session images. [Serving audit](reports/independent-session-reconciliation-20261128.md).
+
 - [x] Claim Turns directly, promote late input on closure, render delivered/read receipts and reuse a verified source prefix on a Fork’s first Turn. [Acceptance](reports/turn-queue-fork-receipts-20261128.md).
 
 - [x] Use a point mailbox lookup and an unfinished-Turn index in the serving candidate. Verify online upgrade, recovery from a cancelled build, and index maintenance cost. [Results](reports/session-claim-selector-integration-20261127.md).

@@ -35,6 +35,8 @@ const lock = JSON.parse(await readFile("package-lock.json", "utf8"));
 const verified = new Set();
 for (const [role, base, entry, assets] of [
   ["migrate", control, "scripts/serving/independent-session/migrate.mjs", sqlAssets],
+  ["subagents", control, "packages/control-plane/src/independent-session-subagents-main.mjs", []],
+  ["tool-host", control, "packages/control-plane/src/independent-session-tool-host-main.mjs", []],
   ["api", control, "packages/control-plane/src/independent-session-api-main.mjs", []],
   ["projector", control, "packages/control-plane/src/independent-session-projector-main.mjs", []],
   [

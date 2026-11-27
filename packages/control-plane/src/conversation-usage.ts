@@ -8,16 +8,26 @@ export async function readConversationUsage(
   database: Kysely<Database>,
   tenantId: string,
   sessionId: string,
-  delegatedRuns = false,
+  layout: "native" | "delegated" | "independent" = "native",
 ): Promise<ConversationUsageResource> {
   if (!database.isTransaction)
     return database
       .transaction()
       .setIsolationLevel("repeatable read")
-      .execute((tx) => readConversationUsage(tx, tenantId, sessionId, delegatedRuns));
+      .execute((tx) => readConversationUsage(tx, tenantId, sessionId, layout));
   type Member = { id: string; title: string };
-  const query = delegatedRuns
-    ? sql<Member>`with recursive family(root,id,title) as (
+  const query =
+    layout === "independent"
+      ? sql<Member>`with recursive family(id,title) as (
+        select w.id,p.title from flow_session_tips w join public.sessions p
+          on p.tenant_id=w.tenant_id and p.id=w.id and p.pruned_at is null
+        where w.tenant_id=${tenantId}::uuid and w.id=${sessionId}::uuid
+        union all
+        select c.id,c.agent_name from family f join flow_session_tips c
+          on c.tenant_id=${tenantId}::uuid and c.parent_session_id=f.id
+      ) select id,title from family order by id`
+      : layout === "delegated"
+        ? sql<Member>`with recursive family(root,id,title) as (
         (select id,id,title from sessions where tenant_id=${tenantId}::uuid and id=${sessionId}::uuid and pruned_at is null
          union all
          select s.id,a.id,coalesce(a.agent_name,left(a.initial_input,160))
@@ -30,7 +40,7 @@ export async function readConversationUsage(
         join runs a on a.caller_run_id=caller.id and a.session_id=f.root and a.tenant_id=caller.tenant_id and a.id=a.agent_id and a.pruned_at is null
         join runs r on r.id=a.root_run_id and r.tenant_id=a.tenant_id and r.pruned_at is null
       ) select id,title from family order by id`
-    : sql<Member>`with recursive family as (
+        : sql<Member>`with recursive family as (
     select id,title from sessions where tenant_id=${tenantId}::uuid and id=${sessionId}::uuid and pruned_at is null
     union
     select c.id,c.title from family f join subagent_conversations l on l.tenant_id=${tenantId}::uuid and l.parent_session_id=f.id

@@ -5,6 +5,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./tool-catalog-reader": "./src/tool-catalog-reader.ts",
+    "./control-tool-catalog": "./src/control-tool-catalog.ts",
     "./execution-publication": "./src/execution-publication.ts",
     "./run-skill-catalog": "./src/run-skill-catalog.ts",
     ".": "./src/index.ts",

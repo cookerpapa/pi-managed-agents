@@ -116,11 +116,11 @@ export function namedModelFixture(url, scope) {
           );
         }
         await assert.rejects(
-          readConversationUsage(database, randomUUID(), childId, true),
+          readConversationUsage(database, randomUUID(), childId, "delegated"),
           /Conversation was not found/,
         );
         await assert.rejects(
-          readConversationUsage(database, scope.tenantId, randomUUID(), true),
+          readConversationUsage(database, scope.tenantId, randomUUID(), "delegated"),
           /Conversation was not found/,
         );
         const result = await database

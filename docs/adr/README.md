@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0377](0377-serving-session-projection-prefixes.md) integrates bounded native batches into the independent Session serving consumer.
+
 [ADR-0376](0376-direct-turn-claims-and-fork-locality.md) moves readiness onto Turns, defines input receipts and enables immediate cache-aware routing and frozen prefix reuse.
 
 [ADR-0375](0375-independent-session-serving-entry.md) stages the independent Session serving roles and a real-provider conversation.

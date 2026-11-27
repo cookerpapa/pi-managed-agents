@@ -1,5 +1,9 @@
 import { MemoryStorage } from "@earendil-works/pi-durable";
-import { readSealedFamily, hydrateSealedFamily } from "@pi-cloud/pi-session-postgres/durable";
+import {
+  readSealedFamily,
+  hydrateSealedFamily,
+  readSealedDelegationIntent,
+} from "@pi-cloud/pi-session-postgres/durable";
 import { loadPriorRoot } from "./retained-family-read.mjs";
 export const historyScope = (s, flow) => ({
   ...s,
@@ -57,7 +61,14 @@ export async function openSegmentNative(
       importEntries(await store.contextPrefix(s.tenantId, job.logical_id, true));
       const family = await readSealedFamily(store.db, s, topic, { bashIntentLog });
       await hydrateSealedFamily(family, restored);
-      return { storage: mem, resumed: true, family, load };
+      return {
+        storage: mem,
+        resumed: true,
+        family,
+        load,
+        originalControlIntent: (lane, task) =>
+          readSealedDelegationIntent(store.db, s, topic, lane, task),
+      };
     }
     await loadPriorRoot(store.pool, s, restored, {
       cache: capture,

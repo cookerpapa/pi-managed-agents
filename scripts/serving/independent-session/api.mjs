@@ -17,7 +17,6 @@ import { WebAuthenticationService } from "../../../packages/control-plane/src/we
 
 const pendingReads = new Set([
   "/v1/runs/:id",
-  "/v1/conversations/:id/usage",
   "/v1/conversations/:id/compact",
   "/v1/conversations/:id/compact/:id",
 ]);
@@ -102,11 +101,15 @@ export async function startIndependentSessionApi() {
         installSegmentInputApi(server, inputs, async (req, session) => {
           const identity = tenantRequestIdentity(req);
           if (!identity || (req.method !== "GET" && identity.role === "viewer")) return;
+          const canAddressChild =
+            req.method === "GET" ||
+            (req.method === "POST" &&
+              req.routeOptions.url === "/v1/sessions/:session/turns/:turnId/cancellations");
           const {
             rows: [s],
           } =
             await sql`select s.id from sessions s join public.sessions p on p.tenant_id=s.tenant_id and p.id=s.id
-            where s.tenant_id=${identity.tenantId}::uuid and s.id=${session}::uuid and p.pruned_at is null and s.parent_session_id is null`.execute(
+            where s.tenant_id=${identity.tenantId}::uuid and s.id=${session}::uuid and p.pruned_at is null and (s.parent_session_id is null or ${canAddressChild}::boolean)`.execute(
               store.db,
             );
           if (!s) return;

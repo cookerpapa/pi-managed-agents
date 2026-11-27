@@ -3,7 +3,17 @@ import { resolve } from "node:path";
 import { FamilyModelPermits } from "../../../packages/supervisor-host/src/family-model-permits.ts";
 import { MODEL_RETRY_COUNT } from "../../../packages/sandbox-supervisor/src/durable/model-wait-policy.ts";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
-import { KafkaWorkerProducer } from "@pi-cloud/event-log";
+import { ToolCatalogReader } from "@pi-cloud/runtime-core/tool-catalog-reader";
+import { configuredImageAttachments } from "@pi-cloud/session-attachments";
+import {
+  segmentWorkerTools,
+  segmentControlReferences,
+} from "../../experiments/minimal-session-storage/segment-worker-tools.mjs";
+import {
+  KafkaToolReplyMailbox,
+  KafkaToolCatalogConsumer,
+  KafkaWorkerProducer,
+} from "@pi-cloud/event-log";
 import {
   createExecutionReference,
   modelSamplingHeaders,
@@ -92,6 +102,19 @@ export async function startIndependentWorker() {
       job.authority.assertActive();
     },
   });
+  const mailbox = new KafkaToolReplyMailbox({
+    brokers: config.brokers,
+    bootId: identity.bootId,
+    replicas: 3,
+  });
+  const versions = new ToolCatalogReader(store.db);
+  const catalog = new KafkaToolCatalogConsumer({
+    brokers: config.brokers,
+    replicas: 3,
+    instanceId: identity.bootId,
+    minimumGenerations: () => versions.minimumGenerations(),
+  });
+  const images = await configuredImageAttachments(store.db);
   const inputs = new SegmentMailReader(store.db);
   async function execute(job) {
     const scope = job.scope,
@@ -127,6 +150,7 @@ export async function startIndependentWorker() {
     };
     const modelTasks = new Map();
     let runtime,
+      tools,
       pump,
       lease,
       sequence = 0;
@@ -141,16 +165,21 @@ export async function startIndependentWorker() {
       presentation.bind(1, scope);
       const opened = await openSegmentNative(store, job, config.topic, async (commit) => {
         const display = presentation.prepare(commit);
+        const effects = runtime?.preparePublication(commit);
         await emit({
           kind: "durable_commit",
           factId: randomUUID(),
           occurredAt: new Date().toISOString(),
           commit,
           origins: [],
-          tools: [],
+          tools: await segmentControlReferences(commit, effects, scope, {
+            mailbox,
+            replyTopic: mailbox.topic,
+          }),
           cancellations: [],
           display: display.display,
         });
+        effects?.confirmed();
         display.confirmed();
         sequence = commit.seq;
         for (const w of commit.writes)
@@ -168,9 +197,20 @@ export async function startIndependentWorker() {
             presentation.live[w.record.id] = { conversation: 1, value: w.content.value };
         }
       }
+      tools = await segmentWorkerTools({
+        job,
+        opened,
+        catalog: catalog.view,
+        versions,
+        mailbox,
+        codec: images?.codec,
+        childAnchor: async (_ref, inherit, lane, callId) =>
+          inherit ? String(await runtime.childAnchor(lane, callId)) : null,
+      });
       runtime = await DurableAgentSession.open(opened.storage, {
         models: registry.models,
-        remoteTools: [],
+        remoteTools: tools.definitions.current(),
+        remoteToolUpdates: tools.definitions,
         settings: {
           stream: { timeoutMs: 0, maxRetries: 0 },
           retry: { maxRetries: MODEL_RETRY_COUNT },
@@ -186,12 +226,23 @@ export async function startIndependentWorker() {
           initialRequestId: initial,
           conversationId: 1,
           tools: [],
-          remoteTools: () => [],
+          trackFreshDelegationOrigin: true,
+          remoteTools: tools.offered,
+          recoveryTools: () =>
+            tools.definitions
+              .current()
+              .filter((t) => t.recoveryOnly)
+              .map((t) => t.name),
           assertCurrent: () => job.authority.assertCurrent(),
-          prepareRemote: async () => {
-            throw Error("Unregistered tool in text-only Session");
+          prepareRemote: tools.prepare,
+          toolHostVersion: tools.version,
+          beforeYield: async () => {
+            if (tools.advance()) await runtime.refreshRemoteTools(tools.definitions.current());
           },
-          afterToolRound: (task, context) => pump.postTools(task, context),
+          afterToolRound: async (task, context) => {
+            await pump.postTools(task, context);
+            if (tools.advance()) await runtime.refreshRemoteTools(tools.definitions.current());
+          },
           openModel: async (request, native) => {
             if (!native) throw Error("Missing native model task");
             await job.authority.assertCurrent();
@@ -314,7 +365,11 @@ export async function startIndependentWorker() {
       pump?.close();
       lease?.release();
       active.delete(executionReference);
-      await runtime?.close();
+      try {
+        await runtime?.close();
+      } finally {
+        tools?.close();
+      }
     }
   }
   let ws,
@@ -353,7 +408,7 @@ export async function startIndependentWorker() {
     await ws?.stop();
     permits.close();
     await modelGateway.close();
-    await publishLog.close();
+    await Promise.all([publishLog.close(), mailbox.shutdown(), catalog.close()]);
     await management.close();
     await store.db.destroy();
   }
@@ -361,6 +416,8 @@ export async function startIndependentWorker() {
     await management.listen();
     await modelGateway.start();
     await publishLog.start();
+    await mailbox.start();
+    await catalog.start();
     const bootSecret = randomBytes(32).toString("base64url"),
       credentialId = randomUUID();
     await new SupervisorProvisioningClient({

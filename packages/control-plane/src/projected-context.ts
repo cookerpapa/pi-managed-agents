@@ -71,6 +71,27 @@ export async function readProjectedContextEstimate(
     for (const r of rows)
       if (BigInt(r.lo) <= BigInt(cut)) ranges.push({ ...r, hi: lesser(r.hi, cut) });
   }
+  return estimateRanges(db, tenant, ranges, model);
+}
+
+export async function readSegmentContextEstimate(
+  db: Kysely<Database>,
+  tenant: string,
+  session: string,
+  model: Parameters<typeof estimateStoredContext>[1],
+) {
+  const { rows } = await sql<Range>`select physical as stream,source_lane as lane,
+      coalesce(entry_lo,1) as lo,coalesce(entry_hi,9007199254740991) as hi,coalesce(cut_seq,9007199254740991) as seq
+      from flow_read_ranges(${tenant}::uuid,${session}::uuid)`.execute(db);
+  return estimateRanges(db, tenant, rows, model);
+}
+
+async function estimateRanges(
+  db: Kysely<Database>,
+  tenant: string,
+  ranges: Range[],
+  model: Parameters<typeof estimateStoredContext>[1],
+) {
   // Select at most one page of coordinates before fetching bodies. Once a head
   // is visible, Pi keeps the summary and entries starting at the head's floor.
   const entries: Entry[] = [];

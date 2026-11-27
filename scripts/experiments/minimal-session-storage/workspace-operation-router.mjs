@@ -131,11 +131,14 @@ export class WorkspaceOperationRouter {
       let route;
       if (covered) route = await this.original(f.scope, op, record);
       else {
-        let span = await this.spans.at(op.scope, op.conversationId, record);
+        // Pruning can rebind the public Session to a new physical history Flow.
+        // The route row references the Flow's Turn, the provider receives the logical Session.
+        const historyOwner = { ...op.scope, piSessionId: f.scope.piSessionId };
+        let span = await this.spans.at(historyOwner, op.conversationId, record);
         if (!span || span.writerId !== op.scope.writerId) {
           if (warmOnly) return;
           span = await this.spans.activate(
-            op.scope,
+            historyOwner,
             op.conversationId,
             record,
             await this.select(op.scope, op.conversationId),

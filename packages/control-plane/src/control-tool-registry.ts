@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
+import { controlToolCatalog } from "@pi-cloud/runtime-core/control-tool-catalog";
+export { controlToolCatalog } from "@pi-cloud/runtime-core/control-tool-catalog";
 import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
 import {
-  parseControlToolCatalog,
   parseToolResultPayload,
   assertSubagentResultBudget,
   type ControlToolCatalog,
@@ -23,19 +23,6 @@ export type RegisteredControlTool = {
     signal?: AbortSignal,
   ): Promise<Result>;
 };
-
-export function controlToolCatalog(
-  tools: readonly ControlToolCatalogDefinition[],
-): ControlToolCatalog {
-  const definitions = JSON.parse(
-    JSON.stringify([...tools].sort((a, b) => a.name.localeCompare(b.name))),
-  ) as ControlToolCatalogDefinition[];
-  return parseControlToolCatalog({
-    version: 4,
-    revision: createHash("sha256").update(JSON.stringify(definitions)).digest("hex"),
-    tools: definitions,
-  });
-}
 
 /** Definitions and executable admission share one owner; accepted handlers keep their reference. */
 export class ControlToolRegistry implements ControlToolCatalogSource {

@@ -9,7 +9,11 @@ import { ReadyProjection } from "./ready-projection.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { installWorkspaceRoutes } from "./workspace-route-spans.mjs";
-import { decodeWorkspaceFact, encodeWorkspaceFact } from "./workspace-operations.mjs";
+import {
+  decodeWorkspaceFact,
+  encodeWorkspaceFact,
+  operationsFor,
+} from "./workspace-operations.mjs";
 const fixture = await testPostgres({}, { crashable: true });
 let pool;
 const connect = () => {
@@ -157,8 +161,15 @@ try {
   }
   // Restore a missing candidate PG projection from the earlier Kafka intent.
   // The dispatch offset was already granted. No physical submit may occur.
+  const entry = decodeWorkspaceFact(wire);
+  // The independent consumer rebinds the accepted history, keeping the logical
+  // operation's Session address intact. This must find the original span.
+  const operations = operationsFor(entry.fact).map((op) => ({
+    ...op,
+    scope: { ...op.scope, piSessionId: s.sessionId },
+  }));
   await router.consume(
-    { ...p(20), fact: decodeWorkspaceFact(wire).fact },
+    { ...p(20), fact: entry.fact, decodedOperations: operations },
     () => true,
     async () => false,
   );

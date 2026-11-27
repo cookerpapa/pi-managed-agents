@@ -1,16 +1,13 @@
+import { serveSegmentDelegations } from "./segment-delegation-service.mjs";
 // Compose the segmented candidate with the ordinary native projection and the
 // existing named return dispatcher. Kafka still orders every writer boundary.
 import assert from "node:assert/strict";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import Fastify from "fastify";
 import { durableControlIntent } from "@pi-cloud/protocol";
-import { installNamedSubagentEndpoint } from "../../../packages/control-plane/src/named-subagent-endpoint.ts";
 import { NamedSubagentClient } from "../../../packages/control-plane/src/named-subagent-client.ts";
-import { SubagentAdmissionRefused } from "../../../packages/control-plane/src/named-subagent-store.ts";
 import {
   AcceptedFamilyCheckpoint,
-  readSealedDelegationIntent,
   resumeFamilyCheckpoint,
   saveSealedFamily,
 } from "@pi-cloud/pi-session-postgres/durable";
@@ -24,18 +21,18 @@ import { ControlToolDispatcher } from "../../../packages/control-plane/src/contr
 import { ToolCatalogAuthority } from "../../../packages/control-plane/src/tool-catalog-authority.ts";
 
 import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
-import { NamedSubagentExecutor } from "../../../packages/control-plane/src/named-subagent-executor.ts";
 import {
   operationsFor,
   decodeWorkspaceFact,
   isMcpReference,
   isOrdinaryHostReference,
 } from "./workspace-operations.mjs";
-import { ChildNameConflict, ForkStorage } from "./fork-storage.mjs";
+import { ForkStorage } from "./fork-storage.mjs";
 import { installSegmentInputApi } from "./segment-input-api.mjs";
 import { SegmentInputs } from "./segment-inputs.mjs";
 import { serveSegmentScheduler } from "./segment-wake.mjs";
 import { SegmentLeaseProjection, SegmentWorker } from "./independent-session-leases.mjs";
+import { recoveryConnectionError } from "./ready-projection.mjs";
 import { normalRootProjection } from "./normal-root-projection.mjs";
 import { settledFamilyBase } from "./settled-family-base.mjs";
 
@@ -49,6 +46,7 @@ const matches = (s, r) =>
 
 export class IndependentSessionRuntime {
   #owners = new Map();
+  #prepared = new WeakMap();
   constructor({ pool, topic, partitions = 1, selectSandbox, resolveSandbox, bashLog = false }) {
     this.store = new ForkStorage(pool);
     this.inputs = this.store.inputs = new SegmentInputs(this.store.db);
@@ -98,6 +96,11 @@ export class IndependentSessionRuntime {
     return starts;
   }
   reader({ brokers, clientId, groupId, onError }) {
+    const failed = (error, current) => {
+      if (current() && recoveryConnectionError(error)) this.consumer.reloadRecoveryState();
+      onError?.(error);
+      throw error;
+    };
     return (this.consumer = new KafkaLogConsumer({
       brokers,
       topic: this.topic,
@@ -105,6 +108,10 @@ export class IndependentSessionRuntime {
       groupId,
       groupRecovery: true,
       orderedEffects: true,
+      batchRead: true,
+      effectPrefixLimit: this.projection.view.width,
+      prepareReady: (records, current) =>
+        this.prepareReady(records, current).catch((error) => failed(error, current)),
       onRevoked: () => this.reset(),
       replayOffsets: (bounds) => this.replayOffsets(bounds),
       decode: (bytes) => {
@@ -119,11 +126,65 @@ export class IndependentSessionRuntime {
         try {
           return await this.consume(record, current, grant);
         } catch (error) {
-          onError?.(error);
-          throw error;
+          return failed(error, current);
         }
       },
     }));
+  }
+  async prepareReady(records, current) {
+    const { view } = this.projection;
+    const staged = [];
+    for (const record of records) {
+      const { fact, topic, offset, partition } = record,
+        s = fact.scope;
+      const owner = this.#owners.get(s.tenantId + "/" + s.sessionId);
+      if (
+        staged.length === view.width ||
+        !current() ||
+        fact.kind !== "durable_commit" ||
+        topic !== this.topic ||
+        partition !== records[0].partition ||
+        partition !== kafkaProducerLane(s.sessionId, this.partitions) ||
+        offset < view.next.get(partition) ||
+        s.sessionId !== s.piSessionId ||
+        s.turnId !== s.runId ||
+        !owner?.witness ||
+        !matches(s, owner) ||
+        view.sessions.get(s.runId)?.writer !== s.writerId ||
+        fact.tools.length ||
+        fact.cancellations?.length ||
+        operationsFor(fact).length ||
+        fact.inputQueueSessions?.length ||
+        fact.display.some((d) => Object.keys(s).some((k) => d.scope[k] !== s[k]))
+      )
+        break;
+      const mapped = this.#mapFact(fact, owner);
+      staged.push({
+        ...record,
+        fact: mapped,
+        partitionKey: s.sessionId,
+        rootPresentation: true,
+        workspaceBatch: true,
+        nativeDispatches: [],
+        stagePresentation: (state, before) => {
+          const result = this.projection.presentationResult(mapped, state, before, true);
+          return () => this.#prepared.set(record, result);
+        },
+      });
+    }
+    if (staged.length < 2) return 1;
+    const n = await this.projection.prepareNativeHistory(staged, current);
+    if (current())
+      for (const record of records.slice(0, n)) {
+        if (!this.#prepared.has(record)) this.#prepared.set(record, { admitted: false });
+      }
+    return n;
+  }
+  #mapFact(fact, owner) {
+    const s = fact.scope;
+    if (owner.flow_id === s.sessionId) return fact;
+    const local = historyScope(s, owner.flow_id);
+    return { ...fact, scope: local, display: fact.display.map((d) => ({ ...d, scope: local })) };
   }
   installInputApi(app, authorize) {
     installSegmentInputApi(app, this.inputs, authorize);
@@ -207,115 +268,14 @@ export class IndependentSessionRuntime {
     this.subagents = new NamedSubagentClient(url, token);
     return this.subagents;
   }
-  async serveDelegations({ connectionString, publish, token, host = "127.0.0.1", port = 0 }) {
-    const dispatcher = new NamedSubagentExecutor({
-      db: this.store.db,
-      connectionString,
-      publish,
-      independentSessions: true,
-    });
-    const api = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
-    installNamedSubagentEndpoint(
-      api,
-      token,
-      () => true,
-      async (o) => {
-        if (o.tool === "send_message" && "args" in o.input) {
-          await this.inputs.sendAgent(o);
-          dispatcher.wake();
-          return;
-        }
-        if (o.tool !== "subagent")
-          throw new SubagentAdmissionRefused("Expected independent delegation");
-        const {
-          rows: [caller],
-        } =
-          await sql`select s.flow_id,r.model_snapshot from sessions s join turns r on r.tenant_id=s.tenant_id and r.session_id=s.flow_id
-        where s.tenant_id=${o.tenant}::uuid and s.id=${o.session}::uuid and r.id=${o.root}::uuid and r.lease_id=${o.writer}::uuid
-        and r.fencing_token=${o.epoch} and r.state='running' and r.output_seal_id is null`.execute(
-            this.store.db,
-          );
-        if (!caller) throw new SubagentAdmissionRefused("Caller writer closed");
-        const s = {
-          tenantId: o.tenant,
-          sessionId: o.session,
-          piSessionId: o.session,
-          runId: o.root,
-          turnId: o.root,
-          writerId: o.writer,
-          fencingToken: o.epoch,
-        };
-        let intent;
-        if ("recover" in o.input) {
-          intent = await readSealedDelegationIntent(
-            this.store.db,
-            historyScope(s, caller.flow_id),
-            this.topic,
-            o.lane,
-            o.task,
-          );
-          if (
-            intent.operationId !== o.input.recover ||
-            intent.sequence !== o.input.seq ||
-            intent.contextAnchor !== o.anchor
-          )
-            throw new SubagentAdmissionRefused("Changed original delegation");
-        } else
-          intent = {
-            toolName: o.tool,
-            operationId: o.operation,
-            taskId: o.task,
-            conversationId: o.lane,
-            nativeCallId: o.input.call,
-            arguments: o.input.args,
-            sequence: o.input.seq,
-            contextAnchor: o.anchor,
-            contextThrough: o.through,
-            requestEntry: o.requestEntry,
-            assistantEntry: o.assistantEntry,
-          };
-        try {
-          await this.store.delegateFromIntent(
-            o.tenant,
-            o.session,
-            { run: o.root, writer: o.writer },
-            intent,
-            caller.model_snapshot.modelId,
-            { operationId: o.operation, topic: o.destination },
-          );
-        } catch (error) {
-          if (!(error instanceof ChildNameConflict)) throw error;
-          // A deterministic name conflict is also a durable Tool Result. A stale
-          // caller or a failed PG transaction leaves its original bounded wait.
-          const hash = createHash("sha256").update(JSON.stringify(o)).digest("hex");
-          const { rows } =
-            await sql`insert into subagent_deliveries(operation_id,root_id,writer,caller_task,caller_lane,operation_hash,destination,call_id,tool,kind,value,due_at)
-          select ${o.operation}::uuid,r.id,${o.writer}::uuid,${o.task},${o.lane},${hash},${o.destination},${intent.nativeCallId},'subagent','fixed',
-            jsonb_build_object('isError',true,'text',${"名字已被占用。已有子 Agent 的 UUID 是 " + error.childId + "。请换一个名字或联系已有的子 Agent。"}::text),clock_timestamp()
-          from (select id from turns where id=${o.root}::uuid and tenant_id=${o.tenant}::uuid and session_id=${caller.flow_id}::uuid and state='running'
-            and output_seal_id is null and lease_id=${o.writer}::uuid and fencing_token=${o.epoch} for share) r
-          on conflict(operation_id) do update set operation_hash=excluded.operation_hash where subagent_deliveries.operation_hash=excluded.operation_hash returning operation_id`.execute(
-              this.store.db,
-            );
-          if (!rows.length) throw new SubagentAdmissionRefused("Stale or conflicting delivery");
-        }
-        dispatcher.wake();
-      },
-    );
-    const url = await api.listen({ host, port });
-    dispatcher.start();
-    return {
-      url,
-      async close() {
-        await api.close();
-        await dispatcher.close();
-      },
-    };
+  serveDelegations(options) {
+    return serveSegmentDelegations(this, options);
   }
   reset() {
     this.hostTools?.reset();
     this.subagents?.reset();
     this.#owners.clear();
+    this.#prepared = new WeakMap();
     this.browser?.reset();
     this.projection.nativeStore.projection.reset();
   }
@@ -427,25 +387,26 @@ export class IndependentSessionRuntime {
     const ops = operationsFor(fact);
     if (ops.some((op) => op.scope?.sessionId !== s.sessionId || op.scope.turnId !== s.turnId))
       throw Error("Cross-Session sandbox operation");
-    const mapped =
-      owner.flow_id === s.sessionId
-        ? fact
-        : { ...fact, scope: local, display: fact.display.map((d) => ({ ...d, scope: local })) };
+    const mapped = this.#mapFact(fact, owner);
     // Embedded tool and origin scopes stay on the original trusted Session.
     const covered = offset < (this.projection.view.next.get(partition) ?? 0n);
     if (covered && owner.output_first_offset !== null && offset < BigInt(owner.output_first_offset))
       return false;
     const opening = !owner.witness;
     owner.witness ??= await this.#base(owner, local, record);
-    const result = await this.projection.nativeStore.projection.project(
-      mapped,
-      record,
-      current,
-      s.sessionId,
-      opening,
-      ops,
-    );
-    if (result.admitted || covered) owner.witness.observe(mapped);
+    const prepared = this.#prepared.get(record);
+    this.#prepared.delete(record);
+    const result =
+      prepared ??
+      (await this.projection.nativeStore.projection.project(
+        mapped,
+        record,
+        current,
+        s.sessionId,
+        opening,
+        ops,
+      ));
+    if (result.admitted || (!prepared && covered)) owner.witness.observe(mapped);
     if (!result.admitted) return false;
     if (this.browser) {
       await this.browser.placements?.(s, owner.flow_id, fact.commit);

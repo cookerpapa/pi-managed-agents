@@ -13,7 +13,9 @@ import { encodeWorkspaceFact } from "./workspace-operations.mjs";
 const { frames, requestId } = JSON.parse(await readFile("/run/pma/mixed-trace", "utf8"));
 const start = KafkaWorkerProducer.prototype.start,
   serve = SegmentWorker.prototype.serve;
-let producer;
+let producer,
+  terminalAcks = 0;
+const expectedAcks = Number(process.env.PMA_FIXTURE_TERMINALS);
 KafkaWorkerProducer.prototype.start = async function (...args) {
   const result = await start.apply(this, args);
   producer = this;
@@ -72,6 +74,14 @@ SegmentWorker.prototype.serve = function (options) {
         baseSequence: presentation.sequences.get(scope.sessionId),
         terminal: { type: "turn.completed", payload: { stopReason: "stop" } },
       });
+      if (++terminalAcks === expectedAcks)
+        console.log(
+          JSON.stringify({
+            event: "fixture.terminal-acks",
+            terminalAcks,
+            lastTerminalAckMs: Date.now(),
+          }),
+        );
     },
   });
 };

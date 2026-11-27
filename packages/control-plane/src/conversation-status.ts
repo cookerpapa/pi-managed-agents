@@ -1,5 +1,9 @@
 import { receivingConversationRunId } from "@pi-cloud/runtime-core/run-readiness";
-import { readProjectedContextEstimate, type ProjectedContextAddress } from "./projected-context.ts";
+import {
+  readProjectedContextEstimate,
+  readSegmentContextEstimate,
+  type ProjectedContextAddress,
+} from "./projected-context.ts";
 import { sql, type Kysely } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import { type ConversationStatusResource, parseModelRuntimeSnapshot } from "@pi-cloud/protocol";
@@ -11,7 +15,10 @@ export async function readConversationStatus(
   database: Kysely<Database>,
   tenantId: string,
   sessionId: string,
-  history = { messages: false, delegated: false },
+  history: { messages: boolean; delegated: boolean; independent?: boolean } = {
+    messages: false,
+    delegated: false,
+  },
 ): Promise<ConversationStatusResource> {
   if (!database.isTransaction)
     return database
@@ -19,6 +26,33 @@ export async function readConversationStatus(
       .setIsolationLevel("repeatable read")
       .setAccessMode("read only")
       .execute((tx) => readConversationStatus(tx, tenantId, sessionId, history));
+  if (history.independent) {
+    const {
+      rows: [settings],
+    } = await sql<{ model: { provider: string; modelId: string; runtime: unknown } }>`
+      select coalesce(t.model_snapshot,s.desired_model) as model from flow_session_tips s
+        join public.sessions p on p.id=s.id and p.tenant_id=s.tenant_id and p.pruned_at is null
+        left join lateral (select model_snapshot from turns t where t.tenant_id=s.tenant_id and t.session_id=s.flow_id
+          and t.state in ('queued','running','settling','cancel_requested') order by t.mailbox_position limit 1) t on true
+        where s.tenant_id=${tenantId}::uuid and s.id=${sessionId}::uuid`.execute(database);
+    if (!settings) throw new ControlPlaneStoreError("not_found", "Conversation was not found");
+    const { provider, modelId } = settings.model,
+      model = { provider, modelId };
+    const runtime = settings.model.runtime
+      ? parseModelRuntimeSnapshot(settings.model.runtime)
+      : catalogModel(provider, modelId);
+    const context = await readSegmentContextEstimate(database, tenantId, sessionId, model);
+    return {
+      sessionId,
+      observedAt: new Date().toISOString(),
+      model,
+      context: {
+        ...context,
+        window: runtime?.contextWindow ?? null,
+        compactThreshold: runtime?.autoCompactTokenLimit ?? null,
+      },
+    };
+  }
   // A named child is addressed by its founding Run. Each continuation has its own native lane.
   const named = history.delegated
     ? (

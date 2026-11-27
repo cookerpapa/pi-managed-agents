@@ -1,3 +1,4 @@
+import { ToolCatalogReader } from "@pi-cloud/runtime-core/tool-catalog-reader";
 import { capturePreparationWork } from "@pi-cloud/observability";
 import { settleWorkerExecutions } from "./worker-retirement.ts";
 import { resourceLimit } from "@pi-cloud/domain";
@@ -460,14 +461,7 @@ export class PiWorkerRuntime {
       brokers: this.#config.kafka.brokers,
       replicas: this.#config.kafka.replicas,
       instanceId: identity.bootId,
-      minimumGenerations: async () => {
-        const { rows } = await sql<{
-          scope: string;
-          generation: string;
-        }>`select scope,generation::text
-          from tool_catalog_publication`.execute(this.#readDatabase);
-        return rows.map((row) => ({ scope: row.scope, generation: Number(row.generation) }));
-      },
+      minimumGenerations: () => new ToolCatalogReader(this.#readDatabase).minimumGenerations(),
       onSnapshot: ({ catalog }) => {
         operationalLog({
           service: "pi-cloud-pi-worker",

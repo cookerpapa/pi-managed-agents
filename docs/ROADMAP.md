@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The [independent Session integration record](reports/independent-session-reconciliation-20261128.md) tracks the November storage decisions against the serving roles and fixed mixed trace.
+
 The [direct Turn queue and Fork cache gate](reports/turn-queue-fork-receipts-20261128.md) covers the independent Session scheduler and placement receipts in the candidate images.
 
 The [isolated segmented serving gate](reports/independent-session-serving-20261127.md) takes an authenticated browser conversation through the real provider and a replacement Worker. The next vertical slice attaches the Guest tool path and measures its effect on projection.

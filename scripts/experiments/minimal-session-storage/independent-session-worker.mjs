@@ -10,7 +10,7 @@ import {
 import { bootMailbox } from "./direct-delegation-worker.mjs";
 import { DurableAgentSession } from "../../../packages/sandbox-supervisor/src/durable/agent-session.ts";
 import { segmentWorkerTools, segmentControlReferences } from "./segment-worker-tools.mjs";
-import { ToolCatalogAuthority } from "../../../packages/control-plane/src/tool-catalog-authority.ts";
+import { ToolCatalogReader } from "@pi-cloud/runtime-core/tool-catalog-reader";
 import { configuredImageAttachments } from "@pi-cloud/session-attachments";
 
 import { encodeWorkspaceFact } from "./workspace-operations.mjs";
@@ -45,7 +45,7 @@ const catalog =
         brokers: cfg.brokers,
         replicas: 3,
         instanceId: cfg.bootId,
-        minimumGenerations: () => new ToolCatalogAuthority(storage.db).minimumGenerations(),
+        minimumGenerations: () => new ToolCatalogReader(storage.db).minimumGenerations(),
       })
     : undefined;
 await catalog?.start();
@@ -231,7 +231,7 @@ process.on("message", async (msg) => {
         job,
         opened,
         catalog: catalog?.view,
-        versions: cfg.versionedTools ? new ToolCatalogAuthority(storage.db) : undefined,
+        versions: cfg.versionedTools ? new ToolCatalogReader(storage.db) : undefined,
         mailbox: replies.mailbox,
         codec: images?.codec,
         childAnchor: async (_ref, inherit, lane, callId) =>

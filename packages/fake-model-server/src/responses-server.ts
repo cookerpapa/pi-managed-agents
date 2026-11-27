@@ -42,7 +42,7 @@ type ResponseInput = {
   model: string;
   input: unknown[];
   previous_response_id?: string;
-  tools?: { name?: string; type?: string }[];
+  tools?: { name?: string; type?: string; parameters?: { required?: string[] } }[];
   stream?: boolean;
   instructions?: string;
 };
@@ -596,6 +596,11 @@ export class FakeResponsesServer {
             await tool(
               "subagent",
               {
+                ...(input.tools
+                  ?.find((t) => t.name === "subagent")
+                  ?.parameters?.required?.includes("name")
+                  ? { name: "child-" + n }
+                  : {}),
                 task: benchmarkPrompt({
                   id: `${plan.id}_c${n}`,
                   kind: "text",

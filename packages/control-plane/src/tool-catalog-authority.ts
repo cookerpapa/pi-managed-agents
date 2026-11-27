@@ -1,13 +1,13 @@
+import { ToolCatalogReader } from "@pi-cloud/runtime-core/tool-catalog-reader";
 import { controlToolCatalog } from "./control-tool-registry.ts";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { sql, type Kysely, type Transaction } from "kysely";
+import { sql, type Transaction } from "kysely";
 import type { Database } from "@pi-cloud/database";
 import {
   parseToolCatalogPublication,
   type ToolCatalogPublication,
   type ControlToolCatalog,
-  type ToolCatalogWatermark,
 } from "@pi-cloud/protocol";
 
 type Row = {
@@ -107,21 +107,13 @@ async function changeAvailability(
 
 /** One selected release, not a second tool scheduler. Only deployment activation
  * changes this current value; restarting an old executable cannot select itself. */
-export class ToolCatalogAuthority {
-  constructor(readonly database: Kysely<Database>) {}
-
+export class ToolCatalogAuthority extends ToolCatalogReader {
   async read(scope = "platform"): Promise<ToolCatalogPublication | undefined> {
     const { rows } = await sql<Row>`select scope,mcp,generation::text,release_id,catalog,replayable,
       published_generation::text from tool_catalog_publication where scope=${scope}`.execute(
       this.database,
     );
     return rows[0] ? publication(rows[0]) : undefined;
-  }
-
-  async minimumGenerations(): Promise<readonly ToolCatalogWatermark[]> {
-    const { rows } = await sql<{ scope: string; generation: string }>`
-      select scope,generation::text from tool_catalog_publication`.execute(this.database);
-    return rows.map((row) => ({ scope: row.scope, generation: Number(row.generation) }));
   }
 
   async select(input: Selection): Promise<ToolCatalogPublication> {
@@ -277,17 +269,6 @@ export class ToolCatalogAuthority {
       from tool_host_versions where release_id=${releaseId} and endpoint=${versionEndpoint(endpoint)}
       and (expires_at is null or expires_at>clock_timestamp())`.execute(this.database);
     return { current: row!.current, acceptUntil: row!.until?.toISOString() ?? null };
-  }
-  async versionCatalog(generation: number, releaseId: string) {
-    const {
-      rows: [row],
-    } = await sql<{
-      publication: ToolCatalogPublication;
-    }>`select publication from tool_host_versions
-      where generation=${generation} and release_id=${releaseId} and (expires_at is null or expires_at>clock_timestamp())`.execute(
-      this.database,
-    );
-    return row?.publication;
   }
   async admitOrdinary(
     generation: number,

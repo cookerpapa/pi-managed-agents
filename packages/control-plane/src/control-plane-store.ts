@@ -1215,15 +1215,20 @@ export class ControlPlaneStore {
     return readConversationStatus(this.#conversationReadDatabase, this.#tenantId, sessionId, {
       messages: this.#rootMessageHistory || this.#delegatedRunHistory,
       delegated: this.#delegatedRunHistory,
+      independent: this.#independentSessions,
     });
   }
 
   getConversationUsage(sessionId: string) {
     return readConversationUsage(
-      this.#database,
+      this.#independentSessions ? this.#conversationReadDatabase : this.#database,
       this.#tenantId,
       sessionId,
-      this.#delegatedRunHistory,
+      this.#independentSessions
+        ? "independent"
+        : this.#delegatedRunHistory
+          ? "delegated"
+          : "native",
     );
   }
   searchConversation(sessionId: string, text: string, before?: string) {

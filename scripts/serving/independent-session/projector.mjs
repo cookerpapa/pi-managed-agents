@@ -159,7 +159,8 @@ export async function startIndependentProjector() {
     topic: config.topic,
     clientId: "pma-seal-" + instanceId,
   });
-  let reconcile, scheduler;
+  let reconcile, scheduler, hosted;
+  const delegations = rt.connectDelegations(required("PI_CLOUD_SUBAGENT_EXECUTOR_URL"), token);
   const close = async () => {
     stop.abort();
     try {
@@ -167,6 +168,20 @@ export async function startIndependentProjector() {
     } finally {
       await scheduler?.close();
       await reader.close();
+      await delegations.close();
+      await hosted?.close();
+      const { commits, recordsInTransactions, maxRecords, syncTransactions, asyncTransactions } =
+        rt.projection.view.stats;
+      console.info(
+        JSON.stringify({
+          event: "session.projection.summary",
+          commits,
+          recordsInTransactions,
+          maxRecords,
+          syncTransactions,
+          asyncTransactions,
+        }),
+      );
       await control.close();
       await writer.close();
       live.close();
@@ -176,6 +191,12 @@ export async function startIndependentProjector() {
   };
   try {
     await writer.start();
+    hosted = await rt.connectToolHost({
+      url: required("PI_CLOUD_TOOL_HOST_URL"),
+      token,
+      brokers: config.brokers,
+      versioned: true,
+    });
     await reader.start();
     await reader.waitUntilInitialReplay(await reader.captureEndOffsets());
     scheduler = await rt.serveScheduler({

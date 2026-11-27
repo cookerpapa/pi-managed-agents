@@ -457,6 +457,8 @@ export class ReadyProjection {
             seq: f.commit.seq,
           };
       }
+      if (r.stagePresentation && !draft.frame.rejected)
+        draft.after.push(r.stagePresentation(view, previous?.rootInputDoc));
       if (intentPrefix) {
         assert(
           r.workspaceBatch &&

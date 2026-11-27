@@ -11,6 +11,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "node:net";
 import pg from "pg";
 import kafkaNative from "@confluentinc/kafka-javascript";
+import { httpMcpFixture } from "../packages/control-plane/test/mcp/http-fixture.ts";
+import { McpConnectionService } from "../packages/control-plane/src/mcp/connection-service.ts";
+import { McpCredentialVault } from "../packages/control-plane/src/mcp/credential-vault.ts";
+import { ModelMeteringService } from "@pi-cloud/accounting";
 import { createDatabase } from "@pi-cloud/database";
 import { createPrivateTenant } from "../packages/control-plane/src/tenant-administration.ts";
 import { PiCloudApi } from "../packages/web-ui/src/api.ts";
@@ -278,13 +282,65 @@ try {
       () => false,
     );
   const started = Date.now();
+  const toolPort = await port(),
+    toolKey = randomBytes(32).toString("base64url"),
+    vaultFile = await file("mcp-key", toolKey),
+    resourceFile = await file("resource-token", randomBytes(32).toString("base64url"));
   role(
+    "tool-host",
+    "tool-host",
+    {
+      ...mgEnv,
+      PI_CLOUD_TOOL_HOST_PORT: toolPort,
+      PI_CLOUD_IMAGE_REVISION: tag,
+      PI_CLOUD_TOOL_RELEASE_ID: tag,
+      PI_CLOUD_TOOL_HOST_VERSION_URL: url(toolPort),
+      PI_CLOUD_MCP_CREDENTIAL_MASTER_KEY_FILE: "/run/pma/vault",
+      PI_CLOUD_SANDBOX_CONTROL_TOKEN_FILE: "/run/pma/resources",
+      NO_PROXY: "localhost,127.0.0.1",
+    },
+    [
+      ...mount(management, "management"),
+      ...mount(vaultFile, "vault"),
+      ...mount(resourceFile, "resources"),
+    ],
+  );
+  await until("Tool host ready", () => health(toolPort), 45000);
+  let external;
+  if (load) {
+    const remote = await httpMcpFixture();
+    clean.push(() => remote.close());
+    const connections = new McpConnectionService(db, new McpCredentialVault(toolKey));
+    const actor = { tenantId: identity.tenantId, userId: identity.ownerUserId, role: "owner" },
+      id = randomUUID();
+    await connections.save(actor, id, {
+      expectedRevision: null,
+      name: "serving-check",
+      endpoint: remote.url,
+      visibility: "personal",
+      enabled: true,
+      allowedTools: null,
+      credential: { kind: "bearer", token: "fixture-token" },
+    });
+    const name = await until(
+      "published MCP echo",
+      async () =>
+        (await connections.read(actor, id)).tools.find((t) => t.name === "echo")?.platformName,
+    );
+    external = { name, remote };
+  }
+  const executorPort = await port();
+  role("subagents", "subagents", { ...mgEnv, PORT: executorPort }, mount(management, "management"));
+  await until("Subagent executor ready", () => health(executorPort), 45000);
+  const projectorRole = role(
     "projector",
     "projector",
     {
       ...mgEnv,
       ...enEnv,
       PORT: projectorPort,
+      PI_CLOUD_SUBAGENT_EXECUTOR_URL: url(executorPort),
+      PI_CLOUD_TOOL_HOST_URL: url(toolPort),
       PI_CLOUD_SEGMENT_WAKE_PORT: wakePort,
       PI_CLOUD_SEGMENT_MANAGEMENT_TEMPLATES: JSON.stringify(
         hostPorts.map((p) => "http://{supervisorId}:" + p),
@@ -313,10 +369,52 @@ try {
   assert.notEqual(kafkaProducerLane(session, partitions), 0);
   const denied = await fetch(apiUrl + "/v1/sessions/" + session + "/queued-inputs");
   assert.equal(denied.status, 401, "Queue reads require authentication");
-  const pendingUsage = await fetch(apiUrl + "/v1/conversations/" + session + "/usage", {
-    headers: { authorization: "Bearer " + identity.credential.token },
-  });
-  assert.equal(pendingUsage.status, 501, "An unmapped usage source cannot return a zero balance");
+  const usage = await api.getConversationUsage(session);
+  assert.equal(usage.source, "provider_receipts");
+  assert.equal(usage.tokens.total, 0);
+  if (load) {
+    const meter = new ModelMeteringService(db);
+    const context = {
+      version: 1,
+      tenantId: identity.tenantId,
+      sessionId: session,
+      invocationId: randomUUID(),
+      runId: randomUUID(),
+      requestedAt: new Date().toISOString(),
+      purpose: "agent",
+      provider: "fixture",
+      model: "fixture",
+    };
+    const event = {
+      kind: "usage",
+      context,
+      occurredAt: context.requestedAt,
+      executionId: randomUUID(),
+      usage: {
+        provider: "fixture",
+        model: "fixture",
+        serviceTier: "default",
+        quality: "complete",
+        failed: false,
+        unsupportedDimensions: false,
+        tokens: {
+          input: 5,
+          cacheRead: 2,
+          cacheWrite: 0,
+          output: 2,
+          reasoning: 0,
+          unclassified: 0,
+          total: 9,
+        },
+      },
+    };
+    await meter.ingest({ events: [event] });
+    await meter.ingest({ events: [event] });
+    const measured = await api.getConversationUsage(session);
+    assert.equal(measured.tokens.total, 9);
+    assert.equal(measured.includingChildren.total, 9);
+    assert.equal(measured.unconfirmedRequests, 0);
+  }
   const verifyUpgrade = process.argv.includes("--verify-claim-upgrade");
   if (verifyUpgrade) {
     assert(claimIndexInstalled, "Fresh migration missed the Turn claim index");
@@ -429,6 +527,7 @@ try {
         PI_CLOUD_SEGMENT_BOOT_DIR: "/tmp/segment-boot",
         PI_CLOUD_MODEL_GATEWAY_PORT: [modelA, modelB][i],
         PI_CLOUD_SEGMENT_CAPACITY: capacity,
+        ...(mixed ? { PMA_FIXTURE_TERMINALS: process.env.PI_CLOUD_CHECK_TURNS ?? "192" } : {}),
         ...(profileClaims && process.argv.includes("--selector-cpu")
           ? { PI_CLOUD_TEST_SELECTOR_CPU: "1" }
           : {}),
@@ -581,7 +680,8 @@ try {
         ).rows[0].n === count,
       300000,
     );
-    const elapsedMs = performance.now() - begin;
+    const allSealedObservationMs = Date.now(),
+      elapsedMs = performance.now() - begin;
     clearInterval(timer);
     const finalCpu = await pgCpu();
     const {
@@ -693,6 +793,23 @@ try {
       0,
     );
     assert.equal(finalLag, 0);
+    let kafkaAckToSealedObservationMs;
+    if (mixed) {
+      const ack = await until(
+        "terminal Kafka acknowledgements",
+        () =>
+          docker(["logs", workerName], {
+            maxBuffer: 8 * 1024 * 1024,
+            stdio: ["ignore", "pipe", "pipe"],
+          })
+            .split("\n")
+            .filter((line) => line.includes('"event":"fixture.terminal-acks"'))
+            .map((line) => JSON.parse(line))
+            .findLast((v) => v.terminalAcks === count),
+        5000,
+      );
+      kafkaAckToSealedObservationMs = allSealedObservationMs - ack.lastTerminalAckMs;
+    }
     console.log(
       JSON.stringify({
         mode: mixed ? "mixed-claim-replay" : "text-load",
@@ -702,6 +819,7 @@ try {
               completeCalls: count * 20,
               completeResults: count * 20,
               completeAnswers: count,
+              kafkaAckToSealedObservationMs,
             }
           : {}),
         claimBatchLimit: Number(
@@ -790,6 +908,122 @@ try {
         console.log(JSON.stringify(sample));
       }
     }
+    const call = await api.acceptTurn(
+      session,
+      fake.prompt("remote_echo", { kind: "mcp", rounds: 1, toolName: external.name }),
+      "turn:" + randomUUID(),
+    );
+    await until(
+      "MCP Tool result through serving roles",
+      async () =>
+        (
+          await pool.query(
+            `
+      select from pma_segments.turns t join pma_segments.messages m on m.run_id=t.id and m.tenant_id=t.tenant_id
+      where t.id=$1 and t.state='completed' and m.role='toolResult' and (m.content::jsonb#>>'{model,0,isError}')::boolean=false
+      and m.content like '%PMA_TOOL remote_echo%'`,
+            [call.turnId],
+          )
+        ).rowCount,
+      45000,
+    );
+    assert.deepEqual(external.remote.state.calls, ["echo"]);
+    console.log("One scoped MCP echo was executed and its canonical reply was projected.");
+    if (capacity >= 2) {
+      const delegated = await api.acceptTurn(
+        session,
+        fake.prompt("delegation", { kind: "children", children: 1 }),
+        "turn:" + randomUUID(),
+      );
+      await until(
+        "independent parent and child sealed",
+        async () => {
+          const {
+            rows: [r],
+          } = await pool.query(
+            `select t.state as parent,
+          (select ct.state from pma_segments.sessions c join pma_segments.turns ct on ct.session_id=c.flow_id and ct.tenant_id=c.tenant_id
+           where c.tenant_id=t.tenant_id and c.parent_session_id=$2 and c.agent_name='child-0') as child
+          from pma_segments.turns t where t.id=$1`,
+            [delegated.turnId, session],
+          );
+          return r?.parent === "completed" && r.child === "completed";
+        },
+        45000,
+      );
+      const family = await api.getConversationUsage(session);
+      assert.deepEqual(
+        family.children.map((c) => c.title),
+        ["child-0"],
+      );
+      assert.equal(
+        (await api.getConversationUsage(family.children[0].sessionId)).children.length,
+        0,
+      );
+      const status = await api.getConversationStatus(family.children[0].sessionId);
+      assert(
+        status.context.estimatedTokens > 0 && status.context.window > 0,
+        "Status must read the child's own history",
+      );
+      const {
+        rows: [anchor],
+      } = await pool.query(
+        `select entry_id from pma_segments.messages where run_id=$1 and role='assistant' order by commit_seq desc,ordinal desc limit 1`,
+        [delegated.turnId],
+      );
+      const forked = await api.forkConversation(
+        session,
+        delegated.turnId,
+        String(anchor.entry_id),
+        undefined,
+        "fork:" + randomUUID(),
+      );
+      const sourceStatus = await api.getConversationStatus(session),
+        forkStatus = await api.getConversationStatus(forked.session.sessionId);
+      assert.equal(forkStatus.context.estimatedTokens, sourceStatus.context.estimatedTokens);
+      assert(forkStatus.context.estimatedTokens > 0);
+      const forkUsage = await api.getConversationUsage(forked.session.sessionId);
+      assert.equal(forkUsage.tokens.total, 0);
+      assert.deepEqual(forkUsage.children, []);
+      console.log(
+        "Named child registered, independently claimed and completed through the serving roles.",
+      );
+    }
+    if (capacity >= 2) {
+      const fresh = (
+        await api.createSession(project.projectId, project.workspaceId, "Stop a child", "elastic")
+      ).sessionId;
+      const parent = await api.acceptTurn(
+        fresh,
+        fake.prompt("child_stop", { kind: "children", children: 1, firstByteMs: 1500 }),
+        "turn:" + randomUUID(),
+      );
+      const target = await until(
+        "running child",
+        async () =>
+          (
+            await pool.query(
+              `select c.id as session,t.id as turn from pma_segments.sessions c
+        join pma_segments.turns t on t.session_id=c.flow_id and t.tenant_id=c.tenant_id where c.parent_session_id=$1 and t.state='running'`,
+              [fresh],
+            )
+          ).rows[0],
+        30000,
+      );
+      await api.cancelTurn(target.session, target.turn, "stop:" + randomUUID());
+      await until(
+        "targeted child Stop leaves parent able to complete",
+        async () =>
+          (
+            await pool.query(
+              `select from pma_segments.turns p,pma_segments.turns c
+        where p.id=$1 and p.state='completed' and c.id=$2 and c.state='cancelled' and c.output_sealed_at is not null`,
+              [parent.turnId, target.turn],
+            )
+          ).rowCount,
+        30000,
+      );
+    }
     const held = await api.acceptTurn(
       session,
       fake.prompt("stop_test", { firstByteMs: 30000 }),
@@ -808,6 +1042,18 @@ try {
         ).rowCount,
     );
     console.log("Active text Stop sealed the original Turn.");
+    if (mixed) {
+      docker(["stop", "-t", "15", projectorRole]);
+      const summary = docker(["logs", projectorRole], { stdio: ["ignore", "pipe", "pipe"] })
+        .split("\n")
+        .filter((line) => line.includes('"event":"session.projection.summary"'))
+        .map((line) => JSON.parse(line))
+        .at(-1);
+      assert(summary?.commits > 0, "Missing Projector transaction measurements");
+      if (count >= 32)
+        assert(summary.maxRecords >= 2, "Serving consumer wrote only single-record transactions");
+      console.log(JSON.stringify(summary));
+    }
   } else {
     const token = "PMA-" + randomBytes(5).toString("hex");
     const [webPort, adminPort, unusedProviderPort] = await Promise.all([port(), port(), port()]);

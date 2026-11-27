@@ -9,10 +9,10 @@ import {
 import { withToolInvocation } from "@pi-cloud/sandbox-supervisor";
 import { WorkerToolRuntime } from "../../../packages/supervisor-host/src/tools/worker-tool-runtime.ts";
 import { restoreToolReply } from "../../../packages/supervisor-host/src/tool-reply-result.ts";
-import {
-  controlToolCatalog,
-  ControlToolRegistry,
-} from "../../../packages/control-plane/src/control-tool-registry.ts";
+import { controlToolCatalog } from "@pi-cloud/runtime-core/control-tool-catalog";
+
+const empty = controlToolCatalog([]);
+const emptyDirectory = { read: () => empty, subscribe: () => () => {} };
 
 export async function segmentWorkerTools({
   job,
@@ -38,7 +38,7 @@ export async function segmentWorkerTools({
       tenantId: scope.tenantId,
       userId: job.owner_user_id,
       root: !job.parent_session_id,
-    }) ?? new ControlToolRegistry();
+    }) ?? emptyDirectory;
   let platform = versions ? catalog.snapshot : undefined;
   if (versions && opened.resumed) {
     const saved = opened.family.handoff.state.records.find(
@@ -80,6 +80,10 @@ export async function segmentWorkerTools({
         : catalog?.implementation(name),
     nativeConversations: {
       childAnchor,
+      originalControlIntent: (_ref, lane, task) => {
+        if (!opened.originalControlIntent) throw Error("Missing sealed original control intent");
+        return opened.originalControlIntent(lane, task);
+      },
       conversationDepth: async () => (job.parent_session_id ? 1 : 0),
       recoveredControlToolNames: () => [...originals.values()].map((o) => o.reply.toolName),
     },
@@ -163,6 +167,7 @@ export async function segmentControlReferences(commit, effects, scope, replies) 
       contextAnchor: c.contextAnchor,
       operationId: c.operationId,
       replyTopic: replies.replyTopic,
+      ...(c.recovery ? { recovery: c.recovery } : {}),
     };
     if (!c.implementation?.catalogScope)
       return c.implementation ? { ...ref, implementation: c.implementation } : ref;

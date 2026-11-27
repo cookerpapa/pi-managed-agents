@@ -8,10 +8,37 @@ import { changedInputConfirmations } from "@pi-cloud/pi-session-postgres/durable
 import { sql } from "kysely";
 import { resolveDurableDisplay } from "@pi-cloud/protocol";
 import { ReadyProjection } from "./ready-projection.mjs";
+import { projectRecord } from "./project-record.mjs";
 import { projectionTemplates } from "./projection-statements.mjs";
 import { WorkspaceOperationRouter } from "./workspace-operation-router.mjs";
 import { assertFamilySettled } from "./moving-checkpoint.mjs";
 import { emptyInboxRoutes } from "./family-inboxes.mjs";
+
+function presentationResult(fact, session, before, admitted) {
+  const events = [],
+    covers = [];
+  if (admitted) {
+    for (const d of fact.display) {
+      for (const e of d.events)
+        events.push(resolveDurableDisplay(fact.commit, e, (id) => session.liveDocs[id]?.value));
+      if (d.coveredThrough !== undefined)
+        covers.push({ sessionId: d.scope.sessionId, through: d.coveredThrough });
+    }
+  }
+  const after = session?.rootInputDoc;
+  const inputConfirmations =
+    admitted && fact.inputQueueSessions?.length && after && before !== after
+      ? changedInputConfirmations(
+          fact.scope.tenantId,
+          { ...after.value, conversationId: 1 },
+          before ? { ...before.value, conversationId: 1 } : undefined,
+        ).map(({ conversationId, ...receipt }) => ({
+          ...receipt,
+          sessionId: fact.scope.sessionId,
+        }))
+      : [];
+  return { admitted, events, covers, inputConfirmations };
+}
 
 export function normalRootProjection(
   pool,
@@ -171,32 +198,8 @@ export function normalRootProjection(
           session?.writer === fact.scope.writerId &&
           session.seq === fact.commit.seq &&
           session.lastFact === fact.factId;
-        const events = [],
-          covers = [];
-        if (admitted) {
-          if (plan) deliveries.set(fact, plan);
-          for (const d of fact.display) {
-            for (const e of d.events)
-              events.push(
-                resolveDurableDisplay(fact.commit, e, (id) => session.liveDocs[id]?.value),
-              );
-            if (d.coveredThrough !== undefined)
-              covers.push({ sessionId: d.scope.sessionId, through: d.coveredThrough });
-          }
-        }
-        const after = session?.rootInputDoc;
-        const inputConfirmations =
-          admitted && fact.inputQueueSessions?.length && after && before !== after
-            ? changedInputConfirmations(
-                scope.tenantId,
-                { ...after.value, conversationId: 1 },
-                before ? { ...before.value, conversationId: 1 } : undefined,
-              ).map(({ conversationId, ...receipt }) => ({
-                ...receipt,
-                sessionId: scope.sessionId,
-              }))
-            : [];
-        return { admitted, events, covers, inputConfirmations };
+        if (admitted && plan) deliveries.set(fact, plan);
+        return presentationResult(fact, session, before, admitted);
       },
       async prepareCoverage() {
         throw Error("Standalone native display is outside the ordinary root composition");
@@ -275,6 +278,11 @@ export function normalRootProjection(
   };
   return {
     view,
+    async prepareNativeHistory(records, current) {
+      // The caller has admitted a warm writer and ruled out every external operation.
+      return view.apply(records, current, (r, draft) => projectRecord(r, draft, env));
+    },
+    presentationResult,
     prepareHistory: (records, current) => router.prepareHistory(records, current),
     nativeStore,
     async dispatch(r, current, grant) {
