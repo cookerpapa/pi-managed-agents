@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [#52 serving cutover plan (中文)](independent-session-cutover-plan-20261128.zh.md) maps the November 28 design to the shared candidate entry points, recovery tests and release gates.
+
 - [Independent Turn references](independent-turn-references.md) documents the candidate migration, its verified callers and the remaining integration boundaries.
 
 - [Independent Session integration](independent-session-reconciliation-20261128.md) traces design revisions to the serving code, including the mixed-load measurement, open ownership conflicts and legacy foreign keys.

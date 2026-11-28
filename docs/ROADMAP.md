@@ -1,5 +1,7 @@
 # Implementation roadmap
 
+The [#52 cutover implementation plan](reports/independent-session-cutover-plan-20261128.zh.md) tracks mailbox-first admission, ordered writer boundaries, stream recovery and release through the same serving images.
+
 The [independent Session integration record](reports/independent-session-reconciliation-20261128.md) tracks the November storage decisions against the serving roles and fixed mixed trace.
 
 The [direct Turn queue and Fork cache gate](reports/turn-queue-fork-receipts-20261128.md) covers the independent Session scheduler and placement receipts in the candidate images.
