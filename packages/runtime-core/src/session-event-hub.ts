@@ -16,6 +16,7 @@ import { stringifyChunked } from "@discoveryjs/json-ext";
 export const SESSION_EVENT_PENDING_BYTES = 16 * 1024 * 1024;
 
 export type SessionEventWake = {
+  historyFlow?: string;
   throughSequence: number | null;
   event?: PiCloudEvent;
   progress?: ToolProgress;
@@ -66,7 +67,7 @@ export class SessionEventSubscription {
     return this.#closed;
   }
 
-  notifyEvent(event: PiCloudEvent, encodedBytes: () => number): void {
+  notifyEvent(event: PiCloudEvent, encodedBytes: () => number, historyFlow?: string): void {
     if (this.#closed || this.#resync) return;
     if (event.sessionId !== this.#sessionId) {
       throw new TypeError("Session event wake belongs to a different Session");
@@ -82,7 +83,10 @@ export class SessionEventSubscription {
             preview.header.toolCallId === event.payload.toolCallId)
         )
           this.#progress.delete(id);
-    this.#push({ throughSequence: event.seq, event }, encodedBytes);
+    this.#push(
+      { throughSequence: event.seq, event, ...(historyFlow ? { historyFlow } : {}) },
+      encodedBytes,
+    );
   }
 
   notifyProgress(progress: ToolProgress): void {
@@ -161,9 +165,9 @@ export class SessionEventSubscription {
     this.#inputQueue = undefined;
   }
 
-  notifyPlacement(placement: InputPlaced): void {
+  notifyPlacement(placement: InputPlaced, historyFlow?: string): void {
     if (this.#closed || this.#resync) return;
-    this.#push({ throughSequence: null, placement }, () =>
+    this.#push({ throughSequence: null, placement, ...(historyFlow ? { historyFlow } : {}) }, () =>
       Buffer.byteLength(JSON.stringify(placement)),
     );
   }
@@ -316,7 +320,7 @@ export class SessionEventHub {
     return subscription;
   }
 
-  publish(tenantId: string, event: PiCloudEvent): void {
+  publish(tenantId: string, event: PiCloudEvent, historyFlow?: string): void {
     const current = this.#subscriptions.get(this.#key(tenantId, event.sessionId));
     if (current === undefined) return;
     // Count only when a reader actually queues this event, once for this broadcast.
@@ -334,7 +338,8 @@ export class SessionEventHub {
       }
       return bytes;
     };
-    for (const subscription of [...current]) subscription.notifyEvent(event, encodedBytes);
+    for (const subscription of [...current])
+      subscription.notifyEvent(event, encodedBytes, historyFlow);
   }
 
   publishProgress(tenantId: string, progress: ToolProgress): void {
@@ -352,9 +357,9 @@ export class SessionEventHub {
   hasSubscribers(tenant: string, session: string): boolean {
     return (this.#subscriptions.get(this.#key(tenant, session))?.size ?? 0) > 0;
   }
-  publishPlacement(tenant: string, placement: InputPlaced): void {
+  publishPlacement(tenant: string, placement: InputPlaced, historyFlow?: string): void {
     for (const sub of this.#subscriptions.get(this.#key(tenant, placement.sessionId)) ?? [])
-      sub.notifyPlacement(placement);
+      sub.notifyPlacement(placement, historyFlow);
   }
   publishInputQueue(tenant: string, queue: InputQueueResource): void {
     for (const subscriber of this.#subscriptions.get(this.#key(tenant, queue.sessionId)) ?? [])

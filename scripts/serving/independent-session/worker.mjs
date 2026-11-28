@@ -190,6 +190,13 @@ export async function startIndependentWorker() {
           }
       });
       if (opened.family) {
+        // The seal is captured under the physical Flow. Publish on the logical
+        // Session after a prune, continuing past both durable and live events.
+        const sealedSequence = new Map(opened.family.handoff.state.sequences).get(job.flow_id) ?? 0;
+        presentation.sequences.set(
+          scope.sessionId,
+          Math.max(Number(job.display_base), sealedSequence),
+        );
         sequence = opened.family.handoff.state.seq;
         for (const rec of opened.family.handoff.state.records) {
           const w = rec.write;

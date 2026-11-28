@@ -32,6 +32,21 @@ describe("pending input protocol", () => {
       parseAcceptedConversationInputResource({ ...accepted, inputId: undefined }),
     ).toThrow();
   });
+  it("acknowledges an unclaimed input by its stable ID before a Turn exists", () => {
+    const receipt = {
+      kind: "input",
+      inputId: id,
+      sessionId: id,
+      runId: null,
+      turnId: null,
+      delivery: "input",
+      state: "accepted",
+      acceptedAt: "2026-11-28T00:00:00.000Z",
+      replayed: false,
+    };
+    expect(parseAcceptedConversationInputResource(receipt)).toEqual(receipt);
+    expect(() => parseAcceptedConversationInputResource({ ...receipt, runId: id })).toThrow();
+  });
   it("accepts atomic edited steer and requires an explicit queue revision", () => {
     expect(() =>
       parseQueuedInputAction({ action: "send", revision: `${"a".repeat(64)}.${"b".repeat(64)}` }),

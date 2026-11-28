@@ -343,7 +343,7 @@ export function replayableMetadata(frame, fact) {
 
 // The rows and partition head come from one MVCC snapshot. Multiple live
 // families on a partition can have different moving floors.
-export async function movingStarts(db, topic, bounds) {
+export async function movingStarts(db, topic, bounds, replayAfterCheckpoint = false) {
   const { rows } = await db.query(
     `select h.partition,h.next_offset,r.id,r.lease_id,r.projection_first,r.projection_state,r.projection_pin
     from accepted_fact_projection_offsets h left join runs r on r.projection_partition=h.partition
@@ -355,13 +355,12 @@ export async function movingStarts(db, topic, bounds) {
   return bounds.map((b) => {
     const records = groups.get(b.partition) ?? [];
     const next = records.length ? BigInt(records[0].next_offset) : b.low;
-    const start = records.reduce(
-      (floor, r) =>
-        r.projection_pin != null && BigInt(r.projection_pin) < floor
-          ? BigInt(r.projection_pin)
-          : floor,
-      next,
-    );
+    const start = records.reduce((floor, row) => {
+      // The independent consumer may have seen additional memory-only commits
+      // after this durable base while another Session advanced the partition.
+      const first = replayAfterCheckpoint ? row.projection_first : row.projection_pin;
+      return first != null && BigInt(first) < floor ? BigInt(first) : floor;
+    }, next);
     if (
       !records.length ||
       start < b.low ||

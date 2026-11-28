@@ -160,7 +160,11 @@ export class SessionScheduleService {
             : "paused",
       nextFireAt: row.next_fire_at === null ? null : iso(row.next_fire_at),
       lastRun:
-        row.lastId && row.lastTurnId && row.lastState && row.admittedAt && origin
+        row.lastId &&
+        row.lastTurnId &&
+        row.lastState &&
+        row.admittedAt &&
+        origin?.scheduleId === row.id
           ? {
               runId: row.lastId,
               turnId: row.lastTurnId,
@@ -337,13 +341,15 @@ export class SessionScheduleService {
               "output_sealed_at",
             ])
             .where("id", "=", row.last_run_id)
+            .where("tenant_id", "=", scope.tenantId)
+            .where(sql<boolean>`scheduled_origin->>'scheduleId' = ${id}`)
             .executeTakeFirst()
         : undefined;
       await tx.deleteFrom("session_schedules").where("id", "=", id).execute();
       return {
         id,
         deleted: true,
-        lastRunId: row.last_run_id,
+        lastRunId: last?.id ?? null,
         activeRun:
           last && busyRun(last)
             ? { runId: last.id, turnId: last.turn_id, state: last.state }

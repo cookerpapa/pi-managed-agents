@@ -2,11 +2,17 @@
 // loop and partition checkpoint execute in one synchronous autocommit call.
 import { projectionTemplatesFor } from "./projection-statements.mjs";
 
+// Recovery scans the active owners of a partition and reads their checkpoint
+// state from the heap. Indexing the moving offset defeats HOT on every advance.
+export const activePartitionIndex = (table, concurrently = false) =>
+  `create index ${concurrently ? "concurrently " : ""}active_projection_partition on ${table}(projection_partition)
+   where state in ('running','cancel_requested') and projection_partition is not null`;
+
 export async function installPrefixSql(db, templates) {
   await db.query(`create table accepted_fact_projection_offsets(topic text,partition int,next_offset bigint not null,primary key(topic,partition));
     alter table runs add column projection_first bigint,add column projection_partition int,add column projection_state jsonb,add column native_work_handoff jsonb,add column root_compacts jsonb,add column root_input_receipts jsonb,add column root_human_inputs text,add column root_input_seq bigint not null default 0,
       add column cancel_positions jsonb not null default '{}',add column projection_tools jsonb not null default '{}',add column projection_pin bigint;
-    create index active_projection_start on runs(projection_partition,projection_first) where state in ('running','cancel_requested') and projection_first is not null;`);
+    ${activePartitionIndex("runs")};`);
   await installProjectionFunctions(db, templates, "runs");
 }
 

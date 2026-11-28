@@ -227,7 +227,7 @@ export function normalRootProjection(
         }
       },
     },
-    async settle(tx, f, pos) {
+    async settle(tx, f, pos, publicState) {
       assert(
         f.kind === "work_finished" &&
           (["turn.completed", "turn.cancelled"].includes(f.terminal.type) ||
@@ -269,7 +269,7 @@ export function normalRootProjection(
       }
       const checked =
         await sql`with bound as (update runs set history_head=${JSON.stringify(h)}::jsonb,projection_first=null,projection_partition=null,projection_pin=null,projection_state=null,native_work_handoff=null,cancel_positions='{}'::jsonb
-        where id=${f.scope.runId}::uuid and tenant_id=${f.scope.tenantId}::uuid and lease_id=${s.writer}::uuid and state=${state} and output_seal_offset=${String(pos.offset)}::bigint and projection_tools='{}'::jsonb ${bashLog ? sql`and not exists(select from pending_bash_intents where run_id=${f.scope.runId}::uuid)` : sql``} returning id),
+        where id=${f.scope.runId}::uuid and tenant_id=${f.scope.tenantId}::uuid and lease_id=${s.writer}::uuid and state=${publicState ?? state} and output_seal_offset=${String(pos.offset)}::bigint and projection_tools='{}'::jsonb ${bashLog ? sql`and not exists(select from pending_bash_intents where run_id=${f.scope.runId}::uuid)` : sql``} returning id),
         retired as (delete from workspace_route_spans where run_id in(select id from bound))select id from bound`.execute(
           tx,
         );

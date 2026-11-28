@@ -147,6 +147,45 @@ describe.sequential("transactional scheduled Run admission", () => {
     expect(await f.runs()).toHaveLength(1);
     expect(await f.service.list(f.scope)).toEqual({ schedules: [], nextCursor: null });
   });
+  it("exposes a post-deletion Stop only for the plan that opened the Turn", async () => {
+    const f = await fixture();
+    const owner = await f.create({ kind: "once", at: "2026-10-26T00:00:10Z" });
+    const other = await f.create({ kind: "once", at: "2026-10-27T00:00:10Z" });
+    f.setTime("2026-10-26T00:00:10Z");
+    await f.service.dispatchDue();
+    const [run] = await f.runs();
+    // A plan's delivery may refer to the Turn that adopted a follow-up.
+    // Only the immutable opener on the Turn proves schedule Stop scope.
+    await db
+      .updateTable("session_schedules")
+      .set({ last_run_id: run!.id })
+      .where("id", "=", other.id)
+      .execute();
+    expect((await f.service.get(f.scope, other.id)).lastRun).toBeNull();
+    expect(await f.service.delete(f.scope, other.id, other.revision)).toMatchObject({
+      lastRunId: null,
+      activeRun: null,
+    });
+    const key = randomUUID();
+    await expect(
+      f.store.acceptTurnCancellation(f.scope.sessionId, run!.turn_id, key, {
+        scheduleId: other.id,
+      }),
+    ).rejects.toThrow(/did not open/);
+    const deletion = await f.service.delete(f.scope, owner.id, owner.revision);
+    expect(deletion.activeRun?.turnId).toBe(run!.turn_id);
+    const receipt = await f.store.acceptTurnCancellation(f.scope.sessionId, run!.turn_id, key, {
+      scheduleId: owner.id,
+    });
+    expect(receipt.turnId).toBe(run!.turn_id);
+    expect(
+      (
+        await f.store.acceptTurnCancellation(f.scope.sessionId, run!.turn_id, key, {
+          scheduleId: owner.id,
+        })
+      ).replayed,
+    ).toBe(true);
+  });
   it("skips overlap and catches up only the latest missed recurrence", async () => {
     const f = await fixture(),
       p = await f.create({ kind: "cron", expression: "0 8 * * *", timezone: "Asia/Shanghai" });

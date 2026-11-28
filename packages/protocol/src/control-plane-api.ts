@@ -1109,6 +1109,20 @@ export const AcceptedTurnResourceSchema = Type.Object(
 export const AcceptedConversationInputResourceSchema = Type.Union([
   AcceptedTurnResourceSchema,
   NativeInputAcceptedSchema,
+  Type.Object(
+    {
+      ...NativeInputAcceptedSchema.properties,
+      inputId: UuidSchema,
+      runId: Type.Null(),
+      turnId: Type.Null(),
+      delivery: Type.Union([
+        Type.Literal("input"),
+        Type.Literal("steer"),
+        Type.Literal("follow_up"),
+      ]),
+    },
+    { additionalProperties: false },
+  ),
 ]);
 
 export const RunStateSchema = Type.Union([
@@ -1188,6 +1202,7 @@ export const WorkspaceDirectoryResourceSchema = Type.Object(
 
 export const CreateTurnCancellationRequestSchema = Type.Object(
   {
+    scheduleId: Type.Optional(UuidSchema),
     gracePeriodMs: Type.Optional(Type.Integer({ minimum: 0, maximum: 30_000 })),
   },
   { additionalProperties: false },

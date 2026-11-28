@@ -1,3 +1,6 @@
+import { createDatabase } from "@pi-cloud/database";
+import { SessionScheduleController } from "../../../packages/control-plane/src/session-schedule-controller.ts";
+import { segmentSchedules } from "./schedules.mjs";
 import { randomUUID } from "node:crypto";
 import { KafkaToolReplyPublisher } from "@pi-cloud/event-log";
 import { serveSegmentDelegations } from "../../experiments/minimal-session-storage/segment-delegation-service.mjs";
@@ -10,13 +13,18 @@ export async function startIndependentDelegations() {
   const token = await secret("PI_CLOUD_SUPERVISOR_MANAGEMENT_TOKEN");
   const store = new ForkStorage(await openStore(config));
   const inputs = (store.inputs = new SegmentInputs(store.db));
+  const reads = createDatabase({ connectionString: config.read, maxConnections: 3 });
+  const timer = new SessionScheduleController({
+    service: segmentSchedules(reads, inputs),
+    notificationConnectionString: config.url,
+  });
   const replies = new KafkaToolReplyPublisher(config.brokers, "pma-subagent-" + randomUUID());
   let service;
   async function close() {
     try {
-      await service?.close();
+      await Promise.all([timer.close(), service?.close()]);
     } finally {
-      await Promise.all([replies.close(), store.db.destroy()]);
+      await Promise.all([replies.close(), store.db.destroy(), reads.destroy()]);
     }
   }
   try {
@@ -31,6 +39,7 @@ export async function startIndependentDelegations() {
         port: integer("PORT", 4320),
       },
     );
+    timer.start();
     return { close };
   } catch (error) {
     await close();

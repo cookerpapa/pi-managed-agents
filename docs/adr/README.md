@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0379](0379-independent-session-cutover.md) defines the mailbox and recovery changes for the integrated #52 cutover.
+
 [ADR-0378](0378-independent-turn-references.md) moves business references onto independent Turns and their mailbox inputs.
 
 [ADR-0377](0377-serving-session-projection-prefixes.md) integrates bounded native batches into the independent Session serving consumer.

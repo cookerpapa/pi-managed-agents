@@ -4,7 +4,10 @@ const turnReferences = () => readFile(new URL("./turn-references.sql", import.me
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { installation, schema, readSchema } from "./config.mjs";
 import { installSessionTables } from "../../experiments/minimal-session-storage/segment-schema.mjs";
-import { installPrefixSql } from "../../experiments/minimal-session-storage/ready-projection-sql.mjs";
+import {
+  activePartitionIndex,
+  installPrefixSql,
+} from "../../experiments/minimal-session-storage/ready-projection-sql.mjs";
 import { projectionTemplates } from "../../experiments/minimal-session-storage/projection-statements.mjs";
 import {
   installForkTables,
@@ -96,6 +99,20 @@ export async function migrate(config) {
         await c.query("update pma_segments.installation set version=3");
         await c.query("commit");
       }
+      // Both role revisions can read with either index. Install the replacement
+      // first so a cancelled concurrent build never removes the working path.
+      const replacement = (
+        await c.query(`select i.indisvalid,i.indrelid='turns'::regclass as on_turns
+        from pg_class c left join pg_index i on i.indexrelid=c.oid
+        where c.oid=to_regclass('pma_segments.active_projection_partition')`)
+      ).rows[0];
+      if (replacement && !replacement.on_turns) throw Error("Unexpected projection index target");
+      if (!replacement?.indisvalid) {
+        if (replacement)
+          await c.query("drop index concurrently pma_segments.active_projection_partition");
+        await c.query(activePartitionIndex("turns", true));
+      }
+      await c.query("drop index concurrently if exists pma_segments.active_projection_start");
       return;
     }
     if (

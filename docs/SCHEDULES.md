@@ -41,7 +41,7 @@ it can be resumed. These policies do not limit Agent execution duration.
 
 Pausing/deleting a plan prevents future admissions. An already admitted Run is
 independent; deletion reports its identity and offers the existing Stop action.
-Deleting a plan does not remove its prior conversation history. Scheduled Runs
+The schedule page sends the originating schedule ID with Stop, including after deletion. The server checks that ID against the immutable Turn origin. Delivery of a steer or follow-up to another Turn grants no schedule Stop action on that Turn. Deleting a plan does not remove its prior conversation history. Scheduled Runs
 have a source badge and do not appear as editable follow-up drafts.
 
 ## Data flow and authority

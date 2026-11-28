@@ -200,11 +200,10 @@ export class ReadyProjection {
   }
   async recover(bounds) {
     const generation = this.generation;
-    const starts = await (this.policy === "fixed" ? projectionStarts : movingStarts)(
-      this.db,
-      this.topic,
-      bounds,
-    );
+    const starts =
+      this.policy === "fixed"
+        ? await projectionStarts(this.db, this.topic, bounds)
+        : await movingStarts(this.db, this.topic, bounds, this.independentSessions);
     assert.equal(generation, this.generation, "Assignment changed during bootstrap");
     for (const [p, next, start, states] of starts) {
       if (start instanceof Error) continue;
@@ -392,9 +391,23 @@ export class ReadyProjection {
           }
           if (!covered && !draft.frame.snapshot && previous?.pinOffset === undefined) {
             const args = [f.scope.tenantId, f.scope.piSessionId, f.scope.runId, f.scope.writerId];
-            draft.frame.pin = args;
             view.pinOffset = r.offset;
-            if (!draft.frame.ops.length) draft.frame.ops.push({ kind: "pin", args, count: 1 });
+            // On the serving consumer the preceding checkpoint already bounds
+            // recovery. A memory-only suffix does not need another PG write.
+            const needsPin =
+              !this.independentSessions ||
+              opened ||
+              r.openingIndependentWriter ||
+              draft.frame.ops.length > 0 ||
+              f.display.some(
+                (d) =>
+                  d.coveredThrough !== undefined ||
+                  d.events.some(({ event }) => event.type !== "assistant.text.delta"),
+              );
+            if (needsPin) {
+              draft.frame.pin = args;
+              if (!draft.frame.ops.length) draft.frame.ops.push({ kind: "pin", args, count: 1 });
+            }
           }
           draft.views.set(f.scope.runId, view);
           draft.frame.history =

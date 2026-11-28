@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [ ] Complete the remaining #52 storage and cutover gates, including sustained settlement latency after ordered terminal arbitration. [Serving race, regression fixes and upgrade measurements](reports/independent-session-claim-settlement-20261128.md).
+
 - [ ] Deliver the [#52 integrated cutover plan](reports/independent-session-cutover-plan-20261128.zh.md) through the serving images and the matched release operator. First slice: create the Turn on claim and reproduce the scheduled-input/steer race through the public API.
 
 - [x] Move candidate business references to physical Turns and mailbox inputs. Exercise a scheduled Turn, attachment lifetime, frozen Skills and execution bindings on the segmented installation. [Ownership changes](adr/0378-independent-turn-references.md).

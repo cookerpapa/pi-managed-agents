@@ -1,8 +1,7 @@
 import { AttachmentReaper, configuredImageAttachments } from "@pi-cloud/session-attachments";
 import { ExecutionTargetService } from "../../../packages/control-plane/src/execution-target-service.ts";
 import { readInputUploadsForUpdate } from "../../../packages/control-plane/src/workspace-upload-service.ts";
-import { segmentSchedules } from "./schedules.mjs";
-import { SessionScheduleController } from "../../../packages/control-plane/src/session-schedule-controller.ts";
+import { SessionScheduleService } from "../../../packages/control-plane/src/session-schedule-service.ts";
 import { createDatabase } from "@pi-cloud/database";
 import { SessionEventHub } from "@pi-cloud/runtime-core/session-event-hub";
 import { sql } from "kysely";
@@ -49,11 +48,7 @@ export async function startIndependentSessionApi() {
   const db = createDatabase({ connectionString: config.url, maxConnections: 8 }),
     reads = createDatabase({ connectionString: config.read, maxConnections: 5 });
   const inputs = (store.inputs = new SegmentInputs(store.db));
-  const schedules = segmentSchedules(reads, inputs);
-  const timer = new SessionScheduleController({
-    service: schedules,
-    notificationConnectionString: config.url,
-  });
+  const schedules = new SessionScheduleService({ database: reads });
   let app, images, reaper;
   try {
     images = await configuredImageAttachments(db, reads, undefined, schema);
@@ -152,14 +147,12 @@ export async function startIndependentSessionApi() {
       },
     });
     await app.listen(integer("PORT", 3000), process.env.HOST ?? "127.0.0.1");
-    timer.start();
     if (images)
       reaper = new AttachmentReaper(images.store, () =>
         console.error("session.attachment_cleanup_failed"),
       );
     return {
       close: async () => {
-        await timer.close();
         await reaper?.close();
         await images?.blobs.close();
         await app.close();
@@ -167,7 +160,6 @@ export async function startIndependentSessionApi() {
       },
     };
   } catch (e) {
-    await timer.close();
     await reaper?.close();
     await images?.blobs.close();
     await app?.close();

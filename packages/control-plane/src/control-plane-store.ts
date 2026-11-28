@@ -199,12 +199,13 @@ function turnRequestFingerprint(request: InitialRunRequest, origin?: ScheduledOr
     .digest("hex");
 }
 
-function cancellationRequestFingerprint(gracePeriodMs: number): string {
+function cancellationRequestFingerprint(gracePeriodMs: number, scheduleId?: string): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
         schemaVersion: 1,
         kind: "run.cancel",
+        ...(scheduleId ? { scheduleId } : {}),
         reason: "user_request",
         gracePeriodMs,
       }),
@@ -1804,7 +1805,7 @@ export class ControlPlaneStore {
     request: CreateTurnCancellationRequest,
   ): Promise<AcceptedTurnCancellationResource> {
     const gracePeriodMs = request.gracePeriodMs ?? DEFAULT_CANCELLATION_GRACE_PERIOD_MS;
-    const fingerprint = cancellationRequestFingerprint(gracePeriodMs);
+    const fingerprint = cancellationRequestFingerprint(gracePeriodMs, request.scheduleId);
     const controlRequestId = this.#idGenerator();
     return this.#database.transaction().execute(async (transaction) => {
       const lifecycle = await transaction
@@ -1834,6 +1835,12 @@ export class ControlPlaneStore {
       if (lifecycle === undefined) {
         throw new ControlPlaneStoreError("not_found", "Turn was not found");
       }
+      if (
+        request.scheduleId &&
+        (!lifecycle.scheduledOrigin ||
+          parseScheduledOrigin(lifecycle.scheduledOrigin).scheduleId !== request.scheduleId)
+      )
+        throw new ControlPlaneStoreError("conflict", "This schedule did not open the Turn");
       const existing = await this.#findAcceptedTurnCancellation(
         transaction,
         sessionId,

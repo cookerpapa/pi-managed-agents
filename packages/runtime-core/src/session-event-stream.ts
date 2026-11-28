@@ -26,6 +26,7 @@ export interface LiveSessionTailSource {
 }
 
 export type CanonicalSessionView = Readonly<{
+  historyFlow?: string;
   conversation: ConversationDetailResource;
   canonicalThroughSequence: number;
 }>;
@@ -63,18 +64,21 @@ export class OpenSessionEventStream {
   readonly #subscription: SessionEventSubscription;
   #snapshot: SessionViewSnapshotResource | undefined;
   readonly #highWaterMark: number;
+  readonly #historyFlow: string | undefined;
   readonly #heartbeatIntervalMs: number;
   readonly #sendTimeoutMs: number;
   readonly #progress: ToolProgressView;
   readonly #observations: RunObservationView;
 
   constructor(options: {
+    historyFlow?: string;
     subscription: SessionEventSubscription;
     snapshot: SessionViewSnapshotResource;
     highWaterMark: number;
     heartbeatIntervalMs: number;
     sendTimeoutMs?: number;
   }) {
+    this.#historyFlow = options.historyFlow;
     this.#subscription = options.subscription;
     this.#snapshot = options.snapshot;
     this.#progress = new ToolProgressView(options.snapshot.conversation);
@@ -117,6 +121,7 @@ export class OpenSessionEventStream {
           continue;
         }
         if (item === undefined) return;
+        if (item.historyFlow !== undefined && item.historyFlow !== this.#historyFlow) return;
         if (item.placement) {
           if (!(await this.#sendValue(response, item.placement, "event", "input.placed"))) return;
           continue;
@@ -235,14 +240,18 @@ export class SessionEventStream {
     try {
       // Capture before reading primary PG. The database cannot precede a
       // coverage position already committed and observed in this tail.
-      const tail = this.#tails.snapshot(options.tenantId, options.sessionId);
+      const captured = this.#tails.snapshot(options.tenantId, options.sessionId);
       const canonical = await options.loadCanonical();
-      if (tail.canonicalThroughSequence > canonical.canonicalThroughSequence)
+      // A prune can replace the writable Flow without changing the public
+      // Session. Its old high-water mark cannot cover the new Flow.
+      const tail = captured.historyFlow === canonical.historyFlow ? captured : undefined;
+      if (tail && tail.canonicalThroughSequence > canonical.canonicalThroughSequence)
         throw new Error("Canonical Session view is behind its committed display coverage");
-      const liveEvents = tail.events.filter(
+      const liveEvents = (tail?.events ?? []).filter(
         (event) => event.seq > canonical.canonicalThroughSequence,
       );
       return new OpenSessionEventStream({
+        ...(canonical.historyFlow ? { historyFlow: canonical.historyFlow } : {}),
         subscription,
         snapshot: {
           schemaVersion: 3,
@@ -265,7 +274,7 @@ export class SessionEventStream {
         },
         highWaterMark:
           liveEvents.at(-1)?.seq ??
-          Math.max(canonical.canonicalThroughSequence, tail.canonicalThroughSequence),
+          Math.max(canonical.canonicalThroughSequence, tail?.canonicalThroughSequence ?? 0),
         heartbeatIntervalMs: this.#heartbeatIntervalMs,
         sendTimeoutMs: this.#sendTimeoutMs,
       });

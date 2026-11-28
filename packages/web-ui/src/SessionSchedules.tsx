@@ -194,6 +194,7 @@ export function SessionSchedules({
                       sessionId,
                       deleted.activeRun!.turnId,
                       newIdempotencyKey("cancel"),
+                      { scheduleId: deleted.id },
                     );
                     setDeleted({ ...deleted, activeRun: null });
                   })
@@ -408,6 +409,7 @@ export function SessionSchedules({
                                   sessionId,
                                   row.lastRun!.turnId,
                                   newIdempotencyKey("cancel"),
+                                  { scheduleId: row.id },
                                 ),
                               )
                             }

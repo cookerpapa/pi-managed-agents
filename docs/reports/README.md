@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Initial #52 serving checks](independent-session-claim-settlement-20261128.md) reproduce misdirected steer, mid-stream replacement and a partition-order conflict during upgrade load.
+
 - [#52 serving cutover plan (中文)](independent-session-cutover-plan-20261128.zh.md) maps the November 28 design to the shared candidate entry points, recovery tests and release gates.
 
 - [Independent Turn references](independent-turn-references.md) documents the candidate migration, its verified callers and the remaining integration boundaries.

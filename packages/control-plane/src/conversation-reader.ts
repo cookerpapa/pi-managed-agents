@@ -251,6 +251,7 @@ export class ConversationReader {
   ): Promise<{
     conversation: ConversationDetailResource;
     canonicalThroughSequence: number;
+    historyFlow?: string;
   }> {
     return this.#database
       .transaction()
@@ -300,6 +301,7 @@ export class ConversationReader {
   ): Promise<{
     conversation: ConversationDetailResource;
     canonicalThroughSequence: number;
+    historyFlow?: string;
   }> {
     const conversation = await this.#database
       .selectFrom("sessions as session_row")
@@ -672,6 +674,7 @@ export class ConversationReader {
         ? await this.#delegatedInheritedMessages(sessionId)
         : { inheritedMessages: [] };
     return {
+      ...(this.flowRootHistory ? { historyFlow: conversation.piSessionId } : {}),
       canonicalThroughSequence,
       conversation: {
         project: {

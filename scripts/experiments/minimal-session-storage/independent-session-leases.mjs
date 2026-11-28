@@ -443,17 +443,14 @@ export class SegmentLeaseProjection {
         rows: [r],
       } =
         await sql`with target as materialized (select * from sessions where tenant_id=${s.tenantId}::uuid and id=${s.sessionId}::uuid for no key update)
-        select r.state,r.output_seal_id,r.native_work_handoff,r.projection_first,r.output_first_offset,r.session_id as flow_id,l.writer_failed_at
+        select r.state,r.stop_on_resume,r.stop_request,r.output_seal_id,r.native_work_handoff,r.projection_first,r.output_first_offset,r.session_id as flow_id,l.writer_failed_at
         from turns r join target s on s.tenant_id=r.tenant_id and s.flow_id=r.session_id join session_leases l on l.tenant_id=s.tenant_id and l.pi_session_id=s.id::text and l.lease_id=r.lease_id
         where r.tenant_id=${s.tenantId}::uuid and s.id=${s.sessionId}::uuid and r.id=${s.runId}::uuid and r.lease_id=${s.writerId}::uuid
           and r.fencing_token=${s.fencingToken} and l.fencing_token=r.fencing_token and l.released_at is null and r.state in ('running','cancel_requested')
         for update of r,l`.execute(tx);
-      if (
-        !r ||
-        (recover
-          ? r.output_seal_id !== fact.factId || !r.writer_failed_at
-          : r.output_seal_id !== null)
-      )
+      // The PG expiry intent already revokes new tool effects. Retirement of
+      // the writer itself is ordered by this partition's first valid boundary.
+      if (!r || (recover && (r.output_seal_id !== fact.factId || !r.writer_failed_at)))
         return false;
       if (recover) {
         await settleNative(tx, r);
@@ -487,17 +484,23 @@ export class SegmentLeaseProjection {
           tx,
         );
       } else {
+        const stopped =
+          r.state === "cancel_requested" || r.stop_on_resume || r.stop_request !== null;
+        const terminal =
+          stopped && fact.terminal.type !== "turn.cancelled"
+            ? { type: "turn.cancelled", payload: { reason: "user_request", forced: false } }
+            : fact.terminal;
         const state = {
           "turn.completed": "completed",
           "turn.failed": "failed",
           "turn.cancelled": "cancelled",
-        }[fact.terminal.type];
+        }[terminal.type];
         if (!state) throw Error("Invalid terminal outcome");
         await sql`update turns set state=${state},settled_at=clock_timestamp(),output_seal_id=${fact.factId}::uuid,
-          output_sealed_at=clock_timestamp(),output_seal_offset=${String(offset)}::bigint where id=${s.runId}::uuid`.execute(
+          output_sealed_at=clock_timestamp(),output_seal_offset=${String(offset)}::bigint,recovery_requested_at=null,seal_offer_after=null where id=${s.runId}::uuid`.execute(
           tx,
         );
-        await settleNative(tx, r);
+        await settleNative(tx, r, terminal, state);
         if (fact.nativeSequence > 0) {
           const { rows } =
             await sql`select from turns where id=${s.runId}::uuid and history_head->>'version'=${fact.factId}

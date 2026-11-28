@@ -22,8 +22,16 @@ import { kafkaProducerLane } from "@pi-cloud/runtime-core/kafka-accepted-fact";
 import { testPostgres } from "./lib/test-postgres.mjs";
 import { distribution } from "./lib/runtime-load-scheduler.mjs";
 import { createUnsettledTurnIndex } from "./experiments/minimal-session-storage/independent-session-leases.mjs";
+import { checkTerminalOrder } from "./experiments/minimal-session-storage/check-terminal-order.mjs";
 import { defaultSessionClaimBatch } from "./experiments/minimal-session-storage/segment-wake.mjs";
-import { checkServingTurnReferences } from "./experiments/minimal-session-storage/check-serving-turn-references.mjs";
+import {
+  checkStreamHandoff,
+  checkStreamReplay,
+} from "./experiments/minimal-session-storage/check-stream-handoff.mjs";
+import {
+  checkScheduledSteer,
+  checkServingTurnReferences,
+} from "./experiments/minimal-session-storage/check-serving-turn-references.mjs";
 import { servingLoadFixture } from "./serving/independent-session/load-fixture.mjs";
 import { withChromePage } from "./lib/chrome-cdp.mjs";
 import { testKafka } from "./lib/test-kafka.mjs";
@@ -365,7 +373,7 @@ try {
     [...mount(management, "management"), ...mount(enroll, "enroll")],
   );
   await until("Projector ready", () => health(projectorPort), 45000);
-  role(
+  const apiRole = role(
     "api",
     "api",
     { ...mgEnv, PORT: apiPort, PI_CLOUD_SESSION_RUNTIME_URL: runtimeUrl },
@@ -540,6 +548,7 @@ try {
         PI_CLOUD_SESSION_RUNTIME_URL: runtimeUrl,
         PI_CLOUD_SEGMENT_WAKE_URL: "ws://127.0.0.1:" + wakePort + "/internal/segment-work",
         PI_CLOUD_SEGMENT_BOOT_DIR: "/tmp/segment-boot",
+        ...(process.argv.includes("--terminal-order") ? { PI_CLOUD_SEGMENT_LEASE_MS: "9000" } : {}),
         PI_CLOUD_MODEL_GATEWAY_PORT: [modelA, modelB][i],
         PI_CLOUD_SEGMENT_CAPACITY: capacity,
         ...(mixed ? { PMA_FIXTURE_TERMINALS: process.env.PI_CLOUD_CHECK_TURNS ?? "192" } : {}),
@@ -586,7 +595,84 @@ try {
     await until("Worker ready", () => health(hostPorts[i]), 45000);
     return label;
   };
-  if (load) {
+  if (load && process.argv.includes("--terminal-order")) {
+    assert(!mixed && !profileClaims);
+    await checkTerminalOrder({
+      api,
+      pool,
+      session,
+      partitions,
+      topic,
+      brokers: kafka.brokers,
+      fake,
+      startWorker,
+      until,
+      stop: process.argv.includes("--with-stop"),
+    });
+  } else if (load && process.argv.includes("--stream-replay")) {
+    assert(!mixed && !profileClaims);
+    await checkStreamReplay({
+      api,
+      pool,
+      session,
+      project,
+      partitions,
+      partitionFor: kafkaProducerLane,
+      fake,
+      until,
+      startWorker,
+      pause: (name) => docker(["pause", name]),
+      resume: (name) => docker(["unpause", name]),
+      restartProjector: async () => {
+        docker(["kill", projectorRole]);
+        docker(["start", projectorRole]);
+        await until("replacement Projector", () => health(projectorPort), 20000);
+      },
+    });
+  } else if (load && process.argv.includes("--schedule-steer")) {
+    await startWorker(0);
+    await checkScheduledSteer({
+      api,
+      project,
+      pool,
+      db,
+      fake,
+      until,
+      identity,
+      tool: external.name,
+      verifyStopScope: true,
+      pauseApi: () => docker(["pause", apiRole]),
+      resumeApi: () => docker(["unpause", apiRole]),
+    });
+  } else if (load && process.argv.includes("--stream-handoff")) {
+    assert(!mixed && !profileClaims, "Use the real serving Worker for a stream handoff");
+    await checkStreamHandoff({
+      api,
+      pool,
+      session,
+      fake,
+      until,
+      startWorker,
+      kill: async (name) => {
+        if (process.argv.includes("--restart-projector-first")) {
+          docker(["pause", name]);
+          try {
+            docker(["kill", projectorRole]);
+            docker(["start", projectorRole]);
+            await until(
+              "replacement Projector before Worker failure",
+              () => health(projectorPort),
+              30000,
+            );
+          } finally {
+            docker(["unpause", name]);
+          }
+        }
+        docker(["kill", name]);
+      },
+      prune: process.argv.includes("--prune-first"),
+    });
+  } else if (load) {
     const rate = Number(process.env.PI_CLOUD_CHECK_ARRIVALS_PER_SECOND ?? 0);
     const count = Number(process.env.PI_CLOUD_CHECK_TURNS ?? 192),
       parallel = 64;
@@ -612,8 +698,10 @@ try {
         rows: [r],
       } = await pool.query(`select
         pg_current_wal_insert_lsn() as lsn, substring(body from 'usage_usec ([0-9]+)')::float8/1000 cpu_ms,
-        substring(body from 'nr_throttled ([0-9]+)')::int periods
-        from pg_read_file('/sys/fs/cgroup/cpu.stat') body`);
+        substring(body from 'nr_throttled ([0-9]+)')::int periods,
+        n_tup_upd::float8 as turn_updates,n_tup_hot_upd::float8 as turn_hot_updates
+        from pg_read_file('/sys/fs/cgroup/cpu.stat') body,pg_stat_user_tables
+        where schemaname='pma_segments' and relname='turns'`);
       return r;
     }
     const initialCpu = await pgCpu();
@@ -684,17 +772,35 @@ try {
     const admittedMs = performance.now() - begin;
     const admissionAckMs = distribution(admissionAckSamples);
     assert.equal(admissionAckMs.count, count);
-    await until(
-      "all load Turns sealed",
-      async () =>
-        (
-          await pool.query(
-            "select count(*)::int n from pma_segments.turns where id=any($1::uuid[]) and output_sealed_at is not null",
-            [ids],
-          )
-        ).rows[0].n === count,
-      300000,
-    );
+    try {
+      await until(
+        "all load Turns sealed",
+        async () =>
+          (
+            await pool.query(
+              "select count(*)::int n from pma_segments.turns where id=any($1::uuid[]) and output_sealed_at is not null",
+              [ids],
+            )
+          ).rows[0].n === count,
+        300000,
+      );
+    } catch (error) {
+      clearInterval(timer);
+      const states = await pool.query(
+        `select state,(native_work_handoff is not null) as recovering,count(*)::int as turns
+        from pma_segments.turns where id=any($1::uuid[]) group by 1,2 order by 1,2`,
+        [ids],
+      );
+      console.error(
+        JSON.stringify({
+          event: "session.settlement.timeout",
+          turns: states.rows,
+          lastSample: lagSamples.at(-1),
+          peakSampledRawLag,
+        }),
+      );
+      throw error;
+    }
     const allSealedObservationMs = Date.now(),
       elapsedMs = performance.now() - begin;
     clearInterval(timer);
@@ -873,6 +979,8 @@ try {
         pgCpuLimit: Number(process.env.PI_CLOUD_CHECK_PG_CPUS ?? 2),
         pgWalBytesPerTurn: wal.bytes / count,
         pgCpuMs: finalCpu.cpu_ms - initialCpu.cpu_ms,
+        turnUpdates: finalCpu.turn_updates - initialCpu.turn_updates,
+        turnHotUpdates: finalCpu.turn_hot_updates - initialCpu.turn_hot_updates,
         pgThrottledPeriods: finalCpu.periods - initialCpu.periods,
         peakModelRequests: fake.metrics().maximumInflight,
         upstreamRequests: fake.metrics().completed,
@@ -945,6 +1053,16 @@ try {
     );
     assert.deepEqual(external.remote.state.calls, ["echo"]);
     console.log("One scoped MCP echo was executed and its canonical reply was projected.");
+    await checkScheduledSteer({
+      api,
+      project,
+      pool,
+      db,
+      fake,
+      until,
+      identity,
+      tool: external.name,
+    });
     if (capacity >= 2) {
       const delegated = await api.acceptTurn(
         session,

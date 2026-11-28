@@ -81,8 +81,8 @@ export async function startIndependentProjector() {
     reader.waitForPartition(kafkaProducerLane(s, config.partitions)),
   );
   rt.browser = {
-    accept: (t, e) => live.accept(t, e),
-    cover: (t, s, n) => live.cover(t, s, n),
+    accept: (t, e, flow) => live.accept(t, e, flow),
+    cover: (t, s, n, flow) => live.cover(t, s, n, flow),
     reset: () => live.reset(),
     async placements(scope, flow, commit) {
       if (!live.eventHub.hasSubscribers(scope.tenantId, scope.sessionId)) return;
@@ -105,17 +105,21 @@ export async function startIndependentProjector() {
             rt.store.db,
           );
         for (const r of rows)
-          live.eventHub.publishPlacement(scope.tenantId, {
-            type: "input.placed",
-            sessionId: scope.sessionId,
-            turnId: scope.turnId,
-            inputId: r.id,
-            entryId: Number(r.entry_id),
-            sequence: Number(r.commit_seq),
-            initial: r.initial,
-            text: r.body,
-            uploads: r.uploads,
-          });
+          live.eventHub.publishPlacement(
+            scope.tenantId,
+            {
+              type: "input.placed",
+              sessionId: scope.sessionId,
+              turnId: scope.turnId,
+              inputId: r.id,
+              entryId: Number(r.entry_id),
+              sequence: Number(r.commit_seq),
+              initial: r.initial,
+              text: r.body,
+              uploads: r.uploads,
+            },
+            flow,
+          );
       } catch {
         live.eventHub.resyncSession(scope.tenantId, scope.sessionId);
       }
@@ -180,6 +184,8 @@ export async function startIndependentProjector() {
           maxRecords,
           syncTransactions,
           asyncTransactions,
+          pinOnlyWrites: rt.projection.view.stats.pinOnlyWrites,
+          zeroWritePrefixes: rt.projection.view.stats.zeroWritePrefixes,
         }),
       );
       await control.close();

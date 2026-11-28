@@ -59,16 +59,18 @@ export class SegmentInputs extends SegmentMailReader {
       if (old.fingerprint !== hash) throw new InputConflict("Input identity changed");
       return { ...old, replayed: true };
     }
+    // Only the active writer can take a steer. A later queued Turn may
+    // already exist but cannot receive input on that writer's tool boundary.
     const {
-      rows: [last],
-    } =
-      await sql`select id,state,mailbox_position,output_seal_id from turns where tenant_id=${tenant}::uuid and session_id=${s.flow_id}::uuid order by mailbox_position desc limit 1`.execute(
-        tx,
-      );
-    const busy = last && ["queued", "running", "cancel_requested", "settling"].includes(last.state);
+      rows: [current],
+    } = await sql`select id,state from turns
+      where tenant_id=${tenant}::uuid and session_id=${s.flow_id}::uuid
+        and state not in ('completed','failed','timed_out','cancelled')
+      order by (state='cancel_requested'),mailbox_position limit 1`.execute(tx);
+    const busy = current !== undefined;
     // A new message after an explicit Stop waits behind that closing Turn.
     const held = source === "agent" && s.agent_mail_paused && !initialTurn;
-    const open = busy && last.state !== "cancel_requested" && !s.agent_mail_paused;
+    const open = busy && current.state !== "cancel_requested" && !s.agent_mail_paused;
     if (strict && busy && !s.agent_mail_paused && !initialTurn)
       throw new InputConflict("Session is busy");
     if (open && mode === "input" && !initialTurn) throw new InputConflict("A Turn is already open");
@@ -81,12 +83,12 @@ export class SegmentInputs extends SegmentMailReader {
       ).rows.length
     )
       throw new InputConflict("Too many pending user messages");
-    const turn = held ? null : (initialTurn ?? (open ? last.id : randomUUID()));
+    const turn = held ? null : (initialTurn ?? (open ? current.id : randomUUID()));
     if (!held && !initialTurn && !open) {
       await sql`insert into turns(id,tenant_id,session_id,mailbox_position,idempotency_key,initial_input,input_uploads,state)
-        values(${turn}::uuid,${tenant}::uuid,${s.flow_id}::uuid,${Number(last?.mailbox_position ?? 0) + 1},${id}::uuid,${text},${JSON.stringify(uploads)}::jsonb,'queued')`.execute(
-        tx,
-      );
+        select ${turn}::uuid,${tenant}::uuid,${s.flow_id}::uuid,coalesce(max(mailbox_position),0)+1,
+          ${id}::uuid,${text},${JSON.stringify(uploads)}::jsonb,'queued'
+        from turns where tenant_id=${tenant}::uuid and session_id=${s.flow_id}::uuid`.execute(tx);
       if (source === "user" && s.agent_mail_paused) {
         await sql`update sessions set agent_mail_paused=false where tenant_id=${tenant}::uuid and id=${session}::uuid`.execute(
           tx,
@@ -106,7 +108,7 @@ export class SegmentInputs extends SegmentMailReader {
       );
     return row;
   }
-  async stop({ tenant, session }, turn, key, gracePeriodMs) {
+  async stop({ tenant, session }, turn, key, gracePeriodMs, scheduleId) {
     return this.db.transaction().execute(async (tx) => {
       await sql`set local synchronous_commit=on`.execute(tx);
       const {
@@ -123,16 +125,22 @@ export class SegmentInputs extends SegmentMailReader {
           tx,
         );
       if (old) {
-        if (old.id !== turn || old.stop_request.gracePeriodMs !== gracePeriodMs)
+        if (
+          old.id !== turn ||
+          old.stop_request.gracePeriodMs !== gracePeriodMs ||
+          old.stop_request.scheduleId !== scheduleId
+        )
           throw new InputConflict("Stop identity changed");
         return { ...old.stop_request.receipt, replayed: true };
       }
       const {
         rows: [target],
       } =
-        await sql`select state,started_at,stop_request,output_seal_id from turns where tenant_id=${tenant}::uuid and session_id=${window.flow_id}::uuid and id=${turn}::uuid for no key update`.execute(
+        await sql`select state,started_at,stop_request,output_seal_id,scheduled_origin from turns where tenant_id=${tenant}::uuid and session_id=${window.flow_id}::uuid and id=${turn}::uuid for no key update`.execute(
           tx,
         );
+      if (scheduleId && target?.scheduled_origin?.scheduleId !== scheduleId)
+        throw new InputConflict("This schedule did not open the Turn");
       if (
         !target ||
         target.stop_request ||
@@ -157,7 +165,7 @@ export class SegmentInputs extends SegmentMailReader {
         : target.state === "queued"
           ? "cancelled"
           : "cancel_requested";
-      await sql`update turns set stop_request=${JSON.stringify({ key, gracePeriodMs, receipt })}::jsonb,state=${state},stop_on_resume=stop_on_resume or ${recovering},
+      await sql`update turns set stop_request=${JSON.stringify({ key, gracePeriodMs, scheduleId, receipt })}::jsonb,state=${state},stop_on_resume=stop_on_resume or ${recovering},
         settled_at=case when ${state}='cancelled' then clock_timestamp() else settled_at end where id=${turn}::uuid`.execute(
         tx,
       );
@@ -245,7 +253,7 @@ export class SegmentInputs extends SegmentMailReader {
       await sql`select m.id,m.mode,m.body,m.uploads,m.state,m.withdrawing,m.position,m.turn_id,m.accepted_at,m.starts_turn,
      case when m.starts_turn and r.state='queued' then r.mailbox_position end as initial_position,
      (m.steer_seen_epoch=r.fencing_token and r.state='running' and r.output_seal_id is null and l.released_at is null and l.writer_failed_at is null and l.valid_until>statement_timestamp()) as owner_notified
-     from user_or_agent_messages m join turns r on r.id=m.turn_id left join session_leases l on l.lease_id=r.lease_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
+     from user_or_agent_messages m left join turns r on r.id=m.turn_id left join session_leases l on l.lease_id=r.lease_id where m.tenant_id=${tenant}::uuid and m.session_id=${session}::uuid and m.sender_id=${sender}::uuid and m.source='user'
      and m.state in ('pending','sending') and m.position>${after} order by m.position limit ${limit}`.execute(
         tx,
       )
@@ -273,10 +281,10 @@ export class SegmentInputs extends SegmentMailReader {
         rows: [changed],
       } =
         await sql`update user_or_agent_messages set return_requested=true,state=case when state='pending' then 'withdrawn' else state end,
-        withdrawing=state<>'pending' where turn_id=${m.turn_id}::uuid and id=${id}::uuid returning *`.execute(
+        withdrawing=state<>'pending' where tenant_id=${tenant}::uuid and session_id=${session}::uuid and id=${id}::uuid returning *`.execute(
           tx,
         );
-      if (!changed.withdrawing) {
+      if (!changed.withdrawing && changed.turn_id !== null) {
         if (m.starts_turn) {
           await sql`with first_pending as (
               select id from user_or_agent_messages where turn_id=${m.turn_id}::uuid and state='pending' order by position limit 1

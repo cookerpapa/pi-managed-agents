@@ -29,6 +29,16 @@ export async function checkServingTurnReferences({
     ),
     [],
   );
+  const [recoveryIndex] =
+    await query(`select i.indisvalid, pg_get_indexdef(i.indexrelid,1,true) as key,
+    i.indnatts::int as columns, pg_get_expr(i.indpred,i.indrelid) as predicate,
+    to_regclass('pma_segments.active_projection_start') as old
+    from pg_index i where i.indrelid='pma_segments.turns'::regclass
+    and i.indexrelid=to_regclass('pma_segments.active_projection_partition')`);
+  assert(recoveryIndex?.indisvalid && recoveryIndex.old === null);
+  assert.equal(recoveryIndex.key, "projection_partition");
+  assert.equal(recoveryIndex.columns, 1);
+  assert(!recoveryIndex.predicate.includes("projection_first"));
   const foreignKeys =
     await query(`select r.relname,c.confdeltype as deletion,pg_get_constraintdef(c.oid) as definition
     from pg_constraint c join pg_class r on r.oid=c.conrelid and r.relnamespace='public'::regnamespace
@@ -280,4 +290,167 @@ export async function checkServingTurnReferences({
   console.log(
     "Scheduled Turn, scoped Skill selection, mailbox attachment adoption and legacy writer exclusion verified.",
   );
+}
+
+export async function checkScheduledSteer({
+  api,
+  project,
+  pool,
+  db,
+  fake,
+  until,
+  identity,
+  tool,
+  verifyStopScope,
+  pauseApi,
+  resumeApi,
+}) {
+  const { sessionId } = await api.createSession(
+    project.projectId,
+    project.workspaceId,
+    "Scheduled mail and steer",
+    "elastic",
+  );
+  const initial = await api.acceptTurn(
+    sessionId,
+    fake.prompt("schedule_race", {
+      kind: "mcp",
+      toolName: tool,
+      rounds: 1,
+      firstByteMs: 4200,
+    }),
+    "turn:" + randomUUID(),
+  );
+  const turn = await until(
+    "initial Turn is executing",
+    async () =>
+      (
+        await pool.query(
+          "select t.id from pma_segments.sessions s join pma_segments.turns t on t.session_id=s.flow_id where s.id=$1 and t.state='running'",
+          [sessionId],
+        )
+      ).rows[0]?.id,
+  );
+  if (initial.kind === "run") assert.equal(initial.turnId, turn);
+  const schedules = new SessionScheduleService({ database: db });
+  const schedule = randomUUID();
+  await schedules.create({ tenantId: identity.tenantId, sessionId }, schedule, {
+    name: "During active Turn",
+    prompt: fake.prompt("schedule_later"),
+    timing: { kind: "after", seconds: 1 },
+  });
+  await until(
+    "schedule fired while the first Turn was running",
+    async () =>
+      (
+        await pool.query(
+          "select 1 from public.session_schedules p join pma_segments.turns t on t.id=$2 where p.id=$1 and p.next_fire_at is null and t.state='running'",
+          [schedule, turn],
+        )
+      ).rowCount,
+  );
+  if (verifyStopScope) {
+    await assert.rejects(
+      api.cancelTurn(sessionId, turn, "cancel:" + randomUUID(), { scheduleId: schedule }),
+      (error) => error.status === 409,
+    );
+  }
+  const input = await api.acceptTurn(
+    sessionId,
+    fake.prompt("steer_original"),
+    "turn:" + randomUUID(),
+    undefined,
+    [],
+    "steer",
+  );
+  assert.equal(input.kind, "input");
+  await until(
+    "Pi adopted the steer",
+    async () =>
+      (
+        await pool.query(
+          "select 1 from pma_segments.user_or_agent_messages where session_id=$1 and id=$2 and state='placed'",
+          [sessionId, input.inputId],
+        )
+      ).rowCount,
+    30000,
+  );
+  const placed = await pool.query(
+    "select run_id from pma_segments.messages where tenant_id=$1 and source_input_id=$2",
+    [identity.tenantId, input.inputId],
+  );
+  assert.deepEqual(
+    placed.rows,
+    [{ run_id: turn }],
+    "The running Pi must adopt the steer in the original Turn",
+  );
+  console.log(
+    "Scheduled occurrence followed by human steer: canonical input belongs to original Turn.",
+  );
+  if (verifyStopScope) {
+    const ownedSession = (
+      await api.createSession(
+        project.projectId,
+        project.workspaceId,
+        "Stop scheduled opener",
+        "elastic",
+      )
+    ).sessionId;
+    const ownedSchedule = randomUUID(),
+      scope = { tenantId: identity.tenantId, sessionId: ownedSession };
+    const plan = await schedules.create(scope, ownedSchedule, {
+      name: "Only this opener",
+      prompt: fake.prompt("stop_schedule", { firstByteMs: 30000 }),
+      timing: { kind: "after", seconds: 1 },
+    });
+    pauseApi();
+    try {
+      await until(
+        "schedule fires with the public API suspended",
+        async () =>
+          (
+            await pool.query(
+              "select 1 from public.session_schedules where id=$1 and next_fire_at is null",
+              [ownedSchedule],
+            )
+          ).rowCount,
+        15000,
+      );
+    } finally {
+      resumeApi();
+    }
+    const running = await until(
+      "scheduled opener running",
+      async () => {
+        const value = await api.getSchedule(ownedSession, ownedSchedule);
+        return value.lastRun?.state === "running" && value.lastRun;
+      },
+      30000,
+    );
+    const deleted = await api.deleteSchedule(ownedSession, ownedSchedule, plan.revision);
+    assert.equal(deleted.activeRun?.turnId, running.turnId);
+    const key = "cancel:" + randomUUID();
+    const receipt = await api.cancelTurn(ownedSession, running.turnId, key, {
+      scheduleId: ownedSchedule,
+    });
+    assert.equal(receipt.turnId, running.turnId);
+    assert(
+      (await api.cancelTurn(ownedSession, running.turnId, key, { scheduleId: ownedSchedule }))
+        .replayed,
+    );
+    await until(
+      "post-deletion scoped Stop settled",
+      async () =>
+        (
+          await pool.query(
+            "select from pma_segments.turns where id=$1 and state='cancelled' and output_sealed_at is not null",
+            [running.turnId],
+          )
+        ).rowCount,
+      30000,
+    );
+    console.log(
+      "Schedule Stop rejected an unrelated Turn and cancelled its own opener after deletion.",
+    );
+  }
 }

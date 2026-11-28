@@ -335,7 +335,7 @@ export class IndependentSessionRuntime {
     const local = historyScope(s, owner.flow_id);
     if (boundary) {
       let terminalEvent;
-      const changed = await this.leases.projectBoundary(record, async (tx, r) => {
+      const changed = await this.leases.projectBoundary(record, async (tx, r, terminal, state) => {
         if (fact.kind === "execution_seal") {
           let state = owner.witness?.snapshot();
           if (
@@ -361,10 +361,10 @@ export class IndependentSessionRuntime {
             current,
             fact.nativeSequence,
           );
-          await this.projection.nativeStore.settle(tx, { ...fact, scope: local }, record);
+          await this.projection.nativeStore.settle(tx, { ...fact, scope: local }, record, state);
         }
         if (this.browser && fact.kind === "work_finished")
-          terminalEvent = await this.browser.terminal(tx, fact, r.flow_id);
+          terminalEvent = await this.browser.terminal(tx, { ...fact, terminal }, r.flow_id);
         if (!current()) throw Error("Session partition revoked");
         await this.#advance(tx, record);
       });
@@ -372,7 +372,7 @@ export class IndependentSessionRuntime {
         await this.#skip(record);
         return false;
       }
-      if (terminalEvent) this.browser.accept(s.tenantId, terminalEvent);
+      if (terminalEvent) this.browser.accept(s.tenantId, terminalEvent, owner.flow_id);
       await this.hostTools?.consume(record, current);
       this.#owners.delete(s.tenantId + "/" + s.sessionId);
       this.projection.nativeStore.projection.releaseSettled(local);
@@ -410,8 +410,9 @@ export class IndependentSessionRuntime {
     if (!result.admitted) return false;
     if (this.browser) {
       await this.browser.placements?.(s, owner.flow_id, fact.commit);
-      for (const event of result.events) this.browser.accept(s.tenantId, event);
-      for (const cover of result.covers) this.browser.cover(s.tenantId, s.sessionId, cover.through);
+      for (const event of result.events) this.browser.accept(s.tenantId, event, owner.flow_id);
+      for (const cover of result.covers)
+        this.browser.cover(s.tenantId, s.sessionId, cover.through, owner.flow_id);
     }
     let permit;
     const admit = () => (permit ??= grant());

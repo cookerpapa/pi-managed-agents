@@ -47,7 +47,7 @@ export const QueuedInputActionSchema = Type.Union([
 export const QueuedInputResourceSchema = Type.Object(
   {
     inputId: NativeInputIdSchema,
-    runId: UuidSchema,
+    runId: Type.Union([UuidSchema, Type.Null()]),
     text: Text,
     uploads: Type.Optional(UserUploadsSchema),
     mailboxPosition: PositiveSafeIntegerSchema,

@@ -74,7 +74,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
   );
   const status = async (a, id) =>
     (
-      await sql`select m.*,r.mailbox_position,r.idempotency_key as opening_key from user_or_agent_messages m join turns r on r.id=m.turn_id
+      await sql`select m.*,r.mailbox_position,r.idempotency_key as opening_key from user_or_agent_messages m left join turns r on r.id=m.turn_id
     where m.id=${id}::uuid and m.tenant_id=${a.tenant}::uuid and m.session_id=${a.session}::uuid and m.sender_id=${a.sender}::uuid and m.source='user'`.execute(
         inputs.db,
       )
@@ -176,16 +176,18 @@ export function installSegmentInputApi(app, inputs, authorize) {
   route("GET", "/queued-inputs", (req, a) =>
     snapshot(a, Number(req.query.afterPosition ?? 0), req.query.revision),
   );
-  route("GET", "/input-receipt", async (req, a) => ({
-    status: (await status(a, sessionInputId(req.query.key, a.sender, a.session)))
-      ? "accepted"
-      : "unconfirmed",
-  }));
+  route("GET", "/input-receipt", async (req, a) => {
+    const id = sessionInputId(req.query.key, a.sender, a.session);
+    const receipt = await sql`select 1 from user_or_agent_messages
+      where tenant_id=${a.tenant}::uuid and session_id=${a.session}::uuid and id=${id}::uuid
+        and sender_id=${a.sender}::uuid and source='user'`.execute(inputs.db);
+    return { status: receipt.rows.length ? "accepted" : "unconfirmed" };
+  });
   route("POST", "/turns/:turnId/cancellations", async (req, a, res) => {
     const turn = parseUuidPathParameter(req.params.turnId, "turnId");
     const key = parseIdempotencyKey(req.headers["idempotency-key"]);
-    const { gracePeriodMs = 2000 } = parseCreateTurnCancellationRequest(req.body);
-    const receipt = await inputs.stop(a, turn, key, gracePeriodMs);
+    const { gracePeriodMs = 2000, scheduleId } = parseCreateTurnCancellationRequest(req.body);
+    const receipt = await inputs.stop(a, turn, key, gracePeriodMs, scheduleId);
     return res.code(202).send(receipt);
   });
   route("POST", "/turns", async (req, a) => {

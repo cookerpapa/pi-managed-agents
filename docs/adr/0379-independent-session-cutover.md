@@ -1,0 +1,15 @@
+# ADR-0379. Mailbox admission and ordered execution history on the #52 serving path
+
+Accepted for the candidate. The sequence below is the target contract. Follow the [cutover plan](../reports/independent-session-cutover-plan-20261128.zh.md) and record each verified serving slice separately.
+
+Session API, scheduled occurrences and named agents submit durable mailbox inputs. Opening a Turn belongs to the Worker claim transaction on an eligible Session, along with its lease and frozen model and logical environment. Recovery claims the previously opened Turn. Arrival, reservation and native placement have distinct receipts. Schedules select steer or follow-up and retain an occurrence identity across retries. This supersedes eager Turn creation in ADR-0376 and ADR-0378. Existing directed wakes, batched claims, verified cache locality, independent child leases and original-operation cancellation remain in use.
+
+The partition owner appends accepted history and ordered execution boundaries. A writer seal is an internal historical fact. Normal Kafka-derived projection resumes at its PG partition cursor. Presentation repair may read an earlier suffix without renewing authority or dispatching effects. Ordinary native entries and text deltas must not update a Turn merely to drive browser presentation. A pure text delta must cause zero PG writes. Guard removal in ADR-0377 requires fencing, rebalance and old-transaction tests on the serving consumer.
+
+The stream controller retains a byte-bounded Session tail and delivers settled messages as well as deltas. Its position identifies the source record and event within it. Subscribers attach and capture a snapshot before loading canonical history. Worker replacement must preserve the public Session's published sequence across the physical Flow handoff. Keep the PG-native handoff until a replacement passes successive Worker and Projector failure checks. Only reproducible projection may use transaction-local asynchronous PG commits.
+
+Validate the contracts through the same API, Worker, Projector, executor, browser and migration used for release. Keep the current deployment until the matched cutover gates pass.
+
+For one Session writer, Kafka order decides between a valid work_finished and its execution_seal. A PG recovery intent immediately closes admission to external tools. It does not discard completed native work earlier in the partition. The settlement transaction locks the same Turn and lease, verifies the writer and the native completion, and commits exactly one boundary. Later copies or the losing boundary cannot requeue the Turn. Preserve an already accepted user Stop in the public terminal state and retain the original native outcome for validation. The unsuccessful writer observation and physical tool revocation remain recorded.
+
+The schedule page may stop only a Turn opened by that schedule. Attaching an occurrence as steer or follow-up grants no right to stop the containing Turn. Deleting a plan affects future occurrences. The opener identity remains on the Turn so a post-deletion Stop can verify it. Normal Session Stop retains its existing scope.

@@ -517,13 +517,17 @@ export class SessionApi {
     sessionId: string,
     turnId: string,
     idempotencyKey: string,
-    gracePeriodMs = 2_000,
+    options: number | { scheduleId: string; gracePeriodMs?: number } = 2_000,
   ): Promise<AcceptedTurnCancellationResource> {
+    const cancellation =
+      typeof options === "number"
+        ? { gracePeriodMs: options }
+        : { scheduleId: options.scheduleId, gracePeriodMs: options.gracePeriodMs ?? 2_000 };
     return parseAcceptedTurnCancellationResource(
       await request(
         this.#fetch,
         `/v1/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/cancellations`,
-        jsonRequest({ gracePeriodMs }, idempotencyKey),
+        jsonRequest(cancellation, idempotencyKey),
         this.#authorizationToken,
       ),
     );
