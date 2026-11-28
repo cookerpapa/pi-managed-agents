@@ -34,7 +34,12 @@ const revision = commit + (dirty ? "-dirty" : "");
 const lock = JSON.parse(await readFile("package-lock.json", "utf8"));
 const verified = new Set();
 for (const [role, base, entry, assets] of [
-  ["migrate", control, "scripts/serving/independent-session/migrate.mjs", sqlAssets],
+  [
+    "migrate",
+    control,
+    "scripts/serving/independent-session/migrate.mjs",
+    [...sqlAssets, "scripts/serving/independent-session/turn-references.sql"],
+  ],
   ["subagents", control, "packages/control-plane/src/independent-session-subagents-main.mjs", []],
   ["tool-host", control, "packages/control-plane/src/independent-session-tool-host-main.mjs", []],
   ["api", control, "packages/control-plane/src/independent-session-api-main.mjs", []],

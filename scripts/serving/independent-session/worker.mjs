@@ -1,3 +1,4 @@
+import { readRunSkillCatalog } from "@pi-cloud/runtime-core/run-skill-catalog";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { FamilyModelPermits } from "../../../packages/supervisor-host/src/family-model-permits.ts";
@@ -222,6 +223,7 @@ export async function startIndependentWorker() {
       const root = await runtime.bind(
         {
           ...binding,
+          skillCatalog: await readRunSkillCatalog(store.db, scope.tenantId, job.id),
           runId: job.id,
           initialRequestId: initial,
           conversationId: 1,

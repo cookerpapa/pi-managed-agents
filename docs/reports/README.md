@@ -1,5 +1,7 @@
 # Delivery and research evidence
 
+- [Independent Turn references](independent-turn-references.md) documents the candidate migration, its verified callers and the remaining integration boundaries.
+
 - [Independent Session integration](independent-session-reconciliation-20261128.md) traces design revisions to the serving code, including the mixed-load measurement, open ownership conflicts and legacy foreign keys.
 
 - [Turn queue, Fork cache and delivered/read receipts](turn-queue-fork-receipts-20261128.md) includes a matched migration and a fixed 20-tool throughput comparison.

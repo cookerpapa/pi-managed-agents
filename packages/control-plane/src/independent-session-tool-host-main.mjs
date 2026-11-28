@@ -1,2 +1,3 @@
 import { startToolHost } from "./tool-host-main.ts";
-await startToolHost({ mcpTurnAdmittedByProjector: true });
+import { paths } from "../../../scripts/serving/independent-session/config.mjs";
+await startToolHost({ mcpTurnAdmittedByProjector: true, turnReadUrl: (url) => paths(url).read });

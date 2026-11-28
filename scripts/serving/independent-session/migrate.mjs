@@ -1,4 +1,6 @@
 import pg from "pg";
+import { readFile } from "node:fs/promises";
+const turnReferences = () => readFile(new URL("./turn-references.sql", import.meta.url), "utf8");
 import { createDatabase, runMigrations } from "@pi-cloud/database";
 import { installation, schema, readSchema } from "./config.mjs";
 import { installSessionTables } from "../../experiments/minimal-session-storage/segment-schema.mjs";
@@ -31,7 +33,7 @@ export async function migrate(config) {
         rows: [row],
       } = await c.query("select * from pma_segments.installation");
       if (
-        ![1, 2].includes(row?.version) ||
+        ![1, 2, 3].includes(row?.version) ||
         row.topic !== config.topic ||
         row.partitions !== config.partitions
       )
@@ -88,6 +90,12 @@ export async function migrate(config) {
         await c.query("update installation set version=2");
         await c.query("commit");
       }
+      if (row.version !== 3) {
+        await c.query("begin");
+        await c.query(await turnReferences());
+        await c.query("update pma_segments.installation set version=3");
+        await c.query("commit");
+      }
       return;
     }
     if (
@@ -129,7 +137,8 @@ export async function migrate(config) {
     await c.query(
       "create table installation(singleton boolean primary key default true check(singleton),version int not null,topic text not null,partitions int not null)",
     );
-    await c.query("insert into installation(version,topic,partitions) values(2,$1,$2)", [
+    await c.query(await turnReferences());
+    await c.query("insert into installation(version,topic,partitions) values(3,$1,$2)", [
       config.topic,
       config.partitions,
     ]);

@@ -23,6 +23,7 @@ import { testPostgres } from "./lib/test-postgres.mjs";
 import { distribution } from "./lib/runtime-load-scheduler.mjs";
 import { createUnsettledTurnIndex } from "./experiments/minimal-session-storage/independent-session-leases.mjs";
 import { defaultSessionClaimBatch } from "./experiments/minimal-session-storage/segment-wake.mjs";
+import { checkServingTurnReferences } from "./experiments/minimal-session-storage/check-serving-turn-references.mjs";
 import { servingLoadFixture } from "./serving/independent-session/load-fixture.mjs";
 import { withChromePage } from "./lib/chrome-cdp.mjs";
 import { testKafka } from "./lib/test-kafka.mjs";
@@ -197,6 +198,8 @@ try {
     const c = await pool.connect();
     try {
       await c.query("set search_path=pma_segments,public");
+      const before = (await c.query("select version from installation")).rows[0].version;
+      assert([1, 2].includes(before));
       await c.query("insert into flows(tenant_id,flow_id) values($1,$2)", [
         identity.tenantId,
         logical,
@@ -214,9 +217,11 @@ try {
         "insert into user_or_agent_messages(tenant_id,session_id,id,sender_id,source,mode,body,fingerprint,turn_id,request_key) values($1,$2,$3,$4,'user','follow_up','upgrade','fixture',$5,'stable')",
         [identity.tenantId, logical, input, owner, first],
       );
+      if (before === 2)
+        await c.query("update user_or_agent_messages set starts_turn=true where id=$1", [input]);
       const denied = role("old-boot-guard", "migrate", {}, []);
       assert.notEqual(docker(["wait", denied]).trim(), "0");
-      assert.equal((await c.query("select version from installation")).rows[0].version, 1);
+      assert.equal((await c.query("select version from installation")).rows[0].version, before);
       await c.query(
         "update public.supervisor_connections set state='expired',close_reason='heartbeat_timeout',closed_at=clock_timestamp() where worker_id=$1",
         [owner],
@@ -230,6 +235,16 @@ try {
           )
         ).rows[0].retired,
         null,
+      );
+      assert.equal((await c.query("select version from installation")).rows[0].version, 3);
+      assert.deepEqual(
+        (
+          await c.query(
+            "select versions from public.run_skill_catalogs where run_id=any($1::uuid[])",
+            [[first, second]],
+          )
+        ).rows,
+        [{ versions: [] }, { versions: [] }],
       );
       const { rows } = await c.query(
         "select id,ready_at is not null as ready from turns where session_id=$1 order by mailbox_position",
@@ -908,6 +923,7 @@ try {
         console.log(JSON.stringify(sample));
       }
     }
+    await checkServingTurnReferences({ api, apiUrl, identity, project, pool, db, fake, until });
     const call = await api.acceptTurn(
       session,
       fake.prompt("remote_echo", { kind: "mcp", rounds: 1, toolName: external.name }),

@@ -42,7 +42,7 @@ export async function openStore(config) {
     const {
       rows: [v],
     } = await pool.query("select version,topic,partitions from pma_segments.installation");
-    if (v?.version !== 2 || v.topic !== config.topic || v.partitions !== config.partitions)
+    if (v?.version !== 3 || v.topic !== config.topic || v.partitions !== config.partitions)
       throw Error("Segmented installation does not match the transport");
     return pool;
   } catch (e) {

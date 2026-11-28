@@ -47,7 +47,8 @@ export class SegmentInputs extends SegmentMailReader {
         tx,
       );
     if (!s) throw new InputConflict("Unknown Session");
-    const hash = fingerprint([sender, source, mode, text, uploads, strict]);
+    // The API accepts immutable, ordered ticket IDs. JSONB may reorder descriptor keys on retry.
+    const hash = fingerprint([sender, source, mode, text, uploads.map((file) => file.id), strict]);
     const {
       rows: [old],
     } =

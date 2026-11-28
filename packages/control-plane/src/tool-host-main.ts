@@ -37,6 +37,7 @@ import {
 export async function startToolHost(
   options: {
     mcpTurnAdmittedByProjector?: boolean;
+    turnReadUrl?(url: string): string;
     ordinaryTools?: ControlToolRegistry;
     versionRoute?: (serverAddress: string) => string;
     graceMs?: number;
@@ -76,6 +77,13 @@ export async function startToolHost(
     cleanup.push(() => observability.close());
     const database = createDatabase({ connectionString: config.databaseUrl, maxConnections: 8 });
     cleanup.push(() => database.destroy());
+    const turnReads = options.turnReadUrl
+      ? createDatabase({
+          connectionString: options.turnReadUrl(config.databaseUrl),
+          maxConnections: 4,
+        })
+      : undefined;
+    if (turnReads) cleanup.push(() => turnReads.destroy());
     const images = await configuredImageAttachments(database);
     if (images) cleanup.push(() => images.blobs.close());
     const egress = new EnvHttpProxyAgent();
@@ -87,6 +95,7 @@ export async function startToolHost(
     let catalog: ReturnType<typeof executionToolCatalog>;
     const skills = new SkillMarketService({
       database,
+      ...(turnReads ? { turnContexts: turnReads } : {}),
       ...(images ? { blobs: images.blobs } : {}),
       maximumDepth: config.subagentTreePolicy.maximumDepth,
       catalog: () => catalog.read().tools,
@@ -107,7 +116,7 @@ export async function startToolHost(
         database,
         skills,
         schedules: new SessionScheduleService({
-          database,
+          database: turnReads ?? database,
           environmentImageRevision: config.environmentImageRevision,
         }),
         ...(config.enabledControlTools ? { enabled: config.enabledControlTools } : {}),

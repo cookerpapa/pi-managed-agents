@@ -67,6 +67,7 @@ export class ExecutionTargetService {
   constructor(
     readonly options: {
       database: Kysely<Database>;
+      independentTurns?: boolean;
       transport?: ExecutorTransport;
       publish?(ids: readonly string[]): Promise<void>;
     },
@@ -136,8 +137,20 @@ export class ExecutionTargetService {
           "conflict",
           "Conversation changed; refresh the device selection",
         );
+      let flow = sessionId;
+      if (this.options.independentTurns) {
+        const {
+          rows: [selected],
+        } = await sql<{
+          flow_id: string;
+        }>`select flow_id from pma_segments.sessions where tenant_id=${tenantId}::uuid
+          and id=${sessionId}::uuid for no key update`.execute(tx);
+        if (!selected)
+          throw new ControlPlaneStoreError("conflict", "Session history is unavailable");
+        flow = selected.flow_id;
+      }
       const busy =
-        await sql`select 1 from runs where tenant_id=${tenantId}::uuid and session_id=${sessionId}::uuid and (state not in ('completed','failed','cancelled','timed_out') or recovery_requested_at is not null or (output_seal_id is not null and output_sealed_at is null))
+        await sql`select 1 from ${this.options.independentTurns ? sql.id("pma_segments", "turns") : sql.id("runs")} where tenant_id=${tenantId}::uuid and session_id=${flow}::uuid and (state not in ('completed','failed','cancelled','timed_out') or recovery_requested_at is not null or (output_seal_id is not null and output_sealed_at is null))
         union all select 1 from session_leases where tenant_id=${tenantId}::uuid and pi_session_id=${session.pi_session_id} and released_at is null limit 1`.execute(
           tx,
         );
@@ -181,6 +194,29 @@ export class ExecutionTargetService {
   }
   async #owner(db: Kysely<Database>, reference: string, lock = false) {
     const identity = parseExecutionReference(reference);
+    if (this.options.independentTurns) {
+      const {
+        rows: [r],
+      } = await sql<{
+        tenant_id: string;
+        id: string;
+        session_id: string;
+        execution_target_snapshot: unknown;
+        pi_session_id: string;
+        pi_conversation_id: string;
+        lease_id: string;
+        fencing_token: string;
+      }>`
+        select t.tenant_id,t.id,s.id as session_id,t.execution_target_snapshot,l.pi_session_id,1::bigint as pi_conversation_id,
+          l.lease_id,l.fencing_token from pma_segments.turns t join pma_segments.sessions s on s.tenant_id=t.tenant_id and s.flow_id=t.session_id
+          join public.session_leases l on l.tenant_id=t.tenant_id and l.pi_session_id=s.id::text and l.lease_id=t.lease_id
+        where t.id=${identity.runId}::uuid and l.lease_id=${identity.leaseId}::uuid and l.fencing_token=${identity.fencingToken}::bigint
+          and t.fencing_token=l.fencing_token and s.parent_session_id is null and t.state='running' and t.output_seal_id is null
+          and l.released_at is null and l.writer_failed_at is null and l.writer_sealed_at is null and l.valid_until>clock_timestamp()
+        ${lock ? sql`for share of t,l` : sql``}`.execute(db);
+      if (!r) throw new ControlPlaneStoreError("conflict", "Execution owner is no longer current");
+      return r;
+    }
     const query = db
       .selectFrom("runs as r")
       .innerJoin("session_leases as l", "l.lease_id", "r.lease_id")
@@ -293,10 +329,15 @@ export class ExecutionTargetService {
     if (!this.options.transport) return;
     try {
       await this.options.transport.revoke(row.endpoint, executionBinding(row));
-      await sql`delete from execution_target_bindings b where b.id=${row.id}::uuid and b.closed
-        and not exists(select 1 from pi_durable_owned_records r where r.tenant_id=b.tenant_id
+      const settled = this.options.independentTurns
+        ? sql`exists(select from pma_segments.turns t where t.tenant_id=b.tenant_id and t.id=b.run_id
+            and t.state in ('completed','cancelled','failed','timed_out') and t.output_sealed_at is not null)`
+        : sql`not exists(select 1 from pi_durable_owned_records r where r.tenant_id=b.tenant_id
           and r.kind='task' and r.fields ? 'replyTopic' and r.fields->>'status'<>'terminal'
-          and r.fields->>'replyBinding'=b.id::text)`.execute(this.options.database);
+          and r.fields->>'replyBinding'=b.id::text)`;
+      await sql`delete from execution_target_bindings b where b.id=${row.id}::uuid and b.closed and ${settled}`.execute(
+        this.options.database,
+      );
     } catch {
       /* Closed routing remains durable until endpoint closure can be confirmed. */
     }

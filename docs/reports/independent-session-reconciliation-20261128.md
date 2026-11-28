@@ -40,6 +40,8 @@ The workflow script tool was retired. Parent parking or wait_for_input, read rep
 
 ## Actual schema dependencies
 
+The following inventory describes installation version 2. [Version 3](independent-turn-references.md) has migrated those references.
+
 A catalog query on a fully migrated, disposable PG17 database found eleven foreign keys from ten public tables to public.runs. A search through historical migration text overcounts these links. The physical target matters because the segmented runs compatibility view addresses turns and cannot be the target of a PG foreign key.
 
 | Public referencing table | Use to review at matched cutover |

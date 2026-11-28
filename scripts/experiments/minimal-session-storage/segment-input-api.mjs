@@ -15,7 +15,7 @@ import { sql } from "kysely";
 import { ControlPlaneStoreError } from "../../../packages/control-plane/src/control-plane-store-error.ts";
 import { InputConflict } from "./segment-inputs.mjs";
 const hash = (x) => createHash("sha256").update(JSON.stringify(x)).digest("hex");
-function identity(key, actor, session) {
+export function sessionInputId(key, actor, session) {
   if (typeof key !== "string" || !key.length || key.length > 256)
     throw new InputConflict("Missing message identity");
   const h = hash([actor, session, key]);
@@ -177,7 +177,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
     snapshot(a, Number(req.query.afterPosition ?? 0), req.query.revision),
   );
   route("GET", "/input-receipt", async (req, a) => ({
-    status: (await status(a, identity(req.query.key, a.sender, a.session)))
+    status: (await status(a, sessionInputId(req.query.key, a.sender, a.session)))
       ? "accepted"
       : "unconfirmed",
   }));
@@ -190,15 +190,8 @@ export function installSegmentInputApi(app, inputs, authorize) {
   });
   route("POST", "/turns", async (req, a) => {
     const request = parseAcceptTurnRequest(req.body),
-      id = identity(req.headers["idempotency-key"], a.sender, a.session);
-    const uploads = request.uploadIds?.length ? await a.resolveUploads(request.uploadIds) : [];
-    if (
-      request.uploadIds &&
-      (uploads.length !== request.uploadIds.length ||
-        uploads.some((file, i) => file?.id !== request.uploadIds[i]))
-    )
-      throw new InputConflict("An attachment is unavailable");
-    const m = await inputs.admit({
+      id = sessionInputId(req.headers["idempotency-key"], a.sender, a.session);
+    const input = {
       ...a,
       source: "user",
       requestKey: req.headers["idempotency-key"],
@@ -206,8 +199,33 @@ export function installSegmentInputApi(app, inputs, authorize) {
       mode: request.whenBusy ?? "input",
       strict: !request.whenBusy,
       text: request.prompt,
-      uploads,
-    });
+    };
+    let m;
+    if (request.uploadIds?.length) {
+      m = await inputs.db.transaction().execute(async (tx) => {
+        const {
+          rows: [window],
+        } =
+          await sql`select desired_workspace from sessions where tenant_id=${a.tenant}::uuid and id=${a.session}::uuid for no key update`.execute(
+            tx,
+          );
+        if (!window) throw new InputConflict("Unknown Session");
+        const {
+          rows: [old],
+        } =
+          await sql`select uploads from user_or_agent_messages where tenant_id=${a.tenant}::uuid and session_id=${a.session}::uuid and id=${id}::uuid`.execute(
+            tx,
+          );
+        const uploads =
+          old?.uploads ?? (await a.resolveUploads(request.uploadIds, tx, window.desired_workspace));
+        if (
+          uploads.length !== request.uploadIds.length ||
+          uploads.some((f, i) => f?.id !== request.uploadIds[i])
+        )
+          throw new InputConflict("Input attachment identity changed");
+        return inputs.admitIn(tx, { ...input, uploads });
+      });
+    } else m = await inputs.admit(input);
     const at = m.accepted_at.toISOString();
     const opening = m.starts_turn && (await status(a, id));
     if (opening && opening.opening_key === id)
@@ -236,7 +254,7 @@ export function installSegmentInputApi(app, inputs, authorize) {
   route("POST", "/queued-inputs/:id/actions", async (req, a, res) => {
     const id = req.params.id,
       action = parseQueuedInputAction(req.body),
-      op = identity(req.headers["idempotency-key"], a.sender, a.session);
+      op = sessionInputId(req.headers["idempotency-key"], a.sender, a.session);
     let withdrawnTurnId;
     if (action.action === "cancel") {
       let item = await inputs.withdraw(a.tenant, a.session, a.sender, id);

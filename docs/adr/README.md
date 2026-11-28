@@ -1,5 +1,7 @@
 # Current architecture decisions
 
+[ADR-0378](0378-independent-turn-references.md) moves business references onto independent Turns and their mailbox inputs.
+
 [ADR-0377](0377-serving-session-projection-prefixes.md) integrates bounded native batches into the independent Session serving consumer.
 
 [ADR-0376](0376-direct-turn-claims-and-fork-locality.md) moves readiness onto Turns, defines input receipts and enables immediate cache-aware routing and frozen prefix reuse.

@@ -67,6 +67,7 @@ export class SkillMarketService {
   constructor(
     readonly options: {
       database: Kysely<Database>;
+      turnContexts?: Kysely<Database>;
       blobs?: SkillPackageBlobs;
       catalog?(): readonly import("@pi-cloud/protocol").ControlToolCatalogDefinition[];
       fetch?: typeof fetch;
@@ -154,10 +155,10 @@ export class SkillMarketService {
     root?: { sessionId: string; conversationId: number },
   ): Promise<Actor> {
     const { rows } = await sql<{ userId: string }>`select s.created_by_user_id as "userId"
-      from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
-      where r.tenant_id=${tenantId}::uuid and r.id=${runId}::uuid
+      from ${sql.id(this.options.turnContexts ? "turn_tool_contexts" : "runs")} r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
+      ${this.options.turnContexts && root ? sql`where r.parent_session_id is null and` : sql`where`} r.tenant_id=${tenantId}::uuid and r.id=${runId}::uuid
         and (${root?.sessionId ?? null}::uuid is null or (r.session_id=${root?.sessionId ?? null}::uuid and s.pi_conversation_id=${root?.conversationId ?? null}::bigint))`.execute(
-      this.options.database,
+      this.options.turnContexts ?? this.options.database,
     );
     if (!rows[0]?.userId) return notFound();
     return { tenantId, userId: rows[0].userId, role: "member" };
@@ -261,11 +262,13 @@ export class SkillMarketService {
       enabled: boolean;
       revision: string;
     }>`select i.package_id as "packageId", i.version_id as "versionId", i.enabled, i.revision::text
-      from runs r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
+      from ${sql.id(this.options.turnContexts ? "turn_tool_contexts" : "runs")} r join sessions s on s.tenant_id=r.tenant_id and s.id=r.session_id
       join skill_installations i on i.tenant_id=s.tenant_id
         and i.scope_kind='personal' and i.scope_id=s.created_by_user_id
       where r.tenant_id=${tenantId}::uuid and r.id=${runId}::uuid
-        and i.package_id=any(${[...new Set(packageIds)]}::uuid[])`.execute(this.options.database);
+        and i.package_id=any(${[...new Set(packageIds)]}::uuid[])`.execute(
+      this.options.turnContexts ?? this.options.database,
+    );
     return rows.map((row) => ({ ...row, scope: { kind: "personal" as const } }));
   }
 
@@ -349,13 +352,23 @@ export class SkillMarketService {
     };
   }
   async runCapabilities(tenantId: string, runId: string, conversationId?: number) {
-    const row = (
-      await sql<{
-        sessionKind: "conversation" | "subagent";
-        tools: unknown;
-        targets: unknown;
-        depth: number;
-      }>`select s.session_kind as "sessionKind",
+    type Context = {
+      sessionKind: "conversation" | "subagent";
+      tools: unknown;
+      targets: unknown;
+      depth: number;
+    };
+    const db = this.options.turnContexts;
+    const row = db
+      ? (
+          await sql<Context>`select case when parent_session_id is null then 'conversation' else 'subagent' end as "sessionKind",
+      tools,execution_target_snapshot as targets,case when parent_session_id is null then 0 else 1 end as depth from turn_tool_contexts
+      where tenant_id=${tenantId}::uuid and id=${runId}::uuid and ${conversationId ?? 1}::bigint=1`.execute(
+            db,
+          )
+        ).rows[0]
+      : (
+          await sql<Context>`select s.session_kind as "sessionKind",
       case when s.id=r.session_id then r.tool_capability_snapshot else s.tool_capabilities end as tools,
       case when s.id=r.session_id then r.execution_target_snapshot else '[]'::jsonb end as targets,
       coalesce(e.depth,0)::int as depth
@@ -366,7 +379,7 @@ export class SkillMarketService {
         and ${conversationId === undefined ? sql`s.id=r.session_id` : sql`s.pi_conversation_id=${String(conversationId)}::bigint`}
         and (s.id=r.session_id or e.id is not null)
     `.execute(this.options.database)
-    ).rows[0];
+        ).rows[0];
     if (!row) return notFound();
     return effectiveToolCapabilities(
       {

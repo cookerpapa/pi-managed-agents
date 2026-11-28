@@ -1,3 +1,8 @@
+import { AttachmentReaper, configuredImageAttachments } from "@pi-cloud/session-attachments";
+import { ExecutionTargetService } from "../../../packages/control-plane/src/execution-target-service.ts";
+import { readInputUploadsForUpdate } from "../../../packages/control-plane/src/workspace-upload-service.ts";
+import { segmentSchedules } from "./schedules.mjs";
+import { SessionScheduleController } from "../../../packages/control-plane/src/session-schedule-controller.ts";
 import { createDatabase } from "@pi-cloud/database";
 import { SessionEventHub } from "@pi-cloud/runtime-core/session-event-hub";
 import { sql } from "kysely";
@@ -31,6 +36,7 @@ const supportedWrites = new Set([
   "/v1/sessions/:id/returned-inputs/acknowledgements",
   "/v1/sessions/:id/model",
   "/v1/conversations/:id/workspace",
+  "/v1/conversations/:id/schedules/:id",
   "/v1/conversations/:id/forks",
   "/v1/conversations/:id/prunes",
   "/v1/conversations/:id",
@@ -43,8 +49,14 @@ export async function startIndependentSessionApi() {
   const db = createDatabase({ connectionString: config.url, maxConnections: 8 }),
     reads = createDatabase({ connectionString: config.read, maxConnections: 5 });
   const inputs = (store.inputs = new SegmentInputs(store.db));
-  let app;
+  const schedules = segmentSchedules(reads, inputs);
+  const timer = new SessionScheduleController({
+    service: schedules,
+    notificationConnectionString: config.url,
+  });
+  let app, images, reaper;
   try {
+    images = await configuredImageAttachments(db, reads, undefined, schema);
     const auth = new WebAuthenticationService({
       database: db,
       enabled: false,
@@ -54,6 +66,8 @@ export async function startIndependentSessionApi() {
     const hub = new SessionEventHub();
     app = await createControlPlaneApplication({
       database: db,
+      schedules,
+      executionTargets: new ExecutionTargetService({ database: reads, independentTurns: true }),
       conversationReadDatabase: reads,
       rootMessageHistory: true,
       flowRootHistory: true,
@@ -116,24 +130,46 @@ export async function startIndependentSessionApi() {
           return {
             tenant: identity.tenantId,
             sender: identity.userId,
-            resolveUploads: async () => {
-              throw new ControlPlaneStoreError(
-                "invalid_request",
-                "This deployment currently accepts text inputs",
-              );
+            resolveUploads: async (ids, tx, workspace) => {
+              if (!workspace)
+                throw new ControlPlaneStoreError("conflict", "Session workspace is unavailable");
+              const uploads = await readInputUploadsForUpdate(tx, {
+                tenantId: identity.tenantId,
+                sessionId: session,
+                workspaceId: workspace.workspaceId,
+                workingDirectory: workspace.cwd,
+                ids,
+              });
+              if (uploads.some((f) => f.image))
+                throw new ControlPlaneStoreError(
+                  "invalid_request",
+                  "Image input preparation is unavailable in this installation",
+                );
+              return uploads;
             },
           };
         });
       },
     });
     await app.listen(integer("PORT", 3000), process.env.HOST ?? "127.0.0.1");
+    timer.start();
+    if (images)
+      reaper = new AttachmentReaper(images.store, () =>
+        console.error("session.attachment_cleanup_failed"),
+      );
     return {
       close: async () => {
+        await timer.close();
+        await reaper?.close();
+        await images?.blobs.close();
         await app.close();
         await Promise.all([db.destroy(), reads.destroy(), store.db.destroy()]);
       },
     };
   } catch (e) {
+    await timer.close();
+    await reaper?.close();
+    await images?.blobs.close();
     await app?.close();
     await Promise.all([db.destroy(), reads.destroy(), store.db.destroy()]);
     throw e;

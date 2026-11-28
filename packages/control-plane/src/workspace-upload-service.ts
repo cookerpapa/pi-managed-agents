@@ -463,18 +463,17 @@ export class WorkspaceUploadService {
   }
 }
 
-/** Used under the existing Session/input transaction; an upload may be reused
- * by later messages in its same conversation, including restored queued drafts. */
-export async function bindInputUploads(
+type InputUploadScope = {
+  tenantId: string;
+  sessionId: string;
+  workspaceId: string;
+  workingDirectory: string;
+  ids: readonly string[];
+};
+/** Validate and lock ready tickets in the caller's admission transaction. */
+export async function readInputUploadsForUpdate(
   tx: Transaction<Database>,
-  input: {
-    tenantId: string;
-    sessionId: string;
-    workspaceId: string;
-    workingDirectory: string;
-    ids: readonly string[];
-    pin?: UploadInputPin;
-  },
+  input: InputUploadScope,
 ): Promise<UserUpload[]> {
   if (!input.ids.length) return [];
   if (new Set(input.ids).size !== input.ids.length)
@@ -502,7 +501,16 @@ export async function bindInputUploads(
   if (rows.length !== input.ids.length)
     conflict("An attachment is unavailable or belongs to another conversation or Workspace");
   const map = new Map(rows.map((row) => [row.id, uploadResource(row)]));
-  const uploads = input.ids.map((id) => map.get(id)!);
+  return input.ids.map((id) => map.get(id)!);
+}
+/** Used under the existing Session/input transaction; an upload may be reused
+ * by later messages in its same conversation, including restored queued drafts. */
+export async function bindInputUploads(
+  tx: Transaction<Database>,
+  input: InputUploadScope & { pin?: UploadInputPin },
+): Promise<UserUpload[]> {
+  const uploads = await readInputUploadsForUpdate(tx, input);
+  if (!uploads.length) return uploads;
   if (input.pin) {
     const p = input.pin;
     await sql`insert into session_upload_pins(pin_id,upload_id,tenant_id,pi_session_id,

@@ -2,6 +2,8 @@
 
 ## Minimal Session storage feasibility
 
+- [x] Move candidate business references to physical Turns and mailbox inputs. Exercise a scheduled Turn, attachment lifetime, frozen Skills and execution bindings on the segmented installation. [Ownership changes](adr/0378-independent-turn-references.md).
+
 - [x] Connect mixed native ready-prefix projection, receipt-based usage and named child creation to the independent Session images. [Serving audit](reports/independent-session-reconciliation-20261128.md).
 
 - [x] Claim Turns directly, promote late input on closure, render delivered/read receipts and reuse a verified source prefix on a Fork’s first Turn. [Acceptance](reports/turn-queue-fork-receipts-20261128.md).

@@ -1,5 +1,7 @@
 # Architecture
 
+[ADR-0378](adr/0378-independent-turn-references.md) assigns the isolated installation’s schedule, device binding, validation, issue-job and Skill references to Turns. Pending attachment tickets belong to mailbox inputs.
+
 The independent Session prototype now projects ready native prefixes, serves gateway usage and dispatches named children through a dedicated executor. [Integration and remaining conflicts](reports/independent-session-reconciliation-20261128.md).
 
 Pi Managed Agents hosts Pi Durable 1.0 in trusted Workers and runs untrusted file/shell

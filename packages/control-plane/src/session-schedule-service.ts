@@ -72,6 +72,13 @@ export class SessionScheduleService {
       database: DB;
       admissionDatabase?: DB;
       environmentImageRevision?: string;
+      admitScheduledTurn?(
+        tx: Transaction<Database>,
+        scope: Scope,
+        prompt: string,
+        origin: ScheduledOrigin,
+        key: string,
+      ): Promise<string>;
       /** Deterministic calendar tests only; production always uses PG time. */
       clock?: () => Date;
     },
@@ -517,22 +524,27 @@ export class SessionScheduleService {
           scheduledAt: planned.toISOString(),
           timezone: timing.kind === "cron" ? timing.timezone : "UTC",
         };
-        const store = new ControlPlaneStore({
-          database: db,
-          tenantId: scope.tenantId,
-          defaultModelProfileId: session.desired_model_profile_id,
-          ...(this.options.environmentImageRevision
-            ? { environmentImageRevision: this.options.environmentImageRevision }
-            : {}),
-        });
-        const run = await store.acceptTurn(
-          scope.sessionId,
-          `schedule:${plan.id}:${plan.revision}:${origin.scheduledAt}`,
-          { prompt: plan.prompt },
-          tx,
-          origin,
-        );
-        lastRunId = run.runId;
+        const key = `schedule:${plan.id}:${plan.revision}:${origin.scheduledAt}`;
+        if (this.options.admitScheduledTurn) {
+          lastRunId = await this.options.admitScheduledTurn(tx, scope, plan.prompt, origin, key);
+        } else {
+          const store = new ControlPlaneStore({
+            database: db,
+            tenantId: scope.tenantId,
+            defaultModelProfileId: session.desired_model_profile_id,
+            ...(this.options.environmentImageRevision
+              ? { environmentImageRevision: this.options.environmentImageRevision }
+              : {}),
+          });
+          const run = await store.acceptTurn(
+            scope.sessionId,
+            key,
+            { prompt: plan.prompt },
+            tx,
+            origin,
+          );
+          lastRunId = run.runId;
+        }
       }
       await tx
         .updateTable("session_schedules")
