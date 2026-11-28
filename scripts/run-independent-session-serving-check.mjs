@@ -655,20 +655,19 @@ try {
       startWorker,
       kill: async (name) => {
         if (process.argv.includes("--restart-projector-first")) {
-          docker(["pause", name]);
-          try {
-            docker(["kill", projectorRole]);
-            docker(["start", projectorRole]);
-            await until(
-              "replacement Projector before Worker failure",
-              () => health(projectorPort),
-              30000,
-            );
-          } finally {
-            docker(["unpause", name]);
-          }
+          // Kill both before either can finish the response or write a handoff.
+          // Unpausing a Worker with a buffered final response races SIGKILL.
+          docker(["kill", projectorRole]);
+          docker(["kill", name]);
+          docker(["start", projectorRole]);
+          await until(
+            "replacement Projector after both failures",
+            () => health(projectorPort),
+            30000,
+          );
+        } else {
+          docker(["kill", name]);
         }
-        docker(["kill", name]);
       },
       prune: process.argv.includes("--prune-first"),
     });
